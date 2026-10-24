@@ -13,7 +13,7 @@ export default async function LizenzPage({ searchParams }: { searchParams: Promi
   return (
     <LegalPage title={en ? "License terms" : "Lizenzbedingungen"} eyebrow={en ? "License" : "Lizenz"} locale={locale}>
       <LegalSection title={en ? "Source code license" : "Quellcode-Lizenz"}>
-        <p>{en ? "BloomMD source code from Marketing 0.5.1 onward is available under the Elastic License 2.0 (ELv2). Earlier published versions, including Desktop v0.5.14, retain their original MIT license. The Obsidian plugin uses ELv2 from its next public release; published versions through 0.5.12 remain MIT." : "Der BloomMD-Quellcode steht ab Marketing 0.5.1 unter der Elastic License 2.0 (ELv2). Frühere veröffentlichte Versionen, einschließlich Desktop v0.5.14, behalten ihre ursprüngliche MIT-Lizenz. Das Obsidian-Plugin nutzt ELv2 ab seinem nächsten öffentlichen Release; veröffentlichte Versionen bis 0.5.12 bleiben MIT."}</p>
+        <p>{en ? "BloomMD source code from Marketing 0.5.1 onward is available under the Elastic License 2.0 (ELv2). Earlier published versions, including Desktop v0.5.14, retain their original MIT license. The Obsidian plugin is and stays licensed under MIT." : "Der BloomMD-Quellcode steht ab Marketing 0.5.1 unter der Elastic License 2.0 (ELv2). Frühere veröffentlichte Versionen, einschließlich Desktop v0.5.14, behalten ihre ursprüngliche MIT-Lizenz. Das Obsidian-Plugin steht weiterhin unter der MIT-Lizenz."}</p>
         <p><a href="https://www.elastic.co/licensing/elastic-license/">{en ? "Read the Elastic License 2.0" : "Elastic License 2.0 lesen"}</a></p>
       </LegalSection>
       <LegalSection title={en ? "Hosted beta access" : "Zugang zur gehosteten Beta"}>

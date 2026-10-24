@@ -45,7 +45,7 @@ async function releaseSnapshotSha256() {
 
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) errors.push("manifest version must be numeric semver without a v prefix");
 if (packageJson.version !== manifest.version) errors.push("package.json and manifest.json versions differ");
-if (packageJson.license !== "Elastic-2.0") errors.push("package.json license must be Elastic-2.0");
+if (packageJson.license !== "MIT") errors.push("package.json license must be MIT");
 if (versions[manifest.version] !== manifest.minAppVersion) errors.push("versions.json does not map the release to minAppVersion");
 if (manifest.id !== "bloommd") errors.push("manifest id must remain bloommd");
 if (manifest.isDesktopOnly !== true) {
@@ -58,7 +58,7 @@ if (manifest.isDesktopOnly !== true) {
   }
 }
 
-for (const file of ["main.js", "shared-runtime.js", "manifest.json", "styles.css", "icon.png", "README.md", "LICENSE", "LICENSE-MIT-legacy", "PRIVACY.md", "CHANGELOG.md"]) {
+for (const file of ["main.js", "shared-runtime.js", "manifest.json", "styles.css", "icon.png", "README.md", "LICENSE", "PRIVACY.md", "CHANGELOG.md"]) {
   try {
     const info = await stat(join(root, file));
     if (!info.isFile() || info.size === 0) errors.push(`${file} is empty`);
@@ -68,9 +68,7 @@ for (const file of ["main.js", "shared-runtime.js", "manifest.json", "styles.css
 }
 
 const licenseText = await readFile(join(root, "LICENSE"), "utf8").catch(() => "");
-if (!licenseText.includes("Elastic License 2.0")) errors.push("LICENSE must contain Elastic License 2.0");
-const legacyLicenseText = await readFile(join(root, "LICENSE-MIT-legacy"), "utf8").catch(() => "");
-if (!legacyLicenseText.startsWith("MIT License")) errors.push("LICENSE-MIT-legacy must preserve the MIT notice");
+if (!licenseText.startsWith("MIT License")) errors.push("LICENSE must contain the MIT License");
 
 try {
   const bundle = await stat(join(root, "main.js"));
@@ -168,7 +166,7 @@ if (process.argv.includes("--package")) {
   const output = join(root, "release", manifest.version);
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
-  const packageFiles = ["main.js", "shared-runtime.js", "manifest.json", "styles.css", "icon.png", "README.md", "LICENSE", "LICENSE-MIT-legacy", "PRIVACY.md", "CHANGELOG.md"];
+  const packageFiles = ["main.js", "shared-runtime.js", "manifest.json", "styles.css", "icon.png", "README.md", "LICENSE", "PRIVACY.md", "CHANGELOG.md"];
   try {
     await stat(join(root, "MIRROR.json"));
     packageFiles.push("MIRROR.json");

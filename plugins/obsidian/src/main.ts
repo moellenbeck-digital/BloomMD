@@ -1,3 +1,4 @@
+import "./structured-clone-fallback";
 import "./preact-scheduling";
 import {
   App,

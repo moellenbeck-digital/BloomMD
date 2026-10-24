@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.7.0 (unreleased)
+## 0.7.0
+
+BloomMD 0.7.0 is the first public release since 0.5.12 and includes everything from 0.6.0, which was not published separately. It is the first version for Obsidian on iPad, iPhone and Android as well as desktop.
+
+### Devices and compatibility
+
+- Runs on Obsidian 1.13 or later on macOS, Windows, Linux, iPadOS, iOS and Android. `isDesktopOnly` is off; desktop-only parts (shared mode, **Open app**) are hidden or explained on mobile.
+- No Node or Electron APIs in the plugin; older mobile WebViews without `structuredClone` (iOS/iPadOS before 15.4, old Android System WebView) get a built-in fallback.
 
 ### Learning progress
 
@@ -16,11 +23,11 @@
 - Map nodes the agent wrote or a person approved since the map was last opened on this device carry a small purple dot.
 - Proposals, history, log and rights follow the same shared rules as the `bloommd-wiki agent` commands; agent state is read through the vault adapter, so the panel works on iPad too.
 
-## 0.6.0
+## 0.6.0 (included in 0.7.0, not published separately)
 
 BloomMD 0.6.0 brings handwriting to the node inspector and opens the plugin for Obsidian on iPad (beta).
 
-- This is the first planned Obsidian release under the Elastic License 2.0. Published versions through 0.5.12 retain their original MIT license.
+- The plugin stays under the MIT license (the rest of BloomMD uses the Elastic License 2.0).
 
 - Write and sketch with Apple Pencil, mouse or finger in a new **Handwriting** tab of the node inspector. The pen draws with pressure, fingers pan and pinch, and a resting palm is ignored while the pen is down.
 - Pen, highlighter, stroke eraser, five colors, three widths, undo/redo and fit-to-drawing; a lasso moves, scales, recolors and deletes handwriting.

@@ -420,9 +420,9 @@ test.describe("marketing documentation and waitlist", () => {
   test("serves the desktop download entry point and redirects common aliases", async ({ request }) => {
     const response = await request.get("/download");
     expect(response.ok()).toBe(true);
-    const body = (await response.text()).replace(/\s+/g, " ");
+    const body = (await response.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
     expect(body).toContain("Desktop-Apps herunterladen");
-    expect(body).toContain("wird live ermittelt");
+    expect(body).toMatch(/Desktop-Version (?:wird live ermittelt|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/);
     expect(body).toContain("Apple Silicon · arm64");
     expect(body).toContain("Arch Linux · x86_64 oder aarch64");
     expect(body).toContain("Plattform wählen");

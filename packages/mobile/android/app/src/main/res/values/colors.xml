@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- BloomMD brand palette (assets/ASSETS.md) and the app surface of packages/mobile/src/globals.css. -->
+    <color name="bloommd_bloom">#FF6B35</color>
+    <color name="bloommd_ink">#1A1A1A</color>
+    <color name="bloommd_surface">#FAFAFA</color>
+    <color name="colorPrimary">@color/bloommd_bloom</color>
+    <color name="colorPrimaryDark">@color/bloommd_ink</color>
+    <color name="colorAccent">@color/bloommd_bloom</color>
+</resources>

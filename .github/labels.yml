@@ -1,0 +1,36 @@
+- name: bug
+  color: d73a4a
+  description: Something is broken.
+- name: feature
+  color: a2eeef
+  description: New product functionality.
+- name: template
+  color: ffb088
+  description: Template library work.
+- name: integration
+  color: 7057ff
+  description: External tool integrations.
+- name: obsidian
+  color: 8b5cf6
+  description: BloomMD for Obsidian.
+- name: desktop
+  color: 0e8a16
+  description: Desktop app.
+- name: web
+  color: 1d76db
+  description: Web app.
+- name: mobile
+  color: 5319e7
+  description: Mobile app.
+- name: accessibility
+  color: fbca04
+  description: Accessibility and inclusive UX.
+- name: documentation
+  color: 0075ca
+  description: Docs and README.
+- name: good first issue
+  color: 7057ff
+  description: Suitable for first contributors.
+- name: help wanted
+  color: 008672
+  description: Maintainers welcome help.

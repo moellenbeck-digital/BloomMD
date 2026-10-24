@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#F7931E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Square background for Windows/Linux -->
+  <rect width="256" height="256" rx="32" fill="#FAFAFA"/>
+
+  <!-- # Mark -->
+  <g transform="translate(64, 56)">
+    <rect x="32" y="4" width="14" height="108" rx="7" fill="#1A1A1A"/>
+    <rect x="72" y="4" width="14" height="108" rx="7" fill="#1A1A1A"/>
+    <rect x="4" y="30" width="112" height="14" rx="7" fill="url(#bloom)"/>
+    <rect x="4" y="70" width="112" height="14" rx="7" fill="url(#bloom)"/>
+    <circle cx="116" cy="10" r="9" fill="url(#bloom)" opacity="0.85"/>
+  </g>
+</svg>

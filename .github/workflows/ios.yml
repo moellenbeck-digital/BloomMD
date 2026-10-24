@@ -1,0 +1,130 @@
+name: iOS
+
+# Native build of the BloomMD iPad/iPhone app (Capacitor) plus an on-simulator self-test of the
+# folder plugin: open a vault folder, list, read, write in place, refuse stale writes, open a node.
+# The release-build job builds the unsigned Release app the store upload would ship and checks it
+# (privacy manifests, review keys, version, no self-test code). Signing and the TestFlight upload
+# live in ios-release.yml and never run on pull requests.
+on:
+  pull_request:
+    paths:
+      - packages/mobile/**
+      - packages/capacitor-folder/**
+      - packages/ui/**
+      - packages/ink/**
+      - packages/core/**
+      - bun.lock
+      - .github/workflows/ios.yml
+      - .github/workflows/ios-release.yml
+  push:
+    branches:
+      - main
+    paths:
+      - packages/mobile/**
+      - packages/capacitor-folder/**
+      - packages/ui/**
+      - packages/ink/**
+      - packages/core/**
+      - bun.lock
+      - .github/workflows/ios.yml
+      - .github/workflows/ios-release.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Unit tests (app and folder plugin)
+        working-directory: packages/mobile
+        run: bun run test
+      - name: Build web assets with the simulator self-test
+        working-directory: packages/mobile
+        env:
+          VITE_BLOOMMD_SELFTEST: "1"
+        run: bun run build
+      - name: Sync Capacitor iOS project
+        working-directory: packages/mobile
+        run: bunx cap sync ios
+      - name: Build for the iOS simulator
+        working-directory: packages/mobile/ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build | tail -20
+          # Ad-hoc signed: the keychain check fails with -34018 in an unsigned simulator build.
+      - name: Run the self-test on an iPad simulator
+        run: |
+          set -euo pipefail
+          # Newest iOS runtime, and the newest iPad Pro that runtime supports (old models are not).
+          runtime_json="$(xcrun simctl list runtimes -j | jq '[.runtimes[] | select(.isAvailable and .platform == "iOS")] | last')"
+          runtime="$(jq -r '.identifier' <<< "$runtime_json")"
+          device_type="$(jq -r '[.supportedDeviceTypes[] | select(.name | startswith("iPad Pro"))] | last | .identifier' <<< "$runtime_json")"
+          echo "runtime=$runtime device=$device_type"
+          sim="$(xcrun simctl create bloommd-ci "$device_type" "$runtime")"
+          xcrun simctl boot "$sim"
+          xcrun simctl bootstatus "$sim" -b
+          xcrun simctl install "$sim" "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
+          data="$(xcrun simctl get_app_container "$sim" app.bloommd.mobile data)"
+          mkdir -p "$data/Documents"
+          touch "$data/Documents/run-selftest"
+          xcrun simctl launch "$sim" app.bloommd.mobile
+          for _ in $(seq 1 90); do
+            [ -f "$data/Documents/selftest-result.json" ] && break
+            sleep 2
+          done
+          xcrun simctl io "$sim" screenshot "$RUNNER_TEMP/ipad-selftest.png" || true
+          cat "$data/Documents/selftest-result.json"
+          jq -e '.passed == true' "$data/Documents/selftest-result.json"
+      - name: Keep the simulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-selftest
+          path: ${{ runner.temp }}/ipad-selftest.png
+          if-no-files-found: ignore
+
+  release-build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Xcode version matches package.json
+        working-directory: packages/mobile
+        run: bun scripts/ios-version.ts --check
+      - name: Build web assets (no self-test)
+        working-directory: packages/mobile
+        run: bun run build
+      - name: Sync Capacitor iOS project
+        working-directory: packages/mobile
+        run: bunx cap sync ios
+      - name: Build Release for iOS devices (unsigned)
+        working-directory: packages/mobile/ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO build | tail -20
+      - name: Check the Release app
+        working-directory: packages/mobile
+        run: scripts/check-ios-release.sh "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/App.app"

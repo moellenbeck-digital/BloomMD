@@ -1,0 +1,4 @@
+@import "../../../src/globals.css";
+
+/* The harness lives outside src/, so the app shell's classes must be listed explicitly. */
+@source "../../../src/**/*.{ts,tsx}";

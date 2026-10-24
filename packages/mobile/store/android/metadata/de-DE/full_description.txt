@@ -1,0 +1,22 @@
+BloomMD zeigt Markdown-Notizen als Mind Map. Jede Überschrift wird ein Knoten, jeder Knoten behält seinen Text. Die Datei bleibt eine ganz normale Markdown-Datei – lesbar in Obsidian, in jedem Texteditor und in zehn Jahren noch.
+
+Dein Obsidian-Vault, direkt bearbeitet
+Wähle über die Android-Ordnerauswahl einen Ordner – im internen Speicher, auf der SD-Karte oder in einem Sync-Ordner (zum Beispiel Syncthing oder Nextcloud). BloomMD bearbeitet die Notizen dort, wo sie liegen: kein Import, keine Kopie. Der Zugriff bleibt über Neustarts erhalten. Hat ein anderes Gerät eine Notiz inzwischen geändert, überschreibt BloomMD sie nicht, sondern sichert deine Fassung als eigene Notiz daneben.
+
+Handschrift mit dem Stift
+Schreib Formeln, Pfeile und Skizzen direkt in einen Knoten. Stifte wie der S Pen oder USI-Stifte zeichnen mit Druck, Finger verschieben die Fläche, ein aufgelegter Handballen zeichnet nicht. Mit dem Lasso verschiebst, skalierst und löschst du Teile einer Zeichnung, und handschriftliche Wörter lassen sich mit anderen Notizen verknüpfen. Jede Zeichnung ist eine SVG-Datei neben deinen Notizen – im selben Format wie im BloomMD-Plugin für Obsidian.
+
+Map, Gliederung, Präsentation
+Wechsle zwischen der Mind Map, einer Gliederung zum schnellen Lesen und einer Präsentationsansicht. Knoten können Aufgaben mit Status und Fälligkeit oder Entscheidungen sein. Auf Tablets öffnet sich der Knoten-Editor als Seitenleiste neben der Map, auf Smartphones als Bottom-Sheet.
+
+Ohne Konto, offline
+BloomMD funktioniert ohne Anmeldung und ohne Internetverbindung. Ohne Ordnerauswahl liegen deine Maps als Markdown-Dateien im App-Speicher. Du kannst Markdown-Dateien importieren und jede Map als Markdown über das Teilen-Menü weitergeben. Eine Notiz zu öffnen schreibt sie nicht um – gespeichert werden nur echte Änderungen.
+
+Links in die App
+Links der Form bloommd://open öffnen eine Notiz des geöffneten Ordners direkt an einem bestimmten Knoten.
+
+Optional: BloomMD-Konto (Beta)
+Mit einem BloomMD-Konto meldest du dich im Browser an und bearbeitest Maps aus deinen Cloud-Workspaces gemeinsam in Echtzeit. Dein Passwort gibst du nur auf der BloomMD-Website ein; die Anmeldung wird im Android Keystore gesichert, „Abmelden“ widerruft sie. Auch selbst gehostete BloomMD-Server werden unterstützt. Für lokale Ordner brauchst du kein Konto.
+
+Datenschutz
+BloomMD enthält kein Tracking, keine Werbung und keine Analyse-Tools. Deine Notizen verlassen das Gerät nur, wenn du sie teilst oder dich bewusst mit deinem BloomMD-Konto anmeldest.

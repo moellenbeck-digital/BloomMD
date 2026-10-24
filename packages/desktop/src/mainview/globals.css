@@ -1,0 +1,224 @@
+@import "tailwindcss";
+
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+
+@theme inline {
+  --color-bloom: #FF6B35;
+  --color-bloom-end: #F7931E;
+  --color-bloom-light: #FFF4EE;
+  --color-bloom-muted: #FFD4BF;
+  --color-ink: #1A1A1A;
+  --color-ink-muted: #666666;
+  --color-ink-faint: #999999;
+  --color-surface: #FAFAFA;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F2F0ED;
+  --color-border: #E8E4DF;
+  --color-border-strong: #D4CFC8;
+
+  --font-display: 'Outfit', 'Helvetica Neue', 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
+  --font-body: 'DM Sans', 'Helvetica Neue', 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+}
+
+html.dark {
+  --color-bloom-light: #2A1A10;
+  --color-bloom-muted: #4A2A18;
+  --color-ink: #E8E4DF;
+  --color-ink-muted: #999999;
+  --color-ink-faint: #888888;
+  --color-surface: #111111;
+  --color-surface-raised: #1A1A1A;
+  --color-surface-sunken: #0A0A0A;
+  --color-border: #2A2A2A;
+  --color-border-strong: #3A3A3A;
+  color-scheme: dark;
+}
+
+/*
+ * Google Fonts remain available for the macOS brand rendering, but a packaged Linux app must stay
+ * readable when the network is unavailable or the request is blocked. The Arch package installs
+ * DejaVu as a predictable fallback with regular and semibold weights.
+ */
+html.platform-linux {
+  --font-display: 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
+  --font-body: 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', sans-serif;
+  --font-mono: 'DejaVu Sans Mono', 'Liberation Mono', monospace;
+  --color-ink-muted: #5F5953;
+  --color-ink-faint: #6B655F;
+}
+
+html.dark.platform-linux {
+  --color-ink-muted: #B0A9A2;
+  --color-ink-faint: #9F978F;
+}
+
+/* Dark mode: MDXEditor */
+html.dark .mdxeditor [contenteditable] {
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] {
+  background: var(--color-surface-sunken) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button {
+  color: var(--color-ink-muted) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button svg {
+  color: var(--color-ink-muted) !important;
+  fill: currentColor !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button:hover svg {
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button:hover {
+  background: var(--color-border) !important;
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button[data-state="on"] {
+  background: var(--color-bloom) !important;
+  color: white !important;
+}
+
+html.dark .mdxeditor select,
+html.dark .mdxeditor [role="toolbar"] select,
+html.dark .mdxeditor [role="combobox"],
+html.dark .mdxeditor [data-radix-collection-item],
+html.dark .mdxeditor [role="toolbar"] > div > button,
+html.dark .mdxeditor [class*="selectTrigger"],
+html.dark .mdxeditor [class*="Select"] {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-ink-muted) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+html.dark [data-radix-popper-content-wrapper] *,
+html.dark [role="listbox"],
+html.dark [role="dialog"],
+html.dark [data-radix-popper-content-wrapper] > div,
+html.dark [data-radix-select-viewport],
+html.dark [class*="selectContent"] {
+  background: var(--color-surface-raised) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-ink) !important;
+}
+
+html.dark [role="listbox"] [role="option"],
+html.dark [data-radix-select-viewport] [role="option"] {
+  color: var(--color-ink) !important;
+}
+
+html.dark [role="listbox"] [role="option"]:hover,
+html.dark [role="listbox"] [role="option"][data-highlighted],
+html.dark [data-radix-select-viewport] [role="option"][data-highlighted] {
+  background: var(--color-border) !important;
+}
+
+html.dark .react-flow__minimap {
+  background: var(--color-surface-raised) !important;
+}
+
+html.dark .react-flow__minimap-mask {
+  fill: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .react-flow__minimap svg {
+  background: var(--color-surface-raised) !important;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Keep native WebKitGTK hinting at fractional display scales instead of thinning every glyph. */
+html.platform-linux body {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+  text-rendering: optimizeLegibility;
+}
+
+.react-flow__background {
+  background: var(--color-surface) !important;
+}
+
+.react-flow__minimap {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.06) !important;
+}
+
+.react-flow__controls {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.06) !important;
+}
+
+.react-flow__controls-button {
+  background: var(--color-surface-raised) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-ink-muted) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-bloom-light) !important;
+  color: var(--color-bloom) !important;
+}
+
+.mdxeditor {
+  font-family: var(--font-body) !important;
+}
+
+.mdxeditor [role="toolbar"] {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  border-radius: 8px !important;
+  margin: 8px 16px !important;
+  padding: 4px !important;
+}
+
+.mdxeditor [role="toolbar"] button {
+  border-radius: 6px !important;
+  color: var(--color-ink-muted) !important;
+}
+
+.mdxeditor [role="toolbar"] button:hover {
+  background: var(--color-bloom-light) !important;
+  color: var(--color-bloom) !important;
+}
+
+.mdxeditor [role="toolbar"] button[data-state="on"] {
+  background: var(--color-bloom) !important;
+  color: white !important;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}

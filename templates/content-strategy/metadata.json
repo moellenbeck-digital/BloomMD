@@ -1,0 +1,13 @@
+{
+  "title": "Content Strategy Map",
+  "description": "Plan audience, positioning, pillars, channels, formats, campaigns, production, distribution and metrics.",
+  "audience": ["Creators", "Agencies", "Marketing teams"],
+  "category": "Marketing",
+  "previewImage": "/templates/content-strategy/preview.png",
+  "sections": ["Audience", "Positioning", "Content Pillars", "Channels", "Formats", "Campaigns", "Production", "Distribution", "Metrics", "Content Backlog"],
+  "tags": ["content", "marketing", "creator", "distribution"],
+  "recommendedUse": "Use this before a launch, editorial planning session or content audit.",
+  "version": "1.0.0",
+  "slug": "content-strategy",
+  "filePath": "templates/content-strategy/template.md"
+}

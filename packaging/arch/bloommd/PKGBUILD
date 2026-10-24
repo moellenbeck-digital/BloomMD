@@ -1,0 +1,52 @@
+# Maintainer: Moellenbeck Digital <hello@bloommd.io>
+pkgname=bloommd-desktop
+pkgver="${BLOOMMD_PACKAGE_VERSION:-0.4.0}"
+pkgrel=1
+pkgdesc="Visual Markdown mind maps with Markdown as the source of truth"
+package_arch="${BLOOMMD_PACKAGE_ARCH:-${CARCH:-x86_64}}"
+arch=("${package_arch}")
+url='https://bloommd.io'
+license=('Elastic-2.0')
+options=('!debug' '!strip')
+depends=('gtk3' 'webkit2gtk-4.1' 'libayatana-appindicator' 'librsvg' 'libsecret' 'ttf-dejavu')
+source=()
+sha256sums=()
+
+build() {
+  :
+}
+
+package() {
+  local app_dir="${BLOOMMD_LINUX_APP_DIR:-}"
+  local icon_source="${BLOOMMD_ICON_PATH:-${startdir}/../../../packages/desktop/assets/AppIcon.iconset/icon_128x128.png}"
+  local license_source="${BLOOMMD_LICENSE_PATH:-${startdir}/../../../LICENSE}"
+  local legacy_license_source="${BLOOMMD_LEGACY_LICENSE_PATH:-${startdir}/../../../LICENSE-MIT-legacy}"
+
+  if [[ -z "${app_dir}" || ! -d "${app_dir}/bin" || ! -x "${app_dir}/bin/launcher" ]]; then
+    error "BLOOMMD_LINUX_APP_DIR must point to an Electrobun Linux bundle containing bin/launcher"
+    return 1
+  fi
+  if [[ ! -f "${icon_source}" ]]; then
+    error "Linux application icon not found: ${icon_source}"
+    return 1
+  fi
+  if [[ ! -f "${license_source}" ]]; then
+    error "License file not found: ${license_source}"
+    return 1
+  fi
+  if [[ ! -f "${legacy_license_source}" ]]; then
+    error "Legacy notice file not found: ${legacy_license_source}"
+    return 1
+  fi
+
+  install -dm755 "${pkgdir}/opt/bloommd/app"
+  cp -R --no-preserve=ownership "${app_dir}/." "${pkgdir}/opt/bloommd/app/"
+  chown -R 0:0 "${pkgdir}/opt/bloommd/app"
+
+  install -Dm755 "${startdir}/bloommd-launcher" "${pkgdir}/usr/bin/bloommd-desktop"
+  install -Dm644 "${startdir}/bloommd.desktop" "${pkgdir}/usr/share/applications/bloommd.desktop"
+  install -Dm644 "${startdir}/bloommd.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/bloommd.svg"
+  install -Dm644 "${icon_source}" "${pkgdir}/usr/share/icons/hicolor/128x128/apps/bloommd.png"
+  install -Dm644 "${license_source}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+  install -Dm644 "${legacy_license_source}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE-MIT-legacy"
+}

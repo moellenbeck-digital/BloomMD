@@ -1,0 +1,44 @@
+# Run from the repository root:
+#   docker compose -f deploy/openclaw/docker-compose.yml build
+#   docker compose -f deploy/openclaw/docker-compose.yml up -d
+# Pair with a one-time code using the documented `openclaw bloommd pair` command in the container.
+services:
+  bloommd-openclaw-agent:
+    build:
+      context: ../..
+      dockerfile: deploy/openclaw/Dockerfile
+    image: bloommd-openclaw-plugin:0.4.4
+    user: "1000:1000"
+    environment:
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      # Containers deliberately use a private, persistent file backend. Mount the volume with
+      # permissions for the non-root `node` user and back it up as credential-bearing data.
+      BLOOMMD_AGENT_SECRET_BACKEND: file
+      BLOOMMD_AGENT_CONFIG_DIR: /home/node/.config/bloommd/agents
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      # The gateway is only a local plugin host, but OpenClaw requires authentication before it
+      # starts in a container. Set this in deploy/openclaw/.env; never commit a real value.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?Set OPENCLAW_GATEWAY_TOKEN in deploy/openclaw/.env}
+    volumes:
+      - openclaw-state:/home/node/.openclaw
+      - bloommd-agent-secrets:/home/node/.config/bloommd/agents
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    command: ["gateway", "--allow-unconfigured"]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /home/node/.openclaw/openclaw.json && test -f /opt/bloommd-plugin/dist/index.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  openclaw-state:
+  bloommd-agent-secrets:

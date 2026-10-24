@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-labelledby="title description">
+  <title id="title">BloomMD — Markdown, visualized.</title>
+  <desc id="description">A Markdown document becomes a connected visual map in BloomMD.</desc>
+  <defs>
+    <linearGradient id="veil" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0D0D0D" stop-opacity="1" />
+      <stop offset="0.58" stop-color="#0D0D0D" stop-opacity="0.97" />
+      <stop offset="1" stop-color="#0D0D0D" stop-opacity="0.05" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FF6B35" />
+      <stop offset="1" stop-color="#F7931E" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="#0D0D0D" />
+  <image xlink:href="bloommd-demo-canvas.png" href="bloommd-demo-canvas.png" x="400" y="0" width="800" height="630" preserveAspectRatio="xMidYMid slice" />
+  <rect x="0" y="0" width="690" height="630" fill="url(#veil)" />
+  <rect x="0" y="0" width="12" height="630" fill="url(#accent)" />
+
+  <image xlink:href="bloommd-logo-dark.png" href="bloommd-logo-dark.png" x="68" y="54" width="270" height="60" preserveAspectRatio="xMinYMid meet" />
+
+  <g transform="translate(68 188)">
+    <rect width="194" height="32" rx="16" fill="#FF6B35" />
+    <text x="97" y="21" text-anchor="middle" fill="#1A1A1A" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">CLOSED BETA</text>
+  </g>
+
+  <text x="68" y="286" fill="#FAFAFA" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" letter-spacing="-2.2">Markdown,</text>
+  <text x="68" y="348" fill="#FAFAFA" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="700" letter-spacing="-2.2">visualized.</text>
+  <rect x="70" y="382" width="88" height="5" rx="2.5" fill="#FF6B35" />
+  <text x="68" y="432" fill="#D6D0C8" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400">Local-first · Web + macOS</text>
+  <text x="68" y="466" fill="#A8A099" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400">Open files. Connected thinking.</text>
+
+  <text x="68" y="570" fill="#8E8880" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="1.6">BLOOMMD.IO</text>
+</svg>

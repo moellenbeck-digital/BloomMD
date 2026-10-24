@@ -1,0 +1,28 @@
+{
+  "name": "@bloommd/sync",
+  "version": "0.5.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "load-test": "bun run scripts/load-test.ts",
+    "verify-restore-persistence": "bun run scripts/verify-restore-persistence.ts",
+    "build:binary": "bun build --compile src/index.ts --outfile ../../artifacts/bloommd-sync"
+  },
+  "dependencies": {
+    "@bloommd/core": "workspace:*",
+    "hono": "^4.13.12",
+    "lib0": "^0.2.117",
+    "postgres": "^3.4.9",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.32"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}

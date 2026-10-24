@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1284 2778" width="1284" height="2778">
+  <defs>
+    <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#F7931E"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#F5F5F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1284" height="2778" fill="url(#bgGrad)"/>
+
+  <!-- # Mark centered -->
+  <g transform="translate(502, 1080)">
+    <rect x="72" y="8" width="28" height="240" rx="14" fill="#1A1A1A"/>
+    <rect x="168" y="8" width="28" height="240" rx="14" fill="#1A1A1A"/>
+    <rect x="16" y="68" width="248" height="28" rx="14" fill="url(#bloom)"/>
+    <rect x="16" y="160" width="248" height="28" rx="14" fill="url(#bloom)"/>
+    <circle cx="264" cy="22" r="20" fill="url(#bloom)" opacity="0.85"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="642" y="1440" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="72" font-weight="700" fill="#1A1A1A" letter-spacing="-1">
+    Bloom<tspan font-weight="400" fill="#666">MD</tspan>
+  </text>
+</svg>

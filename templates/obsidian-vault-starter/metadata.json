@@ -1,0 +1,13 @@
+{
+  "title": "Obsidian Vault Starter",
+  "description": "A practical PARA-inspired starter map for Obsidian and Markdown-based personal knowledge management.",
+  "audience": ["Obsidian users", "PKM users", "Second-brain builders"],
+  "category": "Knowledge Management",
+  "previewImage": "/templates/obsidian-vault-starter/preview.png",
+  "sections": ["Inbox", "Projects", "Areas", "Resources", "People", "Meetings", "Ideas", "Archive"],
+  "tags": ["obsidian", "pkm", "second-brain", "vault"],
+  "recommendedUse": "Use this before creating or cleaning up an Obsidian vault.",
+  "version": "1.0.0",
+  "slug": "obsidian-vault-starter",
+  "filePath": "templates/obsidian-vault-starter/template.md"
+}

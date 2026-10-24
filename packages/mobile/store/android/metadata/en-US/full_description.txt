@@ -1,0 +1,22 @@
+BloomMD shows Markdown notes as a mind map. Every heading becomes a node, and every node keeps its text. The file stays an ordinary Markdown file – readable in Obsidian, in any text editor, and ten years from now.
+
+Your Obsidian vault, edited in place
+Pick a folder with the Android folder picker – in internal storage, on an SD card or in a sync folder (for example Syncthing or Nextcloud). BloomMD edits the notes where they are: no import, no copy. Access is kept across restarts. If another device changed a note in the meantime, BloomMD does not overwrite it but keeps your version as a separate note next to it.
+
+Handwriting with a stylus
+Write formulas, arrows and sketches right inside a node. Styluses such as the S Pen or USI pens draw with pressure, fingers pan the canvas, and a resting palm does not draw. Use the lasso to move, scale and delete parts of a drawing, and link handwritten words to other notes. Every drawing is an SVG file next to your notes – in the same format as the BloomMD plugin for Obsidian.
+
+Map, outline, presentation
+Switch between the mind map, an outline for quick reading and a presentation view. Nodes can be tasks with status and due date, or decisions. On tablets the node editor opens as a side panel next to the map, on phones as a bottom sheet.
+
+No account, works offline
+BloomMD works without signing in and without an internet connection. Without a folder, your maps are Markdown files in the app's storage. Import Markdown files, and share any map as Markdown from the share menu. Opening a note never rewrites it – only real changes are saved.
+
+Links into the app
+Links like bloommd://open open a note of the current folder right at a specific node.
+
+Optional: BloomMD account (beta)
+Sign in with a BloomMD account in the browser and edit maps from your cloud workspaces together in real time. You enter your password only on the BloomMD website; the sign-in is protected by the Android Keystore, and signing out revokes it. Self-hosted BloomMD servers are supported too. Local folders need no account.
+
+Privacy
+BloomMD contains no tracking, no ads and no analytics. Your notes leave the device only when you share them or deliberately sign in with your BloomMD account.

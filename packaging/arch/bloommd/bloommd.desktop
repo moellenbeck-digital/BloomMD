@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=BloomMD
+Comment=Visual Markdown mind maps with Markdown as the source of truth
+Exec=/usr/bin/bloommd-desktop %U
+TryExec=/usr/bin/bloommd-desktop
+Icon=bloommd
+Terminal=false
+StartupWMClass=BloomMD
+Categories=Office;
+MimeType=text/markdown;text/x-markdown;x-scheme-handler/bloommd;
+Keywords=Markdown;Mindmap;Knowledge;Notes;
+X-GNOME-UsesNotifications=true

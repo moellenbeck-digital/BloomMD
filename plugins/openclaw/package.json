@@ -1,0 +1,35 @@
+{
+  "name": "@bloommd/openclaw-plugin",
+  "version": "0.4.4",
+  "license": "Elastic-2.0",
+  "private": true,
+  "description": "Local, review-first BloomMD workspace-agent plugin for OpenClaw.",
+  "type": "module",
+  "files": [
+    "LICENSE",
+    "LICENSE-MIT-legacy",
+    "dist/**",
+    "scripts/install-plugin.sh",
+    "skills/**",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bun build ./src/index.ts --target node --outdir ./dist --external openclaw/*",
+    "test": "bun run build && bun test src/*.test.ts",
+    "validate": "bun run test",
+    "package:release": "bun run validate && mkdir -p ../../artifacts/openclaw-plugin && npm pack --pack-destination ../../artifacts/openclaw-plugin"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "install": {
+      "defaultChoice": "local",
+      "minHostVersion": ">=2026.9.3"
+    },
+    "compat": {
+      "pluginApi": ">=2026.9.3"
+    }
+  }
+}

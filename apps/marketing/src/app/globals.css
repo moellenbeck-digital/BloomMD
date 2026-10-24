@@ -1,0 +1,627 @@
+@import "tailwindcss";
+
+@source "../../../../packages/ui/src/**/*.{ts,tsx}";
+
+@theme inline {
+  --color-bloom: #B94316;
+  --color-bloom-end: #F7931E;
+  --color-bloom-light: #FFF4EE;
+  --color-bloom-muted: #FFD4BF;
+  --color-ink: #1A1A1A;
+  --color-ink-muted: #666666;
+  --color-ink-faint: #737373;
+  --color-surface: #FAFAFA;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-sunken: #F2F0ED;
+  --color-border: #E8E4DF;
+  --color-border-strong: #D4CFC8;
+
+  --font-display: ui-sans-serif, system-ui, sans-serif;
+  --font-body: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Accessible semantic replacement for legacy arbitrary brand-color utilities. */
+.text-\[\#FF6B35\] {
+  color: #B94316 !important;
+}
+
+.text-\[\#C94D20\] {
+  color: #9A3412 !important;
+}
+
+html.dark .text-\[\#B94316\] {
+  color: #FFB38A !important;
+}
+
+html.dark .hover\:text-\[\#B94316\]:hover {
+  color: #FFD0B8 !important;
+}
+
+.bg-\[\#FF6B35\] {
+  background-color: #B94316 !important;
+}
+
+.border-\[\#FF6B35\] {
+  border-color: #B94316 !important;
+}
+
+.text-\[\#999999\],
+.text-\[\#777777\] {
+  color: #666666 !important;
+}
+
+.hover\:bg-\[\#E95F2F\]:hover {
+  background-color: #94340F !important;
+}
+
+/* Dark mode overrides */
+html.dark {
+  --color-bloom-light: #2A1A10;
+  --color-bloom-muted: #4A2A18;
+  --color-ink: #E8E4DF;
+  --color-ink-muted: #999999;
+  --color-ink-faint: #888888;
+  --color-surface: #111111;
+  --color-surface-raised: #1A1A1A;
+  --color-surface-sunken: #0A0A0A;
+  --color-border: #2A2A2A;
+  --color-border-strong: #3A3A3A;
+  color-scheme: dark;
+}
+
+/* Marketing still has legacy arbitrary-color utilities. Keep them theme-aware until the page is fully tokenized. */
+html.dark .bloommd-logo-light {
+  display: none;
+}
+
+.bloommd-logo-dark {
+  display: none;
+}
+
+html.dark .bloommd-logo-dark {
+  display: block;
+}
+
+html.dark [class*="bg-[#FAFAFA]"],
+html.dark [class*="bg-[#FAFAF7]"],
+html.dark [class*="bg-[#F8F5F0]"],
+html.dark [class*="bg-[#F7F5F2]"],
+html.dark [class*="bg-[#FAF8F5]"],
+html.dark [class*="bg-[#FFFDFB]"],
+html.dark [class*="bg-[#FCFBFA]"],
+html.dark .bg-neutral-50 {
+  background-color: var(--color-surface) !important;
+}
+
+html.dark .bg-white,
+html.dark [class*="bg-[#FFFFFF]"],
+html.dark [class*="bg-white/82"],
+html.dark [class*="bg-white/85"],
+html.dark .bg-neutral-100 {
+  background-color: var(--color-surface-raised) !important;
+}
+
+html.dark [class*="bg-[#F2F0ED]"],
+html.dark [class*="hover:bg-[#F2F0ED]"]:hover,
+html.dark [class*="hover:bg-[#FCFBFA]"]:hover,
+html.dark .hover\:bg-neutral-50:hover,
+html.dark .hover\:bg-neutral-100:hover {
+  background-color: var(--color-surface-sunken) !important;
+}
+
+html.dark [class*="bg-[#FFF4EE]"],
+html.dark [class*="bg-[#FFF6F1]"],
+html.dark [class*="hover:bg-[#FFF4EE]"]:hover {
+  background-color: var(--color-bloom-light) !important;
+}
+
+html.dark [class*="bg-[#FFD4BF]"] {
+  background-color: var(--color-bloom-muted) !important;
+}
+
+html.dark [class*="bg-[#F4FAF1]"] {
+  background-color: rgba(34, 197, 94, 0.14) !important;
+}
+
+html.dark [class*="linear-gradient(#F1EEE9"] {
+  background-image:
+    linear-gradient(rgba(232, 228, 223, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 228, 223, 0.08) 1px, transparent 1px) !important;
+}
+
+html.dark [class*="border-[#E8E4DF]"],
+html.dark [class*="border-[#D4CFC8]"],
+html.dark [class*="border-[#E0D9D1]"],
+html.dark .border-neutral-100,
+html.dark .border-neutral-200,
+html.dark .border-neutral-300 {
+  border-color: var(--color-border) !important;
+}
+
+html.dark [class*="border-[#D8E7D3]"] {
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+html.dark [class*="border-[#FFD4BF]"],
+html.dark [class*="border-[#FF6B35]"],
+html.dark [class*="border-[#C94317]"] {
+  border-color: rgba(255, 107, 53, 0.45) !important;
+}
+
+html.dark [class*="text-[#1A1A1A]"],
+html.dark .text-neutral-900,
+html.dark .text-neutral-800,
+html.dark .text-neutral-700 {
+  color: var(--color-ink) !important;
+}
+
+html.dark [class*="text-[#666666]"],
+html.dark [class*="text-[#666]"],
+html.dark [class*="text-[#555555]"],
+html.dark [class*="text-[#5F574F]"],
+html.dark [class*="text-[#68615C]"],
+html.dark .text-neutral-600,
+html.dark .text-neutral-500 {
+  color: var(--color-ink-muted) !important;
+}
+
+html.dark [class*="text-[#777777]"],
+html.dark [class*="text-[#999999]"],
+html.dark [class*="text-[#514C46]"],
+html.dark [class*="text-[#D8D1C8]"],
+html.dark .text-neutral-400 {
+  color: var(--color-ink-faint) !important;
+}
+
+html.dark [class*="text-[#FF6B35]"],
+html.dark [class*="text-[#B64A1F]"],
+html.dark [class*="text-[#B84218]"],
+html.dark [class*="text-[#C94D20]"],
+html.dark [class*="text-[#C94317]"],
+html.dark [class*="text-[#8A3518]"],
+html.dark [class*="text-[#9A3412]"],
+html.dark [class*="text-[#7C2D12]"],
+html.dark [class*="text-[#A93612]"] {
+  color: #FF8A50 !important;
+}
+
+html.dark [class*="text-[#467642]"] {
+  color: #86EFAC !important;
+}
+
+html.dark [class*="bg-green-50"] {
+  background-color: rgba(34, 197, 94, 0.14) !important;
+}
+
+html.dark [class*="border-green-200"],
+html.dark [class*="border-green-300"] {
+  border-color: rgba(34, 197, 94, 0.35) !important;
+}
+
+html.dark [class*="text-green-800"],
+html.dark [class*="text-green-900"],
+html.dark [class*="text-green-950"] {
+  color: #86EFAC !important;
+}
+
+html.dark [class*="bg-amber-50"] {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+}
+
+html.dark [class*="border-amber-200"],
+html.dark [class*="border-amber-300"] {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+html.dark [class*="text-amber-700"],
+html.dark [class*="text-amber-800"],
+html.dark [class*="text-amber-900"],
+html.dark [class*="text-amber-950"] {
+  color: #FCD34D !important;
+}
+
+html.dark [class*="bg-red-50"] {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+html.dark [class*="border-red-200"],
+html.dark [class*="border-red-300"] {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+html.dark [class*="text-red-700"],
+html.dark [class*="text-red-800"],
+html.dark [class*="text-red-950"] {
+  color: #FCA5A5 !important;
+}
+
+html.dark [class*="bg-blue-50"] {
+  background-color: rgba(59, 130, 246, 0.14) !important;
+}
+
+html.dark [class*="border-blue-200"] {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+html.dark [class*="text-blue-800"] {
+  color: #93C5FD !important;
+}
+
+html.dark input,
+html.dark textarea,
+html.dark select {
+  color-scheme: dark;
+}
+
+/* Dark mode: MDXEditor */
+html.dark .mdxeditor [contenteditable] {
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] {
+  background: var(--color-surface-sunken) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button {
+  color: var(--color-ink-muted) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button svg {
+  color: var(--color-ink-muted) !important;
+  fill: currentColor !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button:hover svg {
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button:hover {
+  background: var(--color-border) !important;
+  color: var(--color-ink) !important;
+}
+
+html.dark .mdxeditor [role="toolbar"] button[data-state="on"] {
+  background: var(--color-bloom) !important;
+  color: white !important;
+}
+
+/* MDXEditor select/trigger — Radix UI renders a button, not a native select */
+html.dark .mdxeditor select,
+html.dark .mdxeditor [role="toolbar"] select,
+html.dark .mdxeditor [role="combobox"],
+html.dark .mdxeditor [data-radix-collection-item],
+html.dark .mdxeditor [role="toolbar"] > div > button,
+html.dark .mdxeditor [class*="selectTrigger"],
+html.dark .mdxeditor [class*="Select"] {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-ink-muted) !important;
+  border-color: var(--color-border-strong) !important;
+}
+
+/* MDXEditor popover/dialog/dropdown dark mode */
+html.dark [data-radix-popper-content-wrapper],
+html.dark [data-radix-popper-content-wrapper] * {
+  color-scheme: dark;
+}
+
+html.dark [role="listbox"],
+html.dark [role="dialog"],
+html.dark [data-radix-popper-content-wrapper] > div,
+html.dark [data-radix-select-viewport],
+html.dark [class*="selectContent"] {
+  background: var(--color-surface-raised) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-ink) !important;
+}
+
+html.dark [role="listbox"] [role="option"],
+html.dark [data-radix-select-viewport] [role="option"] {
+  color: var(--color-ink) !important;
+}
+
+html.dark [role="listbox"] [role="option"]:hover,
+html.dark [role="listbox"] [role="option"][data-highlighted],
+html.dark [data-radix-select-viewport] [role="option"][data-highlighted] {
+  background: var(--color-border) !important;
+}
+
+/* Dark mode: MiniMap */
+html.dark .react-flow__minimap {
+  background: var(--color-surface-raised) !important;
+}
+
+html.dark .react-flow__minimap-mask {
+  fill: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .react-flow__minimap svg {
+  background: var(--color-surface-raised) !important;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.prose-bloommd {
+  color: var(--color-ink);
+}
+
+.prose-bloommd :where(h2) {
+  margin-top: 2.75rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.75rem;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.prose-bloommd :where(h3) {
+  margin-top: 1.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.prose-bloommd :where(p, li) {
+  color: var(--color-ink-muted);
+}
+
+.prose-bloommd :where(p:first-child) {
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  color: var(--color-ink);
+}
+
+.prose-bloommd :where(img) {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 2rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-sunken);
+  box-shadow: 0 18px 50px rgba(26, 26, 26, 0.12);
+}
+
+.prose-bloommd :where(a) {
+  color: var(--color-bloom);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+html.dark .prose-bloommd :where(a) {
+  color: #FFB38A;
+}
+
+.prose-bloommd :where(strong) {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.prose-bloommd :where(code) {
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface-sunken);
+  padding: 0.08rem 0.28rem;
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.prose-bloommd :where(pre) {
+  max-width: 100%;
+  margin: 1.25rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  padding: 1rem;
+}
+
+.prose-bloommd :where(pre code) {
+  display: block;
+  min-width: max-content;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.prose-bloommd :where(blockquote) {
+  margin: 1.5rem 0;
+  border-left: 4px solid var(--color-bloom);
+  border-radius: 0 8px 8px 0;
+  background: var(--color-bloom-light);
+  padding: 1rem 1.125rem;
+}
+
+.prose-bloommd :where(blockquote p) {
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.prose-bloommd :where(ol, ul) {
+  margin: 0.75rem 0 1.25rem;
+  padding-left: 1.35rem;
+}
+
+.prose-bloommd :where(ol) {
+  list-style: decimal;
+}
+
+.prose-bloommd :where(ul) {
+  list-style: disc;
+}
+
+.prose-bloommd :where(ol li, ul li) {
+  margin-top: 0.45rem;
+  padding-left: 0.15rem;
+}
+
+.prose-bloommd :where(ol li::marker) {
+  color: var(--color-bloom);
+  font-weight: 700;
+}
+
+.prose-bloommd :where(ul li::marker) {
+  color: var(--color-bloom);
+}
+
+.prose-bloommd :where(table) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 1.25rem 0 1.75rem;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-raised);
+}
+
+.prose-bloommd :where(th, td) {
+  min-width: 12rem;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.prose-bloommd :where(th) {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  font-weight: 700;
+}
+
+.prose-bloommd :where(td) {
+  color: var(--color-ink-muted);
+}
+
+.prose-bloommd :where(tr:last-child td) {
+  border-bottom: 0;
+}
+
+@keyframes drawLine {
+  0%, 100% {
+    stroke-dasharray: 1 420;
+    stroke-dashoffset: 0;
+  }
+  45%, 70% {
+    stroke-dasharray: 280 420;
+    stroke-dashoffset: -40;
+  }
+}
+
+@keyframes sectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* React Flow overrides */
+.react-flow__background {
+  background: var(--color-surface) !important;
+}
+
+.react-flow__minimap {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.06) !important;
+}
+
+.react-flow__controls {
+  border-radius: 10px !important;
+  overflow: hidden !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.06) !important;
+}
+
+.react-flow__controls-button {
+  background: var(--color-surface-raised) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-ink-muted) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-bloom-light) !important;
+  color: var(--color-bloom) !important;
+}
+
+/* MDXEditor overrides */
+.mdxeditor {
+  font-family: var(--font-body) !important;
+}
+
+.mdxeditor [role="toolbar"] {
+  background: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  border-radius: 8px !important;
+  margin: 8px 16px !important;
+  padding: 4px !important;
+}
+
+.mdxeditor [role="toolbar"] button {
+  border-radius: 6px !important;
+  color: var(--color-ink-muted) !important;
+}
+
+.mdxeditor [role="toolbar"] button:hover {
+  background: var(--color-bloom-light) !important;
+  color: var(--color-bloom) !important;
+}
+
+.mdxeditor [role="toolbar"] button[data-state="on"] {
+  background: var(--color-bloom) !important;
+  color: white !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}

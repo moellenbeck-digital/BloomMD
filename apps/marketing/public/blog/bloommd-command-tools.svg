@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="650" viewBox="0 0 1200 650" role="img" aria-labelledby="title desc">
+  <title id="title">BloomMD command-line tools</title>
+  <desc id="desc">OpenClaw plugin, BloomMD agent runtime and Wiki CLI are shown as separate, connected tools.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1A1412"/><stop offset="1" stop-color="#392117"/></linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="13"/></filter>
+  </defs>
+  <rect width="1200" height="650" rx="34" fill="url(#background)"/>
+  <g fill="#D4CFC8" opacity=".62"><circle cx="104" cy="98" r="3"/><circle cx="242" cy="540" r="3"/><circle cx="1084" cy="128" r="3"/><circle cx="1030" cy="571" r="3"/><circle cx="590" cy="90" r="3"/></g>
+  <text x="90" y="112" fill="#FF9368" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="4">BLOOMMD AUTOMATION</text>
+  <text x="90" y="166" fill="#FFFDFC" font-family="Arial, sans-serif" font-size="47" font-weight="700">Drei Wege, eine klare Grenze</text>
+  <path d="M330 365H414" stroke="#FF6B35" stroke-width="7" stroke-linecap="round"/><path d="M405 344l28 21-28 21" fill="none" stroke="#FF6B35" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M762 365H846" stroke="#FF6B35" stroke-width="7" stroke-linecap="round"/><path d="M837 344l28 21-28 21" fill="none" stroke="#FF6B35" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#glow)" opacity=".22"><rect x="88" y="253" width="244" height="231" rx="22" fill="#FF6B35"/><rect x="424" y="253" width="338" height="231" rx="22" fill="#FF6B35"/><rect x="856" y="253" width="254" height="231" rx="22" fill="#FF6B35"/></g>
+  <g font-family="Arial, sans-serif">
+    <rect x="88" y="253" width="244" height="231" rx="22" fill="#211E1D" stroke="#FF6B35" stroke-width="4"/>
+    <text x="118" y="304" fill="#FF9368" font-size="16" font-weight="700" letter-spacing="2">NORMALER EINSTIEG</text>
+    <text x="118" y="355" fill="#FFFDFC" font-size="28" font-weight="700">OpenClaw-</text><text x="118" y="390" fill="#FFFDFC" font-size="28" font-weight="700">Plugin</text>
+    <text x="118" y="437" fill="#D4CFC8" font-size="17">Pairing, Skill und Runner</text>
+    <rect x="424" y="253" width="338" height="231" rx="22" fill="#251D1A" stroke="#7E4B32" stroke-width="2"/>
+    <text x="454" y="304" fill="#FF9368" font-size="16" font-weight="700" letter-spacing="2">NUR BEI AUFTRAG</text>
+    <text x="454" y="355" fill="#FFFDFC" font-size="28" font-weight="700">bloommd-agent</text>
+    <text x="454" y="395" fill="#D4CFC8" font-size="17">lokale Runtime · Token im Secret Store</text>
+    <rect x="454" y="421" width="195" height="35" rx="17" fill="#145A43"/><text x="474" y="445" fill="#9DE3C5" font-size="15" font-weight="700">Vorschlag statt Direktzugriff</text>
+    <rect x="856" y="253" width="254" height="231" rx="22" fill="#211E1D" stroke="#FF6B35" stroke-width="4"/>
+    <text x="886" y="304" fill="#FF9368" font-size="16" font-weight="700" letter-spacing="2">OPTIONAL</text>
+    <text x="886" y="355" fill="#FFFDFC" font-size="28" font-weight="700">bloommd-</text><text x="886" y="390" fill="#FFFDFC" font-size="28" font-weight="700">wiki</text>
+    <text x="886" y="437" fill="#D4CFC8" font-size="17">lokal · CI · MCP</text>
+  </g>
+  <text x="90" y="571" fill="#EAE1DD" font-family="Arial, sans-serif" font-size="23">Agenten arbeiten lokal. Wiki-Automatisierung bleibt getrennt. Menschen entscheiden über Änderungen.</text>
+</svg>

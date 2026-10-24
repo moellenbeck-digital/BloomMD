@@ -1,0 +1,130 @@
+{
+  "name": "@bloommd/core",
+  "version": "0.2.5",
+  "license": "Elastic-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
+    },
+    "./browser": {
+      "import": "./src/browser.ts",
+      "types": "./src/browser.ts"
+    },
+    "./obsidian-markdown": {
+      "import": "./src/obsidian-markdown.ts",
+      "types": "./src/obsidian-markdown.ts"
+    },
+    "./learning": {
+      "import": "./src/learning.ts",
+      "types": "./src/learning.ts"
+    },
+    "./agent-ledger": {
+      "import": "./src/agent-ledger.ts",
+      "types": "./src/agent-ledger.ts"
+    },
+    "./knowledge": {
+      "import": "./src/knowledge.ts",
+      "types": "./src/knowledge.ts"
+    },
+    "./knowledge-yjs": {
+      "import": "./src/knowledge-yjs.ts",
+      "types": "./src/knowledge-yjs.ts"
+    },
+    "./knowledge-templates": {
+      "import": "./src/knowledge-templates.ts",
+      "types": "./src/knowledge-templates.ts"
+    },
+    "./types": {
+      "import": "./src/types.ts",
+      "types": "./src/types.ts"
+    },
+    "./parser": {
+      "import": "./src/parser.ts",
+      "types": "./src/parser.ts"
+    },
+    "./file-store": {
+      "import": "./src/fileStore.ts",
+      "types": "./src/fileStore.ts"
+    },
+    "./paths": {
+      "import": "./src/paths.ts",
+      "types": "./src/paths.ts"
+    },
+    "./sync-ticket": {
+      "import": "./src/sync-ticket.ts",
+      "types": "./src/sync-ticket.ts"
+    },
+    "./shared-document-binding": {
+      "import": "./src/shared-document-binding.ts",
+      "types": "./src/shared-document-binding.ts"
+    },
+    "./shared-document-mirror": {
+      "import": "./src/shared-document-mirror.ts",
+      "types": "./src/shared-document-mirror.ts"
+    },
+    "./workspace-sync-client": {
+      "import": "./src/workspace-sync-client.ts",
+      "types": "./src/workspace-sync-client.ts"
+    },
+    "./wiki": {
+      "import": "./src/wiki.ts",
+      "types": "./src/wiki.ts"
+    },
+    "./wiki-agent": {
+      "import": "./src/wiki-agent.ts",
+      "types": "./src/wiki-agent.ts"
+    },
+    "./wiki-adapter": {
+      "import": "./src/wiki-adapter.ts",
+      "types": "./src/wiki-adapter.ts"
+    },
+    "./wiki-preview": {
+      "import": "./src/wiki-preview.ts",
+      "types": "./src/wiki-preview.ts"
+    },
+    "./wiki-search": {
+      "import": "./src/wiki-search.ts",
+      "types": "./src/wiki-search.ts"
+    },
+    "./frontmatter": {
+      "import": "./src/frontmatter.ts",
+      "types": "./src/frontmatter.ts"
+    },
+    "./workspace-lint": {
+      "import": "./src/workspace-lint.ts",
+      "types": "./src/workspace-lint.ts"
+    },
+    "./workspace-search": {
+      "import": "./src/workspace-search.ts",
+      "types": "./src/workspace-search.ts"
+    },
+    "./workspace-agent": {
+      "import": "./src/workspace-agent.ts",
+      "types": "./src/workspace-agent.ts"
+    },
+    "./workspace-document": {
+      "import": "./src/workspace-document.ts",
+      "types": "./src/workspace-document.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "js-yaml": "^5.4.2",
+    "remark-frontmatter": "^5.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "fast-diff": "^1.3.0",
+    "yjs": "^13.6.32"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/mdast": "^4.0.4",
+    "typescript": "^7.0.2"
+  }
+}

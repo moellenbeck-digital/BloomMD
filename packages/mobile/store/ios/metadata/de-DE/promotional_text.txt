@@ -1,0 +1,1 @@
+Öffne deinen Obsidian-Vault aus iCloud Drive als Mind Map, schreib mit dem Apple Pencil direkt im Knoten – und alles bleibt normales Markdown.

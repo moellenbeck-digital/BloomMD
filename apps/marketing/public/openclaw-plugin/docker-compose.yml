@@ -1,0 +1,32 @@
+services:
+  bloommd-openclaw-agent:
+    build:
+      context: .
+      args:
+        # Pin to a versioned artifact for production. `latest.tgz` is suitable for evaluation.
+        BLOOMMD_PLUGIN_URL: ${BLOOMMD_PLUGIN_URL:-https://bloommd.io/openclaw-plugin/latest.tgz}
+    image: bloommd-openclaw-agent:${BLOOMMD_PLUGIN_VERSION:-local}
+    user: "1000:1000"
+    environment:
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      BLOOMMD_AGENT_SECRET_BACKEND: file
+      BLOOMMD_AGENT_CONFIG_DIR: /home/node/.config/bloommd/agents
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:?Set a unique gateway token in .env}
+    volumes:
+      - openclaw-state:/home/node/.openclaw
+      - bloommd-agent-secrets:/home/node/.config/bloommd/agents
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    command: ["gateway", "--allow-unconfigured"]
+
+volumes:
+  openclaw-state:
+  bloommd-agent-secrets:

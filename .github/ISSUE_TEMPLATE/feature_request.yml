@@ -1,0 +1,41 @@
+name: Feature Request
+description: Suggest a product improvement.
+title: "[Feature]: "
+labels: ["enhancement", "ux"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem should BloomMD solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What should happen?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Mind map
+        - Markdown editing
+        - Templates
+        - Demo
+        - Desktop
+        - Mobile
+        - Obsidian
+        - Sync
+        - Accessibility
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples or references

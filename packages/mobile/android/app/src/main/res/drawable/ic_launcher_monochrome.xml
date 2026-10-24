@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BloomMD themed (monochrome) icon layer. Generated from assets/app-icon-android-432.svg (108dp canvas, mark inside the 66dp safe zone). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="432"
+    android:viewportHeight="432">
+    <path android:fillColor="#FF000000" android:pathData="M187,124 h0 a7,7 0 0 1 7,7 v138 a7,7 0 0 1 -7,7 h-0 a7,7 0 0 1 -7,-7 v-138 a7,7 0 0 1 7,-7 z" />
+    <path android:fillColor="#FF000000" android:pathData="M239,124 h0 a7,7 0 0 1 7,7 v138 a7,7 0 0 1 -7,7 h-0 a7,7 0 0 1 -7,-7 v-138 a7,7 0 0 1 7,-7 z" />
+    <path android:fillColor="#FF000000" android:pathData="M159,160 h114 a7,7 0 0 1 7,7 v0 a7,7 0 0 1 -7,7 h-114 a7,7 0 0 1 -7,-7 v-0 a7,7 0 0 1 7,-7 z" />
+    <path android:fillColor="#FF000000" android:pathData="M159,220 h114 a7,7 0 0 1 7,7 v0 a7,7 0 0 1 -7,7 h-114 a7,7 0 0 1 -7,-7 v-0 a7,7 0 0 1 7,-7 z" />
+    <path android:fillColor="#FF000000" android:fillAlpha="0.85" android:pathData="M270,132 a10,10 0 1 0 20,0 a10,10 0 1 0 -20,0 z" />
+</vector>

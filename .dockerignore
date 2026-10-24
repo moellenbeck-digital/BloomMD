@@ -1,0 +1,30 @@
+.git
+.github
+.agents
+.codex
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+coverage
+**/coverage
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+# Every local env variant, not just the bare name. A `.env.local` holds real credentials by
+# convention, and `COPY . .` would otherwise bake it into the production image — Next.js was
+# observed loading it during the container build.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.log
+.DS_Store
+obsidian-test-vaults

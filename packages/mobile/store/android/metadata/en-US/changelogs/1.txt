@@ -1,0 +1,1 @@
+First version of BloomMD for Android tablets and phones: edit folders such as your Obsidian vault in place, Markdown notes as mind maps, stylus handwriting inside nodes, outline and presentation views – offline and without an account.

@@ -1,0 +1,28 @@
+name: Integration Request
+description: Request an integration with another tool.
+title: "[Integration]: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or platform
+      placeholder: Obsidian, VS Code, GitHub, Notion export, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow
+      description: Describe the exact workflow this integration should support.
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Data and privacy expectations
+      description: What should stay local? What may be synced?
+  - type: textarea
+    id: references
+    attributes:
+      label: References

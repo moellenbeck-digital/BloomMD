@@ -1,0 +1,13 @@
+{
+  "title": "Novel Writing Map",
+  "description": "Plan premise, world, characters, acts, chapters, themes and conflicts in a visual Markdown outline.",
+  "audience": ["Novelists", "Screenwriters", "Worldbuilding projects"],
+  "category": "Writing",
+  "previewImage": "/templates/novel-writing/preview.png",
+  "sections": ["Premise", "World", "Characters", "Plot", "Act I", "Act II", "Act III", "Chapters", "Themes", "Conflicts", "Open Questions"],
+  "tags": ["writing", "fiction", "novel", "worldbuilding"],
+  "recommendedUse": "Use this before drafting or when a story outline has become too linear to reason about.",
+  "version": "1.0.0",
+  "slug": "novel-writing",
+  "filePath": "templates/novel-writing/template.md"
+}

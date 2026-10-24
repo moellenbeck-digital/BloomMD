@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 48" width="680" height="48">
+  <defs>
+    <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#F7931E"/>
+    </linearGradient>
+  </defs>
+
+  <style>
+    .badge-text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; fill: #999; }
+    .badge-platform { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; fill: #E0E0E0; font-weight: 600; }
+  </style>
+
+  <!-- macOS -->
+  <g transform="translate(0, 4)">
+    <rect width="120" height="40" rx="8" fill="#1A1A1A"/>
+    <!-- Apple icon simplified -->
+    <text x="16" y="26" font-size="18" fill="#E0E0E0">&#9679;</text>
+    <text x="36" y="27" class="badge-platform">macOS</text>
+  </g>
+
+  <!-- Windows -->
+  <g transform="translate(140, 4)">
+    <rect width="120" height="40" rx="8" fill="#1A1A1A"/>
+    <text x="16" y="26" font-size="16" fill="#E0E0E0">&#9632;</text>
+    <text x="36" y="27" class="badge-platform">Windows</text>
+  </g>
+
+  <!-- Linux -->
+  <g transform="translate(280, 4)">
+    <rect width="120" height="40" rx="8" fill="#1A1A1A"/>
+    <text x="16" y="26" font-size="16" fill="#E0E0E0">&#9670;</text>
+    <text x="36" y="27" class="badge-platform">Linux</text>
+  </g>
+
+  <!-- iOS / iPad -->
+  <g transform="translate(420, 4)">
+    <rect width="120" height="40" rx="8" fill="#1A1A1A"/>
+    <text x="16" y="26" font-size="16" fill="#E0E0E0">&#9679;</text>
+    <text x="36" y="27" class="badge-platform">iOS</text>
+  </g>
+
+  <!-- Web -->
+  <g transform="translate(560, 4)">
+    <rect width="120" height="40" rx="8" fill="none" stroke="url(#bloom)" stroke-width="2"/>
+    <text x="16" y="26" font-size="16" fill="url(#bloom)">&#9673;</text>
+    <text x="36" y="27" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" fill="url(#bloom)" font-weight="600">Web App</text>
+  </g>
+</svg>

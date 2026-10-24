@@ -1,0 +1,38 @@
+{
+  "name": "@bloommd/ink",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "description": "Handwriting for BloomMD: the bloommd-ink SVG format, Apple Pencil editor, lasso, links and pen gestures. Shared by the Obsidian plugin and the BloomMD apps.",
+  "type": "module",
+  "exports": {
+    "./ink-geometry": "./src/ink-geometry.ts",
+    "./ink-document": "./src/ink-document.ts",
+    "./ink-state": "./src/ink-state.ts",
+    "./ink-preview": "./src/ink-preview.tsx",
+    "./ink-editor": "./src/ink-editor.tsx",
+    "./pen-gestures": "./src/pen-gestures.ts",
+    "./ink.css": "./src/ink.css"
+  },
+  "scripts": {
+    "test": "bun test --preload ./scripts/test-dom.ts src/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "perfect-freehand": "^1.2.2"
+  },
+  "peerDependencies": {
+    "lucide-react": "*",
+    "react": ">=18"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "happy-dom": "^21.0.4",
+    "lucide-react": "^1.30.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2"
+  }
+}

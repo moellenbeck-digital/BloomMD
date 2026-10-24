@@ -1,0 +1,1 @@
+Open your Obsidian vault from iCloud Drive as a mind map, write with Apple Pencil right inside a node – and everything stays plain Markdown.

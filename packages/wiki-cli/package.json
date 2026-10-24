@@ -1,0 +1,29 @@
+{
+  "name": "@bloommd/wiki-cli",
+  "version": "0.4.4",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./workspace": "./src/workspace.ts",
+    "./report": "./src/report.ts"
+  },
+  "bin": {
+    "bloommd-wiki": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test src/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build:binary": "bun build --compile src/cli.ts --outfile ../../artifacts/bloommd-wiki",
+    "build:release": "bun build --compile --target=bun-darwin-arm64 src/cli.ts --outfile ../../artifacts/bloommd-wiki-darwin-arm64 && bun build --compile --target=bun-linux-arm64 src/cli.ts --outfile ../../artifacts/bloommd-wiki-linux-arm64 && bun build --compile --target=bun-linux-x64 src/cli.ts --outfile ../../artifacts/bloommd-wiki-linux-x64",
+    "verify:binary": "./../../artifacts/bloommd-wiki-linux-x64 --help"
+  },
+  "dependencies": {
+    "@bloommd/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}

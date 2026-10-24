@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#F7931E"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#111111"/>
+      <stop offset="100%" style="stop-color:#1A1A1A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="1200" height="630" fill="url(#bgGrad)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04">
+    <line x1="0" y1="0" x2="0" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="60" y1="0" x2="60" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="120" y1="0" x2="120" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="180" y1="0" x2="180" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="240" y1="0" x2="240" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="300" y1="0" x2="300" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="360" y1="0" x2="360" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="420" y1="0" x2="420" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="480" y1="0" x2="480" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="540" y1="0" x2="540" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="660" y1="0" x2="660" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="720" y1="0" x2="720" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="780" y1="0" x2="780" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="840" y1="0" x2="840" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="900" y1="0" x2="900" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="960" y1="0" x2="960" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="1020" y1="0" x2="1020" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="1080" y1="0" x2="1080" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="1140" y1="0" x2="1140" y2="630" stroke="#fff" stroke-width="1"/>
+    <line x1="1200" y1="0" x2="1200" y2="630" stroke="#fff" stroke-width="1"/>
+  </g>
+
+  <!-- Orange glow behind icon -->
+  <circle cx="600" cy="220" r="120" fill="#FF6B35" opacity="0.06"/>
+
+  <!-- # Mark large -->
+  <g transform="translate(530, 140)">
+    <rect x="36" y="4" width="14" height="120" rx="7" fill="#E0E0E0"/>
+    <rect x="80" y="4" width="14" height="120" rx="7" fill="#E0E0E0"/>
+    <rect x="8" y="32" width="118" height="14" rx="7" fill="url(#bloom)"/>
+    <rect x="8" y="76" width="118" height="14" rx="7" fill="url(#bloom)"/>
+    <circle cx="126" cy="10" r="10" fill="url(#bloom)" opacity="0.85"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="600" y="340" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#F0F0F0" letter-spacing="-1">
+    Bloom<tspan font-weight="400" fill="#888">MD</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="600" y="390" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="22" fill="#666" letter-spacing="3">
+    YOUR MARKDOWN, VISUALIZED
+  </text>
+
+  <!-- Platform badges -->
+  <g transform="translate(340, 440)">
+    <rect x="0" y="0" width="90" height="32" rx="6" fill="none" stroke="#444" stroke-width="1"/>
+    <text x="45" y="21" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#888">macOS</text>
+
+    <rect x="110" y="0" width="90" height="32" rx="6" fill="none" stroke="#444" stroke-width="1"/>
+    <text x="155" y="21" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#888">Windows</text>
+
+    <rect x="220" y="0" width="90" height="32" rx="6" fill="none" stroke="#444" stroke-width="1"/>
+    <text x="265" y="21" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#888">Linux</text>
+
+    <rect x="330" y="0" width="90" height="32" rx="6" fill="none" stroke="#444" stroke-width="1"/>
+    <text x="375" y="21" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#888">iOS</text>
+
+    <rect x="440" y="0" width="90" height="32" rx="6" fill="none" stroke="#444" stroke-width="1"/>
+    <text x="485" y="21" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#888">Web</text>
+  </g>
+
+  <!-- URL -->
+  <text x="600" y="550" text-anchor="middle" font-family="monospace" font-size="16" fill="#555">
+    bloommd.app
+  </text>
+</svg>

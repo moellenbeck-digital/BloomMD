@@ -1,0 +1,641 @@
+# Changelog
+
+## [Marketing 0.5.4] - 2026-10-24
+
+- Desktop-Updates, Kommandozeilen-Tools und OpenClaw-Plugin-Downloads bleiben beim Wechsel des GitHub-Repositories verfügbar: Die Download-Proxys suchen zuerst im neuen Repository und verwenden bei fehlendem Release oder Asset das private Archiv.
+- Desktop updates, command-line tools, and OpenClaw plugin downloads remain available during the GitHub repository move: the download proxies check the new repository first and use the private archive when a release or asset is missing.
+- Ältere News verlinken keine künftig unerreichbaren privaten Git-Commits mehr; die Datumsangaben bleiben erhalten.
+- Older news posts no longer link to private Git commits that will become unreachable; their dates remain intact.
+
+## [Mobile 1.0.0] - 2026-10-22
+
+- Erste Store-Version der BloomMD-App für iPad und iPhone (auch auf Macs mit Apple Silicon): Ordner aus der Dateien-App direkt bearbeiten, Handschrift mit dem Apple Pencil, Mind Map, Gliederung und Präsentation, optionale Anmeldung mit BloomMD-Konto.
+- First store release of the BloomMD app for iPad and iPhone (also on Apple silicon Macs): edit folders from the Files app in place, Apple Pencil handwriting, mind map, outline and presentation, optional sign-in with BloomMD account.
+
+## [Marketing 0.5.3] - 2026-10-22
+
+- Zweisprachige News erläutern den ELv2-Lizenzwechsel, den unveränderten MIT-Status älterer Releases und die noch ausstehende Obsidian-Veröffentlichung.
+- Bilingual news explains the ELv2 license change, the unchanged MIT terms of earlier releases, and the pending Obsidian release.
+
+## [Marketing 0.5.2] - 2026-10-21
+
+- Die deutsche und englische Lizenzseite erklärt die ELv2-Bedingungen für künftige Obsidian-Versionen und die unveränderte MIT-Lizenz bereits veröffentlichter Plugin-Versionen bis 0.5.12.
+- The German and English license pages explain ELv2 for future Obsidian versions and preserve the MIT terms of plugin releases through 0.5.12.
+
+## [Desktop 0.5.15] - 2026-10-21
+
+- BloomMD Desktop 0.5.15 wird erstmals unter der Elastic License 2.0 (ELv2) ausgeliefert. App-Bundles und Pacman-Pakete enthalten den Lizenztext und den historischen MIT-Hinweis.
+- Frühere Desktop-Versionen einschließlich 0.5.14 behalten ihre ursprüngliche MIT-Lizenz. Die Bedienung aus 0.5.14 bleibt erhalten.
+- BloomMD Desktop 0.5.15 is the first desktop release under the Elastic License 2.0 (ELv2). App bundles and Pacman packages contain the license text and the historical MIT notice.
+- Earlier desktop versions, including 0.5.14, retain their original MIT license. The interactions from 0.5.14 remain available.
+
+## [Marketing 0.5.1] - 2026-10-21
+
+- Deutsch- und englischsprachige News und Desktop-Hilfe erklären die Knotenbedienung in Desktop 0.5.14. Ein echter nativer Screenshot zeigt das Inline-Umbenennen.
+- German and English news and desktop help explain node interaction in Desktop 0.5.14. A real native screenshot shows inline renaming.
+- Der Quellcode dieses Release-Stands steht unter ELv2; frühere veröffentlichte Versionen und das separat veröffentlichte Obsidian-Plugin behalten ihre MIT-Lizenz.
+- This release's source code uses ELv2; earlier published versions and the separately released Obsidian plugin retain their MIT license.
+
+## [0.5.14] - 2026-10-21
+
+- Die Mindmap bleibt beim Auswählen sichtbarer Knoten an ihrer Position. Tastaturnavigation macht nur Knoten außerhalb des sichtbaren Bereichs sichtbar.
+- Doppelklick oder **R** benennt einen Knoten in bearbeitbaren Dateien um. **Enter** bestätigt, **Escape** verwirft; der Fokus kehrt zum Knoten zurück. Ressourcen öffnen über ihre eigene Aktion.
+- Neue Kindknoten werden vor der Titelbearbeitung sichtbar. In der schreibgeschützten Workspace-Übersicht führt eine eigene Aktion zur Quelldatei.
+- **Cmd/Ctrl+I** und **Cmd/Ctrl+K** funktionieren auch im Editor. Eine aktualisierte Hilfe erklärt Shortcuts und Schreibschutz auf Deutsch und Englisch.
+- Sicherheitsupdate für Vite im Desktop-Build.
+- Selecting a visible node leaves the map in place. Keyboard navigation reveals a node only when it lies outside the viewport.
+- Double-click or **R** renames a node in an editable file. **Enter** confirms, **Escape** cancels, and focus returns to the node. Resources open through their own action.
+- New child nodes become visible before title editing. The read-only workspace overview offers a separate action to open the source file.
+- **Cmd/Ctrl+I** and **Cmd/Ctrl+K** also work in the editor. Updated German and English help explains shortcuts and read-only mode.
+- Security update for Vite in the desktop build.
+
+## [0.5.0] - 2026-10-19
+
+- Lese-Links: Cloud-Maps lassen sich ohne Konto ansehen (Map oder Gliederung, nur lesend, 1–90 Tage gültig, jederzeit widerrufbar). Geteilt werden nur Titel, sichtbarer Text und Aufgaben-Infos; Suchmaschinen indexieren geteilte Maps nicht.
+- Aufgaben bekommen Fälligkeit und Verantwortliche, Entscheidungen ihren Stand – im Knoten-Editor, auf der Map und im Lese-Link.
+- Obsidian-Links und eingebettete Zeichnungen bleiben beim Öffnen eines Knotens im Editor erhalten.
+- Sicherheitsupdates für Abhängigkeiten; Zugriffstoken lassen sich auf Workspaces und Lesen/Schreiben begrenzen.
+- Read-only links: cloud maps can be viewed without an account (map or outline, read only, valid for 1–90 days, revocable at any time). Only titles, visible text and task details are shared; search engines do not index shared maps.
+- Tasks get due dates and owners, decisions their state – in the node editor, on the map and in read-only links.
+- Obsidian links and embedded drawings stay intact when a node is opened in the editor.
+- Security updates for dependencies; access tokens can be limited to workspaces and to read or write.
+
+## [Marketing 0.4.23] - 2026-10-12
+
+- Deutsche und englische News sowie Desktop-Hilfe zu den Speicher- und Titelkorrekturen in Desktop 0.5.13, mit echtem Screenshot der nativen Ordneransicht.
+- German and English news and desktop help cover the saving and title fixes in Desktop 0.5.13, with a real screenshot of the native folder overview.
+
+## [0.5.13] - 2026-10-12
+
+- Neue Markdown-Dateien bleiben beim Anlegen und Bearbeiten aktiv. Verzögerte Ordner-/Dateiaktualisierungen verwerfen keine ungespeicherten Knoten mehr; die Ordnerübersicht ist schreibgeschützt.
+- Gleichnamiger Dateititel und eine einzelne erste Überschrift erscheinen in der Ordnerübersicht nur einmal. Die Markdown-Datei und ihre Unterknoten bleiben erhalten.
+- Newly created Markdown files remain active while editing. Delayed folder/file updates no longer discard unsaved nodes; the folder overview is read-only.
+- Matching file titles and a single top-level heading appear once in the folder overview. Markdown content and child nodes are preserved.
+
+## [Marketing 0.4.22] - 2026-10-08
+
+- Öffentliche News und Hilfe sind explizit zur Indexierung freigegeben; die Sitemap enthält die deutsch- und englischsprachigen Hilfeseiten.
+- Public news and help explicitly allow indexing; the sitemap includes German and English documentation pages.
+
+## [Marketing 0.4.21] - 2026-10-08
+
+- Die englische Desktop-0.5.12-Meldung verlinkt wieder auf die englische Download-Seite und Desktop-Hilfe.
+- The English Desktop 0.5.12 announcement now links to the English download page and desktop help.
+
+## [Marketing 0.4.20] - 2026-10-08
+
+- Deutsch- und englischsprachige News und Desktop-Hilfe erklären die kompakte Workspace-Ansicht und Hintergrundberechnung des Desktop-Releases 0.5.12.
+- German and English news and desktop help explain the compact workspace view and background layout shipped in Desktop 0.5.12.
+
+## [0.5.12] - 2026-10-08
+
+- Große lokale Workspaces starten kompakt auf Datei-/Ordnerebene. Überschriften lassen sich aufklappen; das Layout entsteht im Hintergrund und die Ansicht rendert nur sichtbare Knoten.
+- Unveränderte Parsergebnisse und Workspace-Beiträge werden wiederverwendet. Externe Änderungen, neue Dateien und Löschungen einschließlich `.markdown` werden zuverlässig aktualisiert; die Pfeilnavigation öffnet eingeklappte Eltern.
+- Large local workspaces open as a compact file/folder overview. Expand files to reveal headings; layout runs in the background and the canvas renders visible nodes only.
+- Unchanged parse results and workspace contributions are reused. External edits, additions and removals, including `.markdown` files, refresh reliably; arrow navigation expands collapsed parents.
+
+## [0.5.11] - 2026-10-06
+
+- Vorhandene Markdown-Dateien mit Sonderzeichen wie `?`, `"` und `*` lassen sich auf macOS/Linux öffnen. Einzelne unlesbare Dateien werden sichtbar gemeldet, während die übrigen Dateien verfügbar bleiben. Neu erzeugte Dateinamen vermeiden reservierte Windows-Gerätenamen.
+- Existing Markdown filenames containing punctuation such as `?`, `"` and `*` can now be opened on macOS/Linux. Unreadable entries are reported visibly while the remaining files stay available. Newly generated filenames avoid reserved Windows device names.
+
+## [0.5.10] - 2026-10-05
+
+- Update-Testziel für die korrigierte Desktop-Version 0.5.9. Der Fix für den Installationsknopf ist enthalten; keine weitere Verhaltensänderung.
+- Update test target for the corrected desktop version 0.5.9. Includes the installation-button fix, with no further behavior changes.
+
+## [0.5.9] - 2026-10-05
+
+- Der Installationsknopf wird nach einem fertigen Update-Download wieder freigegeben. Versionen 0.5.7/0.5.8 benötigen einmalig die Installation per DMG.
+- The installation button is now enabled after an update download completes. Versions 0.5.7/0.5.8 require a one-time DMG installation.
+
+## [0.5.8] - 2026-10-05
+
+- Signierter und notarisierter Desktop-Patch als Ziel für den In-App-Update-Test von 0.5.7 auf 0.5.8. Keine Änderungen am App-Verhalten.
+- Signed and notarized desktop patch for testing the in-app update from 0.5.7 to 0.5.8. No changes to application behavior.
+
+## [0.5.7] - 2026-10-05
+
+### macOS-Distribution / macOS distribution
+
+- Release-Builds verlangen Developer-ID-Signierung und Apple-Notarisierung für App, Installer
+  und DMG. Ein eigenes Gate prüft auch das Auto-Update-Archiv, bevor Artefakte veröffentlicht werden.
+- Release builds require Developer ID signing and Apple notarization for the app, installer
+  and DMG. A dedicated gate also verifies the auto-update archive before publishing artifacts.
+- Signierte Installer verwenden einen nativen Launcher mit Installationshinweis.
+- Signed installers use a native launcher with installation guidance.
+
+## [0.4.19] - 2026-10-05
+
+- Die deutsch- und englischsprachigen Download- und Hilfeseiten beschreiben die Installation des signierten macOS-Desktop-Releases 0.5.7.
+- German and English download and help pages describe installation of the signed macOS desktop release 0.5.7.
+
+## [0.5.6] - 2026-09-22
+
+### Verbesserungen
+
+- Shared Mode erklärt den Zustand einer bewusst geteilten lokalen Datei konsistent als
+  **verbunden**, **offline**, **Konflikt** oder **Zugriff entzogen**. Die Freigabe bleibt pro Datei
+  sichtbar und kann jederzeit getrennt werden.
+- Lokale OpenClaw-Agenten arbeiten weiterhin nur für ihren explizit zugewiesenen Knoten. Ihre
+  Ergebnisse bleiben Vorschläge und werden erst nach einer menschlichen Entscheidung übernommen.
+
+### Fehlerbehebungen
+
+- Die Aktion zum bewussten Teilen einer lokalen Datei bleibt auch nach dem Öffnen und Wechseln von
+  Dateien erreichbar.
+
+## [0.4.18] - 2026-09-22
+
+### Verbesserungen
+
+- App, Marketing und Sync tragen dieselbe Hosted-Release-Version für den dokumentierten Shared-
+  Mode- und OpenClaw-Workflow.
+- Die öffentliche Hilfe und die Release-Kommunikation erklären die Dateigrenze beim Teilen, die
+  Rollen im Workspace und den prüfbaren Agenten-Vorschlagsablauf auf Deutsch und Englisch.
+
+## [0.5.5] - 2026-09-14
+
+### Neue Funktionen
+
+- Lokale Markdown-Dateien können gezielt mit einem BloomMD-Workspace geteilt werden. Andere
+  Dateien und Ordner des lokalen Vaults bleiben dabei privat.
+- Die Desktop-App zeigt den Freigabestatus direkt an der geöffneten Datei und bietet die Freigabe
+  auch aus dem Dateimenü an.
+
+### Verbesserungen
+
+- Die Karte wird beim Öffnen einer anderen Datei wieder passend eingepasst.
+- Bei abweichenden lokalen und Cloud-Ständen erklärt BloomMD den Konflikt verständlich und lässt
+  bewusst zwischen lokaler und Cloud-Version wählen.
+
+### Fehlerbehebungen
+
+- Eine erstmalig geteilte, sonst unveränderte Datei erzeugt keinen falschen Konflikt mehr, nur
+  weil BloomMD technische IDs oder Zeitstempel ergänzt.
+
+## [0.4.12] - 2026-09-12
+
+### Neue Funktionen
+
+- Die optionalen Kommandozeilen-Tools sind klar getrennt: `bloommd-agent` für kontrollierte
+  lokale Agenten-Automatisierung und `bloommd-wiki` für Markdown-, OKF- und MCP-Workflows.
+- Beide Tools werden als native, versionierte Binaries für macOS auf Apple Silicon sowie Linux auf
+  x86_64 und ARM64 veröffentlicht; die Downloads enthalten SHA-256-Prüfsummen.
+
+### Verbesserungen
+
+- Das OpenClaw-Plugin enthält die Agent-Runtime weiterhin vollständig. Für normales Pairing und
+  Arbeiten mit Agenten ist kein zweiter Download nötig.
+- BloomMD.io dokumentiert Installation und Automatisierung auf Deutsch und Englisch; News und
+  Blog erklären die Rollen der drei Komponenten anhand einer eigenen Grafik.
+
+### Fehlerbehebungen
+
+- Die geschlossene Beta-Hilfe verweist für Wiki-Workflows nicht mehr auf einen Repository-Bun-Befehl,
+  sondern auf die öffentlich installierbare `bloommd-wiki`-Binary.
+
+## [0.4.11] - 2026-09-11
+
+### Verbesserungen
+
+- OpenClaw-Plugin `0.4.2` übergibt dem lokalen Skill den bereits autorisierten Knotenauftrag
+  strukturiert und nur für die Dauer dieses einen Turns.
+- Die Agentenabnahme ist nun verpflichtend in CI: Browser-Interaktion am Knoten und der
+  vollständige Docker-Compose-Durchlauf werden vor einer Veröffentlichung geprüft.
+
+## [0.4.10] - 2026-09-11
+
+### Fehlerbehebungen
+
+- Die OpenClaw-Anleitung verwendet für den einmaligen Pairing-Code jetzt den tatsächlich
+  unterstützten privaten Dateiübergabepfad, statt den Code über die Kommandozeile sichtbar zu machen.
+- Docker-Compose- und Kubernetes-Beispiele referenzieren das aktuelle veröffentlichte
+  OpenClaw-Plugin `0.4.1`.
+
+## [0.4.9] - 2026-09-11
+
+### Fehlerbehebungen
+
+- Der aktuelle OpenClaw-Plugin-Download funktioniert wieder: `latest.tgz` und konkrete
+  Versionsarchive verwenden nun denselben, eindeutigen Route-Handler.
+
+## [0.4.8] - 2026-09-11
+
+### Verbesserungen
+
+- OpenClaw-Plugin-Downloads sind nun eindeutig versioniert: `latest.tgz` wird innerhalb einer
+  Minute aktualisiert, während eine konkrete Versions-URL dauerhaft unveränderlich bleibt.
+- Der veröffentlichte Plugin-Smoketest prüft sowohl die aktuelle als auch die erwartete
+  Archivversion, bevor das Plugin in einem frischen OpenClaw-Container installiert wird.
+
+## [0.4.7] - 2026-09-11
+
+### Neue Funktionen
+
+- OpenClaw kann als lokales, überprüfbares Workspace-Mitglied verbunden werden und arbeitet
+  auf ausgewählten Mindmap-Knoten.
+- Vorschläge werden im jeweiligen Kontext angezeigt, können geprüft und erst danach in den
+  Workspace übernommen werden.
+- Das OpenClaw-Plugin steht als installierbares Paket bereit; Docker- und Kubernetes-Setups
+  sind dokumentiert.
+
+### Qualität und Dokumentation
+
+- E2E-Tests decken Pairing, nodebegrenzte Aufträge, Echtzeitstatus, Vorschläge und Übernahme ab.
+- bloommd.io enthält eine deutsch- und englischsprachige, bebilderte Anleitung sowie Blog-Beiträge.
+
+## [0.4.6] - 2026-09-07
+
+### Verbesserungen
+
+- Die Footer-Version auf bloommd.io ist jetzt eindeutig als `Marketing-Version` gekennzeichnet.
+- Die Marketing-Version wird ohne Verwechslung mit der Desktop-App angezeigt.
+
+## [0.4.5] - 2026-09-07
+
+### Neue Inhalte
+
+- Die BloomMD-Blogserie ist jetzt auf Deutsch und Englisch vollständig ausgebaut.
+- Neue Beiträge behandeln Local-first, Wissensworkflow, Obsidian-Integration und Zusammenarbeit
+  ohne Format-Lock-in.
+
+### Verbesserungen
+
+- Die Artikel enthalten eigene BloomMD-Visuals, Bildunterschriften und passende Alternativtexte.
+- Der bestehende Beitrag zu Markdown als visueller Map wurde redaktionell erweitert.
+
+## [0.4.4] - 2026-09-07
+
+### Neue Inhalte
+
+- Die News-Seite enthält jetzt zweisprachige Beiträge zu Navigation, Plausible, Omarchy/Linux,
+  sicheren Linux-Serverprofilen, Remote-Löschen und der Linux-Lesbarkeit.
+- Historische News sind den tatsächlichen Releases und Commit-Daten zugeordnet.
+
+## [0.5.4] - 2026-09-07
+
+### Verbesserungen
+
+- Die BloomMD-Desktop-App bleibt unter Omarchy/Linux auch bei 160 % Skalierung gut lesbar.
+- Linux verwendet einen lokalen, zuverlässigen Font-Stack und verbessert die Kontraste für
+  sekundäre Mindmap-Texte.
+
+## [0.4.3] - 2026-09-07
+
+### Behobene Fehler
+
+- Server-Dokumente können jetzt auch bei einer aktiven Sync-Verbindung gelöscht werden.
+- Nach einem fehlgeschlagenen Löschversuch wird die Verbindung automatisch wiederhergestellt.
+
+## [0.5.3] - 2026-09-05
+
+### Verbesserungen
+
+- Linux- und Omarchy-Nutzer können Serverprofile jetzt sicher speichern und nach einem Neustart
+  wiederverwenden.
+- Die Zugangstokens bleiben im systemweiten Secret Service; die BloomMD-Einstellungsdatei enthält
+  weiterhin keine geheimen Zugangsdaten.
+
+### Behobene Fehler
+
+- Der Linux-Dialog meldet nicht mehr pauschal, dass sichere Speicherung nur unter macOS möglich
+  ist.
+- Fehlt der Linux-Schlüsselbund oder ist er gesperrt, erscheint eine konkrete Handlungsanweisung.
+
+## [0.5.2] - 2026-09-05
+
+### Behobene Fehler
+
+- Die Linux-Bundle-Prüfung erwartet keine Metadatei mehr, die Electrobun erst nach dem
+  `postBuild`-Staging erzeugt. Native Linux-Bundles können dadurch wieder als Pacman-Quelle
+  verifiziert und veröffentlicht werden.
+
+## [0.5.1] - 2026-09-05
+
+### Behobene Fehler
+
+- Das Linux-/Omarchy-Pacman-Paket startet wieder korrekt. Es verwendet jetzt das native
+  Electrobun-Bundle statt des nicht direkt startbaren Self-Extractors.
+- Die installierten Linux-App-Dateien werden mit korrekten Systemrechten ausgeliefert.
+
+### Qualität
+
+- Der Pacman-Workflow prüft Installation, echten App-Start unter Xvfb, Dateirechte und
+  Deinstallation.
+
+## [0.5.0] - 2026-09-05
+
+### Neue Funktionen
+
+- BloomMD Desktop kann jetzt als native Linux-App für x86_64 und ARM64/aarch64 gebaut und als
+  Arch-/Pacman-Paket installiert werden.
+- Linux registriert Markdown-Dateien und das `bloommd://`-URI-Schema über die Desktop-App.
+
+### Verbesserungen
+
+- Die öffentlichen Linux-Release-Assets tragen eine eindeutige Versions- und
+  Architekturkennzeichnung: `bloommd-desktop-<version>-x86_64.pacman` bzw.
+  `bloommd-desktop-<version>-aarch64.pacman`.
+- Installations-, Start-, Update- und Deinstallationshinweise für den Linux-Beta-Track sind
+  dokumentiert.
+
+### Qualität
+
+- Native Linux-Builds für x86_64 und aarch64 werden in CI erzeugt.
+- Pacman-Metadaten sowie Installation und Entfernung des x86_64-Pakets werden automatisiert
+  geprüft.
+
+### Beta-Hinweis
+
+- Linux ist ein separater Beta-Track; der manuelle Omarchy-4-Hardwaretest steht noch aus.
+
+## [0.4.0] - 2026-08-30
+
+### Neue Funktionen
+
+- Zwischen der Workspace-Übersicht und der zuletzt geöffneten Markdown-Datei kann jetzt in beide
+  Richtungen navigiert werden.
+- Die Navigation funktioniert in Web-App und macOS-App über sichtbare Zurück-/Vorwärts-Schaltflächen.
+
+### Verbesserungen
+
+- `Cmd/Ctrl + ←` führt zur Workspace-Übersicht zurück; `Cmd/Ctrl + →` öffnet die zuletzt geöffnete
+  Datei wieder.
+- Ordner-, Remote- und Fokuskontext bleiben beim Wechsel erhalten, damit der Arbeitsfluss nicht
+  verloren geht.
+- Die Tastaturkürzel sind in der Hilfe für Deutsch und Englisch dokumentiert.
+
+## [0.3.2] - 2026-08-29
+
+### Release-Qualität
+
+- Sichtbare Versions-Fallbacks in Hilfe und Build-Info entsprechen jetzt der ausgelieferten
+  Version `0.3.2`.
+- Die Versionsanzeige bleibt auch dann konsistent, wenn keine externen Build-Metadaten verfügbar
+  sind.
+
+## [0.3.1] - 2026-08-29
+
+### macOS-App
+
+- Nach dem Öffnen eines Ordners und einer darin enthaltenen Markdown-Datei kann jederzeit klar
+  zur Workspace-Übersicht zurückgewechselt werden.
+- Der lokale Ordner bzw. aktive Remote-Workspace bleibt beim Wechsel erhalten.
+- Nach der Rücknavigation werden Fokus und Seitenleistenkontext wiederhergestellt.
+- Die Rücknavigation ist neben dem sichtbaren Button auch über `Cmd/Ctrl + [` erreichbar.
+
+### Behobene Fehler
+
+- Die macOS-App verliert beim Wechsel von einer Datei zurück zur Workspace-Übersicht nicht mehr
+  den Navigationskontext.
+- Ein fehlgeschlagener Ladevorgang überschreibt die aktuell geöffnete Datei nicht mehr.
+
+## [0.3.0] - 2026-08-29
+
+### Neue Funktionen
+
+- Mehrere Serververbindungen können jetzt als benannte Profile gespeichert und direkt gewechselt
+  werden. Der Wechsel zwischen lokalem Workspace und mehreren Servern verliert die Zugangsdaten
+  nicht mehr.
+
+### Verbesserungen
+
+- Das Umbenennen einer Mindmap hält Dateiname und Titel in Web-App und macOS-App konsistent.
+- Nach dem Umbenennen bleibt die aktuelle Mindmap fokussiert und wird in der Dateiliste automatisch
+  sichtbar gemacht — auch wenn sie vorher nicht geöffnet war.
+- Der Sync-Server verwendet seine eigene Versionsspur für Persistenz und wartet vor einem Rename
+  auf ausstehende Schreibvorgänge.
+
+### Qualität
+
+- Rename-, Fokus-, Dateipfad-, Sync- und Verbindungsprofil-Szenarien sind durch Regressionstests
+  abgesichert.
+
+## [0.2.13] - 2026-08-29
+
+### Analyse und Datenschutz
+
+- Plausible wird direkt von der selbst gehosteten Instanz geladen. Dadurch erhält die GeoIP-Auswertung
+  die echte Besucher-IP statt einer Infrastruktur- oder Proxy-IP.
+- Die Marketingseite bleibt cookielos; der bisherige Analytics-Consent-Dialog wird für Plausible nicht
+  benötigt.
+
+### Sicherheit und Qualität
+
+- Script- und Event-Endpunkte sind auf den vertrauenswürdigen Plausible-Host begrenzt.
+- Die veralteten `bloommd.io/_plausible/...`-Pfade sind nicht mehr verfügbar.
+
+## [0.2.12] - 2026-08-28
+
+### Neue Inhalte
+
+- Die Marketingseite erhält zweisprachige `/blog`- und `/news`-Bereiche mit Artikelseiten,
+  RSS-Feeds und Sitemap-Einträgen.
+- Öffentliche News können aus Release-Informationen als redaktionell prüfbare Entwürfe erzeugt
+  werden; sensible oder personenbezogene Inhalte werden dabei nicht übernommen.
+
+### Zusammenarbeit und Speicherung
+
+- Cloud-Mindmaps verwenden den Sync-Server jetzt als einzige Schreibinstanz für Anlegen,
+  Speichern, Umbenennen und Löschen.
+- Versionsprüfungen und eindeutige Fehlerzustände verhindern, dass REST- oder Offline-Aktionen
+  aktive Yjs-Sitzungen und neuere Änderungen überschreiben.
+- Lokale Änderungen bleiben bei einer Wiederverbindung erhalten und werden beim nächsten
+  Sync-Handshake wieder angeboten.
+
+### Editor und Zugänglichkeit
+
+- Die Markdown-Formatierung im MDX-Editor stellt Listenebenen, Überschriften, Tabellen,
+  Codeblöcke, Blockquotes und Checklisten wieder konsistent dar.
+- Fokus, Tastatur-Navigation und semantische Node-Struktur sind für Web und Desktop weiter
+  vereinheitlicht.
+
+### Qualität
+
+- Sync-Server-, API-, UI-, Marketing- und Editor-Regressionstests decken aktive Räume,
+  Versionskonflikte, Reconnects und die neuen Content-Routen ab.
+
+## [0.2.11] - 2026-08-27
+
+### Verbesserungen
+
+- Die Tastatursteuerung hält den Fokus nach Umbenennen, Löschen, Rückgängig und Wiederholen am
+  erwarteten Node.
+- Nach dem Löschen eines Nodes wird automatisch der Eltern-Node fokussiert; neue Nodes bleiben bis
+  zum Abschluss der Bearbeitung eindeutig aktiv.
+- Die Verbindungswiederherstellung im gemeinsamen Workspace bleibt stabil und zeigt den aktuellen
+  Verbindungszustand zuverlässig an.
+
+### Qualität
+
+- Keyboard-first-Navigation, sichtbarer Fokus und semantische Node-Auswahl sind für Web und Desktop
+  vereinheitlicht.
+
+## [0.2.10] - 2026-08-26
+
+### Behobene Fehler
+
+- Beim Anlegen eines Child- oder Geschwister-Nodes öffnet und fokussiert sich der Umbenennen-Editor
+  jetzt auch zuverlässig nach vorherigen Löschaktionen.
+- Die Node-Erstellung per `Tab` und `Enter` verwendet jetzt den aktiven Sprachkontext statt eines
+  hartcodierten englischen Platzhalters.
+
+## [0.2.9] - 2026-08-25
+
+### Verbesserungen
+
+- Die Anwesenheitsanzeige für gemeinsam geöffnete Mindmaps bleibt während automatischer
+  Verbindungswiederherstellungen sichtbar.
+- Neue Nodes und neu angelegte Markdown-Dateien aktivieren den Umbenennen-Editor direkt.
+- Das Desktop-Feedback-Feld erhält beim Öffnen und nach kurzzeitigem Fokusverlust zuverlässig den
+  Eingabefokus.
+
+### Behobene Fehler
+
+- Web-Feedback kann jetzt auch ohne Screenshot gesendet werden; Screenshots bleiben optionale
+  Anhänge zur besseren Analyse.
+- Feedback-Entwürfe werden verzögert gespeichert, damit Eingaben nicht durch synchrone Persistenz
+  beeinträchtigt werden.
+
+## [0.2.8] - 2026-08-25
+
+### Verbesserungen
+
+- Markdown-Mindmap-Vorschauen auf der Landingpage verwenden jetzt dieselbe visuelle Sprache wie die BloomMD-App.
+- Hero-, Use-Case- und Feature-Vorschauen werden aus echten Markdown-Strukturen erzeugt und bleiben in DE und EN konsistent.
+
+### Qualität
+
+- Gemeinsame read-only Preview-Komponente mit BloomMD-Grid, Nodes, Kanten und Fokus-Styling ergänzt.
+- Responsive Marketing-Prüfungen für Desktop und Mobile erweitert.
+
+## [0.2.7] - 2026-08-24
+
+### Verbesserungen
+
+- Die native macOS-App übernimmt die gewählte Sprache jetzt auch im macOS-Anwendungsmenü.
+- Desktop- und gemeinsame UI-Flächen verwenden konsistente deutsche und englische Übersetzungen.
+- Feedback-, Workspace-, Ressourcen-, Konflikt- und Verbindungsdialoge wurden sprachlich vereinheitlicht.
+
+### Qualität
+
+- Neue Sprach- und Menüverträge verhindern fehlende Übersetzungsschlüssel und gemischte Sprachen.
+- Hosted-Web-App und Marketing bleiben unverändert auf `0.2.5`.
+
+## [0.2.6] - 2026-08-23
+
+### Desktop-Testrelease
+
+- Neue macOS-arm64-App zum realen Test des Electrobun-Updatepfads von `0.2.5` auf `0.2.6`.
+- Hosted-Web-App und Marketing bleiben unverändert auf `0.2.5`.
+
+## [0.2.5] - 2026-08-23
+
+### Behobene Fehler
+
+- Der First-Party-Desktop-Proxy funktioniert auch bei privaten GitHub-Releases: Marketing löst
+  Stable-Artefakte serverseitig über die GitHub-API mit einem Runtime-Token auf; der Token und die
+  GitHub-URL bleiben vollständig außerhalb des Clients.
+- Die Middleware blockiert den internen Proxy-Route-Pfad nicht mehr nach dem Rewrite.
+- Der DMG-Link der Produktions-ConfigMap zeigt auf `/_desktop-updates` statt auf den veralteten
+  statischen Beta-Artefaktpfad.
+
+### Verbesserungen
+
+- Die Downloadseite bezeichnet die laufende Desktop-Version eindeutig als `Version` und liest sie
+  aus dem veröffentlichten Stable-Manifest.
+
+## [0.2.4] - 2026-08-23
+
+### Neue Features
+
+- Die macOS-App prüft stabile Updates, lädt sie mit Fortschrittsstatus herunter und installiert sie
+  erst nach ausdrücklicher Bestätigung im About-Dialog.
+- Desktop-Update-Artefakte und der manuelle DMG-Download sind über einen First-Party-Proxy unter
+  `bloommd.io` erreichbar; die GitHub-Release-URL bleibt aus der App heraus.
+- Stable-Desktop-Artefakte werden durch einen tagbasierten GitHub-Actions-Workflow gebaut, geprüft
+  und als GitHub Release veröffentlicht.
+
+### Verbesserungen
+
+- Die Marketing-Downloadseite ermittelt Version und Update-Hash live aus dem Stable-Manifest und
+  verwendet denselben Proxy wie der Desktop-Updater.
+- Hosted-Packages und Desktop-Bausteine verwenden gemeinsam die Release-Version `0.2.4`.
+
+### Bekannte Einschränkungen
+
+- Der macOS-Build ist für die Closed Beta ad-hoc signiert und noch nicht Developer-ID-signiert bzw.
+  notarisiert. Die vollständige Vertrauenskette bleibt Bestandteil von [Archiv #282](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/282).
+
+## [0.2.3] - 2026-08-23
+
+### Neue Features
+
+- Der About-Dialog ist jetzt auch in der Web-App verfügbar und zeigt Produktkontext, eingesetzte
+  Technologien, rechtliche Links, den M1-Beta-Status sowie technische Build-Details.
+
+### Verbesserungen
+
+- Der Web-About-Dialog ist auf Deutsch und Englisch verfügbar, theming-kompatibel, responsiv und
+  per Tastatur sowie Screenreader zugänglich.
+
+## [0.1.0-beta.11] - 2026-08-23
+
+### Neue Features
+
+- Der macOS-About-Dialog zeigt BloomMD-Branding, eingesetzte Technologien, rechtliche Links, den M1-Beta-Status und technische Build-Details.
+
+### Verbesserungen
+
+- Git-SHA, Git-Tag, Build-Zeitpunkt und Versionsnummer werden im nativen macOS-Artefakt bereits beim CI-Build eingebettet und sind dadurch auch beim Start aus dem Finder verfügbar.
+
+## [0.2.2] - 2026-08-23
+
+### Verbesserungen
+
+- Plausible-Analytics auf der Marketing-Seite läuft cookielos ohne Einwilligungsdialog; Pageviews und erlaubte, inhaltsfreie Events werden weiterhin über den First-Party-Proxy erfasst.
+- Cookie- und Datenschutzhinweise erklären die cookielose Plausible-Konfiguration auf Deutsch und Englisch.
+
+### Behobene Fehler
+
+- Frühe Demo-Events gehen nicht mehr verloren, wenn das Plausible-Script noch lädt.
+
+## [0.2.1] - 2026-08-22
+
+### Neue Features
+
+- BloomMD ist auf den öffentlichen App- und Marketing-Flächen durchgängig auf Deutsch und Englisch verfügbar – einschließlich Authentifizierung, Einladungen, Recovery, Account, Beta, Wiki, Dokumentation, Templates und Waitlist.
+- Geteilte BloomMD-Links verwenden ein korrektes 1200×630-Social-Preview mit echtem BloomMD-Logo und echtem Demo-Screenshot.
+
+### Verbesserungen
+
+- Light- und Dark-Theme sind für App, Authentifizierung, Einladungen, Legal-Flächen, Marketing, Demo, Docs, Templates und Waitlist konsistent umgesetzt.
+- Social-Media-Metadaten, Sprachvarianten und route-spezifische Canonicals sind für öffentliche Seiten konsistent.
+- Web- und macOS-App bündeln Dokument-, Datei-, Suche- sowie Hilfe-/Einstellungsaktionen in einer gemeinsamen, übersetzten Toolbar; doppelte Header-Icons entfallen.
+- Theme-, Lokalisierungs-, Accessibility- und Release-Contract-Tests schützen Desktop- und Mobile-Flächen sowie Fehler-, Erfolgs- und Formularzustände.
+
+### Behobene Fehler
+
+- Feste helle Oberflächen, Form Controls und kontrastarme Textfarben bleiben im Dark Mode nicht mehr als Light-Theme-Reste sichtbar.
+- Englische Fehlermeldungen, Bestätigungs-E-Mails und Beta-Einladungslinks erhalten den korrekten Sprachkontext.
+
+## [0.2.0] - 2026-08-21
+
+### Neue Features
+
+- Einheitlicher Authentifizierungs- und Einladungsablauf für Registrierung, Login, E-Mail-Bestätigung, Passwort-Wiederherstellung und Beta-Einladungen.
+- Workspace-Einladungen können explizit angenommen werden; Einladungskontext bleibt beim Wechsel zwischen Login und Signup erhalten.
+- Waitlist-Administration mit erneuter Bestätigungs-Mail, Beta-Einladung und bestätigungspflichtigem Löschen einzelner Waitlist-Einträge.
+
+### Verbesserungen
+
+- Authentifizierungsoberflächen und Fehlermeldungen unterstützen Deutsch und Englisch.
+- Zugänglichkeit und Tastaturbedienung der Authentifizierungs- und Workspace-Flows verbessert.
+- Kontrast des ungültigen Workspace-Einladungszustands für die Accessibility-Prüfung korrigiert.
+- Version und Build-Informationen sind in den ausgelieferten Web-Flächen sowie über `/api/version` nachvollziehbar.
+
+### Bekannte Einschränkungen
+
+- Die neue Waitlist-Löschung entfernt ausschließlich den Eintrag aus der Marketing-Waitlist. Produkt-Accounts und bestehende Beta-Einladungen werden nicht gelöscht oder widerrufen.
+- Das Hosted-Release `0.2.0` umfasst App, Marketing und Sync. Das separate macOS-Desktop-/CLI-Beta-Artefakt bleibt `0.1.0-beta.10`.

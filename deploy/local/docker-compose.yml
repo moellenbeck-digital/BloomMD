@@ -1,0 +1,120 @@
+# Local runtime for verifying collaboration against a real database.
+#
+# This stack is for development, review and beta rehearsals. It is deliberately NOT the production
+# path: the private beta runs on CloudNativePG, and a container with a well-known password on a
+# published port must never be mistaken for it. The application code cannot tell the difference —
+# both are ordinary PostgreSQL over TLS-capable connections — so the separation is kept here, in the
+# file you have to choose on purpose.
+#
+#   docker compose -f deploy/local/docker-compose.yml up -d postgres sync
+#   bun run --cwd apps/app db:migrate
+#   bun run --cwd apps/app db:verify
+#
+# The `web` service is opt-in via the `full` profile, because most work only needs the database and
+# the sync server while Next.js runs from `bun dev` with hot reload.
+
+name: bloommd-local
+
+services:
+  postgres:
+    # Matches the version the schema is verified against, so a local pass means something.
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bloommd}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bloommd-local-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-bloommd}
+    ports:
+      # Bound to loopback: this database has a known default password and must not be reachable
+      # from the network. The host port deliberately avoids 5432 — most developers already have a
+      # PostgreSQL listening there, and a stack that refuses to start on a fresh clone is a bad
+      # first impression.
+      - "127.0.0.1:${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` reports the socket is up slightly before the server accepts connections during
+      # first-time initialisation, so the database name is included to force a real connection.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bloommd} -d ${POSTGRES_DB:-bloommd}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  sync:
+    build:
+      context: ../..
+      target: sync
+    restart: unless-stopped
+    # The process drains WebSockets and flushes rooms for at most 20 seconds. Leave a small
+    # platform margin so Docker never sends SIGKILL before its own bounded shutdown completes.
+    stop_grace_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # `sslmode=disable` is correct here and only here: the connection never leaves the Docker
+      # network. The release gate rejects a URL like this for production, which is the point.
+      SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-bloommd}:${POSTGRES_PASSWORD:-bloommd-local-dev}@postgres:5432/${POSTGRES_DB:-bloommd}?sslmode=disable
+      BLOOMMD_SYNC_SECRET: "${BLOOMMD_SYNC_SECRET:?BLOOMMD_SYNC_SECRET is required. Generate one with `openssl rand -hex 32`}"
+      # The browser reaches the optional full stack through :3000 by default or :33000 in the
+      # reproducible agent E2E. Both loopback origins are intentional local entry points.
+      SYNC_ALLOWED_ORIGINS: ${SYNC_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:33000}
+      SYNC_PORT: "4100"
+      SYNC_PERSIST_RETRY_MAX_ATTEMPTS: ${SYNC_PERSIST_RETRY_MAX_ATTEMPTS:-3}
+      SYNC_PERSIST_RETRY_BASE_MS: ${SYNC_PERSIST_RETRY_BASE_MS:-100}
+      SYNC_PERSIST_RETRY_MAX_DELAY_MS: ${SYNC_PERSIST_RETRY_MAX_DELAY_MS:-2000}
+      SYNC_PERSIST_RETRY_MAX_DURATION_MS: ${SYNC_PERSIST_RETRY_MAX_DURATION_MS:-10000}
+      SYNC_PERSIST_SAVE_TIMEOUT_MS: ${SYNC_PERSIST_SAVE_TIMEOUT_MS:-15000}
+      SYNC_SHUTDOWN_TIMEOUT_MS: ${SYNC_SHUTDOWN_TIMEOUT_MS:-20000}
+    ports:
+      - "127.0.0.1:${SYNC_PORT:-4100}:4100"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:4100/health').then((r) => { if (!r.ok) process.exit(1); })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  web:
+    profiles: ["full"]
+    build:
+      context: ../..
+      target: app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      sync:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bloommd}:${POSTGRES_PASSWORD:-bloommd-local-dev}@postgres:5432/${POSTGRES_DB:-bloommd}?sslmode=disable
+      BLOOMMD_SYNC_SECRET: "${BLOOMMD_SYNC_SECRET:?BLOOMMD_SYNC_SECRET is required. Generate one with `openssl rand -hex 32`}"
+      BLOOMMD_AUTH_SECRET: "${BLOOMMD_AUTH_SECRET:?BLOOMMD_AUTH_SECRET is required. Generate one with `openssl rand -hex 32`}"
+      # Next.js sees the container's internal :3000 origin. Also allow the explicit loopback URL
+      # that a browser uses through the local Docker port mapping, otherwise form submissions are
+      # rejected as cross-origin even though they never leave the machine.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+      # The image is production-mode Next.js, while this Compose stack remains
+      # local-only. It prevents form redirects from escaping to bloommd.app.
+      BLOOMMD_LOCAL_DEPLOYMENT: "1"
+      # Keep the browser endpoint aligned with the published sync port. The web container never
+      # uses this value for mutations; those go through BLOOMMD_SYNC_INTERNAL_URL below.
+      NEXT_PUBLIC_SYNC_URL: ${NEXT_PUBLIC_SYNC_URL:-ws://localhost:${SYNC_PORT:-4100}}
+      # Server-side document mutations cannot use the browser's loopback address from inside
+      # the web container. Keep the public URL separate from the Docker network endpoint.
+      BLOOMMD_SYNC_INTERNAL_URL: ${BLOOMMD_SYNC_INTERNAL_URL:-ws://sync:4100}
+      # Migrations stay explicit, exactly as in production: the app never migrates itself.
+      BLOOMMD_AUTO_MIGRATE: "0"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/api/health/ready').then((r) => { if (!r.ok) process.exit(1); })"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres-data:

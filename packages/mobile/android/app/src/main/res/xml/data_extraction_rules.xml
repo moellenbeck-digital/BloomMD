@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: cloud backup and device transfer keep the app's own notes and settings. The
+     folder permission (a content URI grant) does not survive a transfer; the folder is chosen again.
+     The keychain plugin's encrypted preferences (bloommd_keychain) are excluded: their key lives in
+     this device's Keystore, so a restored value could not be decrypted on another device. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="bloommd/" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="bloommd_keychain.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="bloommd/" />
+        <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="bloommd_keychain.xml" />
+    </device-transfer>
+</data-extraction-rules>

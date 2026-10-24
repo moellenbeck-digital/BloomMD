@@ -1,0 +1,31 @@
+name: Template Request
+description: Request a new BloomMD template.
+title: "[Template]: "
+labels: ["enhancement", "documentation"]
+body:
+  - type: input
+    id: template_name
+    attributes:
+      label: Template name
+      placeholder: "Example: Incident Response Map"
+    validations:
+      required: true
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target audience
+      placeholder: Who would use this template?
+    validations:
+      required: true
+  - type: textarea
+    id: structure
+    attributes:
+      label: Suggested structure
+      placeholder: Headings, sections, example nodes
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      placeholder: What workflow should this template unlock?

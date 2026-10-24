@@ -1,0 +1,21 @@
+{
+  "id": "bloommd-workspace-agent",
+  "name": "BloomMD Workspace Agent",
+  "description": "Runs local, review-first BloomMD workspace agents inside OpenClaw.",
+  "enabledByDefault": false,
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "profile": { "type": "string" },
+      "pollIntervalSeconds": { "type": "integer", "minimum": 30, "maximum": 300 },
+      "agentTimeoutSeconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
+      "openClawAgentId": { "type": "string" },
+      "workingDirectory": { "type": "string" }
+    }
+  }
+}

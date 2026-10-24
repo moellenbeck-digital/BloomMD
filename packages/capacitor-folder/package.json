@@ -1,0 +1,42 @@
+{
+  "name": "@bloommd/capacitor-folder",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Opens a user-chosen folder (e.g. an Obsidian vault in iCloud Drive) and reads and writes its Markdown files in place.",
+  "license": "Elastic-2.0",
+  "author": "Möllenbeck Digital",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/moellenbeck-digital/BloomMD"
+  },
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "LICENSE",
+    "LICENSE-MIT-legacy",
+    "src/",
+    "ios/Sources",
+    "android/src/main/",
+    "android/build.gradle",
+    "BloommdCapacitorFolder.podspec"
+  ],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": "^8.5.0"
+  },
+  "devDependencies": {
+    "@capacitor/core": "8.5.1",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

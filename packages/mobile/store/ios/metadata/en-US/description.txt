@@ -1,0 +1,28 @@
+BloomMD shows Markdown notes as a mind map. Every heading becomes a node, and every node keeps its text. The file stays an ordinary Markdown file – readable in Obsidian, in any text editor, and ten years from now.
+
+YOUR OBSIDIAN VAULT, EDITED IN PLACE
+Open any folder through the Files app, for example your Obsidian vault in iCloud Drive. BloomMD edits the notes where they are: no import, no copy, no proprietary format. The folder stays open across app restarts. Notes that iCloud has not downloaded to the device yet are fetched when needed.
+
+ONLY REAL CHANGES ARE SAVED
+Opening a note never rewrites it. If another device – say Obsidian on your Mac – changed the note in the meantime, BloomMD does not overwrite it: your version is kept as a separate note next to it, the new version is opened, and you get a notice.
+
+HANDWRITING WITH APPLE PENCIL
+Write formulas, arrows and sketches right inside a node. The pencil draws with pressure, fingers pan the canvas, and a resting palm does not draw. Use the lasso to move, scale and delete parts of a drawing, and link handwritten words to other notes.
+Every drawing is an SVG file in your vault, embedded in the node – exactly like the BloomMD plugin for Obsidian. The app and the plugin see the same drawings.
+
+MAP, OUTLINE, PRESENTATION
+Switch between the mind map, an outline for quick reading and a presentation view. Nodes can be tasks with status and due date, or decisions. The node editor opens as a side panel next to the map on iPad and as a bottom sheet on iPhone.
+
+NO ACCOUNT, WORKS OFFLINE
+BloomMD works without signing in and without an internet connection. If you don't pick a folder, your maps live in the app's own folder on the device. Import Markdown files, and share any map as Markdown from the share sheet.
+
+LINKS INTO THE APP
+Links like bloommd://open open a note of the current folder right at a specific node – handy from Shortcuts or other notes.
+
+OPTIONAL: BLOOMMD ACCOUNT (BETA)
+Sign in with a BloomMD account in the browser and edit maps from your cloud workspaces together in real time. You enter your password only on the BloomMD website; the sign-in is kept in the device keychain, and signing out revokes it. Self-hosted BloomMD servers are supported too. Local folders need no account.
+
+PRIVACY
+BloomMD contains no tracking, no ads and no analytics. Your notes leave the device only through your own storage (such as iCloud Drive) or when you deliberately sign in with your BloomMD account.
+
+BloomMD runs on iPad and iPhone, and on Macs with Apple silicon.

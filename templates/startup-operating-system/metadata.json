@@ -1,0 +1,13 @@
+{
+  "title": "Startup Operating System",
+  "description": "Map vision, product, customers, positioning, marketing, sales, metrics, decisions and risks for a small startup.",
+  "audience": ["Founders", "Indie hackers", "Small SaaS teams"],
+  "category": "Business",
+  "previewImage": "/templates/startup-operating-system/preview.png",
+  "sections": ["Vision", "Product", "Customers", "Positioning", "Marketing", "Sales", "Metrics", "Roadmap", "Decisions", "Risks"],
+  "tags": ["startup", "business", "saas", "strategy"],
+  "recommendedUse": "Use this as a weekly operating map for product and go-to-market alignment.",
+  "version": "1.0.0",
+  "slug": "startup-operating-system",
+  "filePath": "templates/startup-operating-system/template.md"
+}

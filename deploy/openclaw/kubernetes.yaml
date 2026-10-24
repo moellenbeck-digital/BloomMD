@@ -1,0 +1,148 @@
+# Replace the version tag only with a published BloomMD plugin image. For a production rollout,
+# pin the resulting image digest (`...@sha256:...`) after the release.
+# The one-time pairing code is supplied to `openclaw bloommd pair` interactively or through a
+# short-lived Job, then immediately deleted. Do not commit it to this manifest.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bloommd-agents
+  labels:
+    app.kubernetes.io/part-of: bloommd
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bloommd-openclaw-agent
+  namespace: bloommd-agents
+  labels:
+    app.kubernetes.io/name: bloommd-openclaw-agent
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bloommd-openclaw-state
+  namespace: bloommd-agents
+  labels:
+    app.kubernetes.io/name: bloommd-openclaw-agent
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bloommd-openclaw-agent
+  namespace: bloommd-agents
+  labels:
+    app.kubernetes.io/name: bloommd-openclaw-agent
+    app.kubernetes.io/part-of: bloommd
+  annotations:
+    bloommd.io/security: "Local outbound-only agent; human review remains required for every proposal."
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bloommd-openclaw-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bloommd-openclaw-agent
+        app.kubernetes.io/part-of: bloommd
+    spec:
+      serviceAccountName: bloommd-openclaw-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openclaw
+          image: ghcr.io/moellenbeck-digital/bloommd-openclaw-plugin:0.4.4
+          imagePullPolicy: IfNotPresent
+          args: ["gateway", "--allow-unconfigured"]
+          env:
+            - name: OPENCLAW_STATE_DIR
+              value: /home/node/.openclaw
+            - name: OPENCLAW_WORKSPACE_DIR
+              value: /home/node/.openclaw/workspace
+            - name: BLOOMMD_AGENT_CONFIG_DIR
+              value: /home/node/.openclaw/bloommd-agents
+            - name: BLOOMMD_AGENT_SECRET_BACKEND
+              value: file
+            - name: OPENCLAW_DISABLE_BONJOUR
+              value: "1"
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-gateway
+                  key: token
+          envFrom:
+            - secretRef:
+                # Model-provider credentials are always Kubernetes Secrets. The BloomMD pairing
+                # token is created at runtime and retained in the encrypted state volume, because
+                # a projected Secret volume is intentionally read-only.
+                name: openclaw-model-credentials
+                optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -f /home/node/.openclaw/openclaw.json && test -f /opt/bloommd-plugin/dist/index.js"]
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -f /home/node/.openclaw/openclaw.json && test -f /opt/bloommd-plugin/dist/index.js"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          volumeMounts:
+            - name: state
+              mountPath: /home/node/.openclaw
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: bloommd-openclaw-state
+---
+# Egress is restricted to DNS and HTTPS. If BloomMD is hosted in-cluster, replace the HTTPS IP
+# block with an explicit namespace/service policy for bloommd.app.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bloommd-openclaw-agent-egress
+  namespace: bloommd-agents
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: bloommd-openclaw-agent
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - ports:
+        - protocol: TCP
+          port: 443

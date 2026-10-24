@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">OpenClaw agents in BloomMD</title>
+  <desc id="desc">A warm dark illustration of a BloomMD mind map node connected to an OpenClaw agent and a proposal ready for human review.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#191614"/><stop offset=".55" stop-color="#352118"/><stop offset="1" stop-color="#161514"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop stop-color="#FF6B35" stop-opacity=".35"/><stop offset="1" stop-color="#FF6B35" stop-opacity="0"/></radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000" flood-opacity=".45"/></filter>
+  </defs>
+  <rect width="1600" height="900" rx="42" fill="url(#bg)"/>
+  <ellipse cx="805" cy="456" rx="600" ry="360" fill="url(#glow)"/>
+  <g fill="#fff" opacity=".45"><circle cx="114" cy="142" r="3"/><circle cx="216" cy="202" r="3"/><circle cx="358" cy="112" r="3"/><circle cx="1280" cy="132" r="3"/><circle cx="1440" cy="254" r="3"/><circle cx="1354" cy="748" r="3"/><circle cx="186" cy="760" r="3"/></g>
+  <text x="112" y="118" fill="#FF8B5C" font-family="Arial, sans-serif" font-size="25" font-weight="700" letter-spacing="4">BLOOMMD × OPENCLAW</text>
+  <path d="M486 488 C608 488 620 330 738 330" fill="none" stroke="#F4EDEA" stroke-opacity=".8" stroke-width="6"/>
+  <path d="M900 330 C1022 330 1000 490 1118 490" fill="none" stroke="#F4EDEA" stroke-opacity=".8" stroke-width="6"/>
+  <g filter="url(#shadow)">
+    <rect x="130" y="376" width="360" height="226" rx="30" fill="#1E1E1E" stroke="#FF6B35" stroke-width="8"/>
+    <text x="172" y="434" fill="#FF8B5C" font-family="Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="2">AUSGEWÄHLTER KNOTEN</text>
+    <text x="172" y="514" fill="#fff" font-family="Arial, sans-serif" font-size="48" font-weight="700">Sync check</text>
+    <rect x="172" y="546" width="178" height="34" rx="17" fill="#3A251D"/>
+    <text x="191" y="570" fill="#FFC5B0" font-family="Arial, sans-serif" font-size="17" font-weight="700">klar begrenzt</text>
+    <rect x="700" y="198" width="250" height="265" rx="36" fill="#201C19" stroke="#73513F" stroke-width="2"/>
+    <rect x="748" y="242" width="154" height="118" rx="24" fill="#4A281B"/>
+    <rect x="771" y="270" width="108" height="72" rx="17" fill="#2B1B16" stroke="#FF8B5C" stroke-width="4"/>
+    <circle cx="804" cy="306" r="7" fill="#FF8B5C"/><circle cx="846" cy="306" r="7" fill="#FF8B5C"/>
+    <path d="M800 328h49" stroke="#FF8B5C" stroke-width="5" stroke-linecap="round"/>
+    <text x="749" y="407" fill="#fff" font-family="Arial, sans-serif" font-size="28" font-weight="700">Lokaler Agent</text>
+    <rect x="1114" y="382" width="354" height="220" rx="28" fill="#241C18" stroke="#FF6B35" stroke-width="4"/>
+    <text x="1154" y="438" fill="#FF8B5C" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="2">VORSCHLAG BEREIT</text>
+    <text x="1154" y="489" fill="#fff" font-family="Arial, sans-serif" font-size="29" font-weight="700">Mensch prüft</text>
+    <rect x="1154" y="525" width="152" height="44" rx="10" fill="#FF6B35"/>
+    <text x="1180" y="554" fill="#fff" font-family="Arial, sans-serif" font-size="19" font-weight="700">Übernehmen</text>
+  </g>
+  <text x="112" y="764" fill="#F4EDEA" font-family="Arial, sans-serif" font-size="42" font-weight="700">Lokaler Agent. Sichtbarer Vorschlag. Deine Entscheidung.</text>
+</svg>

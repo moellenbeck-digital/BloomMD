@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/moellenbeck-digital/BloomMD/issues/new?template=feature_request.yml
+    about: Ask questions, share ideas, and discuss use cases as a tracked issue.
+  - name: Public demo
+    url: https://bloommd.io/demo
+    about: Try BloomMD without an account.

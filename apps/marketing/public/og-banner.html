@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Internal QA preview of the BloomMD production social image. This page itself is not the image shared on social media.">
+    <title>BloomMD Social Asset QA</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #111; color: #f5f2ed; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; background: radial-gradient(circle at 80% 10%, #3b1f12 0, transparent 32rem), #111; }
+      main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+      header { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+      h1 { margin: 0; font-size: clamp(28px, 5vw, 52px); letter-spacing: -0.05em; }
+      p { color: #aaa39b; line-height: 1.6; }
+      .eyebrow { margin: 0 0 8px; color: #ff6b35; font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+      .hero { overflow: hidden; border: 1px solid #403b36; border-radius: 16px; background: #1a1a1a; box-shadow: 0 24px 80px #0008; }
+      .hero img { display: block; width: 100%; height: auto; }
+      .details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+      .card { padding: 20px; border: 1px solid #332f2b; border-radius: 12px; background: #191817; }
+      .card h2 { margin: 0 0 8px; font-size: 15px; }
+      .card p { margin: 0; font-size: 14px; }
+      .square-frame { width: min(100%, 360px); aspect-ratio: 1; overflow: hidden; border: 1px solid #403b36; border-radius: 12px; background: #1a1a1a; }
+      .square-frame img { width: 100%; height: 100%; object-fit: cover; object-position: center; }
+      code { color: #ffc09d; }
+      a { color: #ff9b72; }
+      @media (max-width: 720px) { header { display: block; } .details { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">Internal QA · not for publishing</p>
+          <h1>Social Asset QA</h1>
+        </div>
+        <p>Production PNG · 1200 × 630</p>
+      </header>
+      <p class="notice">This page is only a technical review surface. Social platforms receive the PNG below, not this HTML page.</p>
+      <section class="hero" aria-labelledby="banner-title">
+        <h2 id="banner-title" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">BloomMD Open Graph banner</h2>
+        <img src="/og/bloommd-og-banner.png" width="1200" height="630" alt="BloomMD: Markdown, visualized. Local-first Web and macOS closed beta.">
+      </section>
+      <section class="details" aria-label="Preview checks">
+        <article class="card">
+          <h2>Production asset</h2>
+          <p><code>/og/bloommd-og-banner.png</code><br>Exact 1200 × 630 export for link previews.</p>
+        </article>
+        <article class="card">
+          <h2>Crop check</h2>
+          <div class="square-frame"><img src="/og/bloommd-og-banner.png" alt="Square crop preview of the BloomMD banner."></div>
+        </article>
+        <article class="card">
+          <h2>Source files</h2>
+          <p><a href="/og/bloommd-og-banner.svg">Open SVG source</a><br><a href="/og/bloommd-demo-canvas.png">Open real demo screenshot</a></p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

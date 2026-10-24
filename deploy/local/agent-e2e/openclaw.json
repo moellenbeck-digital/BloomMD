@@ -1,0 +1,43 @@
+{
+  "models": {
+    "mode": "replace",
+    "providers": {
+      "bloommd-e2e": {
+        "baseUrl": "http://model-stub:8080/v1",
+        "apiKey": "local-e2e-model-stub",
+        "api": "openai-completions",
+        "request": {
+          "allowPrivateNetwork": true
+        },
+        "models": [
+          {
+            "id": "workspace-agent",
+            "name": "BloomMD deterministic E2E model",
+            "contextWindow": 8192,
+            "maxTokens": 1024,
+            "input": ["text"]
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "bloommd-e2e/workspace-agent"
+      },
+      "workspace": "/home/node/.openclaw/workspace",
+      "skipBootstrap": true
+    },
+    "entries": {
+      "bloommd-e2e": {
+        "workspace": "/home/node/.openclaw/workspace",
+        "model": "bloommd-e2e/workspace-agent"
+      }
+    }
+  },
+  "tools": {
+    "allow": ["read", "exec"],
+    "deny": ["browser", "gateway", "message"]
+  }
+}

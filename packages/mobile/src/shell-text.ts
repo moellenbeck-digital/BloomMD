@@ -1,0 +1,103 @@
+/**
+ * Texts of the app shell (header, file drawer, messages) in German and English. The map, node
+ * editor and help come from `@bloommd/ui`; both follow the same locale from `useLocale()`.
+ */
+const de = {
+  openFiles: "Dateien öffnen",
+  closeFiles: "Dateien schließen",
+  save: "Speichern",
+  saved: "Gespeichert",
+  shareMarkdown: "Markdown teilen",
+  closeError: "Fehler schließen",
+  closeEditor: "Editor schließen",
+  newMap: "Neu",
+  importMap: "Import",
+  help: "Hilfe",
+  openFolder: "Ordner öffnen",
+  appFolderOnly: "Nur hier",
+  onThisDevice: "Auf diesem Gerät",
+  folderHint: "Ein Ordner aus der Dateien-App, z. B. dein Obsidian-Vault in iCloud Drive, wird direkt bearbeitet.",
+  filterNotes: "Notizen filtern",
+  truncated: (count: number) => `Der Ordner enthält mehr Notizen, als hier angezeigt werden (${count}). Öffne einen Unterordner, um alle zu sehen.`,
+  stillDownloading: "Wird noch aus iCloud geladen …",
+  downloadingFromICloud: "lädt aus iCloud",
+  deleteNote: (title: string) => `${title} löschen`,
+  deleteFile: "Datei löschen",
+  noMapOpen: "Keine Mindmap geöffnet",
+  pickNote: "Notiz wählen",
+  manageAccount: "Konto verwalten oder löschen",
+  linkNotePrompt: "Mit welcher Notiz verknüpfen? (Name der Notiz)",
+  confirmDeleteFromFolder: (path: string, folder: string) => `„${path}“ dauerhaft aus „${folder}“ löschen? Die Notiz verschwindet auch in Obsidian.`,
+  confirmDeleteFromDevice: (path: string) => `„${path}“ dauerhaft von diesem Gerät löschen?`,
+  errors: {
+    saveFailed: "Die Markdown-Datei konnte nicht gespeichert werden. Die vorherige Version wurde wiederhergestellt.",
+    openFailed: (path: string) => `„${path}“ konnte nicht geöffnet werden.`,
+    unreadable: (count: number) => `${count} Markdown-Datei(en) konnten nicht gelesen werden.`,
+    folderFailed: "Der Ordner konnte nicht geöffnet werden.",
+    tooLarge: "Die Datei ist größer als 10 MB und wurde nicht importiert.",
+    importFailed: "Die Markdown-Datei konnte nicht importiert werden.",
+    deleteFailed: "Die Datei konnte nicht gelöscht werden.",
+    cloudFailed: "Cloud-Verbindung fehlgeschlagen.",
+    startFailed: "Der BloomMD-Ordner konnte nicht geöffnet werden.",
+  },
+  conflict: {
+    changedElsewhere: (path: string) => `„${path}“ wurde auf einem anderen Gerät geändert oder gelöscht.`,
+    kept: (copy: string) => `Deine Änderungen von diesem Gerät sind in „${copy}“ gesichert.`,
+    notKept: "Deine Änderungen von diesem Gerät konnten nicht gesichert werden – bitte über „Teilen“ sichern, bevor du die Notiz wechselst.",
+    otherShown: "Die Version vom anderen Gerät ist jetzt geöffnet.",
+    gone: "Die Notiz ist dort nicht mehr lesbar oder wurde gelöscht.",
+  },
+};
+
+export type ShellText = typeof de;
+
+const en: ShellText = {
+  openFiles: "Open files",
+  closeFiles: "Close files",
+  save: "Save",
+  saved: "Saved",
+  shareMarkdown: "Share Markdown",
+  closeError: "Dismiss error",
+  closeEditor: "Close editor",
+  newMap: "New",
+  importMap: "Import",
+  help: "Help",
+  openFolder: "Open folder",
+  appFolderOnly: "This device",
+  onThisDevice: "On this device",
+  folderHint: "A folder from the Files app, such as your Obsidian vault in iCloud Drive, is edited in place.",
+  filterNotes: "Filter notes",
+  truncated: (count) => `The folder holds more notes than shown here (${count}). Open a subfolder to see all of them.`,
+  stillDownloading: "Still downloading from iCloud…",
+  downloadingFromICloud: "downloading from iCloud",
+  deleteNote: (title) => `Delete ${title}`,
+  deleteFile: "Delete file",
+  noMapOpen: "No mind map open",
+  pickNote: "Choose a note",
+  manageAccount: "Manage or delete account",
+  linkNotePrompt: "Link to which note? (note name)",
+  confirmDeleteFromFolder: (path, folder) => `Permanently delete “${path}” from “${folder}”? The note also disappears in Obsidian.`,
+  confirmDeleteFromDevice: (path) => `Permanently delete “${path}” from this device?`,
+  errors: {
+    saveFailed: "The Markdown file could not be saved. The previous version was restored.",
+    openFailed: (path) => `“${path}” could not be opened.`,
+    unreadable: (count) => `${count} Markdown file(s) could not be read.`,
+    folderFailed: "The folder could not be opened.",
+    tooLarge: "The file is larger than 10 MB and was not imported.",
+    importFailed: "The Markdown file could not be imported.",
+    deleteFailed: "The file could not be deleted.",
+    cloudFailed: "Cloud connection failed.",
+    startFailed: "The BloomMD folder could not be opened.",
+  },
+  conflict: {
+    changedElsewhere: (path) => `“${path}” was changed or deleted on another device.`,
+    kept: (copy) => `Your changes from this device are saved in “${copy}”.`,
+    notKept: "Your changes from this device could not be saved – share them before switching notes.",
+    otherShown: "The version from the other device is open now.",
+    gone: "The note can no longer be read there or was deleted.",
+  },
+};
+
+export function shellText(locale: string): ShellText {
+  return locale === "en" ? en : de;
+}

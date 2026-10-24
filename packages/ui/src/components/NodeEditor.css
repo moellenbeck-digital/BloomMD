@@ -1,0 +1,164 @@
+/*
+ * Tailwind's preflight intentionally removes native list markers and heading styles.
+ * MDXEditor renders semantic Markdown elements, so restore their editor presentation in a
+ * local scope instead of changing list styling across the application.
+ */
+.bloommd-markdown-editor {
+  color: var(--color-ink);
+  line-height: 1.6;
+}
+
+.bloommd-markdown-editor > :first-child {
+  margin-top: 0;
+}
+
+.bloommd-markdown-editor > :last-child {
+  margin-bottom: 0;
+}
+
+.bloommd-markdown-editor p {
+  margin: 0.75rem 0;
+}
+
+.bloommd-markdown-editor :where(ul, ol) {
+  margin: 0.75rem 0;
+  padding-inline-start: 1.75rem;
+}
+
+.bloommd-markdown-editor ul {
+  list-style-type: disc;
+}
+
+.bloommd-markdown-editor ol {
+  list-style-type: decimal;
+}
+
+.bloommd-markdown-editor ul ul {
+  list-style-type: circle;
+  margin-block: 0.25rem;
+}
+
+.bloommd-markdown-editor ul ul ul {
+  list-style-type: square;
+}
+
+.bloommd-markdown-editor ol ol {
+  list-style-type: lower-alpha;
+  margin-block: 0.25rem;
+}
+
+.bloommd-markdown-editor ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.bloommd-markdown-editor li {
+  padding-inline-start: 0.25rem;
+}
+
+.bloommd-markdown-editor li > p {
+  margin: 0;
+}
+
+.bloommd-markdown-editor ::marker {
+  color: var(--color-bloom);
+}
+
+.bloommd-markdown-editor :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--color-ink);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.bloommd-markdown-editor h1 {
+  font-size: 1.875rem;
+}
+
+.bloommd-markdown-editor h2 {
+  font-size: 1.5rem;
+}
+
+.bloommd-markdown-editor h3 {
+  font-size: 1.25rem;
+}
+
+.bloommd-markdown-editor h4 {
+  font-size: 1.125rem;
+}
+
+.bloommd-markdown-editor :where(h5, h6) {
+  font-size: 1rem;
+}
+
+.bloommd-markdown-editor blockquote {
+  border-inline-start: 3px solid var(--color-bloom);
+  color: var(--color-ink-muted);
+  margin: 0.75rem 0;
+  padding-inline-start: 1rem;
+}
+
+.bloommd-markdown-editor blockquote > :first-child {
+  margin-top: 0;
+}
+
+.bloommd-markdown-editor blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.bloommd-markdown-editor :where(code, pre) {
+  font-family: var(--font-mono);
+}
+
+.bloommd-markdown-editor code {
+  background: var(--color-surface-sunken);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.3rem;
+}
+
+.bloommd-markdown-editor pre {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  padding: 0.75rem 1rem;
+}
+
+.bloommd-markdown-editor pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.bloommd-markdown-editor table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+.bloommd-markdown-editor :where(th, td) {
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 0.75rem;
+  text-align: start;
+}
+
+.bloommd-markdown-editor th {
+  background: var(--color-surface-sunken);
+  font-weight: 600;
+}
+
+.bloommd-markdown-editor a {
+  color: var(--color-bloom);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* MDXEditor exposes checklist items through a stable ARIA role. Keep text clear of its checkbox. */
+.bloommd-markdown-editor li[role="checkbox"] {
+  margin-inline-start: 0;
+  padding-inline-start: 1.75rem;
+}
+
+.bloommd-markdown-editor li[role="checkbox"]::before {
+  inset-inline-start: 0;
+}

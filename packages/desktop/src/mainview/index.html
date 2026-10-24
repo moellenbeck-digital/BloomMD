@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BloomMD</title>
+    <!-- Select Linux typography before the first paint; WebKitGTK uses a different local stack. -->
+    <script>
+      (function () {
+        var platform = navigator.platform || navigator.userAgent;
+        var isLinux = /Linux/i.test(platform);
+        document.documentElement.classList.toggle("platform-linux", isLinux);
+        if (!isLinux) {
+          var fontLink = document.createElement("link");
+          fontLink.rel = "stylesheet";
+          fontLink.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap";
+          document.head.appendChild(fontLink);
+        }
+      })();
+    </script>
+    <!--
+      Sets the theme before the first paint.
+
+      `useTheme` applies the class in an effect, which runs after the renderer has already painted.
+      Without this, someone who prefers dark sees the light theme flash every time the app opens —
+      and a desktop app is opened far more often than a web page is loaded.
+
+      The branching mirrors `getInitialTheme`: a stored value only counts when it is "light" or
+      "dark", anything else falls through to the system preference. Getting that wrong brings the
+      flash back, because the script and the effect would then disagree.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("bloommd-theme");
+          var dark = stored === "dark" || stored === "light" ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (error) {
+          /* A theme is not worth failing the window over. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title>BloomMD</title>
+  <rect width="128" height="128" rx="28" fill="#1A1A1A"/>
+  <path d="M34 26v76M64 26v76M94 26v76M22 42h84M22 86h84" fill="none" stroke="#FF6B35" stroke-linecap="round" stroke-width="9"/>
+  <path d="M34 26v76M64 26v76M94 26v76" fill="none" stroke="#F4F1ED" stroke-linecap="round" stroke-width="5"/>
+  <path d="M22 42h84M22 86h84" fill="none" stroke="#FF6B35" stroke-linecap="round" stroke-width="5"/>
+</svg>

@@ -1,0 +1,13 @@
+{
+  "title": "Research Project Map",
+  "description": "Structure research questions, hypotheses, literature, evidence, findings and next steps in Markdown.",
+  "audience": ["Students", "Researchers", "Journalists", "Analysts"],
+  "category": "Research",
+  "previewImage": "/templates/research-project/preview.png",
+  "sections": ["Research Question", "Hypotheses", "Literature", "Methods", "Evidence", "Findings", "Sources", "Open Questions", "Next Steps"],
+  "tags": ["research", "analysis", "sources", "evidence"],
+  "recommendedUse": "Use this when starting a literature review, investigation or analytical report.",
+  "version": "1.0.0",
+  "slug": "research-project",
+  "filePath": "templates/research-project/template.md"
+}

@@ -1,0 +1,162 @@
+# A reproducible, local proof for #346. The OpenClaw workers build the BloomMD plugin image,
+# pair through its native CLI and let its service claim and submit work. The local model stub only
+# decides which skill command creates the runner's result file; it never calls the BloomMD API.
+#
+# Run from the repository root:
+#   BLOOMMD_SYNC_SECRET=... BLOOMMD_AUTH_SECRET=... docker compose \
+#     -f deploy/local/docker-compose.yml -f deploy/local/docker-compose.agent-e2e.yml \
+#     --profile full --profile agent-e2e up --build -d
+#   docker compose -f deploy/local/docker-compose.yml -f deploy/local/docker-compose.agent-e2e.yml wait agent-e2e
+
+services:
+  migrate:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      target: workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bloommd}:${POSTGRES_PASSWORD:-bloommd-local-dev}@postgres:5432/${POSTGRES_DB:-bloommd}?sslmode=disable
+    command: ["bun", "run", "--cwd", "apps/app", "db:migrate"]
+    restart: "no"
+
+  sync:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      # Keep the browser URL from the base Compose file. Only server-side mutations use the
+      # private sync:4100 endpoint, so the E2E stack exercises the same split as a real browser.
+      NEXT_PUBLIC_SITE_URL: http://web:3000
+      BLOOMMD_REQUIRE_AUTH: "1"
+    # The production readiness route intentionally checks deployment-only legal and mail settings
+    # that are absent from an isolated E2E stack. Version is dynamic and proves the built app is
+    # serving before the orchestrator creates authenticated state.
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/api/version').then((r) => { if (!r.ok) process.exit(1); })"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  model-stub:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      target: workspace
+    command: ["bun", "run", "deploy/local/agent-e2e/model-stub.ts"]
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:8080/health').then((r) => { if (!r.ok) process.exit(1); })"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  # Named Docker volumes are initially owned by root. Initialize the shared, deliberately
+  # short-lived E2E artifact volume for the non-root orchestrator and plugin containers.
+  agent-e2e-artifacts-init:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      target: workspace
+    command: ["/bin/sh", "-c", "chown -R 1000:1000 /e2e"]
+    volumes:
+      - agent-e2e-artifacts:/e2e
+    restart: "no"
+
+  openclaw-agent-a:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      dockerfile: deploy/openclaw/Dockerfile
+    # Exercise the product image under its intended, non-privileged runtime identity.
+    user: "1000:1000"
+    depends_on:
+      model-stub:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      agent-e2e-artifacts-init:
+        condition: service_completed_successfully
+    environment:
+      HOME: /home/node
+      BLOOMMD_APP_URL: http://web:3000
+      BLOOMMD_E2E_AGENT: agent-a
+      BLOOMMD_E2E_PROFILE: agent-a
+      BLOOMMD_AGENT_SECRET_BACKEND: file
+      BLOOMMD_AGENT_CONFIG_DIR: /home/node/.config/bloommd/agents
+      OPENCLAW_GATEWAY_TOKEN: agent-e2e-gateway-token
+      OPENCLAW_DISABLE_BONJOUR: "1"
+    volumes:
+      - agent-a-state:/home/node/.openclaw
+      - ./agent-e2e:/fixtures:ro
+      - agent-e2e-artifacts:/e2e
+    entrypoint: ["/bin/sh", "/fixtures/openclaw-plugin-runner.sh"]
+    restart: "no"
+
+  openclaw-agent-b:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      dockerfile: deploy/openclaw/Dockerfile
+    user: "1000:1000"
+    depends_on:
+      model-stub:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      agent-e2e-artifacts-init:
+        condition: service_completed_successfully
+    environment:
+      HOME: /home/node
+      BLOOMMD_APP_URL: http://web:3000
+      BLOOMMD_E2E_AGENT: agent-b
+      BLOOMMD_E2E_PROFILE: agent-b
+      BLOOMMD_AGENT_SECRET_BACKEND: file
+      BLOOMMD_AGENT_CONFIG_DIR: /home/node/.config/bloommd/agents
+      OPENCLAW_GATEWAY_TOKEN: agent-e2e-gateway-token
+      OPENCLAW_DISABLE_BONJOUR: "1"
+    volumes:
+      - agent-b-state:/home/node/.openclaw
+      - ./agent-e2e:/fixtures:ro
+      - agent-e2e-artifacts:/e2e
+    entrypoint: ["/bin/sh", "/fixtures/openclaw-plugin-runner.sh"]
+    restart: "no"
+
+  agent-e2e:
+    profiles: ["agent-e2e"]
+    build:
+      context: ../..
+      target: workspace
+    # Pairing codes and test artifacts are exchanged with the non-root OpenClaw containers.
+    # Keeping the orchestrator on the same UID verifies that this works without privilege escalation.
+    user: "1000:1000"
+    depends_on:
+      web:
+        condition: service_healthy
+      agent-e2e-artifacts-init:
+        condition: service_completed_successfully
+      openclaw-agent-a:
+        condition: service_started
+      openclaw-agent-b:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bloommd}:${POSTGRES_PASSWORD:-bloommd-local-dev}@postgres:5432/${POSTGRES_DB:-bloommd}?sslmode=disable
+      BLOOMMD_AUTH_SECRET: "${BLOOMMD_AUTH_SECRET:?BLOOMMD_AUTH_SECRET is required}"
+      BLOOMMD_E2E_APP_URL: http://web:3000
+      BLOOMMD_E2E_ARTIFACT_DIR: /e2e
+    volumes:
+      - agent-e2e-artifacts:/e2e
+    command: ["bun", "run", "deploy/local/agent-e2e/orchestrator.ts"]
+    restart: "no"
+
+volumes:
+  agent-a-state:
+  agent-b-state:
+  agent-e2e-artifacts:

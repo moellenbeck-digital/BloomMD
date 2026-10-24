@@ -1,0 +1,5 @@
+Die erste Version von BloomMD für iPad und iPhone:
+- Ordner aus der Dateien-App öffnen, z. B. deinen Obsidian-Vault in iCloud Drive, und direkt bearbeiten
+- Handschrift mit dem Apple Pencil im Knoten, gespeichert als SVG im Vault
+- Mind Map, Gliederung und Präsentation
+- Schutz vor Überschreiben, wenn ein anderes Gerät dieselbe Notiz geändert hat

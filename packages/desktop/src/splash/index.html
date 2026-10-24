@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /*
+      The splash is literally the first thing the app shows. Hardcoded light meant a dark-mode user
+      got a bright white flash before the window turned dark — the worst possible first frame.
+
+      A media query rather than the stored preference: the splash renders before any application
+      code runs, so the system setting is all it has.
+    */
+    :root {
+      --splash-bg: #FAFAFA;
+      --splash-version: #bbb;
+      --splash-track: #eee;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --splash-bg: #111111;
+        --splash-version: #666;
+        --splash-track: #2A2A2A;
+      }
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--splash-bg);
+      overflow: hidden;
+      font-family: 'Helvetica Neue', 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif;
+      -webkit-user-select: none;
+    }
+
+    .logo {
+      animation: fadeIn 0.6s ease-out;
+    }
+
+    .version {
+      margin-top: 32px;
+      font-size: 11px;
+      color: var(--splash-version);
+      letter-spacing: 1px;
+      animation: fadeIn 0.8s ease-out 0.3s both;
+    }
+
+    .loader {
+      margin-top: 24px;
+      width: 40px;
+      height: 3px;
+      background: var(--splash-track);
+      border-radius: 2px;
+      overflow: hidden;
+      animation: fadeIn 0.8s ease-out 0.5s both;
+    }
+
+    .loader::after {
+      content: '';
+      display: block;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, #FF6B35, #F7931E);
+      border-radius: 2px;
+      animation: slide 1.2s ease-in-out infinite;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slide {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(140%); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="200" height="168">
+      <defs>
+        <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#FF6B35"/>
+          <stop offset="100%" style="stop-color:#F7931E"/>
+        </linearGradient>
+      </defs>
+      <g transform="translate(52, 8)">
+        <rect x="32" y="4" width="10" height="96" rx="5" fill="#1A1A1A"/>
+        <rect x="64" y="4" width="10" height="96" rx="5" fill="#1A1A1A"/>
+        <rect x="8" y="26" width="92" height="10" rx="5" fill="url(#bloom)"/>
+        <rect x="8" y="60" width="92" height="10" rx="5" fill="url(#bloom)"/>
+        <circle cx="100" cy="10" r="7" fill="url(#bloom)" opacity="0.85"/>
+      </g>
+      <text x="120" y="148" text-anchor="middle" font-family="'Helvetica Neue', 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif" font-size="36" font-weight="700" fill="#1A1A1A" letter-spacing="-0.5">
+        Bloom<tspan font-weight="400" fill="#666">MD</tspan>
+      </text>
+      <text x="120" y="175" text-anchor="middle" font-family="'Helvetica Neue', 'Noto Sans', 'DejaVu Sans', 'Liberation Sans', Arial, sans-serif" font-size="12" fill="#999" letter-spacing="1.5">
+        MARKDOWN MIND MAPS
+      </text>
+    </svg>
+  </div>
+  <div class="version">v0.3.0</div>
+  <div class="loader"></div>
+</body>
+</html>

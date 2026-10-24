@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_desktop-updates/
+Disallow: /desktop-updates/
+Disallow: /openclaw-plugin/
+
+Sitemap: https://bloommd.io/sitemap.xml

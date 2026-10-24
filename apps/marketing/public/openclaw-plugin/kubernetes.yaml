@@ -1,0 +1,109 @@
+# Download this public manifest and replace the image placeholder with an image
+# built from https://bloommd.io/openclaw-plugin/Dockerfile in your own registry.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bloommd-agents
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bloommd-openclaw-agent
+  namespace: bloommd-agents
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bloommd-openclaw-state
+  namespace: bloommd-agents
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bloommd-agent-secrets
+  namespace: bloommd-agents
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 128Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bloommd-openclaw-agent
+  namespace: bloommd-agents
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bloommd-openclaw-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bloommd-openclaw-agent
+    spec:
+      serviceAccountName: bloommd-openclaw-agent
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: openclaw
+          image: REPLACE_WITH_YOUR_REGISTRY/bloommd-openclaw-agent:0.4.4
+          args: ["gateway", "--allow-unconfigured"]
+          env:
+            - name: OPENCLAW_STATE_DIR
+              value: /home/node/.openclaw
+            - name: OPENCLAW_WORKSPACE_DIR
+              value: /home/node/.openclaw/workspace
+            - name: BLOOMMD_AGENT_CONFIG_DIR
+              value: /home/node/.config/bloommd/agents
+            - name: BLOOMMD_AGENT_SECRET_BACKEND
+              value: file
+            - name: OPENCLAW_DISABLE_BONJOUR
+              value: "1"
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-gateway
+                  key: token
+          envFrom:
+            - secretRef:
+                name: openclaw-model-credentials
+                optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: state
+              mountPath: /home/node/.openclaw
+            - name: secrets
+              mountPath: /home/node/.config/bloommd/agents
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: bloommd-openclaw-state
+        - name: secrets
+          persistentVolumeClaim:
+            claimName: bloommd-agent-secrets

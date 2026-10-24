@@ -1,0 +1,13 @@
+{
+  "title": "Software Architecture Map",
+  "description": "Plan system goals, components, integrations, security and deployment in a Markdown-native architecture map.",
+  "audience": ["Developers", "CTOs", "Software agencies", "Open-source maintainers"],
+  "category": "Development",
+  "previewImage": "/templates/software-architecture/preview.png",
+  "sections": ["System Goals", "Architecture", "Frontend", "Backend", "Database", "Integrations", "Security", "Deployment", "Roadmap", "Open Questions"],
+  "tags": ["architecture", "development", "saas", "systems"],
+  "recommendedUse": "Use this before a build sprint, architecture review or technical due diligence session.",
+  "version": "1.0.0",
+  "slug": "software-architecture",
+  "filePath": "templates/software-architecture/template.md"
+}

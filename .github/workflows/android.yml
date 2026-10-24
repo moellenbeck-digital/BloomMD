@@ -1,0 +1,173 @@
+name: Android
+
+# Native build of the BloomMD Android app (Capacitor): debug APK, JVM unit tests of the folder plugin
+# and an emulator self-test on pull requests; a signed AAB for Google Play on tags (mobile-v*) or by
+# hand. Uploads go to the Play *internal testing* track only, never to production.
+on:
+  pull_request:
+    paths:
+      - packages/mobile/**
+      - packages/capacitor-folder/**
+      - packages/ui/**
+      - packages/ink/**
+      - packages/core/**
+      - bun.lock
+      - .github/workflows/android.yml
+  push:
+    tags:
+      - mobile-v*
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Build the signed release AAB (and upload it to internal testing when the Play secret exists)
+        type: boolean
+        default: false
+
+concurrency:
+  group: android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BLOOMMD_ANDROID_VERSION_CODE: ${{ github.run_number }}
+
+jobs:
+  debug:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+        with:
+          # The default also installs the legacy `tools` package, which current SDK managers no longer offer.
+          packages: platform-tools
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Unit tests (app)
+        working-directory: packages/mobile
+        run: bun run test
+      - name: Build web assets with the emulator self-test
+        working-directory: packages/mobile
+        env:
+          VITE_BLOOMMD_SELFTEST: "1"
+        run: bun run build
+      - name: Sync Capacitor Android project
+        working-directory: packages/mobile
+        run: bunx cap sync android
+      - name: Debug APK and Kotlin unit tests (folder plugin)
+        working-directory: packages/mobile/android
+        run: ./gradlew --no-daemon assembleDebug :bloommd-capacitor-folder:testDebugUnitTest
+      - name: Free disk space for the emulator
+        # The runner has ~6 GB left after the build; the tablet image needs more for its data partition.
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost /opt/hostedtoolcache/CodeQL
+          df -h "$HOME"
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run the self-test on an Android tablet emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_tablet
+          disk-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash packages/mobile/scripts/android-selftest.sh packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-selftest.png"
+      - name: Keep the APK and the emulator screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug
+          path: |
+            packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            ${{ runner.temp }}/android-selftest.png
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/mobile-v') || (github.event_name == 'workflow_dispatch' && inputs.release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: android-release
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+        with:
+          # The default also installs the legacy `tools` package, which current SDK managers no longer offer.
+          packages: platform-tools
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Build web assets
+        working-directory: packages/mobile
+        run: bun run build
+      - name: Sync Capacitor Android project
+        working-directory: packages/mobile
+        run: bunx cap sync android
+      - name: Check signing secrets
+        id: signing
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$KEYSTORE" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/upload.jks"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No upload key secrets: building an unsigned AAB, nothing is uploaded to Google Play."
+          fi
+          if [ -n "$PLAY" ]; then echo "play=true" >> "$GITHUB_OUTPUT"; else echo "play=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Release AAB
+        working-directory: packages/mobile/android
+        env:
+          ANDROID_UPLOAD_KEYSTORE_FILE: ${{ steps.signing.outputs.signed == 'true' && format('{0}/upload.jks', runner.temp) || '' }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease :bloommd-capacitor-folder:testReleaseUnitTest
+      - name: Verify the AAB signature
+        if: steps.signing.outputs.signed == 'true'
+        run: jarsigner -verify packages/mobile/android/app/build/outputs/bundle/release/app-release.aab
+      - name: Remove the decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.jks"
+      - name: Keep the AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.run_number }}
+          path: packages/mobile/android/app/build/outputs/bundle/release/app-release.aab
+      - name: Upload to Google Play internal testing
+        if: steps.signing.outputs.signed == 'true' && steps.signing.outputs.play == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.bloommd.mobile
+          releaseFiles: packages/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed

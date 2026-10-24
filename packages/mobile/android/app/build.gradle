@@ -1,0 +1,95 @@
+import groovy.json.JsonSlurper
+
+apply plugin: 'com.android.application'
+
+// Version: versionName from packages/mobile/package.json without the prerelease part (Play shows
+// it to users, e.g. 0.1.0 for 0.1.0-beta.10); versionCode from -PbloommdVersionCode=<n> or the
+// environment (CI passes the workflow run number). Play needs a higher versionCode for every upload.
+def mobilePackage = new JsonSlurper().parse(file('../../package.json'))
+def bloommdVersionName = mobilePackage.version.toString().replaceFirst(/[-+].*$/, '')
+def bloommdVersionCode = (project.findProperty('bloommdVersionCode') ?: System.getenv('BLOOMMD_ANDROID_VERSION_CODE') ?: '1').toString().toInteger()
+
+// Release signing with the Play upload key, only when all secrets are present (CI or a local
+// shell). Without them `bundleRelease` builds an unsigned AAB and debug builds are unaffected.
+def uploadKeystore = null
+def keystorePath = System.getenv('ANDROID_UPLOAD_KEYSTORE_FILE')
+def keystoreBase64 = System.getenv('ANDROID_UPLOAD_KEYSTORE_BASE64')
+if (keystorePath) {
+    uploadKeystore = file(keystorePath)
+} else if (keystoreBase64) {
+    uploadKeystore = new File(layout.buildDirectory.get().asFile, 'upload-keystore/upload.jks')
+    uploadKeystore.parentFile.mkdirs()
+    uploadKeystore.bytes = keystoreBase64.replaceAll(/\s/, '').decodeBase64()
+}
+def uploadSigning = uploadKeystore != null &&
+    System.getenv('ANDROID_UPLOAD_KEYSTORE_PASSWORD') &&
+    System.getenv('ANDROID_UPLOAD_KEY_ALIAS') &&
+    System.getenv('ANDROID_UPLOAD_KEY_PASSWORD')
+
+android {
+    namespace = "app.bloommd.mobile"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "app.bloommd.mobile"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode bloommdVersionCode
+        versionName bloommdVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        if (uploadSigning) {
+            upload {
+                storeFile uploadKeystore
+                storePassword System.getenv('ANDROID_UPLOAD_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_UPLOAD_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_UPLOAD_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (uploadSigning) signingConfig signingConfigs.upload
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

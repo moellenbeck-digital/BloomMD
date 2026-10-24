@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" width="240" height="200">
+  <defs>
+    <linearGradient id="bloom" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#F7931E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Large # centered -->
+  <g transform="translate(52, 8)">
+    <rect x="32" y="4" width="10" height="96" rx="5" fill="#E8E8E8"/>
+    <rect x="64" y="4" width="10" height="96" rx="5" fill="#E8E8E8"/>
+    <rect x="8" y="26" width="92" height="10" rx="5" fill="url(#bloom)"/>
+    <rect x="8" y="60" width="92" height="10" rx="5" fill="url(#bloom)"/>
+    <circle cx="100" cy="10" r="7" fill="url(#bloom)" opacity="0.85"/>
+  </g>
+
+  <!-- Wordmark below -->
+  <text x="120" y="148" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="36" font-weight="700" fill="#F0F0F0" letter-spacing="-0.5">
+    Bloom<tspan font-weight="400" fill="#888">MD</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="120" y="175" text-anchor="middle" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" fill="#666" letter-spacing="1.5">
+    MARKDOWN MIND MAPS
+  </text>
+</svg>

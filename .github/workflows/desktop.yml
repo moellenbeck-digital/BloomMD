@@ -1,0 +1,443 @@
+name: Desktop build matrix
+
+# Electrobun is built on native runners. Linux application bundles are built on native Ubuntu
+# runners; an Arch packaging job turns each bundle into a Pacman package for Omarchy 4.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/desktop/**"
+      - "packages/core/**"
+      - "packages/ui/**"
+      - "packaging/arch/**"
+      - "scripts/check-vite-bundle.mjs"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.base.json"
+      - ".github/workflows/desktop.yml"
+      - ".github/scripts/macos-signing-keychain.py"
+  pull_request:
+    paths:
+      - "packages/desktop/**"
+      - "packages/core/**"
+      - "packages/ui/**"
+      - "packaging/arch/**"
+      - "scripts/check-vite-bundle.mjs"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.base.json"
+      - ".github/workflows/desktop.yml"
+      - ".github/scripts/macos-signing-keychain.py"
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: "Build and notarize macOS release candidate (no publication)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS (arm64)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Node.js for Vite tooling
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare desktop build metadata
+        shell: bash
+        run: |
+          echo "BLOOMMD_BUILD_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "BLOOMMD_BUILD_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || true)" >> "$GITHUB_ENV"
+          echo "BLOOMMD_BUILD_TIME=$(git show -s --format=%cI HEAD)" >> "$GITHUB_ENV"
+          echo "BLOOMMD_RELEASE_VERSION=$(node -p 'require("./packages/desktop/package.json").version')" >> "$GITHUB_ENV"
+
+      - name: Typecheck desktop
+        working-directory: packages/desktop
+        run: bun run typecheck
+
+      - name: Run desktop unit tests
+        working-directory: packages/desktop
+        run: bun run test
+
+      - name: Build renderer and check bundle budget
+        working-directory: packages/desktop
+        run: bun run build:renderer
+
+      - name: Load macOS release credentials from 1Password
+        id: signing-secrets
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        uses: 1password/load-secrets-action@70062d7a876d3eb6334754fa26efd2fbd90c32f2 # v5
+        with:
+          export-env: false
+          version: 2.39.0
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.BLOOMMD_OP_REF_MACOS_DEVELOPER_ID_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.BLOOMMD_OP_REF_MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          ELECTROBUN_DEVELOPER_ID: ${{ secrets.BLOOMMD_OP_REF_ELECTROBUN_DEVELOPER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.BLOOMMD_OP_REF_APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ secrets.BLOOMMD_OP_REF_APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.BLOOMMD_OP_REF_APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY_P8_BASE64: ${{ secrets.BLOOMMD_OP_REF_APPLE_API_PRIVATE_KEY_P8_BASE64 }}
+
+      - name: Import macOS release credentials
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        env:
+          MACOS_DEVELOPER_ID_P12_BASE64: ${{ steps.signing-secrets.outputs.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ steps.signing-secrets.outputs.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          ELECTROBUN_DEVELOPER_ID: ${{ steps.signing-secrets.outputs.ELECTROBUN_DEVELOPER_ID }}
+          APPLE_TEAM_ID: ${{ steps.signing-secrets.outputs.APPLE_TEAM_ID }}
+          APPLE_API_KEY_ID: ${{ steps.signing-secrets.outputs.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ steps.signing-secrets.outputs.APPLE_API_ISSUER_ID }}
+          APPLE_API_PRIVATE_KEY_P8_BASE64: ${{ steps.signing-secrets.outputs.APPLE_API_PRIVATE_KEY_P8_BASE64 }}
+        run: python3 .github/scripts/macos-signing-keychain.py setup
+
+      - name: Build application
+        working-directory: packages/desktop
+        shell: bash
+        run: |
+          if [ "${BLOOMMD_MACOS_RELEASE:-0}" = 1 ]; then
+            bun run build:stable
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if bun run build:stable; then
+              exit 0
+            fi
+            echo "Electrobun build failed on attempt ${attempt}; retrying after a short delay."
+            sleep $((attempt * 10))
+          done
+          exit 1
+
+      - name: Verify macOS stable artifact
+        working-directory: packages/desktop
+        run: bun run verify:stable
+
+      - name: Verify Developer ID, notarization and update archive
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        working-directory: packages/desktop
+        run: bun run verify:release:macos
+
+      - name: Record macOS signing evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.signed
+        run: cat packages/desktop/artifacts/macos-signing-evidence.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove temporary signing credentials
+        if: always()
+        run: python3 .github/scripts/macos-signing-keychain.py cleanup
+
+      - name: Report produced artifacts
+        shell: bash
+        working-directory: packages/desktop
+        run: |
+          echo "### macOS (arm64)" >> "$GITHUB_STEP_SUMMARY"
+          du -h artifacts/* 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+          du -sh build/* 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v7
+        if: success() || (always() && !(github.event_name == 'workflow_dispatch' && inputs.signed))
+        with:
+          name: bloommd-desktop-macos-arm64
+          path: |
+            packages/desktop/artifacts/**
+            packages/desktop/build/*/*.app/**
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux:
+    if: github.event_name != 'workflow_dispatch' || !inputs.signed
+    name: Linux (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: x86_64
+            artifact: linux-x86_64
+            electrobun_arch: x64
+            package_arch: x86_64
+          - os: ubuntu-24.04-arm
+            label: ARM64
+            artifact: linux-arm64
+            electrobun_arch: arm64
+            package_arch: aarch64
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Node.js for Vite tooling
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ matrix.electrobun_arch }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-${{ matrix.electrobun_arch }}-
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            file \
+            libayatana-appindicator3-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            pkg-config
+
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare desktop build metadata
+        shell: bash
+        run: |
+          echo "BLOOMMD_BUILD_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "BLOOMMD_BUILD_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || true)" >> "$GITHUB_ENV"
+          echo "BLOOMMD_BUILD_TIME=$(git show -s --format=%cI HEAD)" >> "$GITHUB_ENV"
+          echo "BLOOMMD_RELEASE_VERSION=$(node -p 'require("./packages/desktop/package.json").version')" >> "$GITHUB_ENV"
+
+      - name: Typecheck desktop
+        working-directory: packages/desktop
+        run: bun run typecheck
+
+      - name: Run desktop unit tests
+        working-directory: packages/desktop
+        run: bun run test
+
+      - name: Build renderer and check bundle budget
+        working-directory: packages/desktop
+        run: bun run build:renderer
+
+      - name: Build native Linux application
+        working-directory: packages/desktop
+        run: bun run build:stable:linux
+
+      - name: Verify native Linux bundle
+        working-directory: packages/desktop
+        env:
+          BLOOMMD_LINUX_APP_DIR: ${{ github.workspace }}/packages/desktop/build/stable-linux-${{ matrix.electrobun_arch }}/package-app
+        run: bun run verify:linux
+
+      - name: Archive native Linux bundle for Pacman packaging
+        working-directory: packages/desktop
+        run: tar -czf "linux-${{ matrix.artifact }}-app.tar.gz" -C "build/stable-linux-${{ matrix.electrobun_arch }}" package-app
+
+      - name: Report produced artifacts
+        shell: bash
+        working-directory: packages/desktop
+        run: |
+          echo "### Linux (${{ matrix.label }})" >> "$GITHUB_STEP_SUMMARY"
+          du -h artifacts/* 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+          du -sh build/* 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload native Linux build output
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bloommd-desktop-linux-${{ matrix.artifact }}
+          path: |
+            packages/desktop/artifacts/**
+            packages/desktop/linux-${{ matrix.artifact }}-app.tar.gz
+          if-no-files-found: warn
+          retention-days: 14
+
+  package:
+    name: Pacman (${{ matrix.label }})
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    needs: linux
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: x86_64
+            artifact: linux-x86_64
+            electrobun_arch: x64
+            package_arch: x86_64
+          - label: ARM64
+            artifact: linux-arm64
+            electrobun_arch: arm64
+            package_arch: aarch64
+
+    steps:
+      - name: Install Arch packaging tools
+        run: |
+          sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf
+          pacman -Syu --noconfirm --needed ca-certificates desktop-file-utils file git nodejs ripgrep zstd gtk3 webkit2gtk-4.1 libayatana-appindicator librsvg libsecret ttf-dejavu xorg-server-xvfb
+
+      - uses: actions/checkout@v7
+
+      - name: Download native Linux bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: bloommd-desktop-linux-${{ matrix.artifact }}
+          path: transfer
+
+      - name: Extract native Linux bundle
+        shell: bash
+        run: |
+          mkdir -p "packages/desktop/build/stable-linux-${{ matrix.electrobun_arch }}"
+          tar -xzf "transfer/linux-${{ matrix.artifact }}-app.tar.gz" \
+            -C "packages/desktop/build/stable-linux-${{ matrix.electrobun_arch }}"
+
+      - name: Build Pacman package
+        shell: bash
+        run: |
+          useradd --create-home builder
+          mkdir -p "${GITHUB_WORKSPACE}/packages/desktop/artifacts"
+          chown -R builder:builder "${GITHUB_WORKSPACE}/packages/desktop/artifacts"
+          runuser -u builder -- env \
+            HOME=/home/builder \
+            BLOOMMD_LINUX_APP_DIR="${GITHUB_WORKSPACE}/packages/desktop/build/stable-linux-${{ matrix.electrobun_arch }}/package-app" \
+            BLOOMMD_PACKAGE_ARCH="${{ matrix.package_arch }}" \
+            BLOOMMD_PACKAGE_OUTPUT_DIR="${GITHUB_WORKSPACE}/packages/desktop/artifacts" \
+            bash packaging/arch/build-package.sh
+
+      - name: Verify Pacman package metadata
+        shell: bash
+        run: |
+          package_file="$(find packages/desktop/artifacts -maxdepth 1 -type f -name 'bloommd-desktop-*.pkg.tar.zst' ! -name 'bloommd-desktop-debug-*.pkg.tar.zst' -print -quit)"
+          test -n "$package_file"
+          test "$(find packages/desktop/artifacts -maxdepth 1 -type f -name 'bloommd-desktop-*.pkg.tar.zst' ! -name 'bloommd-desktop-debug-*.pkg.tar.zst' | wc -l | tr -d ' ')" = 1
+          desktop-file-validate packaging/arch/bloommd/bloommd.desktop
+          pacman -Qp --info "$package_file"
+          pacman -Qp --info "$package_file" | rg -q 'Depends On[[:space:]]*:.*libsecret'
+          pacman -Qp --info "$package_file" | rg -q 'Depends On[[:space:]]*:.*ttf-dejavu'
+          pacman -Qp --list "$package_file" | rg -q '/usr/bin/bloommd-desktop$'
+          pacman -Qp --list "$package_file" | rg -q '/usr/share/applications/bloommd.desktop$'
+          pacman -Qp --info "$package_file" | rg -q "Architecture[[:space:]]*:[[:space:]]*${{ matrix.package_arch }}"
+          rg -q '^Exec=/usr/bin/bloommd-desktop %U$' packaging/arch/bloommd/bloommd.desktop
+          rg -q 'text/markdown' packaging/arch/bloommd/bloommd.desktop
+          rg -q 'x-scheme-handler/bloommd' packaging/arch/bloommd/bloommd.desktop
+
+      - name: Smoke-test Pacman install and removal
+        if: matrix.package_arch == 'x86_64'
+        shell: bash
+        run: |
+          package_file="$(find packages/desktop/artifacts -maxdepth 1 -type f -name 'bloommd-desktop-*.pkg.tar.zst' ! -name 'bloommd-desktop-debug-*.pkg.tar.zst' -print -quit)"
+          test -n "$package_file"
+          pacman -U --noconfirm "$package_file"
+          test -x /opt/bloommd/app/bin/launcher
+          test -x /opt/bloommd/app/bin/bun
+          test -f /opt/bloommd/app/Resources/main.js
+          if strings /opt/bloommd/app/bin/launcher | rg -q 'ELECTROBUN_ARCHIVE_V1|ELECTROBUN_METADATA_V1'; then
+            echo "Pacman package contains the self-extracting wrapper instead of the native app bundle." >&2
+            exit 1
+          fi
+          if find /opt/bloommd/app \( -not -user root -o -not -group root \) -print -quit | rg -q .; then
+            echo "Pacman app files must be owned by root:root." >&2
+            exit 1
+          fi
+          test -x /usr/bin/bloommd-desktop
+          test -f /usr/share/applications/bloommd.desktop
+          desktop-file-validate /usr/share/applications/bloommd.desktop
+          rg -q '^Exec=/usr/bin/bloommd-desktop %U$' /usr/share/applications/bloommd.desktop
+          rg -q 'text/markdown' /usr/share/applications/bloommd.desktop
+          rg -q 'x-scheme-handler/bloommd' /usr/share/applications/bloommd.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/bloommd.svg
+          test -f /usr/share/icons/hicolor/128x128/apps/bloommd.png
+          test -f /usr/share/licenses/bloommd-desktop/LICENSE
+          test -f /usr/share/licenses/bloommd-desktop/LICENSE-MIT-legacy
+          pacman -Qi bloommd-desktop | rg -q '^Licenses[[:space:]]*:[[:space:]]*Elastic-2\.0$'
+          Xvfb :99 -screen 0 1280x800x24 >/tmp/bloommd-xvfb.log 2>&1 &
+          xvfb_pid=$!
+          trap 'kill "$xvfb_pid" 2>/dev/null || true' EXIT
+          sleep 2
+          DISPLAY=:99 bloommd-desktop >/tmp/bloommd-launch.log 2>&1 &
+          app_pid=$!
+          sleep 5
+          if ! kill -0 "$app_pid" 2>/dev/null; then
+            cat /tmp/bloommd-launch.log
+            cat /tmp/bloommd-xvfb.log
+            exit 1
+          fi
+          kill "$app_pid"
+          wait "$app_pid" 2>/dev/null || true
+          ! rg -q 'InvalidInstaller|Not a valid self-extracting installer' /tmp/bloommd-launch.log
+          pacman -Rns --noconfirm bloommd-desktop
+          test ! -e /opt/bloommd
+          test ! -e /usr/bin/bloommd-desktop
+          test ! -e /usr/share/applications/bloommd.desktop
+          test ! -e /usr/share/icons/hicolor/scalable/apps/bloommd.svg
+          test ! -e /usr/share/icons/hicolor/128x128/apps/bloommd.png
+          test ! -e /usr/share/licenses/bloommd-desktop/LICENSE
+          test ! -e /usr/share/licenses/bloommd-desktop/LICENSE-MIT-legacy
+
+      - name: Prepare versioned Pacman release asset
+        shell: bash
+        env:
+          BLOOMMD_PACKAGE_ARCH: ${{ matrix.package_arch }}
+          BLOOMMD_PACKAGE_OUTPUT_DIR: ${{ github.workspace }}/packages/desktop/artifacts
+        run: bash packaging/arch/prepare-release-asset.sh
+
+      - name: Upload Pacman package
+        uses: actions/upload-artifact@v7
+        with:
+          name: bloommd-desktop-pacman-${{ matrix.package_arch }}
+          path: packages/desktop/artifacts/*.pacman
+          if-no-files-found: error
+          retention-days: 14
+
+  summary:
+    name: Platform support summary
+    runs-on: ubuntu-latest
+    needs: [macos, linux, package]
+    if: always()
+    steps:
+      - name: Record platform support
+        run: |
+          {
+            echo "## Desktop platform support"
+            echo ""
+            echo "Native desktop builds cover macOS arm64, Linux x86_64 and Linux ARM64/aarch64."
+            echo "Linux bundles are packaged as installable Arch/Pacman packages for Omarchy 4."
+            echo ""
+            echo "PR and ordinary matrix builds are ad-hoc development artifacts."
+            echo "Signed manual candidates and stable releases require Developer ID and notarization verification."
+          } >> "$GITHUB_STEP_SUMMARY"

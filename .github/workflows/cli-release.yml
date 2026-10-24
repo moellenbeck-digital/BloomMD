@@ -1,0 +1,89 @@
+name: BloomMD command-line tools release
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing cli-v<version> tag to publish"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bloommd-cli-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Validate tag and matching tool versions
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          agent_version="$(node -p 'require("./packages/agent-runtime/package.json").version')"
+          wiki_version="$(node -p 'require("./packages/wiki-cli/package.json").version')"
+          release_tag="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          test "$agent_version" = "$wiki_version"
+          test "$release_tag" = "cli-v${agent_version}"
+          echo "version=$agent_version" >> "$GITHUB_OUTPUT"
+      - name: Typecheck command-line tools
+        run: |
+          bun run --cwd packages/agent-runtime typecheck
+          bun run --cwd packages/wiki-cli typecheck
+      - name: Test command-line tools
+        run: |
+          bun run --cwd packages/agent-runtime test
+          bun run --cwd packages/wiki-cli test
+      - name: Build native Bun single binaries
+        run: |
+          bun run build:agent-runtime-release
+          bun run build:wiki-cli-release
+      - name: Version native Bun single binaries
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for tool in agent wiki; do
+            for platform in darwin-arm64 linux-arm64 linux-x64; do
+              mv "artifacts/bloommd-${tool}-${platform}" "artifacts/bloommd-${tool}-${VERSION}-${platform}"
+            done
+          done
+      - name: Smoke-test Linux binaries and write checksums
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          "artifacts/bloommd-agent-${version}-linux-x64" --help | grep -Fq 'bloommd-agent'
+          "artifacts/bloommd-wiki-${version}-linux-x64" --help | grep -Fq 'bloommd-wiki'
+          sha256sum artifacts/bloommd-agent-* artifacts/bloommd-wiki-* > artifacts/SHA256SUMS.txt
+          cp LICENSE artifacts/LICENSE
+          cp LICENSE-MIT-legacy artifacts/LICENSE-MIT-legacy
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            artifacts/bloommd-agent-* artifacts/bloommd-wiki-* artifacts/SHA256SUMS.txt artifacts/LICENSE artifacts/LICENSE-MIT-legacy \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "BloomMD Command-line Tools $VERSION" \
+            --notes "Optional native tools for local BloomMD automation. The OpenClaw plugin already bundles the agent runtime for normal workspace-agent use." \
+            --prerelease

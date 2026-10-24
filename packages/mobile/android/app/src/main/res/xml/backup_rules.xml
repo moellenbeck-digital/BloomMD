@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older: the app's own notes (files/bloommd) and settings are backed up; the chosen
+     folder is outside the app and backed up by its own storage or sync. The keychain plugin's
+     encrypted preferences (bloommd_keychain) are excluded: their key lives in this device's
+     Keystore, so a restored value could not be decrypted on another device. -->
+<full-backup-content>
+    <include domain="file" path="bloommd/" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="sharedpref" path="bloommd_keychain.xml" />
+</full-backup-content>

@@ -1,0 +1,514 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_full_e2e:
+        description: "Run the full E2E suite for this manually selected ref (required for image publishing)"
+        required: false
+        default: false
+        type: boolean
+      run_release_artifacts:
+        description: "Build CLI, sync and Obsidian release artifacts"
+        required: false
+        default: false
+        type: boolean
+      publish_images:
+        description: "Build and publish the three production images"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      critical: ${{ steps.filter.outputs.critical }}
+      release: ${{ steps.filter.outputs.release }}
+      deploy: ${{ steps.filter.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          RUN_FULL_E2E: ${{ inputs.run_full_e2e }}
+          RUN_RELEASE_ARTIFACTS: ${{ inputs.run_release_artifacts }}
+          PUBLISH_IMAGES: ${{ inputs.publish_images }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed_files="$(git diff --name-only "$PR_BASE_SHA" "$GITHUB_SHA")"
+          elif [[ "$EVENT_NAME" == "push" && "$EVENT_BEFORE" != "0000000000000000000000000000000000000000" ]]; then
+            changed_files="$(git diff --name-only "$EVENT_BEFORE" "$GITHUB_SHA")"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            changed_files=""
+          else
+            changed_files="$(git ls-files)"
+          fi
+
+          critical=false
+          release=false
+          deploy=false
+
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+            case "$path" in
+              apps/app/**|apps/app/e2e/**|apps/marketing/**|apps/marketing/e2e/**|packages/core/**|packages/ui/**|packages/agent-runtime/**|packages/wiki-cli/**|packages/sync/**|plugins/openclaw/**|deploy/openclaw/**|scripts/**|.github/workflows/ci.yml|.github/workflows/desktop.yml|Dockerfile|package.json|bun.lock|tsconfig.base.json)
+                critical=true
+                ;;
+            esac
+            case "$path" in
+              packages/agent-runtime/**|packages/wiki-cli/**|packages/sync/**|plugins/obsidian/**|plugins/openclaw/**|packages/core/**|package.json|bun.lock|.github/workflows/ci.yml|.github/workflows/cli-release.yml)
+                release=true
+                ;;
+            esac
+            case "$path" in
+              apps/app/**|apps/marketing/**|packages/core/**|packages/ui/**|packages/sync/**|Dockerfile|package.json|bun.lock|.github/workflows/ci.yml)
+                deploy=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "$RUN_FULL_E2E" == "true" ]] && critical=true
+            [[ "$RUN_RELEASE_ARTIFACTS" == "true" ]] && release=true
+            [[ "$PUBLISH_IMAGES" == "true" ]] && deploy=true
+          fi
+
+          echo "critical=$critical" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "critical=$critical release=$release deploy=$deploy"
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
+      BLOOMMD_REQUIRE_AUTH: "1"
+      NEXT_PUBLIC_SITE_URL: http://localhost:3211
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Obsidian plugin dependencies
+        working-directory: plugins/obsidian
+        run: bun install --frozen-lockfile
+      - name: Audit workspace dependencies
+        run: bun audit
+      - name: Audit Obsidian plugin dependencies
+        working-directory: plugins/obsidian
+        run: bun audit
+      - name: Typecheck all surfaces
+        run: bun run typecheck
+      - name: Run unit tests
+        run: bun run test
+      - name: Validate M1 QA matrix and test plan
+        run: bun run test:qa
+      - name: Build web
+        working-directory: apps/app
+        run: bun run build
+      - name: Build marketing
+        working-directory: apps/marketing
+        run: bun run build
+      - name: Build mobile web assets
+        working-directory: packages/mobile
+        run: bun run build
+      - name: Build desktop renderer
+        working-directory: packages/desktop
+        run: bun run build:renderer
+      - name: Build and smoke-test OpenClaw workspace-agent image
+        run: |
+          set -euo pipefail
+          bun run --cwd plugins/openclaw package:release
+          package_file="$(find artifacts/openclaw-plugin -maxdepth 1 -type f -name 'bloommd-openclaw-plugin-*.tgz' -print -quit)"
+          test -n "$package_file"
+          docker build --file deploy/openclaw/Dockerfile --tag bloommd-openclaw-plugin:ci .
+          docker volume create bloommd-openclaw-ci-state >/dev/null
+          docker run --rm \
+            --mount type=volume,source=bloommd-openclaw-ci-state,target=/home/node/.openclaw \
+            bloommd-openclaw-plugin:ci bloommd --help | tee /tmp/bloommd-openclaw-help.txt
+          grep -Fq "openclaw bloommd" /tmp/bloommd-openclaw-help.txt
+          grep -Fq "pair" /tmp/bloommd-openclaw-help.txt
+          docker run --rm \
+            --mount type=bind,source="$PWD/artifacts/openclaw-plugin",target=/plugin,readonly \
+            --entrypoint /bin/sh \
+            bloommd-openclaw-plugin:ci \
+            -c 'archive="$(find /plugin -maxdepth 1 -name "bloommd-openclaw-plugin-*.tgz" -print -quit)"; test -n "$archive"; OPENCLAW_ENTRYPOINT=/app/openclaw.mjs /opt/bloommd-plugin/scripts/install-plugin.sh "$archive" --force; node /app/openclaw.mjs bloommd --help' \
+            | tee /tmp/bloommd-openclaw-archive-help.txt
+          grep -Fq "openclaw bloommd" /tmp/bloommd-openclaw-archive-help.txt
+
+  full-e2e:
+    runs-on: ubuntu-latest
+    # Full E2E is an independent final gate. Running it beside verify keeps main's wall time
+    # bounded by the slower gate; image publishing still requires both jobs to pass below.
+    needs: changes
+    if: >-
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'pull_request' && needs.changes.outputs.critical == 'true') ||
+        (github.event_name == 'workflow_dispatch' && (inputs.run_full_e2e == true || inputs.publish_images == true))
+      )
+    timeout-minutes: 30
+    env:
+      BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
+      BLOOMMD_REQUIRE_AUTH: "1"
+      NEXT_PUBLIC_SITE_URL: http://localhost:3211
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/app/package.json', 'apps/marketing/package.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install Playwright browser and system dependencies
+        working-directory: apps/app
+        timeout-minutes: 10
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+      # Eats its own cooking: the repository's own Markdown goes through the checks BloomMD ships.
+      # A broken link in our docs should fail our pipeline, not just other people's.
+      - name: Lint repository Markdown
+        run: bun run packages/wiki-cli/src/index.ts workspace lint docs --format github
+
+      - name: Build app production server for end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+          BLOOMMD_E2E_AUTH_BYPASS: "1"
+          BLOOMMD_E2E_TEST_MODE: "1"
+          BLOOMMD_LOCAL_DEPLOYMENT: "1"
+          BLOOMMD_REQUIRE_AUTH: "1"
+          NEXT_PUBLIC_SITE_URL: http://localhost:3211
+          NEXT_PUBLIC_APP_URL: http://localhost:3211
+          NEXT_PUBLIC_MARKETING_URL: https://bloommd.io
+        run: bun run build
+      - name: Run app Chromium end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+          BLOOMMD_E2E_TEST_MODE: "1"
+        run: >-
+          bun run test:e2e --
+          --project=chromium
+          --project=chromium-mobile
+          e2e/accessibility.spec.ts
+          e2e/auth-shortcuts.spec.ts
+          e2e/release-contracts.spec.ts
+          e2e/mobile-smoke.spec.ts
+          e2e/workspace-agent-node.spec.ts
+      - name: Reclaim Docker disk before workspace-agent end-to-end test
+        # GitHub-hosted runners arrive with preloaded images and BuildKit cache. The isolated
+        # stack needs several large images at the same time (app, sync, Postgres, OpenClaw and
+        # model stub), so reclaim that unrelated space before its build rather than after it has
+        # already exhausted the runner disk. This is intentionally CI-only: local runs must not
+        # delete a developer's unrelated Docker resources.
+        run: |
+          docker system prune --all --force --volumes
+          docker builder prune --all --force
+      - name: Run OpenClaw workspace-agent Docker end-to-end test
+        # This covers the actual plugin image, pairing, realtime task wake, agent isolation,
+        # human proposal application through sync and token revocation. It uses a deterministic
+        # test model, so CI never requires an external model credential.
+        run: bun run test:e2e:agent
+      - name: Reclaim Docker disk after workspace-agent end-to-end test
+        # The isolated stack builds the OpenClaw image alongside the app, sync, Postgres and
+        # model-stub images. Remove those throwaway layers before Playwright starts Marketing;
+        # GitHub-hosted runners otherwise run out of disk despite Compose tearing down volumes.
+        run: docker system prune --all --force --volumes
+      - name: Run marketing accessibility end-to-end tests
+        working-directory: apps/marketing
+        run: bun run test:e2e -- --project=chromium e2e/accessibility.spec.ts
+      - name: Build marketing production server for release end-to-end tests
+        working-directory: apps/marketing
+        env:
+          NEXT_PUBLIC_SITE_URL: http://localhost:3211
+          NEXT_PUBLIC_MARKETING_URL: http://localhost:3211
+          NEXT_PUBLIC_APP_URL: https://bloommd.app
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: bloommd.io
+          NEXT_PUBLIC_PLAUSIBLE_SRC: https://plausible.moellenbeck-digital.io/js/script.js
+          NEXT_PUBLIC_PLAUSIBLE_API_HOST: https://plausible.moellenbeck-digital.io
+          NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg
+          BLOOMMD_REQUIRE_AUTH: "1"
+          BLOOMMD_WAITLIST_ADMIN_USER: admin
+          BLOOMMD_WAITLIST_ADMIN_PASSWORD: secret
+        run: bun run build
+      - name: Run marketing production end-to-end tests
+        working-directory: apps/marketing
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+        run: >-
+          bun run test:e2e --
+          --project=chromium
+          --project=chromium-mobile
+          e2e/release-contracts.spec.ts
+          e2e/waitlist-noindex.spec.ts
+          e2e/mobile-smoke.spec.ts
+      # Separate run: the default E2E server keeps the beta gate off for local development.
+      # This run turns it on and proves the invitation boundary itself.
+      - name: Build app production server for closed-beta end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+          BLOOMMD_E2E_AUTH_BYPASS: "1"
+          BLOOMMD_E2E_TEST_MODE: "1"
+          BLOOMMD_LOCAL_DEPLOYMENT: "1"
+          BLOOMMD_REQUIRE_AUTH: "1"
+          BLOOMMD_BETA_ACCESS: "1"
+          BLOOMMD_BETA_ALLOWED_EMAILS: invited@bloommd.local,@partner.test
+          BLOOMMD_BETA_INVITE_CODES: beta-e2e-code
+          NEXT_PUBLIC_SITE_URL: http://localhost:3411
+          NEXT_PUBLIC_APP_URL: http://localhost:3411
+          NEXT_PUBLIC_MARKETING_URL: http://127.0.0.1:3212
+        run: bun run build
+      - name: Run closed-beta gate end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+        run: bun run test:e2e:beta
+      # Separate run: the Wiki suite needs a server with the public Wiki enabled, and the main run
+      # asserts it stays disabled. Next also refuses a second `next dev` for one project.
+      - name: Run Wiki end-to-end tests
+        working-directory: apps/app
+        run: bun run test:e2e:wiki
+
+  release-artifacts:
+    runs-on: ubuntu-latest
+    needs:
+      - verify
+      - changes
+    if: >-
+      needs.verify.result == 'success' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.release == 'true') ||
+        (github.event_name == 'workflow_dispatch' && inputs.run_release_artifacts == true)
+      )
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Obsidian plugin dependencies
+        working-directory: plugins/obsidian
+        run: bun install --frozen-lockfile
+      - name: Build agent, Wiki and sync release binaries
+        run: bun run build:release-artifacts
+      - name: Smoke-test native Bun single binaries
+        run: |
+          set -euo pipefail
+          artifacts/bloommd-agent-linux-x64 --help | grep -Fq 'bloommd-agent'
+          artifacts/bloommd-wiki-linux-x64 --help | grep -Fq 'bloommd-wiki'
+      - name: Package and verify Obsidian plugin
+        working-directory: plugins/obsidian
+        # CI artifacts are beta builds for the touch matrix itself; public releases through the mirror
+        # still require MOBILE-MATRIX.md to verify the exact version.
+        env:
+          BLOOMMD_ALLOW_UNVERIFIED_MOBILE: "1"
+        run: bun run release:package
+      - name: Package OpenClaw workspace-agent plugin
+        working-directory: plugins/openclaw
+        run: bun run package:release
+      - name: Verify OpenClaw package contents
+        run: |
+          set -euo pipefail
+          package_file="$(find artifacts/openclaw-plugin -maxdepth 1 -type f -name 'bloommd-openclaw-plugin-*.tgz' -print -quit)"
+          test -n "$package_file"
+          tar -tzf "$package_file" | grep -Fx 'package/openclaw.plugin.json'
+          tar -tzf "$package_file" | grep -Fx 'package/dist/index.js'
+          tar -tzf "$package_file" | grep -Fx 'package/skills/bloommd-workspace-agent/SKILL.md'
+      - name: Upload Obsidian release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bloommd-obsidian
+          path: plugins/obsidian/release/
+          if-no-files-found: error
+      - name: Upload OpenClaw workspace-agent artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bloommd-openclaw-plugin
+          path: artifacts/openclaw-plugin/*.tgz
+          if-no-files-found: error
+      - name: Upload agent, Wiki and sync release binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: bloommd-command-binaries
+          path: |
+            artifacts/bloommd-agent-*
+            artifacts/bloommd-wiki-*
+            artifacts/bloommd-sync
+          if-no-files-found: error
+
+  publish-images:
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    needs:
+      - verify
+      - changes
+      - full-e2e
+      - release-artifacts
+    if: >-
+      always() &&
+      needs.verify.result == 'success' &&
+      needs.full-e2e.result == 'success' &&
+      (needs.release-artifacts.result == 'success' || needs.release-artifacts.result == 'skipped') &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.deploy == 'true') ||
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_images == true)
+      )
+    timeout-minutes: 30
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_PREFIX: ghcr.io/moellenbeck-digital
+      NEXT_PUBLIC_PLAUSIBLE_DOMAIN: bloommd.io
+      NEXT_PUBLIC_PLAUSIBLE_SRC: https://plausible.moellenbeck-digital.io/js/script.js
+      NEXT_PUBLIC_PLAUSIBLE_API_HOST: https://plausible.moellenbeck-digital.io
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Prepare build metadata
+        run: |
+          app_version="$(node -p 'require("./apps/app/package.json").version')"
+          marketing_version="$(node -p 'require("./apps/marketing/package.json").version')"
+          sync_version="$(node -p 'require("./packages/sync/package.json").version')"
+          {
+            echo "BLOOMMD_BUILD_SHA=${GITHUB_SHA}"
+            echo "BLOOMMD_BUILD_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
+            echo "BLOOMMD_BUILD_TIME=$(git show -s --format=%cI HEAD)"
+            echo "BLOOMMD_APP_VERSION=$app_version"
+            echo "BLOOMMD_MARKETING_VERSION=$marketing_version"
+            echo "BLOOMMD_SYNC_VERSION=$sync_version"
+          } >> "$GITHUB_ENV"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Verify marketing Plausible production configuration
+        run: |
+          set -euo pipefail
+          test "$NEXT_PUBLIC_PLAUSIBLE_DOMAIN" = "bloommd.io"
+          test "$NEXT_PUBLIC_PLAUSIBLE_SRC" = "https://plausible.moellenbeck-digital.io/js/script.js"
+          test "$NEXT_PUBLIC_PLAUSIBLE_API_HOST" = "https://plausible.moellenbeck-digital.io"
+          legacy_plausible_prefix="/_plausible"
+          if grep -Fq -- "--build-arg NEXT_PUBLIC_PLAUSIBLE_SRC=${legacy_plausible_prefix}/js/script.js" .github/workflows/ci.yml; then
+            echo "The legacy first-party Plausible script path must not be used in the production image." >&2
+            exit 1
+          fi
+          if grep -Fq -- "--build-arg NEXT_PUBLIC_PLAUSIBLE_API_HOST=${legacy_plausible_prefix}" .github/workflows/ci.yml; then
+            echo "The legacy first-party Plausible API path must not be used in the production image." >&2
+            exit 1
+          fi
+      - name: Build and push product app image
+        run: |
+          docker buildx build --target app \
+            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
+            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
+            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
+            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_APP_VERSION" \
+            --tag "$IMAGE_PREFIX/bloommd-app:sha-${{ github.sha }}" \
+            --tag "$IMAGE_PREFIX/bloommd-app:main" \
+            --cache-from type=gha,scope=bloommd-app \
+            --cache-to type=gha,mode=max,scope=bloommd-app \
+            --push \
+            .
+      - name: Build and push marketing image
+        run: |
+          docker buildx build --target marketing \
+            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
+            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
+            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
+            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_MARKETING_VERSION" \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_DOMAIN="$NEXT_PUBLIC_PLAUSIBLE_DOMAIN" \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_SRC="$NEXT_PUBLIC_PLAUSIBLE_SRC" \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_API_HOST="$NEXT_PUBLIC_PLAUSIBLE_API_HOST" \
+            --tag "$IMAGE_PREFIX/bloommd-marketing:sha-${{ github.sha }}" \
+            --tag "$IMAGE_PREFIX/bloommd-marketing:main" \
+            --cache-from type=gha,scope=bloommd-marketing \
+            --cache-to type=gha,mode=max,scope=bloommd-marketing \
+            --push \
+            .
+      - name: Build and push sync image
+        run: |
+          docker buildx build --target sync \
+            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
+            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
+            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
+            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_SYNC_VERSION" \
+            --tag "$IMAGE_PREFIX/bloommd-sync:sha-${{ github.sha }}" \
+            --tag "$IMAGE_PREFIX/bloommd-sync:main" \
+            --cache-from type=gha,scope=bloommd-sync \
+            --cache-to type=gha,mode=max,scope=bloommd-sync \
+            --push \
+            .
+      - name: Record image tags
+        run: |
+          {
+            echo "## BloomMD container images"
+            echo ""
+            echo "- $IMAGE_PREFIX/bloommd-app:sha-${{ github.sha }}"
+            echo "- $IMAGE_PREFIX/bloommd-marketing:sha-${{ github.sha }}"
+            echo "- $IMAGE_PREFIX/bloommd-sync:sha-${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"

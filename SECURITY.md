@@ -3,8 +3,7 @@
 ## Deutsch
 
 Bitte melde vermutete Sicherheitslücken vertraulich an **security@bloommd.io**.
-Sobald GitHubs private Sicherheitsmeldungen für dieses Repository aktiviert sind,
-kannst du alternativ **Security → Report a vulnerability** verwenden. Erstelle
+Alternativ kannst du **Security → Report a vulnerability** verwenden. Erstelle
 für eine noch nicht behobene Schwachstelle kein öffentliches Issue.
 
 Nenne die betroffene BloomMD-Version und Plattform, die Auswirkung und Schritte
@@ -19,8 +18,7 @@ Plattformen stehen auf [bloommd.io/download](https://bloommd.io/download).
 ## English
 
 Please report suspected vulnerabilities privately to **security@bloommd.io**.
-Once GitHub private vulnerability reporting is enabled for this repository, you
-may instead use **Security → Report a vulnerability**. Do not open a public issue
+You may instead use **Security → Report a vulnerability**. Do not open a public issue
 for an unpatched vulnerability.
 
 Include the affected BloomMD version and platform, impact, and reproduction

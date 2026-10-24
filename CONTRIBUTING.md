@@ -19,6 +19,8 @@ nach `plugins/obsidian` hierher.
 - Prüfe vor dem Einreichen TypeScript, Tests und die betroffenen Builds. Bei
   nutzerrelevanten Änderungen gehören Version, Dokumentation und DE/EN-Texte
   zum Release-Umfang.
+- Die öffentliche PR-CI nutzt nur Leserechte. Produktive GHCR-Images werden
+  nach grüner Main-CI separat durch die Maintainer veröffentlicht.
 - Reiche nur Code, Texte und Medien ein, für die du die nötigen Rechte hast.
   Nenne Herkunft und Lizenz von Drittmaterial im PR. Beiträge müssen unter
   den für den betroffenen Quellstand geltenden Bedingungen veröffentlicht
@@ -48,6 +50,8 @@ repository is a generated release mirror; plugin changes belong in
 - Run the affected TypeScript checks, tests, and builds before submitting.
   User-facing changes also need the appropriate version, documentation, and
   German and English release text.
+- Public PR CI uses read-only permissions. Maintainers publish production
+  GHCR images separately after the main CI succeeds.
 - Submit only code, text, and media that you have the right to provide. State
   the source and license of third-party material in the PR. Contributions
   must be publishable under the terms applicable to the affected source tree.

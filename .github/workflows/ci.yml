@@ -1,5 +1,8 @@
 name: CI
 
+# Public fork pull requests run tests with a read-only token. Private GHCR image
+# publishing is handled by a maintainer workflow in the private archive.
+
 on:
   push:
     branches:
@@ -8,17 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       run_full_e2e:
-        description: "Run the full E2E suite for this manually selected ref (required for image publishing)"
+        description: "Run the full E2E suite for this manually selected ref"
         required: false
         default: false
         type: boolean
       run_release_artifacts:
         description: "Build CLI, sync and Obsidian release artifacts"
-        required: false
-        default: false
-        type: boolean
-      publish_images:
-        description: "Build and publish the three production images"
         required: false
         default: false
         type: boolean
@@ -36,7 +34,6 @@ jobs:
     outputs:
       critical: ${{ steps.filter.outputs.critical }}
       release: ${{ steps.filter.outputs.release }}
-      deploy: ${{ steps.filter.outputs.deploy }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -50,7 +47,6 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           RUN_FULL_E2E: ${{ inputs.run_full_e2e }}
           RUN_RELEASE_ARTIFACTS: ${{ inputs.run_release_artifacts }}
-          PUBLISH_IMAGES: ${{ inputs.publish_images }}
         run: |
           set -euo pipefail
 
@@ -66,7 +62,6 @@ jobs:
 
           critical=false
           release=false
-          deploy=false
 
           while IFS= read -r path; do
             [[ -z "$path" ]] && continue
@@ -80,23 +75,16 @@ jobs:
                 release=true
                 ;;
             esac
-            case "$path" in
-              apps/app/**|apps/marketing/**|packages/core/**|packages/ui/**|packages/sync/**|Dockerfile|package.json|bun.lock|.github/workflows/ci.yml)
-                deploy=true
-                ;;
-            esac
           done <<< "$changed_files"
 
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             [[ "$RUN_FULL_E2E" == "true" ]] && critical=true
             [[ "$RUN_RELEASE_ARTIFACTS" == "true" ]] && release=true
-            [[ "$PUBLISH_IMAGES" == "true" ]] && deploy=true
           fi
 
           echo "critical=$critical" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
-          echo "critical=$critical release=$release deploy=$deploy"
+          echo "critical=$critical release=$release"
 
   verify:
     runs-on: ubuntu-latest
@@ -172,13 +160,13 @@ jobs:
   full-e2e:
     runs-on: ubuntu-latest
     # Full E2E is an independent final gate. Running it beside verify keeps main's wall time
-    # bounded by the slower gate; image publishing still requires both jobs to pass below.
+    # bounded by the slower gate.
     needs: changes
     if: >-
       (
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'pull_request' && needs.changes.outputs.critical == 'true') ||
-        (github.event_name == 'workflow_dispatch' && (inputs.run_full_e2e == true || inputs.publish_images == true))
+        (github.event_name == 'workflow_dispatch' && inputs.run_full_e2e == true)
       )
     timeout-minutes: 30
     env:
@@ -397,118 +385,3 @@ jobs:
             artifacts/bloommd-wiki-*
             artifacts/bloommd-sync
           if-no-files-found: error
-
-  publish-images:
-    permissions:
-      contents: read
-      packages: write
-    runs-on: ubuntu-latest
-    needs:
-      - verify
-      - changes
-      - full-e2e
-      - release-artifacts
-    if: >-
-      always() &&
-      needs.verify.result == 'success' &&
-      needs.full-e2e.result == 'success' &&
-      (needs.release-artifacts.result == 'success' || needs.release-artifacts.result == 'skipped') &&
-      (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.deploy == 'true') ||
-        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish_images == true)
-      )
-    timeout-minutes: 30
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_PREFIX: ghcr.io/moellenbeck-digital
-      NEXT_PUBLIC_PLAUSIBLE_DOMAIN: bloommd.io
-      NEXT_PUBLIC_PLAUSIBLE_SRC: https://plausible.moellenbeck-digital.io/js/script.js
-      NEXT_PUBLIC_PLAUSIBLE_API_HOST: https://plausible.moellenbeck-digital.io
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Prepare build metadata
-        run: |
-          app_version="$(node -p 'require("./apps/app/package.json").version')"
-          marketing_version="$(node -p 'require("./apps/marketing/package.json").version')"
-          sync_version="$(node -p 'require("./packages/sync/package.json").version')"
-          {
-            echo "BLOOMMD_BUILD_SHA=${GITHUB_SHA}"
-            echo "BLOOMMD_BUILD_TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || true)"
-            echo "BLOOMMD_BUILD_TIME=$(git show -s --format=%cI HEAD)"
-            echo "BLOOMMD_APP_VERSION=$app_version"
-            echo "BLOOMMD_MARKETING_VERSION=$marketing_version"
-            echo "BLOOMMD_SYNC_VERSION=$sync_version"
-          } >> "$GITHUB_ENV"
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Verify marketing Plausible production configuration
-        run: |
-          set -euo pipefail
-          test "$NEXT_PUBLIC_PLAUSIBLE_DOMAIN" = "bloommd.io"
-          test "$NEXT_PUBLIC_PLAUSIBLE_SRC" = "https://plausible.moellenbeck-digital.io/js/script.js"
-          test "$NEXT_PUBLIC_PLAUSIBLE_API_HOST" = "https://plausible.moellenbeck-digital.io"
-          legacy_plausible_prefix="/_plausible"
-          if grep -Fq -- "--build-arg NEXT_PUBLIC_PLAUSIBLE_SRC=${legacy_plausible_prefix}/js/script.js" .github/workflows/ci.yml; then
-            echo "The legacy first-party Plausible script path must not be used in the production image." >&2
-            exit 1
-          fi
-          if grep -Fq -- "--build-arg NEXT_PUBLIC_PLAUSIBLE_API_HOST=${legacy_plausible_prefix}" .github/workflows/ci.yml; then
-            echo "The legacy first-party Plausible API path must not be used in the production image." >&2
-            exit 1
-          fi
-      - name: Build and push product app image
-        run: |
-          docker buildx build --target app \
-            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
-            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
-            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
-            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_APP_VERSION" \
-            --tag "$IMAGE_PREFIX/bloommd-app:sha-${{ github.sha }}" \
-            --tag "$IMAGE_PREFIX/bloommd-app:main" \
-            --cache-from type=gha,scope=bloommd-app \
-            --cache-to type=gha,mode=max,scope=bloommd-app \
-            --push \
-            .
-      - name: Build and push marketing image
-        run: |
-          docker buildx build --target marketing \
-            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
-            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
-            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
-            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_MARKETING_VERSION" \
-            --build-arg NEXT_PUBLIC_PLAUSIBLE_DOMAIN="$NEXT_PUBLIC_PLAUSIBLE_DOMAIN" \
-            --build-arg NEXT_PUBLIC_PLAUSIBLE_SRC="$NEXT_PUBLIC_PLAUSIBLE_SRC" \
-            --build-arg NEXT_PUBLIC_PLAUSIBLE_API_HOST="$NEXT_PUBLIC_PLAUSIBLE_API_HOST" \
-            --tag "$IMAGE_PREFIX/bloommd-marketing:sha-${{ github.sha }}" \
-            --tag "$IMAGE_PREFIX/bloommd-marketing:main" \
-            --cache-from type=gha,scope=bloommd-marketing \
-            --cache-to type=gha,mode=max,scope=bloommd-marketing \
-            --push \
-            .
-      - name: Build and push sync image
-        run: |
-          docker buildx build --target sync \
-            --build-arg BLOOMMD_BUILD_SHA="$BLOOMMD_BUILD_SHA" \
-            --build-arg BLOOMMD_BUILD_TAG="$BLOOMMD_BUILD_TAG" \
-            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
-            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_SYNC_VERSION" \
-            --tag "$IMAGE_PREFIX/bloommd-sync:sha-${{ github.sha }}" \
-            --tag "$IMAGE_PREFIX/bloommd-sync:main" \
-            --cache-from type=gha,scope=bloommd-sync \
-            --cache-to type=gha,mode=max,scope=bloommd-sync \
-            --push \
-            .
-      - name: Record image tags
-        run: |
-          {
-            echo "## BloomMD container images"
-            echo ""
-            echo "- $IMAGE_PREFIX/bloommd-app:sha-${{ github.sha }}"
-            echo "- $IMAGE_PREFIX/bloommd-marketing:sha-${{ github.sha }}"
-            echo "- $IMAGE_PREFIX/bloommd-sync:sha-${{ github.sha }}"
-          } >> "$GITHUB_STEP_SUMMARY"

@@ -199,8 +199,7 @@ This checkout is a public release mirror. Development changes belong in the [Blo
 
 ## License
 
-BloomMD for Obsidian from the next public release onward is licensed under the
-[Elastic License 2.0](LICENSE). Previously published plugin versions through
-0.5.12 retain their original MIT license; its text is preserved in
-[LICENSE-MIT-legacy](LICENSE-MIT-legacy). The generated public mirror carries
-the same license and the shared Core source snapshots for each release.
+BloomMD for Obsidian is licensed under the [MIT License](LICENSE), including the
+shared BloomMD Core snapshots (`src/markdown-document.ts`, `src/core-types.ts`) that the
+public mirror carries for each release. The rest of BloomMD (apps, sync server and the
+monorepo) is licensed under the Elastic License 2.0; see https://bloommd.io/lizenz.

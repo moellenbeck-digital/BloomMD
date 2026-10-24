@@ -55,5 +55,9 @@ Run `bun run qa:obsidian-ink-smoke` in the monorepo. It drives real Obsidian wit
 On 2026-10-21, plugin 0.6.0 passed all 58 automated clean-vault steps in real Obsidian
 with mobile emulation, including Pencil, palm and concept-map flows. The release
 package contract passed separately in QA mode.
-The manual matrix on a real iPad with Apple Pencil is still pending, so no version has
-passed the full matrix yet.
+On 2026-10-24, plugin 0.7.0 passed all 58 automated steps again (including the agent panel and the
+`structuredClone` fallback for older mobile WebViews). The build is installed in the iCloud test vault
+"BloomMD iPad Test" for the manual matrix on a real iPad with Apple Pencil. On 2026-10-24 the owner (Max Möllenbeck)
+confirmed the manual matrix on a real iPad for 0.7.0.
+
+Verified plugin version: 0.7.0

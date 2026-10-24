@@ -41,7 +41,6 @@ jobs:
             shared-runtime.js
             styles.css
             LICENSE
-            LICENSE-MIT-legacy
       - uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -50,5 +49,4 @@ jobs:
             shared-runtime.js
             styles.css
             LICENSE
-            LICENSE-MIT-legacy
           body_path: CHANGELOG.md

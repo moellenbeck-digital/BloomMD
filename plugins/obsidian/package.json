@@ -1,7 +1,7 @@
 {
   "name": "bloommd-obsidian",
-  "version": "0.6.0",
-  "license": "Elastic-2.0",
+  "version": "0.7.0",
+  "license": "MIT",
   "private": true,
   "description": "BloomMD companion plugin for Obsidian",
   "main": "main.js",
@@ -10,7 +10,7 @@
     "release:verify": "node scripts/release.mjs --verify",
     "release:package": "bun run build && node scripts/release.mjs --package",
     "typecheck": "tsc --noEmit",
-    "test": "bun test --preload ./scripts/test-dom.ts --preload ./scripts/test-preact.ts src/markdown-document.test.ts src/canvas.test.ts src/history-focus.test.ts src/path-migration.test.ts src/shared-document.test.ts src/ink-embeds.test.ts src/concept-map.test.ts src/map-export.test.ts src/open-app.test.ts src/desktop-handoff.test.ts src/map-touch-capture.test.ts src/ink-panel.test.ts src/drawing-save.test.ts src/map-ink-bar.test.ts src/bundle-size.test.ts src/agent-vault.test.ts src/learning-panel.test.ts src/learning-store.test.ts"
+    "test": "bun test --preload ./scripts/test-dom.ts --preload ./scripts/test-preact.ts src/markdown-document.test.ts src/canvas.test.ts src/history-focus.test.ts src/path-migration.test.ts src/shared-document.test.ts src/ink-embeds.test.ts src/concept-map.test.ts src/map-export.test.ts src/open-app.test.ts src/desktop-handoff.test.ts src/map-touch-capture.test.ts src/ink-panel.test.ts src/drawing-save.test.ts src/map-ink-bar.test.ts src/bundle-size.test.ts src/agent-vault.test.ts src/learning-panel.test.ts src/learning-store.test.ts src/structured-clone-fallback.test.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",

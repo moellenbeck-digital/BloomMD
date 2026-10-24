@@ -1,5 +1,10 @@
 # Changelog
 
+## [Obsidian 0.7.0, Marketing 0.5.5, Web-App 0.5.1] - 2026-10-24
+
+- BloomMD für Obsidian 0.7.0 läuft erstmals auch in Obsidian auf iPad, iPhone und Android: Handschrift mit dem Apple Pencil im Knoten und auf der Map, Lernfortschritt mit Wiederholungen, Agenten-Panel für Vorschläge von Agenten. Das Plugin bleibt unter der MIT-Lizenz; News DE/EN, Lizenzseiten von Website und Web-App entsprechend angepasst.
+- BloomMD for Obsidian 0.7.0 is the first version that also runs in Obsidian on iPad, iPhone and Android: Apple Pencil handwriting in nodes and on the map, learning progress with reviews, and an agent panel for proposals from agents. The plugin stays under the MIT license; bilingual news and the license pages of the website and web app are updated accordingly.
+
 ## [Marketing 0.5.4] - 2026-10-24
 
 - Desktop-Updates, Kommandozeilen-Tools und OpenClaw-Plugin-Downloads bleiben beim Wechsel des GitHub-Repositories verfügbar: Die Download-Proxys suchen zuerst im neuen Repository und verwenden bei fehlendem Release oder Asset das private Archiv.

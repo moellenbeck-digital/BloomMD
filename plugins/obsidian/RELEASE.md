@@ -1,6 +1,6 @@
 # Obsidian Release Process
 
-Obsidian expects `manifest.json`, `README.md`, the license, and the optional `icon.png` at the root of a public plugin repository. Release tags must exactly match the version, without a `v` prefix. GitHub releases attach the plugin runtime files: `manifest.json`, `main.js`, `shared-runtime.js`, and `styles.css`, plus `LICENSE` and `LICENSE-MIT-legacy`; `icon.png` stays at the repository root for directory branding.
+Obsidian expects `manifest.json`, `README.md`, the license, and the optional `icon.png` at the root of a public plugin repository. Release tags must exactly match the version, without a `v` prefix. GitHub releases attach the plugin runtime files: `manifest.json`, `main.js`, `shared-runtime.js`, and `styles.css`, plus `LICENSE` (MIT); `icon.png` stays at the repository root for directory branding.
 
 ## Repository topology
 
@@ -84,7 +84,7 @@ not part of the development workflow and is detected by the next mirror check.
 5. Run the clean-vault smoke test and test the generated files from `release/<version>/` in a desktop Obsidian installation.
 6. Push the dedicated repository and create an exact version tag such as `0.5.0`.
 7. Verify the GitHub release contains `manifest.json`, `main.js`, `shared-runtime.js`, and `styles.css`, and verify `icon.png` remains at the repository root.
-8. Verify `package.json` and the release snapshot identify ELv2, while `LICENSE-MIT-legacy` preserves the terms of published versions through 0.5.12.
+8. Verify `package.json` and the release snapshot identify the MIT license.
 9. After beta sign-off, submit the public repository through the official `obsidian-releases` process.
 
 ## 0.5.0 public beta evidence

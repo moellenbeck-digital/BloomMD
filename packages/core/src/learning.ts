@@ -87,7 +87,7 @@ const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
 
 function list<T>(value: unknown, fallback: T[], valid: (item: unknown) => item is T): T[] {
   const source = Array.isArray(value) ? value : [];
-  return fallback.map((item, index) => valid(source[index]) ? source[index] as T : item);
+  return fallback.map((item, index) => valid(source[index]) ? source[index] : item);
 }
 
 /** Fills missing or broken settings (older plugin data, hand edits) with the defaults. */
@@ -95,7 +95,7 @@ export function normalizeLearningSettings(raw: unknown): LearningSettings {
   const value = isRecord(raw) ? raw : {};
   const defaults = DEFAULT_LEARNING_SETTINGS;
   const scaled = <T>(key: "names" | "colors" | "intervals", valid: (item: unknown) => item is T) => {
-    const source = isRecord(value[key]) ? value[key] as Record<string, unknown> : {};
+    const source = isRecord(value[key]) ? value[key] : {};
     return {
       3: list(source[3], defaults[key][3] as T[], valid),
       5: list(source[5], defaults[key][5] as T[], valid),

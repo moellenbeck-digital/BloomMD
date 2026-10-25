@@ -215,7 +215,7 @@ function parseLink(value: unknown, index: number): InkLink {
   if (!Array.isArray(strokeIds) || !strokeIds.every((strokeId) => typeof strokeId === "string")) {
     throw new InkFormatError(`link ${id} has invalid stroke ids.`);
   }
-  return { id, target, strokeIds: strokeIds as string[] };
+  return { id, target, strokeIds };
 }
 
 /**

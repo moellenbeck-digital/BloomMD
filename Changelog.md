@@ -1,5 +1,10 @@
 # Changelog
 
+## [Obsidian 0.7.1] - 2026-10-25
+
+- Das Obsidian-Plugin erfüllt die Hinweise aus dem Community-Plugin-Review (Styles über `setCssStyles`, Fenster-sichere Timer und Typprüfungen, `createEl`, Einstellungen per `update()`, strengere Typprüfung). Keine Verhaltensänderung.
+- The Obsidian plugin addresses the community plugin review findings (styles via `setCssStyles`, window-safe timers and type checks, `createEl`, settings refreshed with `update()`, stricter type checking). No change in behaviour.
+
 ## [Obsidian 0.7.0, Marketing 0.5.5, Web-App 0.5.1] - 2026-10-24
 
 - BloomMD für Obsidian 0.7.0 läuft erstmals auch in Obsidian auf iPad, iPhone und Android: Handschrift mit dem Apple Pencil im Knoten und auf der Map, Lernfortschritt mit Wiederholungen, Agenten-Panel für Vorschläge von Agenten. Das Plugin bleibt unter der MIT-Lizenz; News DE/EN, Lizenzseiten von Website und Web-App entsprechend angepasst.

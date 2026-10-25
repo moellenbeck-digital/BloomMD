@@ -18,3 +18,5 @@ Bereits veröffentlichte Versionen werden dadurch nicht rückwirkend neu lizenzi
 ELv2 erlaubt die Nutzung, Änderung und Weitergabe des Codes unter ihren Bedingungen. Sie begrenzt insbesondere das Anbieten der Software als gehosteten oder verwalteten Dienst für Dritte und schützt Lizenzhinweise. Die vollständigen Bedingungen stehen auf der [Lizenzseite](/lizenz) und im [ELv2-Lizenztext](https://www.elastic.co/licensing/elastic-license/).
 
 Der Lizenzwechsel macht das bisher private BloomMD-Monorepo zum Zeitpunkt dieser Meldung noch nicht öffentlich. Informationen zu den tatsächlich verfügbaren Versionen stehen auf der [Download-Seite](/download).
+
+**Update vom 25. Oktober 2026:** Der [BloomMD-Quellcode ist inzwischen öffentlich](/news/bloommd-repository-public). Die Lizenzgrenzen für frühere Releases bleiben wie oben beschrieben.

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowRight, Bot, Download, Laptop, Terminal } from "lucide-react";
 import Link from "next/link";
+import { AvailabilityOverview } from "@/components/availability-overview";
 import { appUrl } from "@/lib/deployment";
 import { getDesktopUpdateManifest } from "@/lib/desktop-update-proxy";
 import { getMarketingLocale, withMarketingLocale } from "@/lib/locale";
@@ -30,8 +31,8 @@ export async function generateMetadata({
         : "Desktop-App herunterladen · BloomMD",
     description:
       locale === "en"
-        ? "Download and installation notes for the macOS and Omarchy/Linux desktop apps in the BloomMD closed beta."
-        : "Download- und Installationshinweise für die macOS- und Omarchy/Linux-Desktop-Apps in der BloomMD Closed Beta.",
+        ? "Download the macOS and Omarchy/Linux desktop beta without an invitation. See what is public and what needs closed-beta access."
+        : "macOS- und Omarchy/Linux-Desktop-Beta ohne Einladung herunterladen. Sieh, was öffentlich ist und wofür du einen Closed-Beta-Zugang brauchst.",
     path: locale === "en" ? "/download?lang=en" : "/download",
     locale,
   });
@@ -58,7 +59,7 @@ export default async function DownloadPage({
           eyebrow: "BloomMD Desktop",
           title: "Desktop-Apps herunterladen",
           intro:
-            "Wähle macOS oder Omarchy/Linux. BloomMD arbeitet lokal mit deinen Markdown-Dateien.",
+            "Wähle macOS oder Omarchy/Linux. Die lokalen Beta-Builds sind ohne Einladung und ohne BloomMD-Konto herunterladbar.",
           status: "Lokale Desktop-Beta",
           version: "Desktop-Version",
           choose: "1. Plattform wählen",
@@ -96,7 +97,7 @@ export default async function DownloadPage({
             "Ordner als Workspace öffnen",
             "Direkt loslegen",
           ],
-          beta: "Beta-Umfang ansehen",
+          beta: "Web- und Cloud-Beta-Zugang",
           docs: "Vollständige Anleitung",
           agent: "Optional: lokaler OpenClaw-Agent",
           agentDescription:
@@ -116,7 +117,7 @@ export default async function DownloadPage({
           eyebrow: "BloomMD Desktop",
           title: "Download desktop apps",
           intro:
-            "Choose macOS or Omarchy/Linux. BloomMD works locally with your Markdown files.",
+            "Choose macOS or Omarchy/Linux. Download the local beta builds without an invitation or BloomMD account.",
           status: "Local desktop beta",
           version: "Desktop version",
           choose: "1. Choose your platform",
@@ -153,7 +154,7 @@ export default async function DownloadPage({
             "Open a folder as a workspace",
             "Start working",
           ],
-          beta: "See beta scope",
+          beta: "Web and cloud beta access",
           docs: "Full installation guide",
           agent: "Optional: local OpenClaw agent",
           agentDescription:
@@ -212,6 +213,8 @@ export default async function DownloadPage({
             </div>
           </div>
         </header>
+
+        <AvailabilityOverview locale={locale} embedded />
 
         <section className="grid gap-5" aria-labelledby="platform-heading">
           <div>

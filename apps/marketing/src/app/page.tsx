@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
+import { AvailabilityOverview } from "../components/availability-overview";
 import { WaitlistForm } from "./waitlist-form";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
@@ -339,7 +340,7 @@ const faqItems = [
   },
   {
     question: "Wie lange läuft die Beta?",
-    answer: "Demo und Templates sind frei zugänglich. Die Obsidian-Kompatibilität zeigen wir in echten Produktaufnahmen; die Plugin-Beta-Verteilung folgt nach M1. Die Cloud-App läuft als geschlossene Beta mit eingeladenen Testern — kostenlos, aber begrenzt. Preise veröffentlichen wir erst nach der Beta.",
+    answer: "Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin sind ohne Einladung verfügbar. Geschlossen ist der Zugang zu BloomMD Web, Cloud, Sync und Zusammenarbeit: Dafür laden wir Tester von der Warteliste ein. Preise veröffentlichen wir erst nach der Beta.",
   },
   {
     question: "Ist Sync erforderlich?",
@@ -802,7 +803,7 @@ function ObsidianSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Obsidian-Kompatibilität</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Obsidian-Notizen als BloomMD-Maps prüfen.</h2>
           <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Für M1 zeigen echte Produktaufnahmen, dass lokale Obsidian-Notizen als BloomMD-Maps funktionieren. Die vollständige Plugin-Beta-Verteilung folgt danach.
+            Das Plugin ist für Obsidian auf Desktop, iPad, iPhone und Android als Beta über BRAT oder GitHub-Releases verfügbar. Die Aufnahme zeigt eine echte lokale Notiz.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link href="/obsidian" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
@@ -938,7 +939,7 @@ function DesktopSection() {
 
         <div className="mt-8 flex flex-col gap-4 rounded-xl border border-white/12 bg-white/5 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-semibold">macOS und Omarchy/Linux in der Closed Beta</p>
+            <p className="font-semibold">macOS und Omarchy/Linux: lokale Beta ohne Einladung</p>
             <p className="mt-1 text-sm leading-6 text-white/70">
               macOS arm64 sowie Omarchy/Linux für x86_64 und aarch64 sind als lokale Beta-Builds verfügbar.
               Windows folgt als eigener Beta-Release.
@@ -949,7 +950,7 @@ function DesktopSection() {
               Desktop-Builds herunterladen
             </Link>
             <a href="#beta" className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
-              Beta-Zugang anfragen
+              Cloud-Zugang anfragen
             </a>
           </div>
         </div>
@@ -1055,9 +1056,9 @@ function BetaProgramSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Geschlossene Beta</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Kostenlos — und bewusst noch klein.</h2>
           <p className="mt-4 text-lg leading-8 text-[#666666]">
-            BloomMD ist noch nicht fertig, und wir tun nicht so. Demo und Templates kannst du sofort
-            ausprobieren; die Obsidian-Kompatibilität zeigen wir in M1 mit echten Aufnahmen. Die Cloud-App geben wir bewusst nur an eine kleine Runde von
-            Testern — wir wollen erst wissen, ob der Kern trägt, bevor viele Leute darauf bauen.
+            Demo und Templates kannst du sofort ausprobieren. Desktop-Builds und das Obsidian-Plugin
+            kannst du ohne Einladung laden. Nur BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
+            geben wir in kleinen Gruppen frei, damit wir Rückmeldungen beantworten können.
           </p>
         </div>
 
@@ -1089,7 +1090,7 @@ function BetaProgramSection() {
               title: "Was noch fehlt",
               items: [
                 "Cloud-Zugang nur auf Einladung",
-                "Mobile Obsidian ist noch nicht freigegeben",
+                "Die eigenständige Mobile-App und Windows-Desktop sind noch nicht öffentlich verfügbar",
                 "Der Agent-Workflow ist bewusst review-pflichtig",
                 "Rechne mit Bugs — und melde sie uns",
               ],
@@ -1223,6 +1224,7 @@ export default function LandingPage() {
       <WikiSection />
       <FeatureBento />
       <BetaProgramSection />
+      <AvailabilityOverview locale="de" />
 
       <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]">
         <div className="mx-auto grid max-w-7xl gap-4 px-5 py-10 md:grid-cols-4">
@@ -1245,7 +1247,7 @@ export default function LandingPage() {
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Jetzt testen</p>
             <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Beta auf Einladung.</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Die Demo läuft komplett im Browser. Obsidian-Kompatibilität zeigen wir mit echten lokalen Notizen; macOS- und Omarchy/Linux-Desktop sind als lokale Beta-Builds verfügbar, Cloud/Collaboration geben wir in kleinen Beta-Wellen frei.</p>
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Einladung nutzen. Die geschlossene Beta betrifft BloomMD Web, Cloud, Sync und Zusammenarbeit.</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
             <Link href="/demo" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">Demo testen <ArrowRight size={16} /></Link>
@@ -1261,9 +1263,9 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-5 py-14">
           <h2 className="text-3xl font-semibold text-[#1A1A1A]">Die Cloud-App läuft als geschlossene Beta</h2>
           <p className="mt-3 max-w-2xl text-[#514C46]">
-            Wir laden in kleinen Gruppen ein, damit Rückmeldungen auch beantwortet werden. Trag dich
-            ein, und wir melden uns, sobald ein Platz frei wird. Demo und Templates brauchen keine
-            Einladung.
+            Nur für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit laden wir in kleinen Gruppen ein.
+            Trag dich ein; die Warteliste ist noch kein Konto. Demo, lokale Desktop-Builds und das
+            Obsidian-Plugin sind ohne Einladung nutzbar.
           </p>
           <div className="mt-6">
             <WaitlistForm source="landing" />

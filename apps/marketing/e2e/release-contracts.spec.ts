@@ -116,7 +116,10 @@ test.describe("marketing release contracts", () => {
 
     const obsidianResponse = await request.get("/obsidian?lang=en");
     expect(obsidianResponse.ok()).toBe(true);
-    expect((await obsidianResponse.text()).replace(/\s+/g, " ")).toContain("Your Obsidian notes as BloomMD maps.");
+    const obsidianBody = (await obsidianResponse.text()).replace(/\s+/g, " ");
+    expect(obsidianBody).toContain("Install BloomMD in Obsidian");
+    expect(obsidianBody).toContain("Add Beta Plugin");
+    expect(obsidianBody).toContain("You need no BloomMD account or invitation.");
   });
 
   test("routes account CTAs to the product app and beta CTAs to the waitlist section", async ({ request }) => {
@@ -362,10 +365,12 @@ test.describe("marketing documentation and waitlist", () => {
     }
   });
 
-  test("states plainly that mobile is out of scope for the beta", async ({ request }) => {
+  test("distinguishes the mobile app from the Obsidian mobile plugin", async ({ request }) => {
     const response = await request.get("/docs");
     expect(response.ok()).toBe(true);
-    expect(await response.text()).toContain("nicht Teil der Beta");
+    const body = (await response.text()).replace(/\s+/g, " ");
+    expect(body).toContain("keinen öffentlichen App-Store-Download");
+    expect(body).toContain("auch auf Mobilgeräten als Beta verfügbar");
   });
 
   test("renders a subpage from its Markdown file", async ({ request }) => {
@@ -437,6 +442,35 @@ test.describe("marketing documentation and waitlist", () => {
       expect(response.status(), `${path} should point testers to /download`).toBe(307);
       expect(response.headers().location).toBe("/download");
     }
+  });
+
+  test("separates public downloads from invitation-only cloud access in both languages", async ({ request }) => {
+    for (const [path, available, gated, upcoming] of [
+      ["/download", "Jetzt verfügbar, ohne Einladung", "Einladung erforderlich", "Noch kein öffentlicher Download"],
+      ["/download?lang=en", "Available now, no invitation", "Invitation required", "No public download yet"],
+    ]) {
+      const response = await request.get(path);
+      expect(response.ok(), path).toBe(true);
+      const body = (await response.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+      expect(body, path).toContain(available);
+      expect(body, path).toContain(gated);
+      expect(body, path).toContain(upcoming);
+      expect(body, path).toContain("bloommd-obsidian/releases/latest");
+    }
+
+    const obsidian = await request.get("/obsidian");
+    expect(obsidian.ok()).toBe(true);
+    const obsidianBody = (await obsidian.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+    expect(obsidianBody).toContain("moellenbeck-digital/bloommd-obsidian");
+    expect(obsidianBody).toContain("kein Eintrag im Obsidian-Plugin-Verzeichnis");
+    expect(obsidianBody).toContain("bloommd-obsidian#beta-via-brat");
+    expect(obsidianBody).not.toContain('href="/docs/obsidian"');
+
+    const desktopGuide = await request.get("/docs/desktop");
+    expect(desktopGuide.ok()).toBe(true);
+    const guideBody = (await desktopGuide.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+    expect(guideBody).toContain("ohne Einladung oder BloomMD-Konto");
+    expect(guideBody).not.toContain("Build nicht öffentlich gelistet");
   });
 
   test("the landing page offers a waitlist without promising more than it delivers", async ({ request }) => {

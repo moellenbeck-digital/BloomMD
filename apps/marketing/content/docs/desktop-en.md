@@ -14,9 +14,9 @@ The tester download page is [bloommd.io/download](/download?lang=en). It shows t
 builds for macOS arm64 and Omarchy/Linux x86_64 or aarch64, with platform status and installation
 instructions.
 
-The build is not publicly listed during the closed beta. If your account is enabled, the concrete
-download link is provided through beta access. If a link is missing or expired, reply to the beta
-invitation or contact `feedback@bloommd.io`.
+The desktop builds are publicly linked and can be downloaded without an invitation or BloomMD
+account. Closed-beta access applies only to the Web app, cloud, sync and collaboration. If a
+download link does not work, contact `feedback@bloommd.io`.
 
 ## Working with nodes from 0.5.14
 

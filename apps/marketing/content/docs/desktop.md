@@ -14,9 +14,9 @@ Die feste Download-Stelle für Tester ist [bloommd.io/download](/download). Dort
 freigegebenen Desktop-Builds für macOS arm64 sowie Omarchy/Linux für x86_64 und aarch64 — jeweils
 mit Version, Plattformstatus und Installationshinweis.
 
-In der geschlossenen Beta ist der Build nicht öffentlich gelistet. Wenn dein Account freigeschaltet
-ist, bekommst du den konkreten Download-Link über die Beta-Freigabe. Falls der Link fehlt oder
-abgelaufen ist, antworte auf deine Beta-Einladung oder schreibe an `feedback@bloommd.io`.
+Die Desktop-Builds sind öffentlich verlinkt und lassen sich ohne Einladung oder BloomMD-Konto
+herunterladen. Der Closed-Beta-Zugang gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
+Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
 ## Knoten bedienen ab 0.5.14
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [Marketing 0.5.6] - 2026-10-25
+
+- Eine zweisprachige News-Meldung führt zum öffentlichen BloomMD-Quellcode, zu Issues und Beiträgen und erklärt ELv2, das MIT-lizenzierte Obsidian-Plugin sowie den Stand historischer Releases. Die ältere Lizenzmeldung verweist auf den neuen Repo-Stand.
+- Bilingual news links to the public BloomMD source code, issues and contributions, and explains ELv2, the MIT-licensed Obsidian plugin, and historical releases. The earlier license announcement links to the current repository status.
+- Startseite, Download, Obsidian, Hilfe und Leistungsbeschreibung unterscheiden klar zwischen frei verfügbaren lokalen Betas, Cloud-Zugang auf Einladung und noch nicht veröffentlichten Apps.
+- Landing, download, Obsidian, help and service pages distinguish publicly available local betas, invitation-only cloud access and apps without a public download.
+
 ## [Obsidian 0.7.1] - 2026-10-25
 
 - Das Obsidian-Plugin erfüllt die Hinweise aus dem Community-Plugin-Review (Styles über `setCssStyles`, Fenster-sichere Timer und Typprüfungen, `createEl`, Einstellungen per `update()`, strengere Typprüfung). Keine Verhaltensänderung.

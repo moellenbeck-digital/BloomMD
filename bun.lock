@@ -59,7 +59,7 @@
     },
     "apps/marketing": {
       "name": "@bloommd/marketing",
-      "version": "0.5.5",
+      "version": "0.5.6",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ui": "workspace:*",

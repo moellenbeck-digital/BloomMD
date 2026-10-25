@@ -18,3 +18,5 @@ This does not retroactively change the license of published versions: Desktop **
 ELv2 allows use, modification, and redistribution of the code subject to its terms. In particular, it limits offering the software to third parties as a hosted or managed service and protects license notices. Read the full terms on our [license page](/lizenz?lang=en) and in the [ELv2 license text](https://www.elastic.co/licensing/elastic-license/).
 
 The license change does not make the currently private BloomMD monorepo public as of this announcement. See the [download page](/download?lang=en) for the versions currently available.
+
+**Update, October 25, 2026:** [BloomMD source code is now public](/en/news/bloommd-repository-public). The license boundaries for earlier releases remain as described above.

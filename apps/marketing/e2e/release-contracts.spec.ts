@@ -116,7 +116,10 @@ test.describe("marketing release contracts", () => {
 
     const obsidianResponse = await request.get("/obsidian?lang=en");
     expect(obsidianResponse.ok()).toBe(true);
-    expect((await obsidianResponse.text()).replace(/\s+/g, " ")).toContain("Your Obsidian notes as BloomMD maps.");
+    const obsidianBody = (await obsidianResponse.text()).replace(/\s+/g, " ");
+    expect(obsidianBody).toContain("Install BloomMD in Obsidian");
+    expect(obsidianBody).toContain("Add Beta Plugin");
+    expect(obsidianBody).toContain("You need no BloomMD account or invitation.");
   });
 
   test("routes account CTAs to the product app and beta CTAs to the waitlist section", async ({ request }) => {
@@ -362,10 +365,12 @@ test.describe("marketing documentation and waitlist", () => {
     }
   });
 
-  test("states plainly that mobile is out of scope for the beta", async ({ request }) => {
+  test("distinguishes the mobile app from the Obsidian mobile plugin", async ({ request }) => {
     const response = await request.get("/docs");
     expect(response.ok()).toBe(true);
-    expect(await response.text()).toContain("nicht Teil der Beta");
+    const body = (await response.text()).replace(/\s+/g, " ");
+    expect(body).toContain("keinen öffentlichen App-Store-Download");
+    expect(body).toContain("auch auf Mobilgeräten als Beta verfügbar");
   });
 
   test("renders a subpage from its Markdown file", async ({ request }) => {

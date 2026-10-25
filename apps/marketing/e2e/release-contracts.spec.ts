@@ -439,6 +439,35 @@ test.describe("marketing documentation and waitlist", () => {
     }
   });
 
+  test("separates public downloads from invitation-only cloud access in both languages", async ({ request }) => {
+    for (const [path, available, gated, upcoming] of [
+      ["/download", "Jetzt verfügbar, ohne Einladung", "Einladung erforderlich", "Noch kein öffentlicher Download"],
+      ["/download?lang=en", "Available now, no invitation", "Invitation required", "No public download yet"],
+    ]) {
+      const response = await request.get(path);
+      expect(response.ok(), path).toBe(true);
+      const body = (await response.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+      expect(body, path).toContain(available);
+      expect(body, path).toContain(gated);
+      expect(body, path).toContain(upcoming);
+      expect(body, path).toContain("bloommd-obsidian/releases/latest");
+    }
+
+    const obsidian = await request.get("/obsidian");
+    expect(obsidian.ok()).toBe(true);
+    const obsidianBody = (await obsidian.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+    expect(obsidianBody).toContain("moellenbeck-digital/bloommd-obsidian");
+    expect(obsidianBody).toContain("kein Eintrag im Obsidian-Plugin-Verzeichnis");
+    expect(obsidianBody).toContain("bloommd-obsidian#beta-via-brat");
+    expect(obsidianBody).not.toContain('href="/docs/obsidian"');
+
+    const desktopGuide = await request.get("/docs/desktop");
+    expect(desktopGuide.ok()).toBe(true);
+    const guideBody = (await desktopGuide.text()).replace(/<!-- -->/g, "").replace(/\s+/g, " ");
+    expect(guideBody).toContain("ohne Einladung oder BloomMD-Konto");
+    expect(guideBody).not.toContain("Build nicht öffentlich gelistet");
+  });
+
   test("the landing page offers a waitlist without promising more than it delivers", async ({ request }) => {
     const response = await request.get("/");
     expect(response.ok()).toBe(true);

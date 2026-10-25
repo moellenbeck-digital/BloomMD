@@ -29,3 +29,5 @@ Die bisherigen [Desktop- und CLI-Downloads](https://github.com/moellenbeck-digit
 Das [separate Obsidian-Repository](https://github.com/moellenbeck-digital/bloommd-obsidian) bleibt ein Release-Mirror für BRAT und manuelle Installationen. Die Entwicklung findet im BloomMD-Monorepo statt.
 
 Bitte melde noch nicht behobene Sicherheitslücken [vertraulich](https://github.com/moellenbeck-digital/BloomMD/blob/main/SECURITY.md) statt in einem öffentlichen Issue.
+
+Welche Apps du heute ohne Einladung herunterladen kannst und wofür die geschlossene Beta gilt, steht in der [Verfügbarkeitsübersicht](/download#availability).

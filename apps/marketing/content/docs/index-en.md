@@ -31,8 +31,13 @@ them.
 The Web app, cloud workspaces, sync, and collaboration require closed-beta access. The process for
 the waitlist, invitation, account creation, and sign-in is described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
 
+**Available without an invitation:** the [browser demo](/demo?lang=en), desktop
+builds on the [download page](/download?lang=en), and the [Obsidian plugin](/obsidian?lang=en)
+through BRAT or GitHub releases. Closed beta applies to Web and cloud access.
+
 ## Not included in the beta
 
-- **Mobile.** Mobile builds exist, but are explicitly **not part of the beta** and are not supported for production use.
+- The standalone BloomMD app for iPad, iPhone and Android has no public app-store
+  download yet. The Obsidian plugin is separate and is also available as a mobile beta.
 - There is no recovery promise for cloud data. Do not upload anything you do not have elsewhere.
 - Windows desktop builds are not part of this closed beta.

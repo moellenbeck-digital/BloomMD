@@ -10,6 +10,10 @@ BloomMD ist in M1 eine geschlossene Beta. Ein Wartelisten-Eintrag ist noch kein 
 Beta-Einladung erstellt noch kein Passwort. Der normale Ablauf ist bewusst getrennt, damit klar ist,
 was in welchem Schritt passiert.
 
+**Geschlossen ist der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit.**
+Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
+[Obsidian-Plugin](/obsidian) kannst du ohne Einladung nutzen.
+
 ## Normaler Ablauf
 
 1. Du trägst dich auf bloommd.io in die Beta-Warteliste ein.

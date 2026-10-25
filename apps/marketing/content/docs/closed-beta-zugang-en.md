@@ -9,6 +9,10 @@ order: 2
 BloomMD is a closed beta in M1. A waitlist entry is not an account, and a beta invitation does not
 create a password. The steps are intentionally separate so that every stage is clear.
 
+**Invitation-only access applies to BloomMD Web, cloud workspaces, sync and collaboration.**
+The [browser demo](/demo?lang=en), [desktop builds](/download?lang=en) and
+[Obsidian plugin](/obsidian?lang=en) are available without an invitation.
+
 ## The normal process
 
 1. Join the beta waitlist at bloommd.io.

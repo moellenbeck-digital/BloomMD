@@ -5,6 +5,8 @@ const publicPages = [
   { path: "/", name: "landing page" },
   { path: "/en", name: "English landing page" },
   { path: "/demo", name: "public demo" },
+  { path: "/download", name: "download status" },
+  { path: "/obsidian", name: "Obsidian status" },
   { path: "/templates", name: "template library" },
   { path: "/templates/software-architecture", name: "template detail" },
   { path: "/docs", name: "documentation" },

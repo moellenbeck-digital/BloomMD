@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
+import { AvailabilityOverview } from "../../components/availability-overview";
 import {
   ArrowRight,
   Bot,
@@ -197,7 +198,7 @@ const faqItems = [
   },
   {
     question: "What is included in the closed beta?",
-    answer: "The browser demo and templates are public. The macOS and Omarchy/Linux desktop builds, private app, sync and collaboration are invited in small waves.",
+    answer: "The browser demo, macOS and Omarchy/Linux desktop builds, and Obsidian plugin are available without an invitation. Closed beta applies to BloomMD Web, cloud workspaces, sync and collaboration; testers are invited from the waitlist.",
   },
   {
     question: "Can I give feedback with screenshots?",
@@ -601,11 +602,11 @@ function ObsidianSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Obsidian compatibility</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Check Obsidian notes as BloomMD maps.</h2>
           <p className="mt-4 text-lg leading-8 text-[#666666]">
-            For M1, real product recordings show local Obsidian notes rendered as BloomMD maps. The full plugin beta distribution follows after this release.
+            The plugin beta is available for Obsidian on desktop, iPad, iPhone and Android via BRAT or GitHub releases. The recording shows a real local note.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Link href="/obsidian?lang=en" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
-              Open German status page
+              View plugin status
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
             <a href="https://github.com/moellenbeck-digital/bloommd-obsidian" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] px-4 text-sm font-semibold text-[#1A1A1A] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
@@ -645,7 +646,7 @@ function DesktopSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#FFB899]">Desktop beta</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Real local work belongs on the computer.</h2>
           <p className="mt-4 text-lg leading-8 text-white/70">
-            The browser demo is for trying the model. The desktop app opens local Markdown files and folders directly on macOS and Omarchy/Linux in the closed beta.
+            The browser demo is for trying the model. Download the desktop beta for macOS or Omarchy/Linux without an invitation and work directly with local Markdown files.
           </p>
         </div>
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
@@ -663,7 +664,7 @@ function DesktopSection() {
         </div>
         <div className="mt-8 flex flex-col gap-4 rounded-xl border border-white/12 bg-white/5 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-semibold">macOS and Omarchy/Linux in the closed beta</p>
+            <p className="font-semibold">macOS and Omarchy/Linux: local beta without an invitation</p>
             <p className="mt-1 text-sm leading-6 text-white/70">
               macOS arm64 and Omarchy/Linux for x86_64 and aarch64 are available as local beta builds.
               Windows follows as a separate beta release.
@@ -674,7 +675,7 @@ function DesktopSection() {
               Download desktop builds
             </Link>
             <a href="#beta" className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
-              Request beta access
+              Request cloud access
             </a>
           </div>
         </div>
@@ -723,7 +724,7 @@ function BetaSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Closed beta</p>
           <h2 className="text-3xl font-semibold text-[#1A1A1A] sm:text-4xl">Free during beta, intentionally small.</h2>
           <p className="mt-3 text-[#514C46]">
-            We invite testers in small groups so feedback can be answered. Join the waitlist and we will email you when a seat opens. Demo and templates do not need an invite.
+            Invitations apply to BloomMD Web, cloud workspaces, sync and collaboration. Join the waitlist; it does not create an account. The demo, local desktop builds and Obsidian plugin need no invitation.
           </p>
         </div>
         <div className="mt-6">
@@ -954,6 +955,7 @@ export function EnglishLandingPage() {
       <ObsidianSection />
       <DesktopSection />
       <LocalFirstAndWikiSection />
+      <AvailabilityOverview locale="en" />
       <BetaSection />
       <FAQSection />
 

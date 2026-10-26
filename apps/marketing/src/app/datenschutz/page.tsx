@@ -3,6 +3,7 @@ import { LegalPage, LegalSection } from "../legal-page";
 import { getLegalProfile, LEGAL_STATUS } from "../../lib/legal";
 import { getMarketingLocale, type MarketingLocale } from "../../lib/locale";
 import { marketingMetadata } from "../../lib/metadata";
+import { WAITLIST_PURGE_RETENTION_DAYS } from "../../lib/waitlist-retention";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ lang?: string }> }): Promise<Metadata> {
   const locale = getMarketingLocale((await searchParams).lang);
@@ -69,18 +70,17 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
         <p>{en ? <>Only if a consent-required analytics service is enabled, the marketing app stores that choice in the browser under `bloommd:analytics-consent:v1`. Plausible itself does not require this choice because it is configured without cookies or persistent identifiers.</> : <>Nur wenn ein zustimmungspflichtiger Analysedienst aktiviert ist, speichert die Marketing-App die Auswahl im Browser unter `bloommd:analytics-consent:v1`. Plausible selbst benötigt diese Auswahl nicht, weil es ohne Cookies und persistente Identifikatoren konfiguriert ist.</>}</p>
       </LegalSection>
 
-      <LegalSection title={en ? "Waitlist" : "Warteliste"}>
-        <p>{en ? "Anyone joining the waitlist leaves an email address, registration time and the source page. The address is stored and used only after confirmation through a double-opt-in link; unconfirmed entries are not contacted. The legal basis is consent (Art. 6(1)(a) GDPR). Unconfirmed entries are deleted after 30 days if not confirmed." : <>
-          Wer sich in die Warteliste einträgt, hinterlässt eine E-Mail-Adresse, den Zeitpunkt und die Seite, von der die Eintragung kam.
-          Die Adresse wird erst gespeichert und genutzt, wenn sie über einen Bestätigungslink bestätigt wurde (Double-Opt-in);
-          unbestätigte Einträge werden nicht angeschrieben. Rechtsgrundlage ist die Einwilligung (Art. 6 Abs. 1 lit. a DSGVO).
-          Unbestätigte Einträge werden nach 30 Tagen gelöscht, wenn sie bis dahin nicht bestätigt wurden.
+      <LegalSection title={en ? "Waitlist (ended)" : "Warteliste (beendet)"}>
+        <p>{en ? `The waitlist has ended; nobody can join it any more. Anyone who joined earlier and confirmed the address receives a single email inviting them to register. Stored are the email address, the time of the entry, the source page and the status (confirmed, unsubscribed). The legal basis is the consent given when joining (Art. 6(1)(a) GDPR). Unconfirmed entries are not contacted.` : <>
+          Die Warteliste ist beendet; neue Einträge sind nicht mehr möglich. Wer sich früher eingetragen und die Adresse bestätigt hat,
+          bekommt einmalig eine E-Mail mit der Einladung, sich zu registrieren. Gespeichert sind E-Mail-Adresse, Zeitpunkt der Eintragung,
+          Herkunftsseite und der Status (bestätigt, abgemeldet). Rechtsgrundlage ist die Einwilligung bei der Eintragung
+          (Art. 6 Abs. 1 lit. a DSGVO). Unbestätigte Einträge werden nicht angeschrieben.
         </>}</p>
-        <p>{en ? "The address is used only to notify people about an available beta place — no newsletter and no advertising. Consent can be withdrawn through the unsubscribe link in each message, without an account or sign-in. After unsubscribing, the entry remains for up to 90 days as a suppression record so the address is not contacted accidentally. Entries are deleted no later than the end of the closed beta." : <>
-          Die Adresse wird ausschließlich verwendet, um über einen freien Beta-Platz zu informieren — kein Newsletter, keine Werbung.
-          Die Einwilligung kann jederzeit über den Abmeldelink in jeder Nachricht widerrufen werden, ohne Konto und ohne Anmeldung.
-          Nach der Abmeldung bleibt der Eintrag noch bis zu 90 Tage bestehen, damit die Adresse nicht versehentlich erneut angeschrieben wird.
-          Spätestens mit dem Ende der geschlossenen Beta werden die Einträge gelöscht.
+        <p>{en ? `All waitlist entries are deleted ${WAITLIST_PURGE_RETENTION_DAYS} days after that invitation email. Unsubscribing remains possible through the link in the invitation email and in earlier waitlist messages, without an account or sign-in; this withdraws consent at any time. After unsubscribing, the address is not contacted again and is removed with all other entries.` : <>
+          Alle Wartelisten-Einträge werden {WAITLIST_PURGE_RETENTION_DAYS} Tage nach dieser Einladungs-E-Mail gelöscht. Die Abmeldung bleibt weiter möglich — über den Link
+          in der Einladung und in früheren Wartelisten-Nachrichten, ohne Konto und ohne Anmeldung; damit kann die Einwilligung jederzeit widerrufen
+          werden. Nach der Abmeldung wird die Adresse nicht mehr angeschrieben und mit allen übrigen Einträgen gelöscht.
         </>}</p>
       </LegalSection>
 

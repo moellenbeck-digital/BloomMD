@@ -42,23 +42,22 @@ Nach dem Zurücksetzen werden bestehende Anmeldungen beendet.
 
 ## Beta geschlossen (nur mit Einladung)
 
-Ein Wartelisten-Eintrag ist noch kein Account und eine Beta-Einladung erstellt noch kein Passwort.
-Der Ablauf ist bewusst getrennt, damit klar ist, was in welchem Schritt passiert.
+Die Beta-Warteliste auf bloommd.io ist beendet; neue Einträge sind nicht mehr möglich. Eine
+Beta-Einladung erstellt noch kein Passwort. Der Ablauf ist bewusst getrennt, damit klar ist, was in
+welchem Schritt passiert.
 
-1. Du trägst dich auf bloommd.io in die Beta-Warteliste ein.
-2. Du bestätigst deine E-Mail-Adresse über die Bestätigungs-E-Mail.
-3. Ein Admin oder Staff-Mitglied lädt bestätigte Einträge aus der Warteliste ein.
-4. Du bekommst eine persönliche Beta-Einladung per E-Mail mit einem Account-erstellen-Link.
-5. Über diesen Link öffnest du die Account-Erstellung. Die eingeladene E-Mail-Adresse ist bereits
+1. Ein Admin oder Staff-Mitglied lädt dich ein.
+2. Du bekommst eine persönliche Beta-Einladung per E-Mail mit einem Account-erstellen-Link.
+3. Über diesen Link öffnest du die Account-Erstellung. Die eingeladene E-Mail-Adresse ist bereits
    vorausgefüllt.
-6. Du vergibst dein eigenes Passwort, stimmst Datenschutzerklärung und AGB zu und bestätigst
+4. Du vergibst dein eigenes Passwort, stimmst Datenschutzerklärung und AGB zu und bestätigst
    danach deine Account-E-Mail.
-7. Danach kannst du dich auf bloommd.app mit E-Mail und Passwort anmelden.
+5. Danach kannst du dich auf bloommd.app mit E-Mail und Passwort anmelden.
 
 ### Noch keine Einladung
 
-Wenn du noch keine Einladung bekommen hast, nutze zuerst die Warteliste auf bloommd.io. Ohne
-Einladung oder Einladungscode wird in diesem Zustand kein Account freigeschaltet.
+Wenn du noch keine Einladung bekommen hast, wende dich an das BloomMD-Team. Ohne Einladung oder
+Einladungscode wird in diesem Zustand kein Account freigeschaltet.
 
 ### Einladung erhalten
 
@@ -68,8 +67,8 @@ sichtbar sein, falls ein Admin einen Code separat verschickt.
 
 ### Einladung erneut senden
 
-Wenn eine Wartelisten-Bestätigung oder Beta-Einladung nicht angekommen ist, kann ein Admin sie aus
-der Wartelisten-Administration erneut senden. Prüfe vorher auch Spam- und Promotions-Ordner.
+Wenn eine Beta-Einladung nicht angekommen ist, kann ein Admin sie erneut senden. Prüfe vorher auch
+Spam- und Promotions-Ordner.
 
 ## Bereits einen Account erstellt
 

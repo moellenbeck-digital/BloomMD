@@ -8,6 +8,7 @@ import { parseFile, serializeToMarkdown, type MindMapDocument } from "@bloommd/c
 import type { TemplateMetadata } from "../../lib/templates";
 import type { MarketingLocale } from "../../lib/locale";
 import { withMarketingLocale } from "../../lib/locale";
+import { publicAppUrl } from "../../lib/deployment";
 import { trackPlausibleEvent } from "../../lib/plausible";
 import { isMarketingAnalyticsConfigured, scrubMarketingAnalyticsEvent } from "../../lib/telemetryPrivacy";
 
@@ -44,9 +45,9 @@ function createDoc(slug: string, markdown: string) {
 
 export function DemoClient({ templates, initialTemplate, locale }: DemoClientProps) {
   const copy = locale === "de"
-    ? { home: "BloomMD-Startseite", local: "Lokale Demo. Markdown bleibt in diesem Browser, sofern du sie nicht herunterlädst.", shortcuts: "Tastaturkürzel", select: "Vorlage auswählen", markdown: "Markdown", mindmap: "Mindmap", download: "Download", ownMarkdown: "Eigenes Markdown ausprobieren", paste: "Füge Markdown ein oder wähle eine lokale Datei. Die Demo verarbeitet sie im Browser und speichert sie nicht automatisch.", visualize: "Eingefügtes Markdown visualisieren", choose: "Lokale Markdown-Datei auswählen", afterMove: "Verschiebe einen Ast in der Mindmap und wechsle zu Markdown, um die aktualisierte Überschriftenstruktur zu sehen.", templates: "Templates entdecken", waitlist: "Für die Closed-Beta-Warteliste anmelden", obsidian: "BloomMD mit Obsidian nutzen", preview: "Markdown-Vorschau", guided: "Geführte Demo", steps: ["Markdown-Überschriften werden Nodes.", "Öffne einen Node, um seinen Inhalt zu sehen.", "Ziehe einen Ast, um die Dokumentstruktur zu ändern.", "Wechsle zurück zu Markdown.", "Probiere deine eigene Datei aus."], skip: "Überspringen", start: "Starten" }
-    : { home: "BloomMD home", local: "Local demo. Markdown stays in this browser unless you download it.", shortcuts: "Keyboard shortcuts", select: "Select template", markdown: "Markdown", mindmap: "Mindmap", download: "Download", ownMarkdown: "Try your own Markdown", paste: "Paste Markdown or choose a local file. The demo parses it in your browser and does not save it automatically.", visualize: "Visualize pasted Markdown", choose: "Choose local Markdown file", afterMove: "After you move a branch in the mind map, switch to Markdown to see the updated heading structure.", templates: "Explore templates", waitlist: "Join the closed beta waitlist", obsidian: "Use BloomMD with Obsidian", preview: "Markdown preview", guided: "Guided Demo", steps: ["Markdown headings become nodes.", "Open a node to view its content.", "Drag a branch to restructure the document.", "Switch back to Markdown.", "Try your own file."], skip: "Skip", start: "Start" };
-  const closedBetaUrl = withMarketingLocale("/#beta", locale);
+    ? { home: "BloomMD-Startseite", local: "Lokale Demo. Markdown bleibt in diesem Browser, sofern du sie nicht herunterlädst.", shortcuts: "Tastaturkürzel", select: "Vorlage auswählen", markdown: "Markdown", mindmap: "Mindmap", download: "Download", ownMarkdown: "Eigenes Markdown ausprobieren", paste: "Füge Markdown ein oder wähle eine lokale Datei. Die Demo verarbeitet sie im Browser und speichert sie nicht automatisch.", visualize: "Eingefügtes Markdown visualisieren", choose: "Lokale Markdown-Datei auswählen", afterMove: "Verschiebe einen Ast in der Mindmap und wechsle zu Markdown, um die aktualisierte Überschriftenstruktur zu sehen.", templates: "Templates entdecken", signup: "Jetzt registrieren", obsidian: "BloomMD mit Obsidian nutzen", preview: "Markdown-Vorschau", guided: "Geführte Demo", steps: ["Markdown-Überschriften werden Nodes.", "Öffne einen Node, um seinen Inhalt zu sehen.", "Ziehe einen Ast, um die Dokumentstruktur zu ändern.", "Wechsle zurück zu Markdown.", "Probiere deine eigene Datei aus."], skip: "Überspringen", start: "Starten" }
+    : { home: "BloomMD home", local: "Local demo. Markdown stays in this browser unless you download it.", shortcuts: "Keyboard shortcuts", select: "Select template", markdown: "Markdown", mindmap: "Mindmap", download: "Download", ownMarkdown: "Try your own Markdown", paste: "Paste Markdown or choose a local file. The demo parses it in your browser and does not save it automatically.", visualize: "Visualize pasted Markdown", choose: "Choose local Markdown file", afterMove: "After you move a branch in the mind map, switch to Markdown to see the updated heading structure.", templates: "Explore templates", signup: "Register now", obsidian: "Use BloomMD with Obsidian", preview: "Markdown preview", guided: "Guided Demo", steps: ["Markdown headings become nodes.", "Open a node to view its content.", "Drag a branch to restructure the document.", "Switch back to Markdown.", "Try your own file."], skip: "Skip", start: "Start" };
+  const signupUrl = `${publicAppUrl()}/signup${locale === "en" ? "?lang=en" : ""}`;
   const setDocument = useMindMapStore((s) => s.setDocument);
   const document = useMindMapStore((s) => s.document);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
@@ -299,7 +300,7 @@ export function DemoClient({ templates, initialTemplate, locale }: DemoClientPro
             </div>
             <div className="mt-4 grid gap-2 text-sm">
               <Link href={withMarketingLocale("/templates", locale)} className="font-semibold text-[#FF6B35]" onClick={() => captureDemoEvent("explore_templates_clicked")}>{copy.templates}</Link>
-              <Link href={closedBetaUrl} className="font-semibold text-[#FF6B35]" onClick={() => captureDemoEvent("closed_beta_waitlist_clicked")}>{copy.waitlist}</Link>
+              <a href={signupUrl} className="font-semibold text-[#FF6B35]" onClick={() => captureDemoEvent("signup_click")}>{copy.signup}</a>
               <Link href={withMarketingLocale("/obsidian", locale)} className="font-semibold text-[#FF6B35]" onClick={() => captureDemoEvent("obsidian_plugin_clicked")}>{copy.obsidian}</Link>
             </div>
           </div>

@@ -1,14 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createSqlClient, type SqlClient } from "./sql-client";
+import { WAITLIST_PURGE_RETENTION_DAYS } from "./waitlist-retention";
 
 let waitlistClient: SqlClient | null = null;
 let waitlistSchemaPromise: Promise<void> | null = null;
 const WAITLIST_SCHEMA_LOCK_ID = 3_231_097_401;
-
-export interface WaitlistSignupResult {
-  created: boolean;
-  token: string | null;
-}
 
 export interface ConfirmedWaitlistEntry {
   email: string;
@@ -22,8 +18,23 @@ export interface WaitlistAdminEntry {
   createdAt: string;
   confirmedAt: string | null;
   unsubscribedAt: string | null;
+  invitedAt: string | null;
   source: string | null;
 }
+
+/** What the purge guard needs to know about the table. */
+export interface WaitlistPurgeStatus {
+  total: number;
+  /** Confirmed, not unsubscribed — the people the one-time invitation is for. */
+  invitable: number;
+  /** Of those, how many have not received the invitation yet. */
+  notInvited: number;
+  lastInvitedAt: string | null;
+}
+
+export type WaitlistPurgeVerdict =
+  | { allowed: true }
+  | { allowed: false; reason: "invitation-pending" | "no-invitation-sent" | "retention-running"; allowedFrom: string | null };
 
 export interface WaitlistAdminCounts {
   pending: number;
@@ -44,6 +55,9 @@ export interface WaitlistCleanupResult extends WaitlistRetentionPolicy {
   total: number;
 }
 
+export { WAITLIST_PURGE_RETENTION_DAYS };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_WAITLIST_PENDING_RETENTION_DAYS = 30;
 const DEFAULT_WAITLIST_UNSUBSCRIBED_RETENTION_DAYS = 90;
 
@@ -108,6 +122,10 @@ async function ensureWaitlistSchema() {
           updated_at timestamptz not null default now()
         )
       `;
+      // One-time invitation marker and its own unsubscribe token. The confirmation token stays
+      // untouched so unsubscribe links in mails sent earlier keep working.
+      await tx`alter table bloom_waitlist add column if not exists invited_at timestamptz`;
+      await tx`alter table bloom_waitlist add column if not exists invite_token_hash text`;
       await tx`create unique index if not exists bloom_waitlist_email_idx on bloom_waitlist (lower(email))`;
       await tx`create index if not exists bloom_waitlist_confirmed_idx on bloom_waitlist (confirmed_at) where confirmed_at is not null`;
       await tx`
@@ -126,98 +144,58 @@ async function ensureWaitlistSchema() {
   return waitlistSchemaPromise;
 }
 
-export async function addWaitlistSignup(email: string, source: string | null): Promise<WaitlistSignupResult> {
-  if (!isWaitlistConfigured()) return { created: false, token: null };
-  await ensureWaitlistSchema();
-
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = hashWaitlistToken(token);
-
-  const rows = await getWaitlistSql()`
-    insert into bloom_waitlist (email, source, confirm_token_hash)
-    values (${email.trim()}, ${source}, ${tokenHash})
-    on conflict (lower(email)) do update
-      set
-        source = excluded.source,
-        confirm_token_hash = excluded.confirm_token_hash,
-        confirmed_at = null,
-        unsubscribed_at = null,
-        updated_at = now()
-      where bloom_waitlist.unsubscribed_at is not null
-    returning id
-  `;
-  return rows.length > 0 ? { created: true, token } : { created: false, token: null };
-}
-
-export async function renewPendingWaitlistConfirmation(email: string): Promise<WaitlistSignupResult> {
-  if (!isWaitlistConfigured()) return { created: false, token: null };
-  await ensureWaitlistSchema();
-
-  const token = randomBytes(32).toString("base64url");
-  const tokenHash = hashWaitlistToken(token);
-
-  const rows = await getWaitlistSql()`
-    update bloom_waitlist
-    set confirm_token_hash = ${tokenHash}, updated_at = now()
-    where lower(email) = ${email.trim().toLowerCase()}
-      and confirmed_at is null
-      and unsubscribed_at is null
-    returning id
-  `;
-  return rows.length > 0 ? { created: true, token } : { created: false, token: null };
-}
-
-export async function confirmWaitlistSignup(token: string): Promise<boolean> {
-  if (!isWaitlistConfigured()) return false;
-  await ensureWaitlistSchema();
-
-  const rows = await getWaitlistSql()`
-    update bloom_waitlist
-    set confirmed_at = now(), updated_at = now()
-    where confirm_token_hash = ${hashWaitlistToken(token)}
-      and confirmed_at is null
-      and unsubscribed_at is null
-    returning id
-  `;
-  return rows.length > 0;
-}
-
 export async function unsubscribeFromWaitlist(token: string): Promise<boolean> {
   if (!isWaitlistConfigured()) return false;
   await ensureWaitlistSchema();
 
+  // Both tokens work: the one from the confirmation mail and the one from the invitation mail.
+  // Unsubscribe links in mails that are already sent must keep working after the waitlist ends.
+  const tokenHash = hashWaitlistToken(token);
   const rows = await getWaitlistSql()`
     update bloom_waitlist
     set unsubscribed_at = now(), updated_at = now()
-    where confirm_token_hash = ${hashWaitlistToken(token)} and unsubscribed_at is null
+    where (confirm_token_hash = ${tokenHash} or invite_token_hash = ${tokenHash})
+      and unsubscribed_at is null
     returning id
   `;
   return rows.length > 0;
 }
 
-export async function deleteUnsubscribedWaitlistEntry(email: string): Promise<boolean> {
-  if (!isWaitlistConfigured()) return false;
+/**
+ * Reserves the one-time invitation for an address and returns the unsubscribe token for the mail.
+ *
+ * Marking happens before sending, in one statement: a second run — or a second process — gets
+ * `null` for an address that was already claimed, so nobody is written to twice. Only confirmed,
+ * not unsubscribed, not yet invited entries can be claimed.
+ */
+export async function claimWaitlistInvitation(email: string): Promise<string | null> {
+  if (!isWaitlistConfigured()) return null;
   await ensureWaitlistSchema();
 
+  const token = randomBytes(32).toString("base64url");
   const rows = await getWaitlistSql()`
-    delete from bloom_waitlist
+    update bloom_waitlist
+    set invited_at = now(), invite_token_hash = ${hashWaitlistToken(token)}, updated_at = now()
     where lower(email) = ${email.trim().toLowerCase()}
-      and unsubscribed_at is not null
+      and confirmed_at is not null
+      and unsubscribed_at is null
+      and invited_at is null
     returning id
   `;
-  return rows.length > 0;
+  return rows.length > 0 ? token : null;
 }
 
-export async function deleteWaitlistEntryByEmail(email: string): Promise<boolean> {
-  if (!isWaitlistConfigured()) return false;
+/** Takes the marker back when the mail could not be sent, so a later run tries again. */
+export async function releaseWaitlistInvitation(email: string): Promise<void> {
+  if (!isWaitlistConfigured()) return;
   await ensureWaitlistSchema();
 
-  const rows = await getWaitlistSql()`
-    delete from bloom_waitlist
+  await getWaitlistSql()`
+    update bloom_waitlist
+    set invited_at = null, invite_token_hash = null, updated_at = now()
     where lower(email) = ${email.trim().toLowerCase()}
-    returning id
+      and invited_at is not null
   `;
-  return rows.length > 0;
 }
 
 function toIsoString(value: Date | string) {
@@ -246,7 +224,7 @@ export async function listWaitlistAdminEntries(): Promise<WaitlistAdminEntry[]> 
   await ensureWaitlistSchema();
 
   const rows = await getWaitlistSql()`
-    select email, confirmed_at, unsubscribed_at, created_at, source
+    select email, confirmed_at, unsubscribed_at, created_at, invited_at, source
     from bloom_waitlist
     order by created_at desc
   `;
@@ -255,6 +233,7 @@ export async function listWaitlistAdminEntries(): Promise<WaitlistAdminEntry[]> 
     confirmed_at: Date | string | null;
     unsubscribed_at: Date | string | null;
     created_at: Date | string;
+    invited_at: Date | string | null;
     source: string | null;
   }>).map((row) => {
     const confirmedAt = row.confirmed_at ? toIsoString(row.confirmed_at) : null;
@@ -265,9 +244,91 @@ export async function listWaitlistAdminEntries(): Promise<WaitlistAdminEntry[]> 
       confirmedAt,
       unsubscribedAt,
       createdAt: toIsoString(row.created_at),
+      invitedAt: row.invited_at ? toIsoString(row.invited_at) : null,
       source: row.source,
     };
   });
+}
+
+/**
+ * Confirmed, not unsubscribed and not yet invited — the audience of the one-time invitation,
+ * oldest confirmation first.
+ */
+export async function listInvitableWaitlist(): Promise<ConfirmedWaitlistEntry[]> {
+  if (!isWaitlistConfigured()) return [];
+  await ensureWaitlistSchema();
+
+  const rows = await getWaitlistSql()`
+    select email, confirmed_at, source
+    from bloom_waitlist
+    where confirmed_at is not null and unsubscribed_at is null and invited_at is null
+    order by confirmed_at asc
+  `;
+  return (rows as unknown as Array<{ email: string; confirmed_at: Date | string; source: string | null }>).map((row) => ({
+    email: row.email,
+    confirmedAt: toIsoString(row.confirmed_at),
+    source: row.source,
+  }));
+}
+
+export async function waitlistPurgeStatus(): Promise<WaitlistPurgeStatus> {
+  if (!isWaitlistConfigured()) return { total: 0, invitable: 0, notInvited: 0, lastInvitedAt: null };
+  await ensureWaitlistSchema();
+
+  const rows = await getWaitlistSql()`
+    select
+      count(*)::int as total,
+      count(*) filter (where confirmed_at is not null and unsubscribed_at is null)::int as invitable,
+      count(*) filter (where confirmed_at is not null and unsubscribed_at is null and invited_at is null)::int as not_invited,
+      max(invited_at) as last_invited_at
+    from bloom_waitlist
+  `;
+  const row = (rows[0] as { total?: number; invitable?: number; not_invited?: number; last_invited_at?: Date | string | null } | undefined) ?? {};
+  return {
+    total: Number(row.total ?? 0),
+    invitable: Number(row.invitable ?? 0),
+    notInvited: Number(row.not_invited ?? 0),
+    lastInvitedAt: row.last_invited_at ? toIsoString(row.last_invited_at) : null,
+  };
+}
+
+/**
+ * Whether `purge --apply` may delete now.
+ *
+ * Refuses while anybody who should still get the invitation has not received it (they would be
+ * dropped silently), and until {@link WAITLIST_PURGE_RETENTION_DAYS} after the last invitation
+ * mail. An empty table is always fine — there is nothing to lose.
+ */
+export function evaluateWaitlistPurge(status: WaitlistPurgeStatus, now: Date = new Date()): WaitlistPurgeVerdict {
+  if (status.total === 0) return { allowed: true };
+  if (status.notInvited > 0) return { allowed: false, reason: "invitation-pending", allowedFrom: null };
+  if (!status.lastInvitedAt) return { allowed: false, reason: "no-invitation-sent", allowedFrom: null };
+
+  const allowedFrom = new Date(new Date(status.lastInvitedAt).getTime() + WAITLIST_PURGE_RETENTION_DAYS * DAY_MS);
+  if (now.getTime() < allowedFrom.getTime()) {
+    return { allowed: false, reason: "retention-running", allowedFrom: allowedFrom.toISOString() };
+  }
+  return { allowed: true };
+}
+
+export class WaitlistPurgeRefusedError extends Error {
+  constructor(readonly verdict: Extract<WaitlistPurgeVerdict, { allowed: false }>) {
+    super(`Waitlist purge refused: ${verdict.reason}`);
+    this.name = "WaitlistPurgeRefusedError";
+  }
+}
+
+/**
+ * Deletes every waitlist entry. The guard runs here, not only in the CLI, so no caller can skip
+ * the retention period. Returns the number of deleted entries.
+ */
+export async function purgeWaitlist(now: Date = new Date()): Promise<number> {
+  if (!isWaitlistConfigured()) return 0;
+  const verdict = evaluateWaitlistPurge(await waitlistPurgeStatus(), now);
+  if (!verdict.allowed) throw new WaitlistPurgeRefusedError(verdict);
+
+  const rows = await getWaitlistSql()`delete from bloom_waitlist returning id`;
+  return rows.length;
 }
 
 export async function countWaitlistAdmin(): Promise<WaitlistAdminCounts> {

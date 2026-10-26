@@ -37,8 +37,6 @@ export default defineConfig({
       NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: "https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg",
       BLOOMMD_REQUIRE_AUTH: "1",
       BLOOMMD_E2E_AUTH_BYPASS: "1",
-      BLOOMMD_WAITLIST_ADMIN_USER: "admin",
-      BLOOMMD_WAITLIST_ADMIN_PASSWORD: "secret",
     },
   },
   projects: [

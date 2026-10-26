@@ -25,12 +25,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { WaitlistForm } from "../waitlist-form";
 import { getBuildInfo } from "../../lib/build-info";
 import { publicAppUrl } from "../../lib/deployment";
 import { trackPlausibleEvent } from "../../lib/plausible";
 
 const appLoginUrl = `${publicAppUrl()}/login?lang=en`;
+const appSignupUrl = `${publicAppUrl()}/signup?lang=en`;
 const marketingBuildInfo = getBuildInfo("marketing", { publicOnly: true });
 
 const headerNavItems = [
@@ -82,9 +82,9 @@ const audiencePaths = [
   {
     icon: MonitorSmartphone,
     title: "I want team sync",
-    text: "The private app with auth, sync and collaboration opens in small beta waves.",
+    text: "The private app with auth, sync and collaboration is available with an account.",
     href: "#beta",
-    cta: "Request beta access",
+    cta: "Register now",
   },
   {
     icon: LayoutTemplate,
@@ -190,19 +190,19 @@ const faqItems = [
   },
   {
     question: "Do I need to upload my files?",
-    answer: "No. Local work is the default. Cloud sync is optional and limited to invited beta testers.",
+    answer: "No. Local work is the default. Cloud sync is optional and needs an account.",
   },
   {
     question: "Does this work with Obsidian or VS Code?",
     answer: "Yes. Because the source remains Markdown, the same notes keep working in Git, VS Code, Obsidian and any text editor.",
   },
   {
-    question: "What is included in the closed beta?",
-    answer: "The browser demo, macOS and Omarchy/Linux desktop builds, and Obsidian plugin are available without an invitation. Closed beta applies to BloomMD Web, cloud workspaces, sync and collaboration; testers are invited from the waitlist.",
+    question: "What is included in the beta?",
+    answer: "The browser demo, macOS and Omarchy/Linux desktop builds, and Obsidian plugin are available without an account. For BloomMD Web, cloud workspaces, sync and collaboration you register with an account.",
   },
   {
     question: "Can I give feedback with screenshots?",
-    answer: "Yes. Invited testers can send feedback from the app. Screenshots and videos are planned for the beta feedback workflow.",
+    answer: "Yes. Signed-in testers can send feedback from the app. Screenshots and videos are planned for the beta feedback workflow.",
   },
 ] as const;
 
@@ -244,7 +244,7 @@ function Header() {
             Login
           </a>
           <a href="#beta" className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-            Request beta access
+            Register now
             <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>
@@ -300,7 +300,7 @@ function Header() {
                 Login
               </a>
               <a href="#beta" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Request beta access
+                Register now
                 <ArrowRight size={16} aria-hidden="true" />
               </a>
             </div>
@@ -721,14 +721,22 @@ function BetaSection() {
     <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">
       <div className="mx-auto max-w-7xl px-5 py-14">
         <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Closed beta</p>
-          <h2 className="text-3xl font-semibold text-[#1A1A1A] sm:text-4xl">Free during beta, intentionally small.</h2>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
+          <h2 className="text-3xl font-semibold text-[#1A1A1A] sm:text-4xl">Register now</h2>
           <p className="mt-3 text-[#514C46]">
-            Invitations apply to BloomMD Web, cloud workspaces, sync and collaboration. Join the waitlist; it does not create an account. The demo, local desktop builds and Obsidian plugin need no invitation.
+            For BloomMD Web, cloud workspaces, sync and collaboration you create an account. The waitlist no longer exists. The demo, local desktop builds and Obsidian plugin need no account.
           </p>
         </div>
         <div className="mt-6">
-          <WaitlistForm source="landing-en" locale="en" />
+          <a
+            href={appSignupUrl}
+            data-testid="signup-cta"
+            onClick={() => trackPlausibleEvent("signup_click")}
+            className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35"
+          >
+            Register now
+            <ArrowRight size={17} aria-hidden="true" />
+          </a>
         </div>
       </div>
     </section>
@@ -795,7 +803,7 @@ function Footer() {
     {
       title: "Beta",
       links: [
-        { label: "Closed beta", href: "#beta" },
+        { label: "Registration", href: "#beta" },
         { label: "Login", href: appLoginUrl },
       ],
     },
@@ -915,7 +923,7 @@ export function EnglishLandingPage() {
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
               <a href="#beta" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Request beta access
+                Register now
               </a>
             </div>
             <p className="mt-5 text-sm font-medium text-[#666666]">Normal Markdown / local files / macOS and Omarchy/Linux</p>

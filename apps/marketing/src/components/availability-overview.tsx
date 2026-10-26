@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { publicAppUrl } from "@/lib/deployment";
 import { withMarketingLocale, type MarketingLocale } from "@/lib/locale";
 
 const OBSIDIAN_RELEASE_URL = "https://github.com/moellenbeck-digital/bloommd-obsidian/releases/latest";
 
 export function AvailabilityOverview({ locale, embedded = false }: { locale: MarketingLocale; embedded?: boolean }) {
   const en = locale === "en";
-  const betaHref = en ? "/en#beta" : "/#beta";
+  const signupHref = `${publicAppUrl()}/signup${en ? "?lang=en" : ""}`;
 
   return (
     <section id="availability" aria-labelledby="availability-heading" className={embedded ? "rounded-xl border border-[#E8E4DF] bg-[#FFF8F3]" : "border-y border-[#E8E4DF] bg-[#FFF8F3]"}>
@@ -18,13 +19,13 @@ export function AvailabilityOverview({ locale, embedded = false }: { locale: Mar
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[#514C46]">
           {en
-            ? "Closed beta means that BloomMD Web, cloud workspaces, sync and collaboration require an invitation. The browser demo, local desktop builds and Obsidian plugin are available without a BloomMD account."
-            : "Geschlossene Beta bedeutet: Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit brauchst du eine Einladung. Browser-Demo, lokale Desktop-Builds und Obsidian-Plugin kannst du ohne BloomMD-Konto nutzen."}
+            ? "BloomMD Web, cloud workspaces, sync and collaboration need a BloomMD account, and you can register yourself. The browser demo, local desktop builds and Obsidian plugin are available without an account."
+            : "Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit brauchst du ein BloomMD-Konto, das du selbst anlegen kannst. Browser-Demo, lokale Desktop-Builds und Obsidian-Plugin kannst du ohne Konto nutzen."}
         </p>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
           <div className="rounded-xl border border-[#E8E4DF] bg-white p-6">
-            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Available now, no invitation" : "Jetzt verfügbar, ohne Einladung"}</h3>
+            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Available now, no account" : "Jetzt verfügbar, ohne Konto"}</h3>
             <ul className="mt-4 grid gap-4 text-sm leading-6 text-[#514C46]">
               <li>
                 <Link className="font-semibold text-[#B94316] underline" href={withMarketingLocale("/demo", locale)}>{en ? "Browser demo" : "Browser-Demo"}</Link>
@@ -43,15 +44,15 @@ export function AvailabilityOverview({ locale, embedded = false }: { locale: Mar
           </div>
 
           <div className="rounded-xl border border-[#E8E4DF] bg-white p-6">
-            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Invitation required" : "Einladung erforderlich"}</h3>
+            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Account required" : "Konto erforderlich"}</h3>
             <p className="mt-4 text-sm leading-6 text-[#514C46]">
               {en
-                ? "BloomMD Web at bloommd.app, cloud workspaces, sync and collaboration are limited to invited testers. Joining the waitlist does not create an account; a personal invitation enables sign-up."
-                : "BloomMD Web auf bloommd.app, Cloud-Workspaces, Sync und Zusammenarbeit sind für eingeladene Tester freigeschaltet. Die Warteliste erstellt noch kein Konto; erst eine persönliche Einladung ermöglicht die Registrierung."}
+                ? "BloomMD Web at bloommd.app, cloud workspaces, sync and collaboration need an account. The waitlist has ended; you can register right away."
+                : "BloomMD Web auf bloommd.app, Cloud-Workspaces, Sync und Zusammenarbeit brauchen ein Konto. Die Warteliste ist beendet; du kannst dich direkt registrieren."}
             </p>
-            <Link className="mt-4 inline-flex min-h-11 items-center font-semibold text-[#B94316] underline" href={betaHref}>
-              {en ? "Join the beta waitlist" : "Für die Beta-Warteliste anmelden"}
-            </Link>
+            <a className="mt-4 inline-flex min-h-11 items-center font-semibold text-[#B94316] underline" href={signupHref} data-testid="signup-cta">
+              {en ? "Register now" : "Jetzt registrieren"}
+            </a>
           </div>
 
           <div className="rounded-xl border border-[#E8E4DF] bg-white p-6">

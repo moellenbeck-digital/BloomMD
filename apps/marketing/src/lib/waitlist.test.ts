@@ -1,15 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import {
+  WAITLIST_PURGE_RETENTION_DAYS,
+  WaitlistPurgeRefusedError,
   __setWaitlistSqlForTest,
-  addWaitlistSignup,
+  claimWaitlistInvitation,
   cleanupWaitlistRetention,
   countWaitlistAdmin,
-  confirmWaitlistSignup,
   countWaitlist,
   consumeWaitlistRateLimit,
+  evaluateWaitlistPurge,
   listConfirmedWaitlist,
+  listInvitableWaitlist,
   listWaitlistAdminEntries,
+  purgeWaitlist,
+  releaseWaitlistInvitation,
   unsubscribeFromWaitlist,
+  waitlistPurgeStatus,
   waitlistRetentionPolicy,
 } from "./waitlist-db";
 import type { SqlClient } from "./sql-client";
@@ -27,12 +33,11 @@ import type { SqlClient } from "./sql-client";
  */
 
 describe("without a database", () => {
-  test("signup reports nothing was created rather than throwing", async () => {
-    expect(await addWaitlistSignup("someone@example.com", "landing")).toEqual({ created: false, token: null });
-  });
-
-  test("confirming reports failure rather than throwing", async () => {
-    expect(await confirmWaitlistSignup("any-token")).toBe(false);
+  test("claiming an invitation reports nothing was claimed rather than throwing", async () => {
+    expect(await claimWaitlistInvitation("someone@example.com")).toBeNull();
+    expect(await listInvitableWaitlist()).toEqual([]);
+    expect(await purgeWaitlist()).toBe(0);
+    expect(await waitlistPurgeStatus()).toEqual({ total: 0, invitable: 0, notInvited: 0, lastInvitedAt: null });
   });
 
   test("unsubscribing reports failure rather than throwing", async () => {
@@ -69,6 +74,7 @@ describe("admin overview contract", () => {
         confirmed_at: new Date("2026-08-01T10:00:00.000Z"),
         unsubscribed_at: null,
         created_at: new Date("2026-08-01T09:00:00.000Z"),
+        invited_at: new Date("2026-10-01T09:00:00.000Z"),
         source: "landing",
       },
       {
@@ -76,6 +82,7 @@ describe("admin overview contract", () => {
         confirmed_at: null,
         unsubscribed_at: null,
         created_at: "2026-08-02T09:00:00.000Z",
+        invited_at: null,
         source: null,
       },
       {
@@ -83,6 +90,7 @@ describe("admin overview contract", () => {
         confirmed_at: null,
         unsubscribed_at: "2026-08-03T10:00:00.000Z",
         created_at: "2026-08-03T09:00:00.000Z",
+        invited_at: null,
         source: "footer",
       },
     ];
@@ -90,7 +98,7 @@ describe("admin overview contract", () => {
     const sql = ((parts: TemplateStringsArray) => {
       const statement = parts.join("?").replace(/\s+/g, " ").trim();
       if (statement.startsWith("select count(*) filter")) return Promise.resolve(countRows);
-      if (statement.startsWith("select email, confirmed_at, unsubscribed_at, created_at")) return Promise.resolve(entryRows);
+      if (statement.startsWith("select email, confirmed_at, unsubscribed_at, created_at, invited_at")) return Promise.resolve(entryRows);
       return Promise.resolve([]);
     }) as unknown as ((parts: TemplateStringsArray) => Promise<unknown[]>) & {
       begin: (fn: (scopedSql: typeof tx) => Promise<unknown>) => Promise<unknown>;
@@ -106,6 +114,7 @@ describe("admin overview contract", () => {
         confirmedAt: "2026-08-01T10:00:00.000Z",
         unsubscribedAt: null,
         createdAt: "2026-08-01T09:00:00.000Z",
+        invitedAt: "2026-10-01T09:00:00.000Z",
         source: "landing",
       },
       {
@@ -114,6 +123,7 @@ describe("admin overview contract", () => {
         confirmedAt: null,
         unsubscribedAt: null,
         createdAt: "2026-08-02T09:00:00.000Z",
+        invitedAt: null,
         source: null,
       },
       {
@@ -122,6 +132,7 @@ describe("admin overview contract", () => {
         confirmedAt: null,
         unsubscribedAt: "2026-08-03T10:00:00.000Z",
         createdAt: "2026-08-03T09:00:00.000Z",
+        invitedAt: null,
         source: "footer",
       },
     ]);
@@ -205,41 +216,170 @@ describe("waitlist retention cleanup", () => {
   });
 });
 
-describe("the confirmation token", () => {
-  test("is not derived from the address", async () => {
-    // A token anybody could compute from an email would let a stranger confirm somebody else's
-    // address — and confirming is what turns an entry into a contactable one.
-    const first = await addWaitlistSignup("a@example.com", null);
-    const second = await addWaitlistSignup("a@example.com", null);
-    // Without a database both are null; the assertion that matters is that nothing leaks the email.
-    expect(first.token).toBe(second.token);
-    expect(first.token).not.toBe("a@example.com");
+type FakeSql = ((parts: TemplateStringsArray, ...values: unknown[]) => Promise<unknown[]>) & {
+  begin: (fn: (scopedSql: (parts: TemplateStringsArray) => Promise<unknown[]>) => Promise<unknown>) => Promise<unknown>;
+};
+
+/** Records every statement with its bound values; `answer` supplies rows by statement text. */
+function installFakeSql(answer: (statement: string, values: unknown[]) => unknown[] = () => []) {
+  process.env.BLOOMMD_WAITLIST_DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+  const calls: Array<{ statement: string; values: unknown[] }> = [];
+  const tx = ((parts: TemplateStringsArray) => {
+    calls.push({ statement: parts.join("?").replace(/\s+/g, " ").trim(), values: [] });
+    return Promise.resolve([]);
+  }) as unknown as (parts: TemplateStringsArray) => Promise<unknown[]>;
+  const sql = ((parts: TemplateStringsArray, ...values: unknown[]) => {
+    const statement = parts.join("?").replace(/\s+/g, " ").trim();
+    calls.push({ statement, values });
+    return Promise.resolve(answer(statement, values));
+  }) as FakeSql;
+  sql.begin = async (fn) => fn(tx);
+  __setWaitlistSqlForTest(sql as unknown as SqlClient);
+  return calls;
+}
+
+function uninstallFakeSql() {
+  __setWaitlistSqlForTest(null);
+  delete process.env.BLOOMMD_WAITLIST_DATABASE_URL;
+}
+
+describe("the one-time invitation", () => {
+  test("claims an address only while it is confirmed, not unsubscribed and not invited", async () => {
+    const calls = installFakeSql((statement) => (statement.startsWith("update bloom_waitlist set invited_at") ? [{ id: "1" }] : []));
+    const token = await claimWaitlistInvitation("Max@Example.test ");
+    uninstallFakeSql();
+
+    expect(token).toBeTruthy();
+    const claim = calls.find((call) => call.statement.startsWith("update bloom_waitlist set invited_at"));
+    expect(claim?.statement).toContain("confirmed_at is not null");
+    expect(claim?.statement).toContain("unsubscribed_at is null");
+    expect(claim?.statement).toContain("invited_at is null");
+    expect(claim?.values).toContain("max@example.test");
   });
 
-  test("lets unsubscribed addresses request a fresh confirmation token", async () => {
-    process.env.BLOOMMD_WAITLIST_DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
-    const statements: string[] = [];
-    const tx = ((parts: TemplateStringsArray) => {
-      statements.push(parts.join("?").replace(/\s+/g, " ").trim());
-      return Promise.resolve([]);
-    }) as unknown as (parts: TemplateStringsArray) => Promise<unknown[]>;
-    const sql = ((parts: TemplateStringsArray) => {
-      statements.push(parts.join("?").replace(/\s+/g, " ").trim());
-      if (parts.join("?").includes("insert into bloom_waitlist")) return Promise.resolve([{ id: "reactivated" }]);
-      return Promise.resolve([]);
-    }) as unknown as ((parts: TemplateStringsArray) => Promise<unknown[]>) & {
-      begin: (fn: (scopedSql: typeof tx) => Promise<unknown>) => Promise<unknown>;
-    };
-    sql.begin = async (fn) => fn(tx);
+  test("a second claim for the same address gets nothing", async () => {
+    installFakeSql(() => []);
+    expect(await claimWaitlistInvitation("max@example.test")).toBeNull();
+    uninstallFakeSql();
+  });
 
-    __setWaitlistSqlForTest(sql as unknown as SqlClient);
-    const result = await addWaitlistSignup("again@example.test", "landing");
-    __setWaitlistSqlForTest(null);
-    delete process.env.BLOOMMD_WAITLIST_DATABASE_URL;
+  test("the unsubscribe token is random, not derived from the address, and stored only as a hash", async () => {
+    // A token anybody could compute from an email would let a stranger unsubscribe somebody else.
+    const calls = installFakeSql((statement) => (statement.startsWith("update bloom_waitlist set invited_at") ? [{ id: "1" }] : []));
+    const first = await claimWaitlistInvitation("a@example.com");
+    const second = await claimWaitlistInvitation("a@example.com");
+    uninstallFakeSql();
 
-    expect(result.created).toBe(true);
-    expect(result.token).toBeTruthy();
-    expect(statements.some((statement) => statement.includes("where bloom_waitlist.unsubscribed_at is not null"))).toBe(true);
+    expect(first).not.toBe(second);
+    expect(first).not.toContain("a@example.com");
+    const stored = calls.filter((call) => call.statement.startsWith("update bloom_waitlist set invited_at")).flatMap((call) => call.values);
+    expect(stored).not.toContain(first);
+    expect(stored.some((value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value))).toBe(true);
+  });
+
+  test("releasing takes the marker and its token back", async () => {
+    const calls = installFakeSql();
+    await releaseWaitlistInvitation("max@example.test");
+    uninstallFakeSql();
+
+    const release = calls.find((call) => call.statement.startsWith("update bloom_waitlist set invited_at = null"));
+    expect(release?.statement).toContain("invite_token_hash = null");
+  });
+
+  test("lists only confirmed, not unsubscribed, not yet invited addresses", async () => {
+    const calls = installFakeSql((statement) =>
+      statement.startsWith("select email, confirmed_at, source")
+        ? [{ email: "a@example.test", confirmed_at: new Date("2026-08-01T10:00:00.000Z"), source: "landing-en" }]
+        : [],
+    );
+    const entries = await listInvitableWaitlist();
+    uninstallFakeSql();
+
+    expect(entries).toEqual([{ email: "a@example.test", confirmedAt: "2026-08-01T10:00:00.000Z", source: "landing-en" }]);
+    const select = calls.find((call) => call.statement.startsWith("select email, confirmed_at, source"))?.statement ?? "";
+    expect(select).toContain("confirmed_at is not null and unsubscribed_at is null and invited_at is null");
+  });
+
+  test("unsubscribing works with the token from the old confirmation mail and from the invitation mail", async () => {
+    const calls = installFakeSql((statement) => (statement.startsWith("update bloom_waitlist set unsubscribed_at") ? [{ id: "1" }] : []));
+    expect(await unsubscribeFromWaitlist("token-from-a-mail")).toBe(true);
+    uninstallFakeSql();
+
+    const statement = calls.find((call) => call.statement.startsWith("update bloom_waitlist set unsubscribed_at"))?.statement ?? "";
+    expect(statement).toContain("confirm_token_hash = ?");
+    expect(statement).toContain("invite_token_hash = ?");
+  });
+
+  test("the schema gets the marker columns without touching existing rows", async () => {
+    const calls = installFakeSql();
+    await countWaitlist();
+    uninstallFakeSql();
+
+    const ddl = calls.map((call) => call.statement);
+    expect(ddl).toContain("alter table bloom_waitlist add column if not exists invited_at timestamptz");
+    expect(ddl).toContain("alter table bloom_waitlist add column if not exists invite_token_hash text");
+  });
+});
+
+describe("purge", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const now = new Date("2026-12-01T12:00:00.000Z");
+  const daysAgo = (days: number) => new Date(now.getTime() - days * day).toISOString();
+
+  test("the retention period is the named 90 days", () => {
+    expect(WAITLIST_PURGE_RETENTION_DAYS).toBe(90);
+  });
+
+  test("refuses while confirmed addresses have not been invited yet", () => {
+    const verdict = evaluateWaitlistPurge({ total: 10, invitable: 8, notInvited: 3, lastInvitedAt: daysAgo(200) }, now);
+    expect(verdict).toEqual({ allowed: false, reason: "invitation-pending", allowedFrom: null });
+  });
+
+  test("refuses when no invitation was ever sent", () => {
+    const verdict = evaluateWaitlistPurge({ total: 4, invitable: 0, notInvited: 0, lastInvitedAt: null }, now);
+    expect(verdict).toEqual({ allowed: false, reason: "no-invitation-sent", allowedFrom: null });
+  });
+
+  test("refuses before 90 days after the last invitation and names the date", () => {
+    const verdict = evaluateWaitlistPurge({ total: 4, invitable: 4, notInvited: 0, lastInvitedAt: daysAgo(89) }, now);
+    expect(verdict).toEqual({
+      allowed: false,
+      reason: "retention-running",
+      allowedFrom: new Date(new Date(daysAgo(89)).getTime() + 90 * day).toISOString(),
+    });
+  });
+
+  test("allows exactly after the 90 days, and an empty table at any time", () => {
+    expect(evaluateWaitlistPurge({ total: 4, invitable: 4, notInvited: 0, lastInvitedAt: daysAgo(90) }, now)).toEqual({ allowed: true });
+    expect(evaluateWaitlistPurge({ total: 0, invitable: 0, notInvited: 0, lastInvitedAt: null }, now)).toEqual({ allowed: true });
+  });
+
+  test("the library refuses to delete inside the retention period — no delete statement runs", async () => {
+    const calls = installFakeSql((statement) =>
+      statement.includes("max(invited_at)")
+        ? [{ total: 3, invitable: 3, not_invited: 0, last_invited_at: new Date(now.getTime() - 10 * day) }]
+        : [],
+    );
+    await expect(purgeWaitlist(now)).rejects.toBeInstanceOf(WaitlistPurgeRefusedError);
+    uninstallFakeSql();
+
+    expect(calls.some((call) => call.statement.startsWith("delete from bloom_waitlist"))).toBe(false);
+  });
+
+  test("deletes all entries once the period is over and reports how many", async () => {
+    const calls = installFakeSql((statement) => {
+      if (statement.includes("max(invited_at)")) {
+        return [{ total: 2, invitable: 2, not_invited: 0, last_invited_at: new Date(now.getTime() - 91 * day) }];
+      }
+      if (statement.startsWith("delete from bloom_waitlist")) return [{ id: "1" }, { id: "2" }];
+      return [];
+    });
+    expect(await purgeWaitlist(now)).toBe(2);
+    uninstallFakeSql();
+
+    const deletes = calls.filter((call) => call.statement.startsWith("delete from bloom_waitlist"));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]?.statement).not.toContain("where");
   });
 });
 

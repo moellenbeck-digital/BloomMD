@@ -5,7 +5,6 @@ import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
-import { WaitlistForm } from "./waitlist-form";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -68,6 +67,7 @@ const legalLinks = [
 ];
 
 const appLoginUrl = `${publicAppUrl()}/login`;
+const appSignupUrl = `${publicAppUrl()}/signup`;
 const marketingBuildInfo = getBuildInfo("marketing", { publicOnly: true });
 
 const footerSections = [
@@ -98,7 +98,7 @@ const footerSections = [
   {
     title: "Beta",
     links: [
-      { label: "Closed Beta", href: "#beta" },
+      { label: "Registrierung", href: "#beta" },
       { label: "Login", href: appLoginUrl },
     ],
   },
@@ -138,9 +138,9 @@ const audiencePaths = [
   {
     icon: MonitorSmartphone,
     title: "Ich will Team/Cloud testen",
-    text: "Die private App mit Auth, Sync und Collaboration startet in kleinen Beta-Wellen.",
+    text: "Die private App mit Auth, Sync und Collaboration kannst du dir mit einem Konto freischalten.",
     href: "#beta",
-    cta: "Beta-Zugang anfragen",
+    cta: "Jetzt registrieren",
   },
   {
     icon: LayoutTemplate,
@@ -340,7 +340,7 @@ const faqItems = [
   },
   {
     question: "Wie lange läuft die Beta?",
-    answer: "Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin sind ohne Einladung verfügbar. Geschlossen ist der Zugang zu BloomMD Web, Cloud, Sync und Zusammenarbeit: Dafür laden wir Tester von der Warteliste ein. Preise veröffentlichen wir erst nach der Beta.",
+    answer: "Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin sind ohne Konto verfügbar. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich mit einem Konto. Preise veröffentlichen wir erst nach der Beta.",
   },
   {
     question: "Ist Sync erforderlich?",
@@ -403,7 +403,7 @@ function Header() {
             Login
           </a>
           <a href="#beta" className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-            Beta-Zugang anfragen
+            Jetzt registrieren
             <ArrowRight size={16} aria-hidden="true" />
           </a>
         </div>
@@ -459,7 +459,7 @@ function Header() {
                 Login
               </a>
               <a href="#beta" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Beta-Zugang anfragen
+                Jetzt registrieren
                 <ArrowRight size={16} aria-hidden="true" />
               </a>
             </div>
@@ -1053,12 +1053,12 @@ function BetaProgramSection() {
     <section id="pricing" className="border-y border-[#E8E4DF] bg-white">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
         <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Geschlossene Beta</p>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Kostenlos — und bewusst noch klein.</h2>
           <p className="mt-4 text-lg leading-8 text-[#666666]">
             Demo und Templates kannst du sofort ausprobieren. Desktop-Builds und das Obsidian-Plugin
-            kannst du ohne Einladung laden. Nur BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
-            geben wir in kleinen Gruppen frei, damit wir Rückmeldungen beantworten können.
+            kannst du ohne Konto laden. Für BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
+            registrierst du dich; wir wachsen bewusst langsam, damit wir Rückmeldungen beantworten können.
           </p>
         </div>
 
@@ -1089,7 +1089,7 @@ function BetaProgramSection() {
               icon: RefreshCw,
               title: "Was noch fehlt",
               items: [
-                "Cloud-Zugang nur auf Einladung",
+                "Cloud-Zugang nur mit Registrierung",
                 "Die eigenständige Mobile-App und Windows-Desktop sind noch nicht öffentlich verfügbar",
                 "Der Agent-Workflow ist bewusst review-pflichtig",
                 "Rechne mit Bugs — und melde sie uns",
@@ -1178,7 +1178,7 @@ export default function LandingPage() {
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
               <a href="#beta" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Beta-Zugang anfragen
+                Jetzt registrieren
               </a>
             </div>
             <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
@@ -1246,8 +1246,8 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-7xl gap-6 px-5 py-14 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Jetzt testen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Beta auf Einladung.</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Einladung nutzen. Die geschlossene Beta betrifft BloomMD Web, Cloud, Sync und Zusammenarbeit.</p>
+            <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Registrieren, wenn du mehr willst.</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Konto nutzen. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich.</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
             <Link href="/demo" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">Demo testen <ArrowRight size={16} /></Link>
@@ -1258,17 +1258,24 @@ export default function LandingPage() {
       </section>
       <FAQSection />
 
-      {/* Waitlist: the cloud app is invitation only, so the honest ask is an address, not a signup. */}
+      {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}
       <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">
         <div className="mx-auto max-w-7xl px-5 py-14">
-          <h2 className="text-3xl font-semibold text-[#1A1A1A]">Die Cloud-App läuft als geschlossene Beta</h2>
+          <h2 className="text-3xl font-semibold text-[#1A1A1A]">Jetzt registrieren</h2>
           <p className="mt-3 max-w-2xl text-[#514C46]">
-            Nur für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit laden wir in kleinen Gruppen ein.
-            Trag dich ein; die Warteliste ist noch kein Konto. Demo, lokale Desktop-Builds und das
-            Obsidian-Plugin sind ohne Einladung nutzbar.
+            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir ein Konto an. Die Warteliste
+            gibt es nicht mehr. Demo, lokale Desktop-Builds und das Obsidian-Plugin brauchen kein Konto.
           </p>
           <div className="mt-6">
-            <WaitlistForm source="landing" />
+            <a
+              href={appSignupUrl}
+              data-testid="signup-cta"
+              onClick={() => trackPlausibleEvent("signup_click")}
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35"
+            >
+              Jetzt registrieren
+              <ArrowRight size={17} aria-hidden="true" />
+            </a>
           </div>
         </div>
       </section>

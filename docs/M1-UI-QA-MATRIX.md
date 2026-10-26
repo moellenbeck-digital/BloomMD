@@ -232,7 +232,7 @@ Asset: ![](../assets/diagram.png)
 | ID | Funktion | Testdaten | Schritte | Erwartete UX | Edge-Cases | Status | Evidence |
 |---|---|---|---|---|---|---|---|
 | PUI-001 | Landing Desktop-first | `/` | 1. Landing oeffnen.<br>2. Hero/CTA/Waitlist pruefen. | Desktop-App ist Primaerpfad, Browser-Demo sekundär, Closed-Beta klar. | mobile Navigation, no horizontal overflow. | Auto | `release-contracts`, `mobile-smoke` |
-| PUI-002 | Waitlist Form | valide E-Mail | 1. E-Mail eingeben.<br>2. Submit. | Erfolg ist generisch und enum-sicher, Double Opt-in erklaert. | bekannte E-Mail, malformed E-Mail. | Auto | `waitlist` E2E |
+| PUI-002 | Registrierungs-CTA (Waitlist beendet) | `#beta`, `/waitlist` | 1. CTA „Jetzt registrieren“ klicken.<br>2. `/waitlist`, `/waitlist/bestaetigt` aufrufen. | CTA führt zu `bloommd.app/signup`; alte Wartelisten-Links leiten per 308 dorthin; kein Formular. | `/waitlist/abgemeldet`, Abmelde-API bleiben erreichbar. | Auto | `release-contracts` |
 | PUI-003 | Beta Page | `/beta` | 1. Seite oeffnen.<br>2. Scope, Limits, bekannte Issues lesen. | Plattformstatus, ad-hoc signierter macOS-Build ohne Developer-ID/Notarisierung, Feedback, Wiederherstellungsgrenzen klar. | noindex, schmaler Viewport. | Auto | `release-contracts` |
 | PUI-004 | Docs | `/docs`, `/docs/desktop` | 1. Docs oeffnen.<br>2. Navigation pruefen.<br>3. Subpage oeffnen. | Alle M1-Abschnitte sichtbar; Mobile-out-of-scope klar. | unbekannter Slug, responsive Nav. | Auto | `release-contracts` |
 | PUI-005 | Demo | `/demo` | 1. Template waehlen.<br>2. Markdown editieren.<br>3. Datei im Browser laden. | Demo bleibt no-login, keine Inhalte in Analytics/URL, Canvas aktualisiert. | grosse Datei, invalid markdown. | Auto | Release-Contract Demo-E2E |

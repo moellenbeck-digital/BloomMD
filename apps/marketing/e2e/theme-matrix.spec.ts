@@ -21,9 +21,8 @@ const publicRoutes = [
   "/obsidian?lang=en",
   "/roadmap",
   "/en/roadmap",
-  "/waitlist/bestaetigt",
   "/waitlist/abgemeldet",
-  "/waitlist/ungueltig",
+  "/waitlist/abgemeldet?status=ungueltig",
   "/agb",
   "/cookies",
   "/datenschutz",
@@ -40,7 +39,7 @@ const representativeAccessibilityRoutes = [
   "/templates",
   "/docs",
   "/datenschutz",
-  "/waitlist/bestaetigt",
+  "/waitlist/abgemeldet",
 ] as const;
 
 async function setThemeBeforePaint(page: Page, theme: Theme) {

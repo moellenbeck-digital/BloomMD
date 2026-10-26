@@ -86,9 +86,3 @@ test.describe("dark system preference", () => {
     });
   }
 });
-  const response = await page.goto("/admin/waitlist");
-  test.skip(response?.status() === 503, "Waitlist admin auth is not configured on this server.");
-  await page.waitForLoadState("networkidle");
-  const result = await new AxeBuilder({ page }).analyze();
-  expect(seriousViolations(result)).toEqual([]);
-});

@@ -182,6 +182,9 @@ obsidian-test-vaults/**
 !obsidian-test-vaults/*/.obsidian/graph.json
 !obsidian-test-vaults/*/BloomMD Plugin Test.md
 !obsidian-test-vaults/*/Willkommen.md
+# Navigator fixtures: nested folders, equal file names in several folders, a very long file name.
+!obsidian-test-vaults/*/Navigator/
+!obsidian-test-vaults/*/Navigator/**
 
 # Electrobun distributables. A stable build writes a DMG and a packed bundle here; these are release
 # outputs of tens of megabytes and belong in CI artifacts, not in the repository.

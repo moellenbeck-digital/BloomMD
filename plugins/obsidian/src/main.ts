@@ -60,6 +60,7 @@ import { LEARNING_FOLDER, emptyLearningFile, learningFilePath, learningKey, norm
 import { LearningStore } from "./learning-store";
 import { STUDY_ORDERS } from "./learning-panel";
 import { AgentHub, confirmAction } from "./agent-view";
+import { NavigatorView, VIEW_TYPE_NAVIGATOR, type NavigatorHost } from "./navigator-view";
 import type { ObsidianSharedDocumentEntry, ObsidianSharedDocumentSession } from "./shared-document";
 
 const VIEW_TYPE_BLOOMMD = "bloommd-mindmap-view";
@@ -356,6 +357,12 @@ class BloomMDView extends ItemView {
     this.rootId = tree[0]?.id ?? "";
     this.renderCanvas();
     void this.reloadLearning();
+  }
+
+  /** What the map shows: the note, or the folder in folder mode; null while it is empty. */
+  mapTarget(): { kind: "file" | "folder"; path: string } | null {
+    if (this.sourceFile) return { kind: "file", path: this.sourceFile.path };
+    return this.scopeFolder ? { kind: "folder", path: this.scopeFolder.path || "/" } : null;
   }
 
   /** The open note, when the view shows one (folders have no learning progress). */
@@ -911,7 +918,7 @@ class BloomMDView extends ItemView {
   }
 }
 
-export default class BloomMDPlugin extends Plugin {
+export default class BloomMDPlugin extends Plugin implements NavigatorHost {
   settings: BloomMDSettings = DEFAULT_SETTINGS;
   private layouts: Record<string, PersistedCanvasLayout> = {};
   private sharedDocumentBindings: ObsidianSharedDocumentEntry[] = [];
@@ -946,6 +953,7 @@ export default class BloomMDPlugin extends Plugin {
     this.registerView(VIEW_TYPE_BLOOMMD, (leaf) => new BloomMDView(leaf, this));
     // Page Preview shows notes linked from handwriting on hover (mouse or Apple Pencil) without a modifier key.
     this.registerHoverLinkSource(VIEW_TYPE_BLOOMMD, { display: "BloomMD", defaultMod: false });
+    this.registerView(VIEW_TYPE_NAVIGATOR, (leaf) => new NavigatorView(leaf, this));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       if (file instanceof TFile && file.extension === "md") {
         void this.retargetInkLinks(file, oldPath);
@@ -974,6 +982,21 @@ export default class BloomMDPlugin extends Plugin {
       },
     });
     this.addCommand({ id: "visualize-current-folder", name: "Visualize current folder", callback: () => void this.visualizeCurrentFolder() });
+    this.addRibbonIcon("folder-tree", "Open navigator", () => void this.openNavigator());
+    this.addCommand({ id: "open-navigator", name: "Open navigator", callback: () => void this.openNavigator() });
+    this.addCommand({
+      id: "reveal-active-file-in-navigator",
+      name: "Show active file in navigator",
+      hotkeys: [{ modifiers: ["Mod", "Shift"], key: "R" }],
+      callback: () => void this.revealActiveFileInNavigator(),
+    });
+    this.addCommand({
+      id: "focus-navigator",
+      name: "Focus navigator",
+      callback: () => void this.openNavigator().then((view) => view.focusNavigator()),
+    });
+    this.addCommand({ id: "navigator-back", name: "Navigator: go back", checkCallback: (checking) => this.navigatorHistoryStep(-1, checking) });
+    this.addCommand({ id: "navigator-forward", name: "Navigator: go forward", checkCallback: (checking) => this.navigatorHistoryStep(1, checking) });
     this.addCommand({ id: "share-current-note", name: "Share current note with workspace", callback: () => void this.shareCurrentNote() });
     this.addCommand({ id: "unshare-current-note", name: "Stop sharing current note with workspace", callback: () => void this.unshareCurrentNote() });
 
@@ -1153,6 +1176,75 @@ export default class BloomMDPlugin extends Plugin {
     const view = await this.getOrCreateView();
     view.setFolder(folder);
     await this.app.workspace.revealLeaf(view.leaf);
+  }
+
+  /** Opens the navigator in the left sidebar (or reveals it when it is already open). */
+  async openNavigator(): Promise<NavigatorView> {
+    const workspace = this.app.workspace;
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_NAVIGATOR)[0];
+    if (!leaf) {
+      leaf = workspace.getLeftLeaf(false) ?? workspace.getLeaf("split");
+      await leaf.setViewState({ type: VIEW_TYPE_NAVIGATOR, active: true });
+    }
+    await workspace.revealLeaf(leaf);
+    if (!(leaf.view instanceof NavigatorView)) throw new Error("Unable to load the BloomMD navigator.");
+    return leaf.view;
+  }
+
+  /** Shows the note of the active editor in the navigator and focuses it there. */
+  async revealActiveFileInNavigator() {
+    // The navigator itself may be the active view, so ask for the last active file, not the active editor.
+    const file = this.app.workspace.getActiveFile();
+    if (file?.extension !== "md") {
+      new Notice("BloomMD: Open a Markdown note first.");
+      return;
+    }
+    const view = await this.openNavigator();
+    view.revealActive(file, true);
+  }
+
+  private navigatorHistoryStep(direction: -1 | 1, checking: boolean): boolean {
+    const view = this.app.workspace.getActiveViewOfType(NavigatorView);
+    if (!view) return false;
+    if (!checking) view.navigate(direction);
+    return true;
+  }
+
+  // NavigatorHost
+  /** Opens a note from the navigator like Obsidian's file explorer: in the open note's tab, never over the map. */
+  async openNote(file: TFile) {
+    const workspace = this.app.workspace;
+    const open = workspace.getLeavesOfType("markdown").find((leaf) => leaf.view instanceof MarkdownView && leaf.view.file?.path === file.path);
+    if (open) {
+      await workspace.revealLeaf(open);
+      return;
+    }
+    const recent = workspace.getMostRecentLeaf(workspace.rootSplit);
+    const reusable = recent?.view instanceof MarkdownView && !recent.getViewState().pinned ? recent : null;
+    await (reusable ?? workspace.getLeaf("tab")).openFile(file);
+  }
+
+  async openMapFor(target: TFile | TFolder) {
+    // A new map opens beside the notes, never inside the sidebar the navigator lives in.
+    if (!this.app.workspace.getLeavesOfType(VIEW_TYPE_BLOOMMD)[0]) {
+      const anchor = this.app.workspace.getMostRecentLeaf(this.app.workspace.rootSplit);
+      if (anchor) this.app.workspace.setActiveLeaf(anchor);
+    }
+    const view = await this.getOrCreateView();
+    if (target instanceof TFile) await this.loadFileIntoView(target.path, view);
+    else view.setFolder(target);
+    await this.app.workspace.revealLeaf(view.leaf);
+  }
+
+  mapTarget() {
+    return this.bloomViews()[0]?.mapTarget() ?? null;
+  }
+
+  focusMapView(): boolean {
+    const view = this.bloomViews()[0];
+    if (!view) return false;
+    this.app.workspace.setActiveLeaf(view.leaf, { focus: true });
+    return true;
   }
 
   async loadFileIntoView(path: string, view: BloomMDView) {

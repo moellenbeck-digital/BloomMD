@@ -14,7 +14,7 @@ import {
   type KnowledgeAccess,
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
-import { KNOWLEDGE_TEMPLATES, knowledgeTemplate } from "@bloommd/core/knowledge-templates";
+import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
 import { accessFor, foldName, nodeStateFiles, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 
 export interface ChangeMeta {
@@ -171,11 +171,12 @@ export class KnowledgeService {
     return { templates: KNOWLEDGE_TEMPLATES.map(({ id: key, name, area, description }) => ({ id: key, name, area, description })) };
   }
 
-  async createMap(input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[] } & ChangeMeta): Promise<CommitResult> {
+  async createMap(input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; scope?: string } & ChangeMeta): Promise<CommitResult> {
     const template = input.template ? knowledgeTemplate(input.template) : null;
     if (input.template && !template) throw new Error(`Unknown template "${input.template}".`);
     const area = input.area.trim() || template?.area || "";
-    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date: today() });
+    const date = today();
+    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date, frontmatter: templateFrontmatter(template, { date, scope: input.scope }) });
     const change = applyKnowledgeNodes(base, [...(template?.skeleton ?? []), ...(input.nodes ?? [])]);
     // One lock per area: two maps with the same title must not both get the same free path.
     return this.withLock(`create:${area}`, async () => {

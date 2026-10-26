@@ -14,7 +14,15 @@ export interface KnowledgeTemplate {
   /** How to fill the skeleton; written for the agent. */
   guidance: string[];
   skeleton: KnowledgeNodeInput[];
+  /**
+   * Extra frontmatter for maps made from this template (absent: none). `staleAfterDays` becomes a
+   * concrete `stale_after` date (creation day + n days). `scope` comes from the call.
+   */
+  frontmatter?: { type: string; status?: string; staleAfterDays?: number };
 }
+
+/** Default review period of a learning, in days (see docs/LEARNINGS.md). */
+export const LEARNING_STALE_AFTER_DAYS = 90;
 
 const COMMON_GUIDANCE = [
   "Use only facts from the source. Mark open points as questions instead of guessing.",
@@ -136,8 +144,54 @@ export const KNOWLEDGE_TEMPLATES: KnowledgeTemplate[] = [
       { ref: "naechste", title: "Nächste Woche" },
     ],
   },
+  {
+    id: "learning",
+    name: "Learning",
+    area: "Learnings",
+    description: "A lesson learned by an agent or a person: symptom, cause, rule, evidence and where it applies. Knowledge, not a rule.",
+    guidance: [
+      "Suchen vor anlegen: bloommd_search im Bereich Learnings; gibt es das Learning schon, ergänze Beleg oder Gilt für per bloommd_update_map, statt ein Duplikat anzulegen.",
+      "Ein Learning pro Map; der Titel nennt das Symptom oder die Regel in einem kurzen Satz.",
+      "Symptom: was beobachtet wurde (Fehlermeldung als Auszug, nicht als Rohlog). Ursache: warum es passierte. Regel: was künftig zu tun ist, als konkrete Handlung.",
+      "Beleg: Ticket, PR oder CI-Lauf als Link; nur Auszug und Link, keine Rohlogs. Ein zweiter Beleg oder eine Bestätigung durch einen Menschen hebt den Status auf bestätigt.",
+      "Gilt für: Brand, Rolle und Komponente, für die das Learning gilt. Rolle zusätzlich als Tag (architect, coder, tester, chief).",
+      "Aufgaben ist optional: nur füllen, wenn aus dem Learning Folgearbeit entsteht; sonst leer lassen.",
+      "Übergib scope (z. B. 'BloomMD, coder') und source (Ticket oder Lauf) beim Anlegen; Status, Typ und stale_after setzt die Vorlage.",
+      "Keine Secrets, keine Personendaten, keine Rohlogs.",
+      "Learnings sind Wissen, keine Regeln: Änderungen am Verhalten der Agenten (Regeln, Rollen, Hooks) laufen als Pull Request mit Review, nie nur als Learning.",
+    ],
+    skeleton: [
+      { ref: "symptom", title: "Symptom" },
+      { ref: "ursache", title: "Ursache" },
+      { ref: "regel", title: "Regel" },
+      { ref: "beleg", title: "Beleg" },
+      { ref: "gilt-fuer", title: "Gilt für" },
+      { ref: "aufgaben", title: "Aufgaben" },
+    ],
+    frontmatter: { type: "learning", status: "neu", staleAfterDays: LEARNING_STALE_AFTER_DAYS },
+  },
 ];
 
 export function knowledgeTemplate(id: string): KnowledgeTemplate | null {
   return KNOWLEDGE_TEMPLATES.find((template) => template.id === id) ?? null;
+}
+
+/** Day `days` after `date` (both `YYYY-MM-DD`, UTC). */
+export function addDays(date: string, days: number): string {
+  const result = new Date(`${date}T00:00:00Z`);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result.toISOString().slice(0, 10);
+}
+
+/** The frontmatter fields a template adds to a new map; empty for templates without `frontmatter`. */
+export function templateFrontmatter(template: KnowledgeTemplate | null, options: { date: string; scope?: string }): Record<string, string> {
+  const spec = template?.frontmatter;
+  if (!spec) return {};
+  const scope = options.scope?.replace(/[\r\n]+/g, " ").trim().slice(0, 300);
+  return {
+    type: spec.type,
+    ...(spec.status ? { status: spec.status } : {}),
+    ...(scope ? { scope } : {}),
+    ...(spec.staleAfterDays !== undefined ? { stale_after: addDays(options.date, spec.staleAfterDays) } : {}),
+  };
 }

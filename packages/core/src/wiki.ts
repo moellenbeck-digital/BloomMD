@@ -27,6 +27,28 @@ export type WikiPageStatus = "draft" | "stable" | "deprecated";
 const WIKI_PAGE_STATUSES: readonly WikiPageStatus[] = ["draft", "stable", "deprecated"];
 
 /**
+ * Pages of `type: learning` (docs/LEARNINGS.md) use their own status words, each mapped to the
+ * OKF lifecycle: neu = draft, bestätigt = stable, veraltet and ersetzt = deprecated.
+ */
+const LEARNING_PAGE_TYPE = "learning";
+const LEARNING_STATUS_LIFECYCLE: Readonly<Record<string, WikiPageStatus>> = {
+  neu: "draft",
+  "bestätigt": "stable",
+  veraltet: "deprecated",
+  ersetzt: "deprecated",
+};
+
+const isLearning = (type: string | null): boolean => type?.toLowerCase() === LEARNING_PAGE_TYPE;
+
+/** The lifecycle of a status word on a page of this type; null when the word is not allowed there. */
+function lifecycleOf(type: string | null, rawStatus: string | null): WikiPageStatus | null {
+  if (isLearning(type)) {
+    return rawStatus && Object.hasOwn(LEARNING_STATUS_LIFECYCLE, rawStatus) ? LEARNING_STATUS_LIFECYCLE[rawStatus]! : null;
+  }
+  return WIKI_PAGE_STATUSES.includes(rawStatus as WikiPageStatus) ? (rawStatus as WikiPageStatus) : null;
+}
+
+/**
  * How much a consumer can rely on a page.
  *
  * Derived, never stored: a human or agent signing off in `verified` outranks the `generated`
@@ -265,6 +287,7 @@ async function readPage(rootDir: string, path: string): Promise<WikiPage> {
   const generated = parseActorEvent(data.generated);
   const verified = parseVerified(data.verified);
   const rawStatus = str(data.status);
+  const type = str(data.type);
   return {
     path,
     title: titleFromPath(path, data),
@@ -273,10 +296,10 @@ async function readPage(rootDir: string, path: string): Promise<WikiPage> {
     raw,
     contentHash: hashWikiContent(raw),
     sources: parseSources(data.sources),
-    type: str(data.type),
+    type,
     description: str(data.description),
     // OKF defaults an absent or unrecognised status to `stable`; lint reports the unrecognised case.
-    status: WIKI_PAGE_STATUSES.includes(rawStatus as WikiPageStatus) ? (rawStatus as WikiPageStatus) : "stable",
+    status: lifecycleOf(type, rawStatus) ?? "stable",
     rawStatus,
     generated,
     verified,
@@ -436,11 +459,12 @@ export async function lintWikiBundle(rootDir: string, sourceHashes: WikiSourceHa
 
   for (const page of bundle.pages) {
     if (!page.type) issues.push({ code: "missing-type", path: page.path, message: "Every Wiki page needs a non-empty YAML type." });
-    if (page.rawStatus && !WIKI_PAGE_STATUSES.includes(page.rawStatus as WikiPageStatus)) {
+    if (page.rawStatus && lifecycleOf(page.type, page.rawStatus) === null) {
+      const defined = isLearning(page.type) ? `Learnings use ${Object.keys(LEARNING_STATUS_LIFECYCLE).join(", ")}` : `OKF defines ${WIKI_PAGE_STATUSES.join(", ")}`;
       issues.push({
         code: "invalid-status",
         path: page.path,
-        message: `Unknown status "${page.rawStatus}". OKF defines ${WIKI_PAGE_STATUSES.join(", ")}; the page is treated as stable.`,
+        message: `Unknown status "${page.rawStatus}". ${defined}; the page is treated as stable.`,
       });
     }
     if (isWikiPageExpired(page)) {

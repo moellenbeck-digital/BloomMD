@@ -205,6 +205,43 @@ Body.
     await rm(root, { recursive: true, force: true });
   });
 
+  test("accepts the learning status words on type learning and maps them to the OKF lifecycle", async () => {
+    const lifecycle: Record<string, string> = { neu: "draft", "bestätigt": "stable", veraltet: "deprecated", ersetzt: "deprecated" };
+    for (const [word, expected] of Object.entries(lifecycle)) {
+      const root = await bundleWith(`---\ntype: learning\nstatus: ${word}\nstale_after: 2099-01-01\nscope: BloomMD, coder\n---\n\nBody.\n`);
+      expect((await lintWikiBundle(root)).filter((issue) => issue.code !== "unindexed-page")).toEqual([]);
+      expect(String((await readWikiBundle(root)).pages[0]!.status)).toBe(expected);
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a learning keeps its expired-page and rejects words that are not learning statuses", async () => {
+    const expired = await bundleWith("---\ntype: learning\nstatus: neu\nstale_after: 2020-01-01\n---\n\nBody.\n");
+    expect((await lintWikiBundle(expired)).map((issue) => issue.code)).toEqual(["expired-page"]);
+    expect((await getWikiStatus(expired)).expiredPageCount).toBe(1);
+    const foreign = await bundleWith("---\ntype: learning\nstatus: stable\n---\n\nBody.\n");
+    const issues = await lintWikiBundle(foreign);
+    expect(issues.map((issue) => issue.code)).toEqual(["invalid-status"]);
+    expect(issues[0]!.message).toContain("neu, bestätigt, veraltet, ersetzt");
+    await rm(expired, { recursive: true, force: true });
+    await rm(foreign, { recursive: true, force: true });
+  });
+
+  test("other page types still reject the learning status words", async () => {
+    const root = await bundleWith("---\ntype: Concept\nstatus: neu\n---\n\nBody.\n");
+    const issues = await lintWikiBundle(root);
+    expect(issues.map((issue) => issue.code)).toEqual(["invalid-status"]);
+    expect(issues[0]!.message).toBe('Unknown status "neu". OKF defines draft, stable, deprecated; the page is treated as stable.');
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("the learnings example bundle in docs lints clean (apart from aging)", async () => {
+    const issues = await lintWikiBundle(join(import.meta.dir, "../../../docs/learnings-beispiel"));
+    expect(issues.filter((issue) => issue.code !== "expired-page")).toEqual([]);
+    const bundle = await readWikiBundle(join(import.meta.dir, "../../../docs/learnings-beispiel"));
+    expect(bundle.pages.map((page) => page.type)).toEqual(["learning", "learning", "learning"]);
+  });
+
   test("keeps reading a v0.1 bundle whose sources only carry id and contentHash", async () => {
     const root = await bundleWith(`---
 type: Concept

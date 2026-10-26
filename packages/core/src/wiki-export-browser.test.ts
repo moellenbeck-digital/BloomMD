@@ -84,22 +84,27 @@ interface OpenOptions {
 async function openBrowser(options: OpenOptions = {}) {
   const html = await readFile(join(out, "index.html"), "utf8");
   const json = await readFile(join(out, "wiki.json"), "utf8");
-  // Only the export's own script runs here; page content reaches the DOM as text and is never evaluated.
-  const window = new Window({
-    url: options.url ?? "https://wiki.test/share/index.html",
-    settings: { enableJavaScriptEvaluation: true, suppressInsecureJavaScriptEnvironmentWarning: true },
-  });
+  // happy-dom's own script evaluation stays off (its VM context lacks builtins on some Bun versions).
+  // The export's app script is run explicitly against this window, so a regression that parsed page
+  // content as HTML would show up as elements in the DOM; nothing in the page is ever evaluated.
+  const window = new Window({ url: options.url ?? "https://wiki.test/share/index.html" });
   windows.push(window);
   const requests: string[] = [];
   const serve = options.fetch ?? (async () => new Response(json, { headers: { "content-type": "application/json" } }));
-  (window as unknown as { fetch: unknown }).fetch = async (url: string) => {
+  const fetchMock = async (url: string) => {
     requests.push(String(url));
     return serve(String(url));
   };
   if (options.languages) Object.defineProperty(window.navigator, "languages", { value: options.languages, configurable: true });
   window.document.write(html);
+  const appScript = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1];
+  if (!appScript) throw new Error("index.html has no app script");
+  // The client logs when it falls back or fails; keep that out of the test output but inspectable.
+  const logs: string[] = [];
+  const quietConsole = Object.fromEntries(["log", "warn", "error"].map((level) => [level, (...args: unknown[]) => { logs.push(`${level}: ${args.map(String).join(" ")}`); }]));
+  new Function("window", "document", "navigator", "fetch", "console", appScript)(window, window.document, window.navigator, fetchMock, quietConsole);
   await waitFor(window, '[data-testid="wiki-page"], [data-testid="wiki-error"]');
-  return { window, document: window.document, requests };
+  return { window, document: window.document, requests, logs };
 }
 
 async function waitFor(window: Window, selector: string, timeoutMs = 2000): Promise<void> {
@@ -233,9 +238,7 @@ describe("references and media", () => {
 
 describe("safe rendering", () => {
   test("raw HTML, javascript: and data: links stay inert text", async () => {
-    const { window, document } = await openBrowser();
-    expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
-
+    const { document } = await openBrowser();
     const md = document.querySelector(".md")!;
     expect(md.querySelector("script")).toBeNull();
     expect(md.querySelector("[onerror]")).toBeNull();
@@ -288,8 +291,9 @@ describe("language and embedding", () => {
 
 describe("loading", () => {
   test("falls back to the embedded wiki.json when fetch fails", async () => {
-    const { document, requests } = await openBrowser({ fetch: async () => { throw new TypeError("network down"); } });
+    const { document, requests, logs } = await openBrowser({ fetch: async () => { throw new TypeError("network down"); } });
     expect(requests).toEqual(["wiki.json"]);
+    expect(logs.some((line) => line.includes("falling back to the embedded wiki.json"))).toBe(true);
     expect(text(document, '[data-testid="wiki-page"] h2')).toBe("Alpha");
   });
 

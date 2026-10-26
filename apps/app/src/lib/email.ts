@@ -1,3 +1,4 @@
+import { appendFile } from "node:fs/promises";
 import { getSiteUrl } from "./billing";
 import { publicAppUrl } from "./deployment";
 import { formatAuthDate, roleLabel, type AuthLocale } from "./auth-copy";
@@ -32,7 +33,23 @@ export function isEmailConfigured() {
   return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
+/**
+ * E2E only: with the test marker set, mails are appended to this file instead of being sent, so
+ * the browser suite can follow confirmation and reset links without a mail provider. Ignored
+ * without `BLOOMMD_E2E_TEST_MODE=1`, and `release:check` rejects both variables in production.
+ */
+function e2eMailOutboxPath() {
+  if (process.env.BLOOMMD_E2E_TEST_MODE !== "1") return null;
+  return process.env.BLOOMMD_E2E_MAIL_OUTBOX?.trim() || null;
+}
+
 export async function sendTransactionalEmail(input: EmailInput) {
+  const outbox = e2eMailOutboxPath();
+  if (outbox) {
+    await appendFile(outbox, `${JSON.stringify({ to: input.to, subject: input.subject, text: input.text })}\n`);
+    return { sent: true as const };
+  }
+
   if (!isEmailConfigured()) {
     if (process.env.BLOOMMD_LOG_DEV_EMAILS === "1" && process.env.NODE_ENV !== "production") {
       console.log("[BloomMD] Email not configured. Dev email:", input);

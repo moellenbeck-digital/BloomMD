@@ -60,6 +60,7 @@ describe("production auth redirects", () => {
     const response = await signup(formRequest("/api/auth/signup", {
       email: "blocked@example.test",
       password: "Testpass12345",
+      acceptTerms: "1",
       inviteCode: "",
       next: "/app",
     }));

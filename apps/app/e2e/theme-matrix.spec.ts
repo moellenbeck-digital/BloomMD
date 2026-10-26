@@ -99,6 +99,7 @@ for (const theme of themes) {
     await page.getByLabel("Name").fill("Theme Matrix");
     await page.getByLabel("E-Mail").fill(uniqueEmail());
     await page.getByLabel("Passwort").fill("Testpass12345");
+    await page.getByTestId("signup-consent").check();
     await page.getByRole("button", { name: "Account erstellen" }).click();
     await expect(page).toHaveURL((url) => url.pathname === "/app");
     await expect(page.getByTestId("mindmap-canvas")).toBeVisible();

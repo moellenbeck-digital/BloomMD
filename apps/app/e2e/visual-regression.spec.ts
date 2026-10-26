@@ -10,6 +10,7 @@ async function createVisualSession(page: Page, email: string) {
   await page.getByLabel("Name").fill("Visual QA");
   await page.getByLabel("E-Mail").fill(email);
   await page.getByLabel("Passwort").fill(PASSWORD);
+  await page.getByTestId("signup-consent").check();
   await page.getByRole("button", { name: "Account erstellen" }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/app");
 }

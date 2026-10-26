@@ -35,7 +35,9 @@ You can explore raw sources visually, connect concepts across maps, drag branche
 
 BloomMD is becoming the visual layer for the **LLM Wiki pattern**: raw sources stay immutable, an interconnected Markdown wiki becomes the queryable knowledge layer, and human-defined conventions form the schema. Agents may later maintain the wiki, but every change remains reviewable Markdown rather than hidden model memory.
 
-BloomMD runs as a **closed beta**: the hosted cloud application is invitation only, while the demo
+BloomMD runs as a **closed beta**: while the closed-beta gate is on (`BLOOMMD_BETA_ACCESS=1`) the hosted
+cloud application is invitation only; with the gate off, anyone can register themselves (email
+confirmation, consent to privacy policy and terms, and signup rate limits still apply). The demo
 and the template library stay open to everyone. Desktop workspaces and local OKF/LLM-Wiki bundles
 work without any account. Obsidian compatibility is demonstrated during M1 with real local notes;
 the full Obsidian plugin beta distribution follows in M2.
@@ -196,7 +198,7 @@ By default, the plugin keeps vault contents local and does not put Markdown cont
 
 | Area | Technology | Beta status |
 |---|---|
-| Web | Next.js 16 App Router with Turbopack | Hosted closed beta, invitation only |
+| Web | Next.js 16 App Router with Turbopack | Hosted beta: invitation only with the gate on, open self-registration with the gate off |
 | Desktop | Electrobun v1 | Recommended local beta path on macOS for M1, no account required |
 | OKF / LLM-Wiki | BloomMD CLI, MCP transport, `@bloommd/core` | Local and offline-capable |
 | Sync | Bun WebSocket service, Yjs, Postgres persistence | Beta, one writer replica only |
@@ -366,7 +368,8 @@ Required for the hosted closed beta:
 - `DATABASE_URL` with `sslmode=require` or `sslmode=verify-full`
 - `BLOOMMD_AUTH_SECRET`
 - `BLOOMMD_REQUIRE_AUTH=1`
-- `BLOOMMD_BETA_ACCESS=1`
+- `BLOOMMD_BETA_ACCESS=1` (closed-beta gate on: invitation only; any other value or unset: open
+  self-registration, then no invitation list is required)
 - `BLOOMMD_INTERNAL_INVITE_SECRET` for DB-backed Waitlist invites
 - optional fallback: `BLOOMMD_BETA_ALLOWED_EMAILS` or `BLOOMMD_BETA_INVITE_CODES`
 - `BLOOMMD_BILLING_ENABLED=0`

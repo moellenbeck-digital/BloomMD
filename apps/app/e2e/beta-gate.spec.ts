@@ -21,6 +21,7 @@ async function signup(
       name: "Closed Beta E2E",
       email: input.email,
       password: PASSWORD,
+      acceptTerms: "1",
       inviteCode: input.inviteCode ?? "",
       next: input.next ?? "/app",
     },

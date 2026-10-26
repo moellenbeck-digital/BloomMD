@@ -16,6 +16,7 @@ async function createAccount(request: APIRequestContext, email: string) {
       name: "E2E Test",
       email,
       password: PASSWORD,
+      acceptTerms: "1",
       next: "/app",
     },
     maxRedirects: 0,
@@ -223,6 +224,7 @@ test.describe("auth and onboarding", () => {
     await page.getByLabel("Name").fill("E2E Signup");
     await page.getByLabel("E-Mail").fill(email);
     await page.getByLabel("Passwort").fill(PASSWORD);
+    await page.getByTestId("signup-consent").check();
     await page.getByRole("button", { name: "Account erstellen" }).click();
 
     await expect(page).toHaveURL((url) => url.pathname === "/app");

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, isE2EAuthBypassEnabled, safeNextPath, sessionCookieName, shouldUseSecureCookies, validateLoginEmail } from "../../../../lib/auth";
 import { assertBetaSignupAllowedForRequest } from "../../../../lib/betaAccess";
-import { acceptBetaInvite, createAuthToken, createPasswordUser, findPasswordUserByEmail, getWorkspaceInvitationPreviewById } from "../../../../lib/db";
+import { acceptBetaInvite, createAuthToken, createPasswordUser, findPasswordUserByEmail, getWorkspaceInvitationPreviewById, updatePasswordForEmail } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
+import { SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
 import { sendVerificationEmail } from "../../../../lib/email";
 import { hashPassword } from "../../../../lib/passwordAuth";
 import { appendAuthParams, parseWorkspaceInviteHandoff, serializeAuthParams } from "../../../../lib/invite-intent";
-import { assertHumanFormSignal, assertRateLimit, assertSameOrigin, FormSpamError, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
+import { assertHumanFormSignal, assertRateLimit, assertSameOrigin, FormSpamError, RateLimitError, readUrlEncodedForm, RequestSecurityError, SIGNUP_RATE_LIMIT } from "../../../../lib/request-security";
 
 export async function POST(request: Request) {
   let next = "/app";
@@ -32,8 +33,16 @@ export async function POST(request: Request) {
     if (invitation && invitation.email.toLowerCase() !== email.toLowerCase()) {
       throw new Error(`Diese Einladung wurde an ${invitation.email} gesendet.`);
     }
-    await assertRateLimit(request, { action: "signup", identifier: email, limit: 5, windowMs: 60 * 60 * 1000 });
-    // Closed beta: the cloud app is invitation only while public demo/templates stay open.
+    // Consent is enforced here, not only by the `required` checkbox: a direct POST must not skip it.
+    if (form.get(SIGNUP_CONSENT_FIELD) !== "1") throw new Error(SIGNUP_CONSENT_REQUIRED_ERROR);
+    await assertRateLimit(request, {
+      action: "signup",
+      identifier: email,
+      limit: SIGNUP_RATE_LIMIT.perAccount,
+      sourceLimit: SIGNUP_RATE_LIMIT.perSource,
+      windowMs: SIGNUP_RATE_LIMIT.windowMs,
+    });
+    // Gate on: invitation only. Gate off (BLOOMMD_BETA_ACCESS != 1): open self-registration.
     await assertBetaSignupAllowedForRequest({ email, inviteCode: String(form.get("inviteCode") || "") });
     if (isE2EAuthBypassEnabled()) {
       const token = createSessionToken({
@@ -59,7 +68,13 @@ export async function POST(request: Request) {
     const passwordHash = hashPassword(password);
     const existing = await findPasswordUserByEmail(email);
     const user = existing ?? await createPasswordUser({ email, name, passwordHash });
+    // With open registration anyone can register an address they do not own. If the account is
+    // still unconfirmed, the latest signup wins, so a password set by someone else beforehand does
+    // not survive the real owner's registration (account pre-hijacking). Confirmed accounts are
+    // never touched; the password-reset flow is the only way to change those.
+    if (existing && !existing.emailVerifiedAt) await updatePasswordForEmail({ email: existing.email, passwordHash });
     await acceptBetaInvite(user.email);
+    let verificationFailed = false;
     if (!user.emailVerifiedAt) {
       const verification = await createAuthToken({
         userId: user.id,
@@ -67,10 +82,14 @@ export async function POST(request: Request) {
         purpose: "email_verification",
         ttlMinutes: 60 * 24,
       });
-      if (verification) {
-        await sendVerificationEmail(user.email, verification.token, { invite: invite || undefined, lang: lang as "de" | "en" });
-      }
+      const delivery = verification
+        ? await sendVerificationEmail(user.email, verification.token, { invite: invite || undefined, lang: lang as "de" | "en" })
+        : { sent: false as const };
+      verificationFailed = !delivery.sent;
     }
+    // The account exists, but nobody can confirm it without the mail. Say so instead of
+    // announcing a mail that was never sent; submitting the signup form again resends it.
+    if (verificationFailed) throw new Error(VERIFICATION_NOT_SENT_ERROR);
     const loginParams = new URLSearchParams({ next, verification: "sent", lang });
     if (invite) loginParams.set("invite", invite);
     loginParams.set("email", email);

@@ -20,6 +20,7 @@
     "test": "bun scripts/test-isolated.ts",
     "test:e2e": "playwright test",
     "test:e2e:beta": "playwright test --config playwright.beta.config.ts",
+    "test:e2e:open-signup": "playwright test --config playwright.open-signup.config.ts",
     "test:e2e:collaboration": "playwright test --config playwright.collaboration.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",

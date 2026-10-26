@@ -1,20 +1,49 @@
 ---
 title: Closed-Beta Zugang
-description: Was bei Warteliste, Einladung, Account-Erstellung, Login und Passwort passiert.
+description: Registrierung offen oder nur mit Einladung — Account-Erstellung, E-Mail-Bestätigung, Login und Passwort.
 order: 2
 ---
 
 # Closed-Beta Zugang
 
-BloomMD ist in M1 eine geschlossene Beta. Ein Wartelisten-Eintrag ist noch kein Account und eine
-Beta-Einladung erstellt noch kein Passwort. Der normale Ablauf ist bewusst getrennt, damit klar ist,
-was in welchem Schritt passiert.
+Der Web-Zugang zu BloomMD (bloommd.app) kennt zwei Zustände. Welcher gilt, siehst du auf der
+Registrierungsseite: Ist dort direkt ein Formular zu sehen, ist die Registrierung offen. Siehst du
+stattdessen den Hinweis, dass dein Cloud-Zugang noch nicht freigeschaltet ist, gilt die Einladung.
 
-**Geschlossen ist der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit.**
-Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
-[Obsidian-Plugin](/obsidian) kannst du ohne Einladung nutzen.
+**Gesperrt ist in jedem Zustand nur der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und
+Zusammenarbeit.** Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
+[Obsidian-Plugin](/obsidian) kannst du immer ohne Einladung nutzen.
 
-## Normaler Ablauf
+## Registrierung offen
+
+Du brauchst keine Einladung und keinen Code.
+
+1. Öffne die Registrierung auf bloommd.app.
+2. Trage E-Mail-Adresse und ein Passwort mit mindestens 10 Zeichen ein, das Buchstaben und Zahlen enthält.
+3. Stimme der Datenschutzerklärung und den AGB zu. Ohne Zustimmung wird kein Account angelegt.
+4. Du bekommst eine Bestätigungs-E-Mail. Der Link darin ist 24 Stunden gültig.
+5. Öffne den Link. Erst danach ist die Anmeldung möglich; ohne bestätigte E-Mail-Adresse gibt es
+   weder Login noch Sitzung.
+6. Melde dich auf bloommd.app mit E-Mail und Passwort an.
+
+Die Registrierung ist gegen Massenanmeldungen begrenzt. Bei zu vielen Versuchen in kurzer Zeit
+zeigt die Seite „Zu viele Versuche“ an; warte dann etwa eine Stunde und versuche es erneut.
+
+### Bestätigungs-E-Mail nicht angekommen
+
+Prüfe Spam- und Promotions-Ordner. Auf der Anmeldeseite kannst du die Bestätigungs-E-Mail erneut
+senden. Wenn der Versand nicht möglich war, zeigt die Registrierung eine Fehlermeldung statt des
+Hinweises „E-Mail gesendet“; dann kannst du es später noch einmal versuchen.
+
+### Passwort vergessen
+
+Nutze auf der Anmeldeseite „Passwort vergessen?“. Du bekommst einen Link, der 60 Minuten gültig ist.
+Nach dem Zurücksetzen werden bestehende Anmeldungen beendet.
+
+## Beta geschlossen (nur mit Einladung)
+
+Ein Wartelisten-Eintrag ist noch kein Account und eine Beta-Einladung erstellt noch kein Passwort.
+Der Ablauf ist bewusst getrennt, damit klar ist, was in welchem Schritt passiert.
 
 1. Du trägst dich auf bloommd.io in die Beta-Warteliste ein.
 2. Du bestätigst deine E-Mail-Adresse über die Bestätigungs-E-Mail.
@@ -22,30 +51,31 @@ Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
 4. Du bekommst eine persönliche Beta-Einladung per E-Mail mit einem Account-erstellen-Link.
 5. Über diesen Link öffnest du die Account-Erstellung. Die eingeladene E-Mail-Adresse ist bereits
    vorausgefüllt.
-6. Du vergibst dein eigenes Passwort und bestätigst danach deine Account-E-Mail.
+6. Du vergibst dein eigenes Passwort, stimmst Datenschutzerklärung und AGB zu und bestätigst
+   danach deine Account-E-Mail.
 7. Danach kannst du dich auf bloommd.app mit E-Mail und Passwort anmelden.
 
-## Noch keine Einladung
+### Noch keine Einladung
 
-Wenn du noch keine Einladung bekommen hast, nutze zuerst die Warteliste auf bloommd.io. Die
-Account-Erstellung ist für eingeladene Beta-Tester vorgesehen. Ohne Einladung oder Einladungscode
-wird kein Account freigeschaltet.
+Wenn du noch keine Einladung bekommen hast, nutze zuerst die Warteliste auf bloommd.io. Ohne
+Einladung oder Einladungscode wird in diesem Zustand kein Account freigeschaltet.
 
-## Einladung erhalten
+### Einladung erhalten
 
 Der Link in der Einladungs-E-Mail führt direkt zur Account-Erstellung. Bei persönlichen
 Einladungen brauchst du normalerweise keinen Einladungscode. Ein Code-Feld kann als Fallback
 sichtbar sein, falls ein Admin einen Code separat verschickt.
 
+### Einladung erneut senden
+
+Wenn eine Wartelisten-Bestätigung oder Beta-Einladung nicht angekommen ist, kann ein Admin sie aus
+der Wartelisten-Administration erneut senden. Prüfe vorher auch Spam- und Promotions-Ordner.
+
 ## Bereits einen Account erstellt
 
 Wenn dein Account existiert und die E-Mail bestätigt ist, nutzt du die Anmeldung auf bloommd.app.
 Der Passwort-vergessen-Link ist erst sinnvoll, nachdem ein Account mit Passwort erstellt wurde.
-
-## Einladung erneut senden
-
-Wenn eine Wartelisten-Bestätigung oder Beta-Einladung nicht angekommen ist, kann ein Admin sie aus
-der Wartelisten-Administration erneut senden. Prüfe vorher auch Spam- und Promotions-Ordner.
+Das gilt in beiden Zuständen; bestehende Accounts bleiben unverändert.
 
 ## Desktop-App
 

@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { sendBetaInviteEmail, sendPasswordResetEmail, sendVerificationEmail, sendWorkspaceInvitationEmail } from "./email";
 
 const originalFetch = globalThis.fetch;
@@ -8,6 +11,8 @@ const originalEnv = {
   NODE_ENV: process.env.NODE_ENV,
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+  BLOOMMD_E2E_TEST_MODE: process.env.BLOOMMD_E2E_TEST_MODE,
+  BLOOMMD_E2E_MAIL_OUTBOX: process.env.BLOOMMD_E2E_MAIL_OUTBOX,
 };
 
 function restoreEnvValue(key: keyof typeof originalEnv) {
@@ -111,5 +116,38 @@ describe("account email links", () => {
     expect(body.text).toContain("Editor");
     expect(body.text).toContain("Läuft ab:");
     expect(body.html).not.toContain("localhost");
+  });
+});
+
+describe("E2E mail outbox", () => {
+  test("writes mails to the outbox file only with the test marker and never calls the provider", async () => {
+    configureEmailTest();
+    const directory = mkdtempSync(join(tmpdir(), "bloommd-outbox-"));
+    const outbox = join(directory, "mail.jsonl");
+    let providerCalls = 0;
+    globalThis.fetch = Object.assign(async () => {
+      providerCalls += 1;
+      return new Response("{}", { status: 200 });
+    }, { preconnect: originalFetch.preconnect }) as typeof fetch;
+
+    try {
+      setEnvValue("BLOOMMD_E2E_MAIL_OUTBOX", outbox);
+      // Without the marker (a real production server) the variable is ignored.
+      delete (process.env as Record<string, string | undefined>).BLOOMMD_E2E_TEST_MODE;
+      await sendVerificationEmail("max@example.test", "ignored-token");
+      expect(providerCalls).toBe(1);
+
+      setEnvValue("BLOOMMD_E2E_TEST_MODE", "1");
+      const result = await sendVerificationEmail("max@example.test", "outbox-token");
+      expect(result).toEqual({ sent: true });
+      expect(providerCalls).toBe(1);
+
+      const [line] = readFileSync(outbox, "utf8").trim().split("\n");
+      const mail = JSON.parse(line ?? "{}") as { to: string; text: string };
+      expect(mail.to).toBe("max@example.test");
+      expect(mail.text).toContain("/api/auth/verify-email?token=outbox-token");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

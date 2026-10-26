@@ -74,6 +74,49 @@ describe("product app production config", () => {
     expect(productionConfigErrors(env)).toEqual([]);
   });
 
+  test("accepts a closed gate without any invitation list (open self-registration)", () => {
+    for (const gate of ["0", undefined]) {
+      const env = appEnv();
+      if (gate === undefined) delete env.BLOOMMD_BETA_ACCESS;
+      else env.BLOOMMD_BETA_ACCESS = gate;
+      delete env.BLOOMMD_BETA_ALLOWED_EMAILS;
+      delete env.BLOOMMD_BETA_INVITE_CODES;
+      delete env.BLOOMMD_INTERNAL_INVITE_SECRET;
+
+      expect(productionConfigErrors(env)).toEqual([]);
+    }
+  });
+
+  test("still requires an invitation list when the gate is on", () => {
+    const env = appEnv();
+    delete env.BLOOMMD_BETA_ALLOWED_EMAILS;
+
+    expect(productionConfigErrors(env).some((error) => error.includes("BLOOMMD_BETA_ACCESS is 1 but neither"))).toBe(true);
+  });
+
+  test("still requires the mail provider and a valid gate value with the gate off", () => {
+    const env = appEnv();
+    env.BLOOMMD_BETA_ACCESS = "0";
+    delete env.RESEND_API_KEY;
+    expect(productionConfigErrors(env)).toContain("RESEND_API_KEY is required.");
+
+    const invalid = appEnv();
+    invalid.BLOOMMD_BETA_ACCESS = "yes";
+    expect(productionConfigErrors(invalid)).toContain("BLOOMMD_BETA_ACCESS must be exactly \"1\" or \"0\".");
+  });
+
+  test("rejects the E2E bypass and mail outbox in production, with the gate on or off", () => {
+    for (const gate of ["1", "0"]) {
+      for (const key of ["BLOOMMD_E2E_AUTH_BYPASS", "BLOOMMD_E2E_TEST_MODE", "BLOOMMD_E2E_MAIL_OUTBOX"] as const) {
+        const env = appEnv();
+        env.BLOOMMD_BETA_ACCESS = gate;
+        env[key] = key === "BLOOMMD_E2E_MAIL_OUTBOX" ? "/tmp/outbox.jsonl" : "1";
+
+        expect(productionConfigErrors(env)).toContain(`${key} must not be set in production.`);
+      }
+    }
+  });
+
   test("rejects a weak internal invite secret", () => {
     const env = appEnv();
     env.BLOOMMD_INTERNAL_INVITE_SECRET = "TODO";

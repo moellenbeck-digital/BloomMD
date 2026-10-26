@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Navigator
+
+- New **BloomMD navigator** side view (ribbon icon, command **Open navigator**): the vault as a folder tree with open/close folders and the Markdown notes of the selected folder in a separate list. Click or `Enter` opens a note; the map is one step away (**Map of the selected note / folder**, or `M`) and is never loaded for the whole vault.
+- **Show active file in navigator** (`Cmd/Ctrl+Shift+R`) opens the folders on the way, scrolls to the note, selects and focuses it. The navigator also follows the active note while you work.
+- Keyboard model with explicit focus areas (tree, list, map): `↑`/`↓`, `←`/`→`, `Enter`, `Tab`, `Esc`; back and forward through the navigation history with `Cmd/Ctrl+[` and `Cmd/Ctrl+]` or the buttons in the header. The header shows where you are browsing and which map is open as two separate lines; a built-in help lists all shortcuts. New command **Focus navigator** brings focus back from the map.
+- Folder tree and note list only render the rows in view, so large vaults stay responsive.
+
 ## 0.7.1
 
 Code quality fixes from the Obsidian community plugin review; no change in behaviour.

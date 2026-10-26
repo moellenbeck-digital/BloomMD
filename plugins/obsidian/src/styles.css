@@ -2160,3 +2160,185 @@ button.bloommd-agent-path {
   border-radius: 50%;
   background: var(--color-purple);
 }
+
+/* Navigator view: folder tree and note list. */
+.bloommd-nav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.bloommd-nav-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.bloommd-nav-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.bloommd-nav-spacer {
+  flex: 1;
+}
+
+.bloommd-nav-button:disabled {
+  opacity: 0.4;
+}
+
+.bloommd-nav-search {
+  width: 100%;
+}
+
+.bloommd-nav-context {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-ui-smaller);
+}
+
+.bloommd-nav-context > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-left: 3px solid transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bloommd-nav-context-browse {
+  border-left-color: var(--text-muted);
+  color: var(--text-normal);
+}
+
+.bloommd-nav-context-map {
+  border-left-color: var(--interactive-accent);
+  color: var(--text-muted);
+}
+
+.bloommd-nav-context-map:not([data-kind="none"]) {
+  color: var(--text-accent);
+}
+
+.bloommd-nav-context-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.bloommd-nav-help {
+  max-height: 40%;
+  padding: 8px;
+  overflow: auto;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+}
+
+.bloommd-nav-help.is-hidden {
+  display: none;
+}
+
+.bloommd-nav-help td {
+  padding: 2px 6px 2px 0;
+  vertical-align: top;
+}
+
+.bloommd-nav-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bloommd-nav-pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bloommd-nav-pane + .bloommd-nav-pane {
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.bloommd-nav-pane-title {
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bloommd-nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.bloommd-nav-scroll:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.bloommd-nav-sizer {
+  position: relative;
+  height: var(--bloommd-nav-height, 0);
+}
+
+.bloommd-nav-row {
+  position: absolute;
+  top: var(--bloommd-nav-top, 0);
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--bloommd-nav-row-height, 28px);
+  padding-inline-start: calc(var(--bloommd-nav-depth, 0) * 14px + 6px);
+  padding-inline-end: 8px;
+  cursor: pointer;
+}
+
+.is-mobile .bloommd-nav-row {
+  --bloommd-nav-row-height: 40px;
+}
+
+.bloommd-nav-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.bloommd-nav-row.is-selected {
+  background: var(--background-modifier-hover);
+  color: var(--text-accent);
+}
+
+.bloommd-nav-scroll:focus .bloommd-nav-row.is-selected,
+.bloommd-nav-scroll:focus-within .bloommd-nav-row.is-selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.bloommd-nav-chevron {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.bloommd-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

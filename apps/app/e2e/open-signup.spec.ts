@@ -104,9 +104,12 @@ test.describe("open self-registration, closed-beta gate off", () => {
     await loginForm.getByLabel("Passwort").fill(PASSWORD);
     await loginForm.getByRole("button", { name: "Anmelden" }).click();
     await expect(page).toHaveURL((url) => url.pathname === "/app");
-    await expect(page.locator("#mindmap-canvas")).toBeVisible();
 
+    // The signed-in session belongs to the confirmed account. (The editor itself is not asserted:
+    // with a real database it also needs the sync server, which this suite does not start.)
     await page.goto("/account");
+    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByText("E-Mail-Adresse bestätigt")).toBeVisible();
     await page.getByRole("button", { name: "Abmelden" }).click();
 
     await page.goto("/forgot-password");
@@ -125,10 +128,13 @@ test.describe("open self-registration, closed-beta gate off", () => {
     await loginForm.getByRole("button", { name: "Anmelden" }).click();
     await expect(page.getByTestId("login-error")).toContainText("E-Mail oder Passwort ist falsch.");
 
+    // A failed login does not carry the address back into the form.
+    await loginForm.getByLabel("E-Mail", { exact: true }).fill(email);
     await loginForm.getByLabel("Passwort").fill(NEW_PASSWORD);
     await loginForm.getByRole("button", { name: "Anmelden" }).click();
     await expect(page).toHaveURL((url) => url.pathname === "/app");
-    await expect(page.locator("#mindmap-canvas")).toBeVisible();
+    await page.goto("/account");
+    await expect(page.getByText("E-Mail-Adresse bestätigt")).toBeVisible();
   });
 
   test("enforces the consent on the server and sends no mail without it", async ({ request }) => {

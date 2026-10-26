@@ -24,12 +24,19 @@ export function readMails(to?: string): OutboxMail[] {
     .filter((mail) => !to || mail.to.toLowerCase() === to.toLowerCase());
 }
 
-/** The newest link in a mail to `to` whose URL contains `pathPart`, or null while no such mail exists. */
+/**
+ * Path and query of the newest link in a mail to `to` whose URL contains `pathPart`, or null while
+ * no such mail exists. Only path and query are returned: a production server builds mail links for
+ * the public app domain, and the test must stay on its own origin.
+ */
 export function latestLink(to: string, pathPart: string): string | null {
   const mails = readMails(to).reverse();
   for (const mail of mails) {
     const link = mail.text.split(/\s+/).find((word) => /^https?:\/\//.test(word) && word.includes(pathPart));
-    if (link) return link;
+    if (link) {
+      const url = new URL(link);
+      return `${url.pathname}${url.search}`;
+    }
   }
   return null;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { applyKnowledgeNodes, isKnowledgeInputError, knowledgeDecisions, knowledgeTasks, knowledgeVersion, newKnowledgeMap, outlineMarkdown, parseKnowledgeNodeInputs, searchKnowledge } from "./knowledge";
+import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "./knowledge-templates";
 import { parseFile } from "./parser";
 
 const meeting = () => newKnowledgeMap({ title: "Teammeeting 30.09.", area: "Arbeit", source: "Transkript Teams", date: "2026-09-30" });
@@ -11,6 +12,34 @@ describe("newKnowledgeMap", () => {
     expect(markdown).toContain('tags: ["bereich/arbeit"]');
     expect(markdown).toContain("created: 2026-09-30");
     expect(markdown).toMatch(/^# Teammeeting 30\.09\. <!-- bloommd:id=[A-Za-z0-9_-]+ -->$/m);
+  });
+
+  test("adds template frontmatter after the standard fields and refuses to override them", () => {
+    const markdown = newKnowledgeMap({ title: "X", area: "Learnings", source: "Ticket #1", date: "2026-10-26", frontmatter: { type: "learning", status: "neu" } });
+    expect(markdown.split("\n").slice(0, 8)).toEqual(["---", 'title: "X"', "created: 2026-10-26", 'area: "Learnings"', 'tags: ["bereich/learnings"]', 'source: "Ticket #1"', 'type: "learning"', 'status: "neu"']);
+    expect(() => newKnowledgeMap({ title: "X", frontmatter: { title: "Y" } })).toThrow(/not allowed/);
+    expect(() => newKnowledgeMap({ title: "X", frontmatter: { "a: b\nc": "Y" } })).toThrow(/not allowed/);
+  });
+});
+
+describe("templates", () => {
+  test("only the learning template adds frontmatter; the others stay as they were", () => {
+    expect(KNOWLEDGE_TEMPLATES.filter((template) => template.frontmatter).map((template) => template.id)).toEqual(["learning"]);
+    for (const id of ["meeting", "conversation", "discussion", "lesson", "project", "weekly"]) {
+      expect(templateFrontmatter(knowledgeTemplate(id), { date: "2026-10-26", scope: "BloomMD" })).toEqual({});
+    }
+    expect(templateFrontmatter(null, { date: "2026-10-26" })).toEqual({});
+  });
+
+  test("learning: area, skeleton, guidance and a concrete stale_after 90 days ahead", () => {
+    const learning = knowledgeTemplate("learning")!;
+    expect(learning.area).toBe("Learnings");
+    expect(learning.skeleton.map((node) => node.title)).toEqual(["Symptom", "Ursache", "Regel", "Beleg", "Gilt für", "Aufgaben"]);
+    expect(learning.guidance.join("\n")).toMatch(/Aufgaben ist optional/);
+    expect(learning.guidance.join("\n")).toMatch(/Suchen vor anlegen/);
+    expect(templateFrontmatter(learning, { date: "2026-10-26", scope: " BloomMD, coder\n" })).toEqual({ type: "learning", status: "neu", scope: "BloomMD, coder", stale_after: "2027-01-24" });
+    expect(templateFrontmatter(learning, { date: "2026-12-31" }).stale_after).toBe("2027-03-31");
+    expect(templateFrontmatter(learning, { date: "2026-10-26" })).not.toHaveProperty("scope");
   });
 });
 

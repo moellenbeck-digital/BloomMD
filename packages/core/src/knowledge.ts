@@ -195,8 +195,13 @@ function yamlString(value: string): string {
   return JSON.stringify(value);
 }
 
-/** A new, empty map: frontmatter plus the root heading. */
-export function newKnowledgeMap(options: { title: string; area?: string; tags?: string[]; source?: string; date?: string }): string {
+const RESERVED_FRONTMATTER = new Set(["title", "created", "area", "tags", "source"]);
+
+/**
+ * A new, empty map: frontmatter plus the root heading. `frontmatter` adds string fields from a
+ * template (e.g. `type`, `status`, `stale_after`); it cannot replace the fields written here.
+ */
+export function newKnowledgeMap(options: { title: string; area?: string; tags?: string[]; source?: string; date?: string; frontmatter?: Record<string, string> }): string {
   assertKnowledgeTitle(options.title);
   const title = options.title.trim();
   if (!title) throw new KnowledgeInputError("A map needs a title.");
@@ -206,6 +211,10 @@ export function newKnowledgeMap(options: { title: string; area?: string; tags?: 
   if (options.area) lines.push(`area: ${yamlString(options.area)}`);
   if (tags.length > 0) lines.push(`tags: [${tags.map(yamlString).join(", ")}]`);
   if (options.source) lines.push(`source: ${yamlString(options.source.replace(/[\r\n]+/g, " ").slice(0, 300))}`);
+  for (const [key, value] of Object.entries(options.frontmatter ?? {})) {
+    if (!/^[a-z][a-z0-9_]*$/.test(key) || RESERVED_FRONTMATTER.has(key)) throw new KnowledgeInputError(`Frontmatter field "${key}" is not allowed.`);
+    lines.push(`${key}: ${yamlString(value)}`);
+  }
   lines.push("---", "", `# ${title}`, "");
   return ensureHeadingIds(lines.join("\n")).markdown;
 }

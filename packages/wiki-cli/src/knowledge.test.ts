@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { AgentLedger, knowledgeVersion, vaultArea, type AgentDocuments, type AgentStateFiles } from "@bloommd/core/agent-ledger";
 import { applyKnowledgeNodes } from "@bloommd/core/knowledge";
 import { parseFile } from "@bloommd/core/parser";
+import { lintWikiBundle } from "@bloommd/core/wiki";
 import { createMcpParser } from "./mcp";
 import { knowledgeServerOptions } from "./knowledge-mcp";
 import { dueSummary } from "./agent-cli";
@@ -42,6 +43,34 @@ describe("vault knowledge", () => {
     expect((await service.tasks()).tasks).toEqual([expect.objectContaining({ title: "iPad-Test", due: "2026-10-03", assignee: "Max", path: "Arbeit/Teammeeting 30.09.md" })]);
     const overview = await service.overview();
     expect(overview.areas.map((area) => area.area)).toEqual(["Arbeit", "Schule"]);
+  });
+
+  test("a learning from the template gets lint-valid frontmatter; other templates get none", async () => {
+    const { root, service } = await vault();
+    expect((service.templates("learning") as { area: string; skeleton: Array<{ title: string }> })).toEqual(expect.objectContaining({ id: "learning", area: "Learnings" }));
+    expect((service.templates() as { templates: Array<{ id: string }> }).templates.map((template) => template.id)).toContain("learning");
+    const created = await service.createMap({
+      area: "", title: "Bun-Lockfile", template: "learning", scope: "BloomMD, coder", source: "Ticket #109", tags: ["coder"],
+      nodes: [{ parent: "regel", title: "bun install --frozen-lockfile nutzen" }],
+    });
+    expect(created.path).toBe("Learnings/Bun-Lockfile.md");
+    const markdown = await readFile(join(root, created.path), "utf8");
+    const frontmatter = markdown.split("\n---\n")[0]!;
+    const stale = new Date(); stale.setUTCDate(stale.getUTCDate() + 90);
+    expect(frontmatter).toContain('type: "learning"');
+    expect(frontmatter).toContain('status: "neu"');
+    expect(frontmatter).toContain(`stale_after: "${stale.toISOString().slice(0, 10)}"`);
+    expect(frontmatter).toContain('scope: "BloomMD, coder"');
+    expect(frontmatter).toContain('source: "Ticket #109"');
+    expect(frontmatter).toContain('tags: ["bereich/learnings", "coder"]');
+    expect([...parseFile(created.path, markdown).nodes.values()].map((node) => node.title)).toEqual(expect.arrayContaining(["Symptom", "Ursache", "Regel", "Beleg", "Gilt für", "Aufgaben", "bun install --frozen-lockfile nutzen"]));
+    // The same file passes the wiki lint (only the missing index.md link is reported).
+    const issues = await lintWikiBundle(join(root, "Learnings"));
+    expect(issues.filter((issue) => !["unindexed-page", "missing-reserved-file"].includes(issue.code))).toEqual([]);
+    // Other templates stay without type/status/stale_after.
+    const meeting = await service.createMap({ area: "Arbeit", title: "Sync", template: "meeting", scope: "ignored" });
+    const meetingMarkdown = await readFile(join(root, meeting.path), "utf8");
+    expect(meetingMarkdown).not.toMatch(/^(type|status|stale_after|scope):/m);
   });
 
   test("updates an existing map by id and refuses stale versions", async () => {

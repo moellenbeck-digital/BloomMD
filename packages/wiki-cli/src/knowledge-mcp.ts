@@ -73,7 +73,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_templates",
     title: "Vorlagen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Templates for filing material: meeting, conversation, discussion, lesson (school), project, weekly. Without id: the list; with id: skeleton and filling guidance.",
+    description: "Templates for filing material: meeting, conversation, discussion, lesson (school), project, weekly, learning. Without id: the list; with id: skeleton and filling guidance.",
     inputSchema: { type: "object", additionalProperties: false, properties: { id: { type: "string" } } },
   },
   {
@@ -90,6 +90,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
         template: { type: "string" },
         nodes: { type: "array", items: nodeSchema },
         tags: { type: "array", items: { type: "string" } },
+        scope: { type: "string", description: "Where the map applies (brand, role, component); written to the frontmatter by templates that define frontmatter, e.g. learning." },
         ...changeMeta,
         ...targetProperty,
       },
@@ -225,6 +226,7 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           template: string(args, "template"),
           nodes: nodes(args, 0),
           tags: Array.isArray(args.tags) ? args.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
+          scope: string(args, "scope"),
           ...meta,
         });
         case "bloommd_update_map": return service.updateMap({ path: string(args, "path", true)!, version: string(args, "version"), nodes: nodes(args, 1)!, ...meta });

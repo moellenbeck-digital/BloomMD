@@ -30,6 +30,7 @@ test("authenticated editor has no serious accessibility violations", async ({ pa
   await page.getByLabel("Name").fill("Accessibility Test");
   await page.getByLabel("E-Mail").fill(`a11y-${Date.now()}@bloommd.local`);
   await page.getByLabel("Passwort").fill("Testpass12345");
+  await page.getByTestId("signup-consent").check();
   await page.getByRole("button", { name: "Account erstellen" }).click();
   await expect(page.locator("#mindmap-canvas")).toBeVisible();
   const result = await new AxeBuilder({ page }).analyze();

@@ -22,8 +22,9 @@ Verfügbar in Chrome und Edge. Firefox und Safari unterstützen die API nicht.
 
 ## Cloud-Workspace
 
-Mit Konto. Dokumente liegen in der Datenbank, Zusammenarbeit läuft über den Sync-Server. Der
-Closed-Beta Ablauf ist unter [Closed-Beta Zugang](/docs/closed-beta-zugang) beschrieben.
+Mit Konto. Dokumente liegen in der Datenbank, Zusammenarbeit läuft über den Sync-Server.
+Registrierung (offen oder nur mit Einladung) ist unter
+[Closed-Beta Zugang](/docs/closed-beta-zugang) beschrieben.
 
 ### Markdown-Datei in den Cloud-Workspace laden
 

@@ -22,6 +22,11 @@ export function formatAuthDate(value: string, locale: AuthLocale) {
   return new Intl.DateTimeFormat(locale === "de" ? "de-DE" : "en-US", { dateStyle: "medium" }).format(new Date(value));
 }
 
+/** Form field of the signup consent checkbox; the server rejects a signup without it. */
+export const SIGNUP_CONSENT_FIELD = "acceptTerms";
+export const SIGNUP_CONSENT_REQUIRED_ERROR = "Bitte stimme der Datenschutzerklärung und den AGB zu.";
+export const VERIFICATION_NOT_SENT_ERROR = "Bestätigungs-E-Mail konnte nicht gesendet werden.";
+
 export function localizeAuthError(value: string, locale: AuthLocale) {
   if (locale === "de") return value;
   const messages: Record<string, string> = {
@@ -42,7 +47,9 @@ export function localizeAuthError(value: string, locale: AuthLocale) {
     "Passwort-Reset fehlgeschlagen.": "Password reset failed.",
     "Registrierung fehlgeschlagen.": "Sign-up failed.",
     "Login fehlgeschlagen.": "Sign-in failed.",
-    "Bestätigungs-E-Mail konnte nicht gesendet werden.": "The confirmation email could not be sent.",
+    [VERIFICATION_NOT_SENT_ERROR]: "The confirmation email could not be sent.",
+    [SIGNUP_CONSENT_REQUIRED_ERROR]: "Please accept the privacy policy and the terms.",
+    "Zu viele Versuche. Bitte warte kurz und versuche es erneut.": "Too many attempts. Please wait a moment and try again.",
     "Bitte lade die Seite neu und versuche es erneut.": "Reload the page and try again.",
     "E-Mail-Bestätigung oder Passwort ist nicht korrekt.": "Email confirmation or password is incorrect.",
   };
@@ -62,6 +69,7 @@ export const authCopy = {
     language: "Sprache",
     createAccount: "Account erstellen",
     accountSubtitle: "Lege deinen BloomMD-Account an. Danach bestätigst du deine E-Mail-Adresse.",
+    consent: { before: "Ich habe die ", privacy: "Datenschutzerklärung", between: " und die ", terms: "AGB", after: " gelesen und stimme ihnen zu." },
     personalWorkspace: "Deine persönliche Arbeitsumgebung.",
     signIn: "Anmelden",
     alreadyRegistered: "Schon registriert?",
@@ -124,6 +132,7 @@ export const authCopy = {
     language: "Language",
     createAccount: "Create account",
     accountSubtitle: "Create your BloomMD account. Then confirm your email address.",
+    consent: { before: "I have read the ", privacy: "privacy policy", between: " and the ", terms: "terms", after: " and agree to them." },
     personalWorkspace: "Your personal workspace.",
     signIn: "Sign in",
     alreadyRegistered: "Already registered?",

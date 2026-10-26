@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { isE2EAuthBypassEnabled, safeNextPath } from "../../lib/auth";
 import { canBetaSignup, isBetaGateEnabled } from "../../lib/betaAccess";
 import { getWorkspaceInvitationPreviewById } from "../../lib/db";
-import { authCopy, formatAuthDate, getAuthLocale, languageLabel, localizeAuthError, otherAuthLocale, roleLabel } from "../../lib/auth-copy";
+import { authCopy, formatAuthDate, SIGNUP_CONSENT_FIELD, getAuthLocale, languageLabel, localizeAuthError, otherAuthLocale, roleLabel } from "../../lib/auth-copy";
 import { appendAuthParams, parseWorkspaceInviteHandoff } from "../../lib/invite-intent";
 import { isDatabaseConfigured } from "../../lib/db";
 import { publicMarketingUrl } from "../../lib/deployment";
+import { withAppLocale } from "../../lib/locale";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -81,6 +82,16 @@ export default async function SignupPage({
         {copy.password}
         <input name="password" type="password" required minLength={10} className="min-h-11 rounded-md border border-[#D4CFC8] bg-white px-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/20" placeholder={copy.passwordHint} />
         <span className="text-xs font-normal text-[#666666]">{copy.passwordHint}</span>
+      </label>
+      <label className="flex items-start gap-3 text-sm leading-6 text-[#5F574F]">
+        <input name={SIGNUP_CONSENT_FIELD} type="checkbox" value="1" required className="mt-1.5 h-4 w-4 shrink-0 accent-[#B64A1F]" data-testid="signup-consent" />
+        <span>
+          {copy.consent.before}
+          <Link href={withAppLocale("/datenschutz", locale)} target="_blank" rel="noopener" className="font-semibold text-[#8A3518] underline hover:text-[#FF6B35]">{copy.consent.privacy}</Link>
+          {copy.consent.between}
+          <Link href={withAppLocale("/agb", locale)} target="_blank" rel="noopener" className="font-semibold text-[#8A3518] underline hover:text-[#FF6B35]">{copy.consent.terms}</Link>
+          {copy.consent.after}
+        </span>
       </label>
       <button type="submit" className="min-h-11 rounded-md bg-[#B64A1F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8A3518]" data-testid="signup-submit">
         {copy.createAccount}

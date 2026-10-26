@@ -13,7 +13,7 @@ test("opens the accessible web About dialog with web build metadata", async ({ p
   const email = uniqueEmail();
   const signup = await request.post("/api/auth/signup", {
     headers: SAME_ORIGIN_HEADERS,
-    form: { name: "About E2E", email, password: PASSWORD, next: "/app" },
+    form: { name: "About E2E", email, password: PASSWORD, acceptTerms: "1", next: "/app" },
     maxRedirects: 0,
   });
   expect(signup.status()).toBe(303);

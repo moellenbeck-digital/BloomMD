@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { validateLoginEmail } from "../../../../lib/auth";
 import { createAuthToken, findPasswordUserByEmail } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
+import { VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
 import { sendVerificationEmail } from "../../../../lib/email";
 import { parseWorkspaceInviteHandoff, serializeAuthParams } from "../../../../lib/invite-intent";
-import { assertRateLimit, assertSameOrigin, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
+import { ACCOUNT_MAIL_RATE_LIMIT, assertRateLimit, assertSameOrigin, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
 
 export async function POST(request: Request) {
   let invite = "";
@@ -16,7 +17,13 @@ export async function POST(request: Request) {
     lang = form.get("lang") === "en" ? "en" : "de";
     if (invite && !parseWorkspaceInviteHandoff(invite)) throw new Error("Dieser Einladungsübergang ist ungültig oder abgelaufen.");
     const email = validateLoginEmail(String(form.get("email") || ""));
-    await assertRateLimit(request, { action: "resend-verification", identifier: email, limit: 3, windowMs: 60 * 60 * 1000 });
+    await assertRateLimit(request, {
+      action: "resend-verification",
+      identifier: email,
+      limit: ACCOUNT_MAIL_RATE_LIMIT.resendVerificationPerAccount,
+      sourceLimit: ACCOUNT_MAIL_RATE_LIMIT.perSource,
+      windowMs: ACCOUNT_MAIL_RATE_LIMIT.windowMs,
+    });
     const user = await findPasswordUserByEmail(email);
     if (user && !user.emailVerifiedAt) {
       const verification = await createAuthToken({
@@ -25,7 +32,10 @@ export async function POST(request: Request) {
         purpose: "email_verification",
         ttlMinutes: 60 * 24,
       });
-      if (verification) await sendVerificationEmail(user.email, verification.token, { invite: invite || undefined, lang: lang as "de" | "en" });
+      const delivery = verification
+        ? await sendVerificationEmail(user.email, verification.token, { invite: invite || undefined, lang: lang as "de" | "en" })
+        : { sent: false as const };
+      if (!delivery.sent) throw new Error(VERIFICATION_NOT_SENT_ERROR);
     }
     const params = new URLSearchParams({ verification: "sent", lang });
     if (invite) params.set("invite", invite);

@@ -47,6 +47,7 @@ async function signUpAndOpenApp(browser: Browser, label: string) {
   await page.getByLabel("Name").fill(`Collab ${label}`);
   await page.getByLabel("Email").fill(uniqueEmail(label));
   await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByTestId("signup-consent").check();
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page).toHaveURL((url) => url.pathname === "/app");
   await expect(page.getByTestId("mindmap-canvas")).toBeVisible();

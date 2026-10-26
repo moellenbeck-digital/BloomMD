@@ -92,6 +92,36 @@ describe("request security", () => {
     await expect(assertRateLimit(request, options)).rejects.toBeInstanceOf(RateLimitError);
   });
 
+  test("limits the client address separately from, and higher than, one account", async () => {
+    process.env.DATABASE_URL = "";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "";
+    const request = new Request("https://bloommd.app", { headers: { "x-real-ip": "203.0.113.6" } });
+    const options = { action: "test-signup", limit: 2, sourceLimit: 4, windowMs: 60_000 };
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      // Different accounts from one address stay under their own limit but spend the shared one.
+      await assertRateLimit(request, { ...options, identifier: `user${attempt}@example.com` });
+    }
+    await assertRateLimit(request, { ...options, identifier: "user4@example.com" });
+    await expect(assertRateLimit(request, { ...options, identifier: "user5@example.com" })).rejects.toBeInstanceOf(RateLimitError);
+
+    // Another address is unaffected, but one account is still capped at `limit` across addresses.
+    const other = (address: string) => new Request("https://bloommd.app", { headers: { "x-real-ip": address } });
+    await assertRateLimit(other("203.0.113.7"), { ...options, identifier: "shared@example.com" });
+    await assertRateLimit(other("203.0.113.8"), { ...options, identifier: "shared@example.com" });
+    await expect(assertRateLimit(other("203.0.113.9"), { ...options, identifier: "shared@example.com" })).rejects.toBeInstanceOf(RateLimitError);
+  });
+
+  test("keeps the source limit at `limit` when no separate source limit is given", async () => {
+    process.env.DATABASE_URL = "";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "";
+    const request = new Request("https://bloommd.app", { headers: { "x-real-ip": "203.0.113.10" } });
+    const options = { action: "test-default-source", limit: 1, windowMs: 60_000 };
+
+    await assertRateLimit(request, { ...options, identifier: "a@example.com" });
+    await expect(assertRateLimit(request, { ...options, identifier: "b@example.com" })).rejects.toBeInstanceOf(RateLimitError);
+  });
+
   test("accepts forms that leave the honeypot empty and waited briefly", () => {
     const form = new URLSearchParams({ website: "", formStartedAt: String(1_000) });
     expect(() => assertHumanFormSignal(form, { now: 2_000 })).not.toThrow();

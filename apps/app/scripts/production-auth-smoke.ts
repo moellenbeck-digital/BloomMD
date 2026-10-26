@@ -235,6 +235,7 @@ async function run() {
         email: options.email,
         name: "BloomMD Smoke",
         password: options.password,
+        acceptTerms: "1",
         next: "/app",
         formStartedAt: String(Date.now() - 2_000),
         website: "",

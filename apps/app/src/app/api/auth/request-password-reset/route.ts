@@ -4,7 +4,7 @@ import { createAuthToken, findPasswordUserByEmail } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { sendPasswordResetEmail } from "../../../../lib/email";
 import { appendAuthParams, parseWorkspaceInviteHandoff, serializeAuthParams } from "../../../../lib/invite-intent";
-import { assertRateLimit, assertSameOrigin, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
+import { ACCOUNT_MAIL_RATE_LIMIT, assertRateLimit, assertSameOrigin, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
 
 export async function POST(request: Request) {
   let next = "/login";
@@ -19,7 +19,13 @@ export async function POST(request: Request) {
     lang = form.get("lang") === "en" ? "en" : "de";
     if (invite && !parseWorkspaceInviteHandoff(invite)) throw new Error("Dieser Einladungsübergang ist ungültig oder abgelaufen.");
     const email = validateLoginEmail(String(form.get("email") || ""));
-    await assertRateLimit(request, { action: "password-reset-request", identifier: email, limit: 5, windowMs: 60 * 60 * 1000 });
+    await assertRateLimit(request, {
+      action: "password-reset-request",
+      identifier: email,
+      limit: ACCOUNT_MAIL_RATE_LIMIT.passwordResetPerAccount,
+      sourceLimit: ACCOUNT_MAIL_RATE_LIMIT.perSource,
+      windowMs: ACCOUNT_MAIL_RATE_LIMIT.windowMs,
+    });
     const user = await findPasswordUserByEmail(email);
 
     if (user) {

@@ -6,7 +6,10 @@ import { isE2EAuthBypassEnabled } from "./e2e-mode";
 interface RateLimitOptions {
   action: string;
   identifier?: string | null;
+  /** Attempts allowed per identifier, and per client address unless `sourceLimit` is set. */
   limit: number;
+  /** Attempts allowed per client address. A shared address (NAT, campus) needs more room than one account. */
+  sourceLimit?: number;
   windowMs: number;
 }
 
@@ -24,6 +27,32 @@ interface MemoryBucket {
 }
 
 const memoryBuckets = new Map<string, MemoryBucket>();
+
+/**
+ * Signup limits for open registration (#104). Every attempt counts, successful or not.
+ *
+ * The per-account limit stops one address from being used to mail-bomb its owner; the per-source
+ * limit slows mass registration with many different addresses from one client address. It is
+ * deliberately higher than the per-account limit because a household, office or campus shares one
+ * address. No captcha: that is an operator decision.
+ */
+export const SIGNUP_RATE_LIMIT = {
+  windowMs: 60 * 60 * 1000,
+  perAccount: 5,
+  perSource: 20,
+} as const;
+
+/**
+ * Limits for the two mail-sending steps after signup. Their per-source limit used to equal the
+ * per-account one (3 and 5), which would lock out most of a shared address once registration is
+ * open to everyone.
+ */
+export const ACCOUNT_MAIL_RATE_LIMIT = {
+  windowMs: 60 * 60 * 1000,
+  resendVerificationPerAccount: 3,
+  passwordResetPerAccount: 5,
+  perSource: 20,
+} as const;
 
 export class RateLimitError extends Error {
   readonly retryAfterSeconds: number;
@@ -159,18 +188,18 @@ export async function assertRateLimit(request: Request, options: RateLimitOption
   const now = Date.now();
   const windowStart = Math.floor(now / options.windowMs) * options.windowMs;
   const expiresAt = windowStart + options.windowMs;
-  const identifiers = [`ip:${clientAddress(request)}`];
-  if (options.identifier) identifiers.push(`account:${options.identifier.trim().toLowerCase()}`);
+  const buckets = [{ identifier: `ip:${clientAddress(request)}`, limit: options.sourceLimit ?? options.limit }];
+  if (options.identifier) buckets.push({ identifier: `account:${options.identifier.trim().toLowerCase()}`, limit: options.limit });
 
-  for (const identifier of identifiers) {
-    const keyHash = hashKey(identifier);
+  for (const bucket of buckets) {
+    const keyHash = hashKey(bucket.identifier);
     const databaseResult = await consumeRateLimit({
       action: options.action,
       keyHash,
       windowStartedAt: new Date(windowStart).toISOString(),
-      limit: options.limit,
+      limit: bucket.limit,
     });
-    const allowed = databaseResult?.allowed ?? memoryRateLimit(`${options.action}:${keyHash}:${windowStart}`, options.limit, expiresAt);
+    const allowed = databaseResult?.allowed ?? memoryRateLimit(`${options.action}:${keyHash}:${windowStart}`, bucket.limit, expiresAt);
     if (!allowed) {
       throw new RateLimitError(Math.max(1, Math.ceil((expiresAt - now) / 1000)));
     }

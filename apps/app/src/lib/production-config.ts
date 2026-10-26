@@ -89,6 +89,12 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
 
   if (env.BLOOMMD_REQUIRE_AUTH !== "1") errors.push("BLOOMMD_REQUIRE_AUTH must be 1.");
   if (env.BLOOMMD_AUTO_MIGRATE === "1") errors.push("BLOOMMD_AUTO_MIGRATE must not be 1 in production.");
+  // The E2E bypass signs people in without a password or a confirmed address. With open
+  // registration (#104) it would let anyone skip the email confirmation, so it must never ship.
+  for (const key of ["BLOOMMD_E2E_AUTH_BYPASS", "BLOOMMD_E2E_TEST_MODE"] as const) {
+    if (env[key]?.trim()) errors.push(`${key} must not be set in production.`);
+  }
+  if (env.BLOOMMD_E2E_MAIL_OUTBOX?.trim()) errors.push("BLOOMMD_E2E_MAIL_OUTBOX must not be set in production.");
   const siteOrigin = secureOrigin(env.NEXT_PUBLIC_SITE_URL, ["https:"]);
   if (!siteOrigin) errors.push("NEXT_PUBLIC_SITE_URL must be a valid HTTPS URL.");
   if (!hasSecretEntropy(env.BLOOMMD_AUTH_SECRET)) errors.push("BLOOMMD_AUTH_SECRET must be a non-placeholder secret with at least 32 characters and sufficient variety.");
@@ -115,6 +121,8 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
   }
   // Closed beta (#43): the gate must be usable, not merely switched on. A gate with neither an
   // allowlist nor a code is a signup form that rejects everyone, including the operator.
+  // Gate off (#104) means open self-registration; it needs no invitation list, and the signup
+  // limits and the mandatory email confirmation above and in the signup route still apply.
   if (env.BLOOMMD_BETA_ACCESS === "1") {
     const hasInvites = Boolean(env.BLOOMMD_BETA_ALLOWED_EMAILS?.trim() || env.BLOOMMD_BETA_INVITE_CODES?.trim() || env.BLOOMMD_INTERNAL_INVITE_SECRET?.trim());
     if (!hasInvites) errors.push("BLOOMMD_BETA_ACCESS is 1 but neither BLOOMMD_BETA_ALLOWED_EMAILS, BLOOMMD_BETA_INVITE_CODES nor BLOOMMD_INTERNAL_INVITE_SECRET is set.");

@@ -26,7 +26,7 @@ function uniqueEmail() {
 async function createAccount(request: APIRequestContext, email: string) {
   const response = await request.post("/api/auth/signup", {
     headers: { Origin: API_ORIGIN },
-    form: { name: "Node Agent Owner", email, password: PASSWORD, next: "/app" },
+    form: { name: "Node Agent Owner", email, password: PASSWORD, acceptTerms: "1", next: "/app" },
     maxRedirects: 0,
   });
   expect(response.status()).toBe(303);

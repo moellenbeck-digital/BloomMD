@@ -28,9 +28,9 @@ und keine Internetverbindung.
 Die Web-App unter `/app` ist der zweite Weg. Sie kann lokale Ordner über den Browser öffnen, ohne
 etwas hochzuladen.
 
-Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Closed-Beta Zugang. Der
-Ablauf von Warteliste, Einladung, Account-Erstellung und Login steht unter
-[Closed-Beta Zugang](/docs/closed-beta-zugang).
+Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account. Je nach Stand
+registrierst du dich direkt selbst oder brauchst eine Einladung. Beide Abläufe, E-Mail-Bestätigung
+und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
 
 ## Was in der Beta nicht enthalten ist
 

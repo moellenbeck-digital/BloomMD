@@ -1,5 +1,10 @@
 # Changelog
 
+## In Entwicklung
+
+- Wiki-Bundles lassen sich als statischer Export teilen: ein Ordner mit OKF-Kopie, `wiki.json` und einem eingebauten Read-only-Browser (`index.html`), der ohne Server, Datenbank und Netzwerkzugriff läuft. Der Browser zeigt Seiten, Suche, Index, Log, Vertrauensstufen, Quellen und Medien auf Deutsch und Englisch, lässt sich per `?embed=1` in eine Seite einbetten und öffnet sich auch direkt aus dem Dateisystem. Dateien außerhalb des Bundles und Skript-fähige Dateitypen werden nicht mitgeliefert, sondern als „nicht verfügbar“ aufgeführt.
+- Wiki bundles can be shared as a static export: a folder with an OKF copy, `wiki.json` and a built-in read-only browser (`index.html`) that runs without a server, database or network access. The browser shows pages, search, index, log, trust tiers, sources and media in German and English, embeds into another page with `?embed=1`, and also opens straight from disk. Files outside the bundle and file types that can carry script are not shipped but listed as “not available”.
+
 ## [Marketing 0.5.6] - 2026-10-25
 
 - Eine zweisprachige News-Meldung führt zum öffentlichen BloomMD-Quellcode, zu Issues und Beiträgen und erklärt ELv2, das MIT-lizenzierte Obsidian-Plugin sowie den Stand historischer Releases. Die ältere Lizenzmeldung verweist auf den neuen Repo-Stand.

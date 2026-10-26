@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { isWaitlistAdminAuthConfigured, isWaitlistAdminAuthorized, waitlistAdminHeaders } from "./lib/waitlist-admin-auth";
+import { isRetiredWaitlistPath, waitlistSignupUrl } from "./lib/waitlist-redirect";
 
 const DESKTOP_UPDATE_PUBLIC_PREFIX = "/_desktop-updates/";
 const DESKTOP_UPDATE_INTERNAL_PREFIX = "/desktop-updates/";
@@ -46,28 +46,9 @@ export function proxy(request: NextRequest) {
     return new NextResponse(null, { status: 404 });
   }
 
-  if (pathname === "/admin/waitlist" || pathname.startsWith("/admin/waitlist/")) {
-    const securityHeaders = waitlistAdminHeaders();
-    if (!isWaitlistAdminAuthConfigured()) {
-      return new NextResponse("Waitlist admin is not configured.", {
-        status: 503,
-        headers: { ...securityHeaders, "Content-Type": "text/plain; charset=utf-8" },
-      });
-    }
-    if (!isWaitlistAdminAuthorized(request.headers.get("authorization"))) {
-      return new NextResponse("Authentication required.", {
-        status: 401,
-        headers: {
-          ...securityHeaders,
-          "Content-Type": "text/plain; charset=utf-8",
-          "WWW-Authenticate": "Basic realm=\"BloomMD Waitlist\", charset=\"UTF-8\"",
-        },
-      });
-    }
-
-    const response = NextResponse.next({ request: { headers: requestHeaders } });
-    for (const [key, value] of Object.entries(securityHeaders)) response.headers.set(key, value);
-    return response;
+  // The waitlist is gone; registration replaces it. Permanent, so old links and bookmarks settle.
+  if (isRetiredWaitlistPath(pathname)) {
+    return NextResponse.redirect(waitlistSignupUrl(request.nextUrl.searchParams), 308);
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } });

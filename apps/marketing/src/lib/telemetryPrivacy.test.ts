@@ -44,21 +44,26 @@ describe("telemetry privacy", () => {
     expect(scrubMarketingAnalyticsEvent("unknown_event", { path: "/demo" })).toBeNull();
   });
 
-  test("allows the closed beta waitlist CTA without leaking properties", () => {
-    expect(scrubMarketingAnalyticsEvent("closed_beta_waitlist_clicked", {
+  test("allows the registration CTA without leaking properties", () => {
+    expect(scrubMarketingAnalyticsEvent("signup_click", {
       email: "private@example.com",
       path: "/demo",
     })).toEqual({
-      name: "closed_beta_waitlist_clicked",
+      name: "signup_click",
       properties: {},
     });
   });
 
+  test("the retired waitlist events are no longer allowed", () => {
+    expect(scrubMarketingAnalyticsEvent("closed_beta_waitlist_clicked", {})).toBeNull();
+    expect(scrubMarketingAnalyticsEvent("waitlist_signup", {})).toBeNull();
+  });
+
   test("allows Plausible conversion events without personal properties", () => {
-    expect(scrubMarketingAnalyticsEvent("waitlist_signup", {
+    expect(scrubMarketingAnalyticsEvent("login_click", {
       email: "person@example.com",
       name: "Person",
-    })).toEqual({ name: "waitlist_signup", properties: {} });
+    })).toEqual({ name: "login_click", properties: {} });
     expect(scrubMarketingAnalyticsEvent("demo_click", {
       path: "/demo",
       token: "secret",

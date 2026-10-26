@@ -47,7 +47,7 @@ bun test ./packages/core/src/parser.test.ts
 - `@bloommd/core/browser` — Gleich wie core, aber ohne FileStore (browser-safe, kein `node:fs`)
 - `@bloommd/ui` — React-Komponenten (MindMapCanvas, NodeEditor, Toolbar, etc.)
 - `@bloommd/web-app` — Private Next.js App (`apps/app`) mit Auth, Workspaces, Sync, Collaboration, OKF/llm-wiki
-- `@bloommd/marketing` — Public Next.js App (`apps/marketing`) mit Landingpage, Waitlist, Docs/Fumadocs, Legal, Templates, Demo
+- `@bloommd/marketing` — Public Next.js App (`apps/marketing`) mit Landingpage, Docs/Fumadocs, Legal, Templates, Demo
 - `@bloommd/desktop` — Electrobun App mit RPC + File Watcher
 - `@bloommd/mobile` — Capacitor App mit Filesystem API
 - `@bloommd/sync` — Yjs Sync-Server (Bun + Hono, y-protocols, Room-per-file)
@@ -106,15 +106,16 @@ File Watcher nutzt chokidar mit `awaitWriteFinish: { stabilityThreshold: 500 }`.
 
 BloomMD hat ab M1 zwei getrennte Next.js-Anwendungen im selben Monorepo:
 
-- `apps/marketing` (`@bloommd/marketing`) → `bloommd.io`: Landingpage, Waitlist, Docs/Fumadocs, Legal, Templates, isolierte Demo und optional public Wiki
+- `apps/marketing` (`@bloommd/marketing`) → `bloommd.io`: Landingpage, Docs/Fumadocs, Legal, Templates, isolierte Demo und optional public Wiki (die Warteliste ist beendet, Registrierung unter `bloommd.app/signup`)
 - `apps/app` (`@bloommd/web-app`) → `bloommd.app`: Auth, Account, Workspaces, OKF/llm-wiki, Sync, Collaboration und Closed-Beta-Flows
 
 `BLOOMMD_DEPLOYMENT` ist nach dem Split obsolet und wird von `release:check` abgelehnt. Die Trennung
 passiert über getrennte App-Roots und getrennte Builds, nicht über Runtime-Routing in einem gemeinsamen
 Image. Marketing darf keine App-Secrets tragen: kein `DATABASE_URL`, kein `BLOOMMD_AUTH_SECRET`, kein
-`BLOOMMD_SYNC_SECRET`, keine Stripe-Secrets und kein `NEXT_PUBLIC_SYNC_URL`. Die Waitlist nutzt nur
-`BLOOMMD_WAITLIST_DATABASE_URL` mit eigener Tabelle. Die Produkt-App setzt global
-`X-Robots-Tag: noindex, nofollow`. App-Routen existieren im Marketing-Build nicht; Waitlist-/Demo-/
+`BLOOMMD_SYNC_SECRET`, keine Stripe-Secrets und kein `NEXT_PUBLIC_SYNC_URL`. Die beendete Waitlist
+liegt nur noch in `BLOOMMD_WAITLIST_DATABASE_URL` (eigene Tabelle) bis zu Export, Einladung und Löschung
+(`apps/marketing/scripts/waitlist.ts`). Die Produkt-App setzt global
+`X-Robots-Tag: noindex, nofollow`. App-Routen existieren im Marketing-Build nicht; Demo-/
 Docs-/Template-Routen existieren im App-Build nicht.
 
 Die öffentliche Demo darf nicht die private App freischalten. Sie lebt in `apps/marketing`, nutzt nur
@@ -130,7 +131,7 @@ oder die Produktdatenbank.
 - Die sichtbare Kurzform bleibt konsistent: `BloomMD <version> (<short-sha>)`, z. B. `BloomMD 0.1.0-beta.2 (2269618)`.
 - Git-SHA, Git-Tag und Image-Digest sind Nachweis- und Rollout-Metadaten; die fachliche Produktversion bleibt SemVer.
 - App-Flächen mit sichtbarer Version: Login, Account/About, Help/Feedback und App-Shell, soweit der Viewport Platz hat.
-- Marketing-Flächen mit sichtbarer Version: Footer und Admin-Waitlist; Legal-/Support-Kontext darf die Version ebenfalls nutzen.
+- Marketing-Flächen mit sichtbarer Version: Footer; Legal-/Support-Kontext darf die Version ebenfalls nutzen.
 - App und Marketing bieten `/api/version` mit nicht-geheimer Build-Info: Produkt, Package, Deployment, Version, Git-SHA, Short-SHA, Git-Tag, Build-Zeitpunkt und Display-Version.
 - Feedback-Issues müssen Version, SHA, Deployment, Route, Browser/OS und Zeitstempel automatisch enthalten.
 - CI/Docker injiziert Build-Metadaten deterministisch über `BLOOMMD_RELEASE_VERSION`, `BLOOMMD_BUILD_SHA`, `BLOOMMD_BUILD_TAG`, `BLOOMMD_BUILD_TIME` und die zugehörigen `NEXT_PUBLIC_BLOOMMD_*` Werte.
@@ -239,7 +240,7 @@ BloomMD-Repo oder in einem Milestone liegen.
 - Env-Variablen Marketing lokal: `apps/marketing/.env.local` auf Basis von `apps/marketing/.env.example`
 - Closed-Beta-Gate (`BLOOMMD_BETA_ACCESS`): `1` = Registrierung nur mit Einladung (Allowlist, Code oder DB-Einladung); jeder andere Wert bzw. nicht gesetzt = offene Selbst-Registrierung ohne Einladung. In beiden Zuständen gelten E-Mail-Bestätigung (ohne sie kein Login), Pflicht-Einwilligung zu Datenschutz/AGB und Signup-Limits (je E-Mail und je Client-Adresse, `SIGNUP_RATE_LIMIT` in `apps/app/src/lib/request-security.ts`). `BLOOMMD_E2E_AUTH_BYPASS`, `BLOOMMD_E2E_TEST_MODE` und `BLOOMMD_E2E_MAIL_OUTBOX` sind nur für Test-Server; `release:check` lehnt sie ab. Der Gate-Standardwert in Deployment/CI wird nicht ohne Owner-Freigabe geändert.
 - Env-Variablen Hosted App-Beta: `DATABASE_URL`, `BLOOMMD_AUTH_SECRET`, `BLOOMMD_REQUIRE_AUTH=1`, `BLOOMMD_BETA_ACCESS=1` (Gate an; für offene Registrierung weglassen bzw. `0`), `BLOOMMD_BETA_ALLOWED_EMAILS` oder `BLOOMMD_BETA_INVITE_CODES` (nur bei Gate an), `BLOOMMD_BILLING_ENABLED=0`, `NEXT_PUBLIC_SITE_URL=https://bloommd.app`, `NEXT_PUBLIC_APP_URL=https://bloommd.app`, `NEXT_PUBLIC_MARKETING_URL=https://bloommd.io`
-- Env-Variablen Marketing: `NEXT_PUBLIC_SITE_URL=https://bloommd.io`, `NEXT_PUBLIC_MARKETING_URL=https://bloommd.io`, `NEXT_PUBLIC_APP_URL=https://bloommd.app`, optional `BLOOMMD_WAITLIST_DATABASE_URL`; keine App-/Sync-/Stripe-Secrets
+- Env-Variablen Marketing: `NEXT_PUBLIC_SITE_URL=https://bloommd.io`, `NEXT_PUBLIC_MARKETING_URL=https://bloommd.io`, `NEXT_PUBLIC_APP_URL=https://bloommd.app`, optional `BLOOMMD_WAITLIST_DATABASE_URL` (nur für die Abwicklung der beendeten Warteliste); keine App-/Sync-/Stripe-Secrets
 - Desktop Data-Dir: `~/bloommd`
 - M1 Desktop-Support ist macOS-first; Linux und Windows werden nach M1 als eigene Beta-Releases nachgezogen und dürfen M1 nicht blockieren
 - Mobile Data-Dir: `Documents/bloommd/`

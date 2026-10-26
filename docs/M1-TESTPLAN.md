@@ -236,7 +236,7 @@ Testumgebung:
 
 | ID | Test | Automatisierung | Erwartung |
 |---|---|---|---|
-| WEB-01 | Public Landing | `test:e2e` | Closed-Beta-Positionierung, Demo und Waitlist sichtbar |
+| WEB-01 | Public Landing | `test:e2e` | Beta-Positionierung, Demo und Registrierungs-CTA sichtbar |
 | WEB-02 | Signup ohne Gate | `test:e2e` | Lokale Dev-Registrierung funktioniert |
 | WEB-03 | Signup mit Gate ohne Invite | `test:e2e:beta` | Registrierung blockiert, keine Account-Enumeration |
 | WEB-04 | Signup mit Allowlist | `test:e2e:beta` | Session wird gesetzt, Redirect nach `/app` |

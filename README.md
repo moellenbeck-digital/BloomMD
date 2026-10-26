@@ -216,21 +216,21 @@ BloomMD ships two independently buildable Next.js applications from one monorepo
 
 | App | Domain | Purpose |
 |---|---|---|
-| `apps/marketing` / `@bloommd/marketing` | `bloommd.io` | Landing page, waitlist, docs/Fumadocs, legal pages, templates, isolated demo, optional public Wiki |
+| `apps/marketing` / `@bloommd/marketing` | `bloommd.io` | Landing page, docs/Fumadocs, legal pages, templates, isolated demo, optional public Wiki (the waitlist has ended; registration is at `bloommd.app/signup`) |
 | `apps/app` / `@bloommd/web-app` | `bloommd.app` | Private app, auth, account, workspaces, OKF/llm-wiki, sync and collaboration |
 
 `BLOOMMD_DEPLOYMENT` is obsolete after the split and `release:check` rejects it. Marketing builds
 must not receive `DATABASE_URL`, `BLOOMMD_AUTH_SECRET`, `BLOOMMD_SYNC_SECRET`,
-`NEXT_PUBLIC_SYNC_URL`, or Stripe secrets. Persisted waitlist signups use
-`BLOOMMD_WAITLIST_DATABASE_URL`, so the public site can store signups without access to user
-accounts or workspaces. The product app is globally `noindex, nofollow`; marketing only indexes
+`NEXT_PUBLIC_SYNC_URL`, or Stripe secrets. The remaining waitlist data lives in
+`BLOOMMD_WAITLIST_DATABASE_URL` until it is exported, invited once and purged, so the marketing
+app has no access to user accounts or workspaces. The product app is globally `noindex, nofollow`; marketing only indexes
 intended public pages.
 
 The application boundaries are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 For local split development the product app runs on `http://127.0.0.1:3210` via
 `bun run dev:app`; the marketing app runs on `http://127.0.0.1:3212` via
-`bun run dev:marketing`. Waitlist pages and confirmation links belong to the marketing app.
+`bun run dev:marketing`. Old waitlist links (`/waitlist`, confirmation) redirect to the registration of the product app; only the unsubscribe page and API of the marketing app remain.
 
 ## Local-first Architecture
 
@@ -370,7 +370,7 @@ Required for the hosted closed beta:
 - `BLOOMMD_REQUIRE_AUTH=1`
 - `BLOOMMD_BETA_ACCESS=1` (closed-beta gate on: invitation only; any other value or unset: open
   self-registration, then no invitation list is required)
-- `BLOOMMD_INTERNAL_INVITE_SECRET` for DB-backed Waitlist invites
+- `BLOOMMD_INTERNAL_INVITE_SECRET` for DB-backed beta invites (no longer used by the marketing app since the waitlist admin was removed)
 - optional fallback: `BLOOMMD_BETA_ALLOWED_EMAILS` or `BLOOMMD_BETA_INVITE_CODES`
 - `BLOOMMD_BILLING_ENABLED=0`
 - `BLOOMMD_AUTO_MIGRATE=0`
@@ -421,14 +421,26 @@ Required for the early public marketing deployment:
 - `NEXT_PUBLIC_SITE_URL=https://bloommd.io`
 - `NEXT_PUBLIC_MARKETING_URL=https://bloommd.io`
 - `NEXT_PUBLIC_APP_URL=https://bloommd.app`
-- `BLOOMMD_WAITLIST_DATABASE_URL` if the waitlist should persist signups
-- `BLOOMMD_WAITLIST_PENDING_RETENTION_DAYS=30` and
-  `BLOOMMD_WAITLIST_UNSUBSCRIBED_RETENTION_DAYS=90` unless the legal copy and runbook are changed
-  together
+- `BLOOMMD_WAITLIST_DATABASE_URL` only while waitlist data still has to be exported, invited and purged
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` for the one-time invitation mail
 - no `DATABASE_URL`, `BLOOMMD_AUTH_SECRET`, `BLOOMMD_SYNC_SECRET`, `NEXT_PUBLIC_SYNC_URL`, or Stripe secrets
 
-Run `bun run --cwd apps/marketing waitlist cleanup` as a dry-run before invitation waves. It deletes
-only with `--apply`; confirmed, non-unsubscribed addresses remain available for beta invitations.
+Winding down the waitlist (a human runs these against production; every destructive or outgoing
+step is a dry-run unless `--apply` is given):
+
+```bash
+bun run --cwd apps/marketing waitlist count               # confirmed / pending / unsubscribed / total
+bun run --cwd apps/marketing waitlist export --out waitlist.csv   # email, status, time, source; ends with "N Einträge, davon bestätigt M"
+bun run --cwd apps/marketing waitlist invite              # dry-run: lists who would get the one-time mail
+bun run --cwd apps/marketing waitlist invite --apply      # sends it (confirmed, not unsubscribed, once per address)
+bun run --cwd apps/marketing waitlist purge               # dry-run: would deleting be allowed?
+bun run --cwd apps/marketing waitlist purge --apply       # deletes ALL entries
+```
+
+`invite --apply` marks each address in the table before mailing it, so a second run writes to nobody
+again; a failed send releases the mark. `purge --apply` is refused while confirmed addresses have not
+been invited and until `WAITLIST_PURGE_RETENTION_DAYS` (90, `src/lib/waitlist-retention.ts`) after the
+last invitation mail. The privacy policy names the same 90 days.
 
 The public marketing entrypoints are `/` for German and `/en` for English beta participants. Both
 must keep the same product scope, beta CTA, app login target and release version visibility before

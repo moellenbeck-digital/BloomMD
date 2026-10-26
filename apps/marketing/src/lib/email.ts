@@ -1,5 +1,6 @@
-import { publicMarketingUrl } from "./deployment";
+import { publicAppUrl, publicMarketingUrl } from "./deployment";
 import type { MarketingLocale } from "./locale";
+import { WAITLIST_PURGE_RETENTION_DAYS } from "./waitlist-retention";
 
 interface EmailInput {
   to: string;
@@ -50,28 +51,28 @@ export async function sendTransactionalEmail(input: EmailInput) {
 }
 
 /**
- * Confirmation for a waitlist signup.
- *
- * Carries the unsubscribe link in the same message. Somebody who did not sign up should be able to
- * remove the address without confirming it first — asking them to click "confirm" in order to be
- * left alone would be exactly backwards.
+ * The single, final mail to a confirmed waitlist address: the waitlist is over, registration is
+ * open. It names when the address is deleted and carries the unsubscribe link, so the recipient can
+ * leave without signing up. Sent only by `scripts/waitlist.ts invite --apply`.
  */
-export async function sendWaitlistConfirmationEmail(email: string, token: string, locale: MarketingLocale = "de") {
-  const linkBase = publicMarketingUrl();
-  const confirmUrl = `${linkBase}/api/waitlist/confirm?token=${encodeURIComponent(token)}`;
-  const unsubscribeUrl = `${linkBase}/api/waitlist/unsubscribe?token=${encodeURIComponent(token)}`;
+export async function sendWaitlistInvitationEmail(email: string, unsubscribeToken: string, locale: MarketingLocale = "de") {
+  const signupBase = `${publicAppUrl()}/signup`;
+  const unsubscribeBase = `${publicMarketingUrl()}/api/waitlist/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
+  const days = WAITLIST_PURGE_RETENTION_DAYS;
   if (locale === "en") {
+    const signupUrl = `${signupBase}?lang=en`;
+    const unsubscribeUrl = `${unsubscribeBase}&lang=en`;
     return sendTransactionalEmail({
       to: email,
-      subject: "Confirm your BloomMD waitlist signup",
-      text: `Please confirm that you want to join the BloomMD waitlist:\n\n${confirmUrl}&lang=en\n\nWe will only contact you when a beta seat opens.\n\nDid not request this? Unsubscribe without confirming:\n${unsubscribeUrl}&lang=en`,
-      html: `<p>Please confirm that you want to join the BloomMD waitlist:</p><p><a href="${confirmUrl}&lang=en">Confirm waitlist signup</a></p><p>We will only contact you when a beta seat opens.</p><p style="font-size:12px;color:#666">Did not request this? <a href="${unsubscribeUrl}&lang=en">Unsubscribe here</a> without confirming.</p>`,
+      subject: "BloomMD: the waitlist has ended - sign up now",
+      text: `You joined the BloomMD waitlist. The waitlist has ended: sign-up is open now and you no longer need an invitation.\n\nSign up now:\n${signupUrl}\n\nThis is the only message we send about the waitlist. Your address is deleted ${days} days after this email.\n\nNot interested? Unsubscribe here:\n${unsubscribeUrl}`,
+      html: `<p>You joined the BloomMD waitlist. The waitlist has ended: sign-up is open now and you no longer need an invitation.</p><p><a href="${signupUrl}">Sign up now</a></p><p>This is the only message we send about the waitlist. Your address is deleted ${days} days after this email.</p><p style="font-size:12px;color:#666">Not interested? <a href="${unsubscribeUrl}">Unsubscribe here</a>.</p>`,
     });
   }
   return sendTransactionalEmail({
     to: email,
-    subject: "BloomMD Warteliste bestätigen",
-    text: `Bitte bestätige, dass du auf die BloomMD Warteliste möchtest:\n\n${confirmUrl}\n\nDu bekommst eine Nachricht, sobald ein Platz frei wird — sonst nichts.\n\nNicht angefordert? Dann trage dich hier aus, ohne etwas zu bestätigen:\n${unsubscribeUrl}`,
-    html: `<p>Bitte bestätige, dass du auf die BloomMD Warteliste möchtest:</p><p><a href="${confirmUrl}">Warteliste bestätigen</a></p><p>Du bekommst eine Nachricht, sobald ein Platz frei wird — sonst nichts.</p><p style="font-size:12px;color:#666">Nicht angefordert? Dann <a href="${unsubscribeUrl}">hier austragen</a>, ohne etwas zu bestätigen.</p>`,
+    subject: "BloomMD: Die Warteliste ist beendet - jetzt registrieren",
+    text: `Du hast dich auf die BloomMD-Warteliste eingetragen. Die Warteliste ist beendet: Die Registrierung ist jetzt offen, eine Einladung brauchst du nicht mehr.\n\nJetzt registrieren:\n${signupBase}\n\nDas ist die einzige Nachricht, die wir dir zur Warteliste schicken. Deine Adresse wird ${days} Tage nach dieser E-Mail gelöscht.\n\nKein Interesse? Hier abmelden:\n${unsubscribeBase}`,
+    html: `<p>Du hast dich auf die BloomMD-Warteliste eingetragen. Die Warteliste ist beendet: Die Registrierung ist jetzt offen, eine Einladung brauchst du nicht mehr.</p><p><a href="${signupBase}">Jetzt registrieren</a></p><p>Das ist die einzige Nachricht, die wir dir zur Warteliste schicken. Deine Adresse wird ${days} Tage nach dieser E-Mail gelöscht.</p><p style="font-size:12px;color:#666">Kein Interesse? <a href="${unsubscribeBase}">Hier abmelden</a>.</p>`,
   });
 }

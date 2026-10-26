@@ -20,7 +20,7 @@ const darkModePages = [
   { path: "/", name: "landing page", surfaceSelectors: ["body", "header", "footer", '[data-testid="landing-paths"]'] },
   { path: "/en", name: "English landing page", surfaceSelectors: ["body", "header", "footer"] },
   { path: "/datenschutz", name: "privacy page", surfaceSelectors: ["body", "main", "article"] },
-  { path: "/waitlist/bestaetigt", name: "waitlist confirmation", surfaceSelectors: ["body", "main"] },
+  { path: "/waitlist/abgemeldet", name: "waitlist unsubscribe", surfaceSelectors: ["body", "main"] },
   { path: "/news", name: "news", surfaceSelectors: ["body", "header", "footer"] },
 ] as const;
 
@@ -85,26 +85,7 @@ test.describe("dark system preference", () => {
       expect(seriousViolations(result)).toEqual([]);
     });
   }
-
-  test("waitlist admin shell uses dark surfaces without a configured database", async ({ page }) => {
-    await page.setExtraHTTPHeaders({
-      authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
-    });
-    const response = await page.goto("/admin/waitlist");
-    test.skip(response?.status() === 503, "Waitlist admin auth is not configured on this server.");
-    await expect(page.locator("html")).toHaveClass(/dark/);
-    await expect(page.getByRole("heading", { name: "Waitlist", exact: true })).toBeVisible();
-    const mainBackground = await page.locator("main").evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(maxRenderedRgb(mainBackground), `admin main should not render as a light surface (${mainBackground})`).toBeLessThanOrEqual(80);
-    const result = await new AxeBuilder({ page }).analyze();
-    expect(seriousViolations(result)).toEqual([]);
-  });
 });
-
-test("waitlist admin shell has no serious accessibility violations", async ({ page }) => {
-  await page.setExtraHTTPHeaders({
-    authorization: `Basic ${Buffer.from("admin:secret").toString("base64")}`,
-  });
   const response = await page.goto("/admin/waitlist");
   test.skip(response?.status() === 503, "Waitlist admin auth is not configured on this server.");
   await page.waitForLoadState("networkidle");

@@ -12,7 +12,7 @@ test.describe("marketing release contracts", () => {
     expect(rules).toContain("Disallow: /admin/");
     expect(rules).toContain("Disallow: /api/");
     expect(rules).toContain("Sitemap: https://bloommd.io/sitemap.xml");
-    // Crawlers must be able to read the result pages' noindex directives.
+    // Crawlers must be able to read the unsubscribe page's noindex directive.
     expect(rules).not.toContain("Disallow: /waitlist/");
 
     const response = await request.get("/sitemap.xml");
@@ -39,7 +39,7 @@ test.describe("marketing release contracts", () => {
     });
   }
 
-  for (const path of ["/waitlist/bestaetigt", "/waitlist/abgemeldet", "/waitlist/ungueltig"]) {
+  for (const path of ["/waitlist/abgemeldet", "/waitlist/abgemeldet?status=ungueltig"]) {
     test(`keeps waitlist results out of indexes: ${path}`, async ({ page }) => {
       const response = await page.goto(path, { waitUntil: "domcontentloaded" });
       expect(response?.ok()).toBe(true);
@@ -71,22 +71,32 @@ test.describe("marketing release contracts", () => {
     }
   });
 
-  test("protects the waitlist admin and keeps its responses uncached", async ({ request }) => {
-    const unauthorized = await request.get("/admin/waitlist");
-    expect(unauthorized.status()).toBe(401);
-    expect(unauthorized.headers()["www-authenticate"]).toContain("BloomMD Waitlist");
-    expect(unauthorized.headers()["cache-control"]).toContain("no-store");
-    expect(unauthorized.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+  test("the waitlist admin is gone", async ({ request }) => {
+    for (const path of ["/admin/waitlist", "/admin/waitlist/export.csv"]) {
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(404);
+      expect(response.headers()["www-authenticate"], path).toBeUndefined();
+    }
+  });
 
-    const authorization = `Basic ${Buffer.from("admin:secret").toString("base64")}`;
-    const authorized = await request.get("/admin/waitlist", { headers: { authorization } });
-    expect(authorized.ok()).toBe(true);
-    expect(authorized.headers()["cache-control"]).toMatch(/no-store|no-cache/);
-    expect(await authorized.text()).toContain("Waitlist-Datenbank nicht konfiguriert");
+  test("old waitlist links lead to the registration, unsubscribe keeps working", async ({ request }) => {
+    for (const path of ["/waitlist", "/waitlist/bestaetigt", "/waitlist/ungueltig"]) {
+      const response = await request.get(path, { maxRedirects: 0 });
+      expect(response.status(), path).toBe(308);
+      expect(response.headers()["location"], path).toBe("https://bloommd.app/signup");
+    }
+    const english = await request.get("/waitlist/bestaetigt?lang=en", { maxRedirects: 0 });
+    expect(english.headers()["location"]).toBe("https://bloommd.app/signup?lang=en");
 
-    const csv = await request.get("/admin/waitlist/export.csv", { headers: { authorization } });
-    expect(csv.status()).toBe(503);
-    expect(csv.headers()["x-robots-tag"]).toBe("noindex, nofollow");
+    const confirm = await request.get("/api/waitlist/confirm?token=old", { maxRedirects: 0 });
+    expect(confirm.status()).toBe(308);
+    expect(confirm.headers()["location"]).toBe("https://bloommd.app/signup");
+
+    const unsubscribePage = await request.get("/waitlist/abgemeldet", { maxRedirects: 0 });
+    expect(unsubscribePage.status()).toBe(200);
+    const unsubscribeApi = await request.get("/api/waitlist/unsubscribe?token=unknown", { maxRedirects: 0 });
+    expect(unsubscribeApi.status()).toBe(303);
+    expect(unsubscribeApi.headers()["location"]).toContain("/waitlist/abgemeldet?status=ungueltig");
   });
 
   test("keeps templates and their Markdown public without a session", async ({ request }) => {
@@ -122,19 +132,22 @@ test.describe("marketing release contracts", () => {
     expect(obsidianBody).toContain("You need no BloomMD account or invitation.");
   });
 
-  test("routes account CTAs to the product app and beta CTAs to the waitlist section", async ({ request }) => {
+  test("routes account CTAs to the product app and beta CTAs to the registration section", async ({ request }) => {
     const germanResponse = await request.get("/");
     expect(germanResponse.ok()).toBe(true);
     const germanBody = (await germanResponse.text()).replace(/\s+/g, " ");
     expect(germanBody).toContain('href="https://bloommd.app/login"');
     expect(germanBody).toContain('href="#beta"');
-    expect(germanBody).toContain("Beta-Zugang anfragen");
+    expect(germanBody).toContain("Jetzt registrieren");
+    expect(germanBody).toContain('href="https://bloommd.app/signup"');
+    expect(germanBody).not.toContain("Warteliste anmelden");
 
     const englishDemoResponse = await request.get("/demo?lang=en");
     expect(englishDemoResponse.ok()).toBe(true);
     const englishDemoBody = (await englishDemoResponse.text()).replace(/\s+/g, " ");
-    expect(englishDemoBody).toContain('href="/?lang=en#beta"');
-    expect(englishDemoBody).toContain("Join the closed beta waitlist");
+    expect(englishDemoBody).toContain('href="https://bloommd.app/signup?lang=en"');
+    expect(englishDemoBody).toContain("Register now");
+    expect(englishDemoBody).not.toContain("Join the closed beta waitlist");
   });
 
   test("serves the English landing page with correct language, metadata and beta path", async ({ request }) => {
@@ -149,7 +162,9 @@ test.describe("marketing release contracts", () => {
     expect(body).toContain('href="/demo?lang=en"');
     expect(body).toContain('href="https://bloommd.app/login?lang=en"');
     expect(body).toContain('href="/"');
-    expect(body).toContain("Double opt-in");
+    expect(body).toContain('href="https://bloommd.app/signup?lang=en"');
+    expect(body).toContain("Register now");
+    expect(body).not.toContain("Double opt-in");
     expect(body).toContain('src="/demo-branch-drag-markdown.webm"');
     expect(body).toContain('src="/demo-obsidian-note-map.webm"');
   });
@@ -241,7 +256,7 @@ test.describe("marketing release contracts", () => {
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
     const menu = page.locator("#mobile-navigation");
     await expect(menu).toBeVisible();
-    for (const label of ["Produkt", "Demo", "Templates", "LLM Wiki", "Workflow", "Desktop", "Obsidian", "Local-first", "Beta", "FAQ", "Login", "Beta-Zugang anfragen"]) {
+    for (const label of ["Produkt", "Demo", "Templates", "LLM Wiki", "Workflow", "Desktop", "Obsidian", "Local-first", "Beta", "FAQ", "Login", "Jetzt registrieren"]) {
       await expect(menu.getByText(label, { exact: true }).first()).toBeVisible();
     }
 
@@ -353,7 +368,7 @@ test.describe("marketing release contracts", () => {
   });
 });
 
-test.describe("marketing documentation and waitlist", () => {
+test.describe("marketing documentation and registration", () => {
   test("serves the beta documentation with every section", async ({ request }) => {
     const response = await request.get("/docs");
     expect(response.ok()).toBe(true);
@@ -444,10 +459,10 @@ test.describe("marketing documentation and waitlist", () => {
     }
   });
 
-  test("separates public downloads from invitation-only cloud access in both languages", async ({ request }) => {
+  test("separates public downloads from account-based cloud access in both languages", async ({ request }) => {
     for (const [path, available, gated, upcoming] of [
-      ["/download", "Jetzt verfügbar, ohne Einladung", "Einladung erforderlich", "Noch kein öffentlicher Download"],
-      ["/download?lang=en", "Available now, no invitation", "Invitation required", "No public download yet"],
+      ["/download", "Jetzt verfügbar, ohne Konto", "Konto erforderlich", "Noch kein öffentlicher Download"],
+      ["/download?lang=en", "Available now, no account", "Account required", "No public download yet"],
     ]) {
       const response = await request.get(path);
       expect(response.ok(), path).toBe(true);
@@ -473,17 +488,17 @@ test.describe("marketing documentation and waitlist", () => {
     expect(guideBody).not.toContain("Build nicht öffentlich gelistet");
   });
 
-  test("the landing page offers a waitlist without promising more than it delivers", async ({ request }) => {
+  test("the landing page offers the registration without promising more than it delivers", async ({ request }) => {
     const response = await request.get("/");
     expect(response.ok()).toBe(true);
     const body = (await response.text()).replace(/\s+/g, " ");
-    expect(body).toContain('data-testid="waitlist-form"');
+    expect(body).toContain('data-testid="signup-cta"');
+    expect(body).not.toContain('data-testid="waitlist-form"');
     expect(body).toContain('src="/demo-branch-drag-markdown.webm"');
     expect(body).toContain('src="/demo-obsidian-note-map.webm"');
-    expect(body).toContain("Bestätigung");
     expect(body).toContain("Normales Markdown · lokale Dateien · macOS und Omarchy/Linux");
     expect(body).toContain("Ich habe Markdown-Dateien");
-    expect(body).toContain("Beta-Zugang anfragen");
+    expect(body).toContain("Jetzt registrieren");
     expect(body).not.toContain("macOS · Windows · Linux");
     expect(body).toContain("BloomMD wird von");
     expect(body).toContain("Ein Produkt von");
@@ -516,28 +531,13 @@ test.describe("marketing documentation and waitlist", () => {
     await expect(page.getByRole("dialog", { name: "Analytics-Einwilligung" })).toHaveCount(0);
   });
 
-  test("the signup answers the same way regardless of whether the address is known", async ({ request }) => {
-    test.skip(!process.env.BLOOMMD_WAITLIST_DATABASE_URL, "requires the configured waitlist database");
-    const origin = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3211";
-    const send = () =>
-      request.post("/api/waitlist", {
-        form: { email: "waitlist-e2e@example.test", source: "e2e" },
-        headers: { origin },
-      });
-
-    const first = await send();
-    const second = await send();
-    expect(first.status()).toBe(second.status());
-    expect(await first.text()).toBe(await second.text());
-  });
-
-  test("a malformed address is rejected with a fixable message", async ({ request }) => {
+  test("the waitlist signup endpoint is closed and writes nothing", async ({ request }) => {
     const response = await request.post("/api/waitlist", {
-      form: { email: "not-an-address", source: "e2e", website: "", formStartedAt: String(Date.now() - 1_000) },
+      form: { email: "waitlist-e2e@example.test", source: "e2e" },
       headers: { origin: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3211" },
     });
-    expect(response.status()).toBe(400);
-    expect((await response.json()).error).toContain("E-Mail");
+    expect(response.status()).toBe(410);
+    expect((await response.json()).signup).toContain("/signup");
   });
 
   test("serves legal pages and documents the cookieless analytics setup", async ({ request }) => {

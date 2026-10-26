@@ -130,7 +130,7 @@ The navigator is a side view that shows your vault as a **folder tree** and the 
 - **Tree**: folders, open and close them. Selecting a folder shows its notes in the list below.
 - **List**: the notes of the selected folder. Click or `Enter` opens a note in Obsidian.
 - **Active note**: the navigator follows the note you are editing. `Cmd/Ctrl+Shift+R` (command **Show active file in navigator**) opens the folders on the way, scrolls to the note, selects it and focuses the list.
-- **Map**: **Map of the selected note** and **Map of the selected folder** in the header (or `M`) open the existing BloomMD map. The header shows two lines so you can tell them apart: *Browsing* (folder and note you are looking at) and *Map* (what the map shows).
+- **Map**: **Map of the selected note** and **Map of the selected folder** in the header (or `M`) open the existing BloomMD map. The vault root itself is not mapped, because that would put the whole vault on one canvas; select a folder. The header shows two lines so you can tell them apart: *Browsing* (folder and note you are looking at) and *Map* (what the map shows).
 - **History**: the arrow buttons, `Cmd/Ctrl+[` and `Cmd/Ctrl+]` go back and forward through the folders and notes you visited.
 - **Help**: the **?** button in the header shows the shortcuts below.
 

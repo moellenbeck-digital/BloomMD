@@ -1211,6 +1211,19 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
   }
 
   // NavigatorHost
+  /** Opens a note from the navigator like Obsidian's file explorer: in the open note's tab, never over the map. */
+  async openNote(file: TFile) {
+    const workspace = this.app.workspace;
+    const open = workspace.getLeavesOfType("markdown").find((leaf) => leaf.view instanceof MarkdownView && leaf.view.file?.path === file.path);
+    if (open) {
+      await workspace.revealLeaf(open);
+      return;
+    }
+    const recent = workspace.getMostRecentLeaf(workspace.rootSplit);
+    const reusable = recent?.view instanceof MarkdownView && !recent.getViewState().pinned ? recent : null;
+    await (reusable ?? workspace.getLeaf("tab")).openFile(file);
+  }
+
   async openMapFor(target: TFile | TFolder) {
     // A new map opens beside the notes, never inside the sidebar the navigator lives in.
     if (!this.app.workspace.getLeavesOfType(VIEW_TYPE_BLOOMMD)[0]) {

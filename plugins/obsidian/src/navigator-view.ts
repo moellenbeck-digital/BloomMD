@@ -32,13 +32,13 @@ import {
   type NavigatorState,
 } from "./navigator-focus";
 import { NAVIGATOR_FOCUS_AREAS, NAVIGATOR_SHORTCUTS } from "./navigator-help";
-import { ROOT_PATH, buildFolderNode, findFolder, scrollToReveal, shortenMiddle, visibleRows, visibleWindow, type FileNode, type FolderNode, type TreeRow } from "./navigator-model";
+import { ROOT_PATH, buildFolderNode, scrollToReveal, shortenMiddle, visibleRows, visibleWindow, type FileNode, type FolderNode, type TreeRow } from "./navigator-model";
 
 export const VIEW_TYPE_NAVIGATOR = "bloommd-navigator-view";
 
 /** What the navigator needs from the plugin: opening notes and maps, and knowing which map is open. */
 export interface NavigatorHost {
-  openMarkdownFile(file: TFile): Promise<void>;
+  openNote(file: TFile): Promise<void>;
   openMapFor(target: TFile | TFolder): Promise<void>;
   /** The note or folder the BloomMD map shows right now, or null while no map is open. */
   mapTarget(): { kind: "file" | "folder"; path: string } | null;
@@ -299,6 +299,7 @@ export class NavigatorView extends ItemView {
     this.backButton.disabled = !canGoBack(this.state);
     this.forwardButton.disabled = !canGoForward(this.state);
     this.noteMapButton.disabled = this.state.file === null;
+    this.folderMapButton.disabled = this.state.folder === ROOT_PATH;
   }
 
   /** Renders the rows in view of one pane; with `reveal` the selected row is scrolled into view first. */
@@ -420,14 +421,18 @@ export class NavigatorView extends ItemView {
       new Notice("BloomMD: This note no longer exists.");
       return;
     }
-    await this.host.openMarkdownFile(file);
+    await this.host.openNote(file);
     if (!keepFocus) return;
     this.app.workspace.setActiveLeaf(this.leaf, { focus: true });
     this.focusPane(this.state.focus);
   }
 
   private async openMap(kind: "file" | "folder", path: string) {
-    const target = kind === "file" ? this.app.vault.getAbstractFileByPath(path) : findFolder(this.root, path) && (path === ROOT_PATH ? this.app.vault.getRoot() : this.app.vault.getAbstractFileByPath(path));
+    if (kind === "folder" && path === ROOT_PATH) {
+      new Notice("BloomMD: Select a folder to map. The whole vault is not mapped at once.");
+      return;
+    }
+    const target = this.app.vault.getAbstractFileByPath(path);
     if (!(target instanceof TFile) && !(target instanceof TFolder)) {
       new Notice("BloomMD: Select a note or folder first.");
       return;

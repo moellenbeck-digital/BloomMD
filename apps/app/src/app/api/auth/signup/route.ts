@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       verificationFailed = !delivery.sent;
     }
     // The account exists, but nobody can confirm it without the mail. Say so instead of
-    // announcing a mail that was never sent; the login page offers "resend".
+    // announcing a mail that was never sent; submitting the signup form again resends it.
     if (verificationFailed) throw new Error(VERIFICATION_NOT_SENT_ERROR);
     const loginParams = new URLSearchParams({ next, verification: "sent", lang });
     if (invite) loginParams.set("invite", invite);

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, History, LoaderCircle, Plus, Save, ShieldCheck, Trash2, Undo2, X } from "lucide-react";
+import { provenanceParts } from "./agent-provenance";
 import {
   AGENT_ACCESS_LEVELS,
   accessLabel,
@@ -51,6 +52,9 @@ interface TokenChange {
   filename: string | null;
   area: string;
   summary: string | null;
+  tool: string | null;
+  reason: string | null;
+  source: string | null;
   reviewerName: string | null;
   undoable: boolean;
   createdAt: string;
@@ -87,6 +91,8 @@ const copy = {
     undoConfirm: "Diese Änderung zurücknehmen? Das geht nur, wenn die Map seitdem niemand bearbeitet hat.",
     undone: "Zurückgenommen.",
     by: "von",
+    source: "Quelle",
+    via: "über",
     duplicate: "Ein Bereich ist doppelt eingetragen: ",
     tooLong: "Ein Bereichsname ist zu lang.",
     loading: "Lädt…",
@@ -122,6 +128,8 @@ const copy = {
     undoConfirm: "Undo this change? This only works if nobody edited the map since.",
     undone: "Undone.",
     by: "by",
+    source: "Source",
+    via: "via",
     duplicate: "An area is listed twice: ",
     tooLong: "An area name is too long.",
     loading: "Loading…",
@@ -280,6 +288,7 @@ export function AgentTokenAccess({ workspaceId, locale, refreshTick, onApplied }
                   </div>
                   <p className="mt-2">{proposal.summary}</p>
                   {proposal.reason && <p className="mt-1 text-[var(--color-ink-muted)]">„{proposal.reason}“</p>}
+                  {(proposal.source || proposal.tool) && <p className="mt-1 text-[var(--color-ink-faint)]">{provenanceParts({ source: proposal.source, tool: proposal.tool }, text).join(" · ")}</p>}
                   {proposal.changes.length > 0 && (
                     <ul className="mt-2 font-mono text-[11px] leading-5">
                       {proposal.changes.map((change) => (
@@ -359,6 +368,7 @@ export function AgentTokenAccess({ workspaceId, locale, refreshTick, onApplied }
                     {change.filename ? ` · ${change.filename}` : ""} · {when(change.createdAt)}
                     {change.reviewerName ? ` · ${text.by} ${change.reviewerName}` : ""}
                     {change.summary ? <span className="text-[var(--color-ink-faint)]"> — {change.summary}</span> : null}
+                    {provenanceParts(change, text).length > 0 && <span className="block text-[var(--color-ink-faint)]" data-testid="agent-token-log-source">{provenanceParts(change, text).join(" · ")}</span>}
                   </span>
                   {change.undoable && (
                     <button type="button" disabled={busy !== null} onClick={() => void undo(change)} className="rounded border border-[var(--color-border)] px-2 py-0.5 disabled:opacity-50"><Undo2 size={12} className="mr-1 inline" />{text.undo}</button>

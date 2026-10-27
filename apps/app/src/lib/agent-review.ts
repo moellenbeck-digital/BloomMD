@@ -65,6 +65,8 @@ export async function agentOwnerContext(request: Request, workspaceParam: string
   }
   const requested = workspaceParam === "personal" ? null : workspaceParam;
   const workspace = await getWorkspaceForUser(userId, workspaceForIdentity(identity, requested));
+  // Rights, proposals, the log and the undo of any change belong to the workspace owner, not to every member.
+  if (workspace.role !== "owner") throw new AgentReviewError(403, "OWNER_REQUIRED", "Only workspace owners can manage agent rights and proposals.");
   return { identity, userId, workspace, reviewerName: identity.name?.trim() || identity.email || "Owner" };
 }
 

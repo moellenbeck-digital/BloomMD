@@ -255,4 +255,20 @@ describe("mindmap save route", () => {
     expect((await send("DELETE")).status).toBe(200);
     expect(changes.map((change) => change.event)).toEqual(["renamed", "deleted"]);
   });
+
+  test("a rename and a delete name the agent and, when it says so, the source in the log", async () => {
+    agent = true;
+    storedName = "Arbeit – Plan.md";
+    rights = { access: "write", areas: {} };
+    expect((await send("PATCH", { newFilename: "Arbeit – Neu.md", agentMeta: { source: "Teams-Transkript", reason: "Umbenannt" } })).status).toBe(200);
+    expect((await send("DELETE", { agentMeta: { source: "Aufräumen", reason: "Doppelt", tool: "cleanup" } })).status).toBe(200);
+    // Without a body the log still names the agent and the route as the tool.
+    expect((await send("DELETE")).status).toBe(200);
+    expect(changes).toMatchObject([
+      { tokenId: "tok-1", agentName: "OpenClaw", event: "renamed", tool: "api:rename", source: "Teams-Transkript", reason: "Umbenannt" },
+      { tokenId: "tok-1", agentName: "OpenClaw", event: "deleted", tool: "cleanup", source: "Aufräumen", reason: "Doppelt" },
+      { tokenId: "tok-1", agentName: "OpenClaw", event: "deleted", tool: "api:delete" },
+    ]);
+    expect(changes[2]?.source).toBeUndefined();
+  });
 });

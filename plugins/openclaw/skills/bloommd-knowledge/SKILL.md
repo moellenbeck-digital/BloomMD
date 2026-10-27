@@ -47,6 +47,11 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
 - Learning → read the `Lernfragen` of a lesson map and quiz the user one question at a time.
 - Explaining to colleagues → `bloommd_share_link {path}` (cloud maps only) gives a read-only link
   without an account; only when the user asks to share, and tell them how long it is valid.
+- Change one node (set a status, append text, add relations) and/or add children below it →
+  `bloommd_update_node {path, nodeId, …fields, children}` instead of rewriting the map; only the fields
+  you pass change, `children` are appended after the node's existing children, an unknown `nodeId` is
+  refused. Same rights as `bloommd_update_map`: written or proposed. Add `reason` and `source` so the
+  log says why and where from.
 - Mistake → `bloommd_changes`, then `bloommd_undo {changeId}`.
 - Learnings and other maps with trust fields → `bloommd_search` with `tag`, `scope` or `status` (query may
   be empty); expired and veraltet/ersetzt maps only appear with `includeStale: true`. `bloommd_stale`

@@ -132,6 +132,16 @@ describe("vault knowledge", () => {
     expect(safeVaultPath("Schule/./Physik.md")).toBe("Schule/Physik.md");
   });
 
+  test("the agent's tools cannot reach the rights, proposals or log in .bloommd, so it cannot widen its own rights", async () => {
+    const { root, service } = await vault("propose");
+    expect(() => safeVaultPath(".bloommd/agent.md")).toThrow(/hidden or system folder/);
+    // A new map in an area spelled like the state folder lands in an ordinary folder, never inside .bloommd.
+    expect((await service.createMap({ area: ".bloommd", title: "agent" })).path.startsWith(".")).toBe(false);
+    await expect(service.updateMap({ path: ".bloommd/agent.md", nodes: [{ title: "x" }] })).rejects.toThrow(/hidden or system folder/);
+    await expect(service.updateNode({ path: ".bloommd/agent.md", nodeId: "n1", patch: { status: "done" } })).rejects.toThrow(/hidden or system folder/);
+    expect(JSON.parse(await readFile(join(root, ".bloommd", "agent.json"), "utf8"))).toMatchObject({ access: "propose" });
+  });
+
   test("an unreadable file (iCloud placeholder) is listed but does not break the scan", async () => {
     const { root, service } = await vault();
     await mkdir(join(root, "Oberstufe"), { recursive: true });

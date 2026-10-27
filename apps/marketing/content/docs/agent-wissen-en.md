@@ -67,6 +67,45 @@ Templates: **meeting**, **conversation**, **discussion**, **lesson**, **project*
 maps can be presented in BloomMD, quizzed in study mode and exported as PNG/PDF – easy to explain
 and share.
 
+## Change a single node
+
+To change one node partially – set a status, append text, draw a connection, add new sub-items – use
+`bloommd_update_node`. Only the fields you name change; the rest of the node and the map stays, and
+the map is never replaced. The change also works while someone is editing the map. Rights, proposal
+or direct write and the log are the same as for `bloommd_update_map`, in a vault as in a cloud
+workspace:
+
+```bash
+bloommd-wiki agent update-node --cloud https://… --workspace <id> "Arbeit – Plan.md" <node-id> \
+  --patch '{"status":"done","children":[{"title":"Follow-up","status":"open"}]}' \
+  --reason "Task done" --source "Teams transcript 27 Oct"
+```
+
+Use a vault folder instead of `--cloud`; `--patch -` reads the JSON from stdin. With an agent token the
+token's rights apply; with your owner token the command writes as you.
+
+Fields: `title`, `content` (appended; `contentMode: "replace"` replaces), `kind`, `status`,
+`decision`, `due`, `assignee`, `note`, `citation`, `url`, `relations` and `children`. New
+`children` go to the end of the node (same fields as the `nodes` of `bloommd_update_map`; with `ref`
+and `parent` they can form sub-trees). Metadata can be set, not cleared.
+
+Through the server API (agent token, session or personal token):
+
+```http
+PATCH /api/mindmaps/<file>/nodes/<node-id>
+{ "status": "done", "children": [{ "title": "Follow-up" }], "agentMeta": { "source": "Teams transcript 27 Oct", "reason": "Task done" } }
+```
+
+| Response | Meaning |
+| --- | --- |
+| 200 `{ ids, created, updated, version, mode, changeId }` | written directly; `mode` and `changeId` (for undo) for agent tokens |
+| 202 `{ mode: "proposed", proposalId }` | the agent may only propose in this area; the proposal carries the map's base version |
+| 403 `AGENT_READ_ONLY` | the agent may only read in this area |
+| 404 `NODE_NOT_FOUND` | the node id is not in the map |
+| 400 `INVALID_NODES` | invalid or unknown fields, invalid date, `children` with an `id` |
+
+`POST /api/mindmaps/<file>/nodes` stays for several nodes at once (create and update by id).
+
 ## Share with colleagues
 
 For maps in a cloud workspace, **Read-only links** (chain icon in the toolbar) opens the overview:
@@ -180,7 +219,12 @@ As workspace owner open **Manage agents** (workspace menu) in the cloud workspac
   the agent may only propose.
 - The **change log** with **Undo**.
 
-Rights apply immediately. A revoked token is refused on its next call. What the server checks:
+Rights apply immediately. An expired or revoked token is refused with 401 on every route on its next
+call (only a live editing session that is already open keeps the right it was given when it opened,
+until it is closed). A token with scope `read` writes nowhere, not even proposals. Rights, proposals, the
+log and undo are tools of the workspace owner; an agent token cannot reach them and cannot approve itself.
+For every change the log names the agent, the tool and – when the agent gives them – source and reason;
+the interface shows them. What the server checks:
 `read` refuses every change with a message naming the area; `propose` only stores a proposal;
 `write` writes directly and logs. Renaming, deleting, read-only links and live editing need `write`
 in the area as well.

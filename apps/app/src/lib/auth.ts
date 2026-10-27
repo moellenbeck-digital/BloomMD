@@ -173,7 +173,8 @@ export async function revokeCurrentSession() {
 export async function getApiRequestIdentity(request: Request): Promise<ApiRequestIdentity | null> {
   const authorization = request.headers.get("Authorization");
   if (authorization?.startsWith("Bearer ")) {
-    const resolved = await resolveAccessToken(authorization.slice(7).trim());
+    const bearer = authorization.slice(7).trim();
+    const resolved = await resolveAccessToken(bearer);
     if (resolved) {
       // A valid but limited token never falls back to the browser session.
       if (!accessTokenAllows(request, resolved)) return null;
@@ -191,6 +192,9 @@ export async function getApiRequestIdentity(request: Request): Promise<ApiReques
         tokenExpiresAt: resolved.expiresAt,
       };
     }
+    // An access token that is expired, revoked or unknown is refused on every route. It never falls
+    // back to a browser session, the instance key or (where allowed) anonymous access.
+    if (bearer.startsWith("bloom_pat_")) return null;
   }
 
   const session = await getSession();

@@ -67,6 +67,45 @@ Vorlagen: **Besprechung**, **Gespräch**, **Diskussion**, **Lerneinheit**, **Pro
 **Wochenrückblick**. Die Maps lassen sich in BloomMD präsentieren, im Lernmodus abfragen und als
 PNG/PDF exportieren – so lassen sie sich gut erklären und teilen.
 
+## Einen Knoten gezielt ändern
+
+Für die Teiländerung eines einzelnen Knotens – Status setzen, Text ergänzen, Verknüpfung ziehen, neue
+Unterpunkte anhängen – gibt es `bloommd_update_node`. Nur die genannten Felder ändern sich, der Rest
+des Knotens und der Map bleibt; die Map wird nie ersetzt. Die Änderung wirkt auch, während jemand die
+Map gerade bearbeitet. Rechte, Vorschlag oder direktes Schreiben und das Protokoll sind dieselben wie
+bei `bloommd_update_map`, im Vault wie im Cloud-Workspace:
+
+```bash
+bloommd-wiki agent update-node --cloud https://… --workspace <id> "Arbeit – Plan.md" <knoten-id> \
+  --patch '{"status":"done","children":[{"title":"Folgeaufgabe","status":"open"}]}' \
+  --reason "Aufgabe erledigt" --source "Teams-Transkript 27.10."
+```
+
+Statt `--cloud` geht ein Vault-Ordner; `--patch -` liest das JSON von stdin. Mit einem Agent-Token gelten
+dessen Rechte, mit deinem Besitzer-Token schreibt der Befehl wie du.
+
+Felder: `title`, `content` (wird angehängt, `contentMode: "replace"` ersetzt), `kind`, `status`,
+`decision`, `due`, `assignee`, `note`, `citation`, `url`, `relations` und `children`. Neue
+`children` stehen am Ende des Knotens (Felder wie bei den `nodes` von `bloommd_update_map`; mit `ref`
+und `parent` entstehen auch Unterbäume). Metadaten lassen sich setzen, nicht leeren.
+
+Über die Server-Schnittstelle (Agent-Token, Sitzung oder persönliches Token):
+
+```http
+PATCH /api/mindmaps/<datei>/nodes/<knoten-id>
+{ "status": "done", "children": [{ "title": "Folgeaufgabe" }], "agentMeta": { "source": "Teams-Transkript 27.10.", "reason": "Aufgabe erledigt" } }
+```
+
+| Antwort | Bedeutung |
+| --- | --- |
+| 200 `{ ids, created, updated, version, mode, changeId }` | direkt geschrieben; `mode` und `changeId` (für Rückgängig) bei Agent-Tokens |
+| 202 `{ mode: "proposed", proposalId }` | der Agent darf im Bereich nur vorschlagen; der Vorschlag trägt die Basisversion der Map |
+| 403 `AGENT_READ_ONLY` | der Agent darf im Bereich nur lesen |
+| 404 `NODE_NOT_FOUND` | die Knoten-ID gibt es in der Map nicht |
+| 400 `INVALID_NODES` | ungültige oder unbekannte Felder, ungültiges Datum, `children` mit `id` |
+
+`POST /api/mindmaps/<datei>/nodes` bleibt für mehrere Knoten auf einmal (anlegen und ändern per ID).
+
 ## Mit Kolleg:innen teilen
 
 Für Maps im Cloud-Workspace öffnet **Lese-Links** (Ketten-Symbol in der Werkzeugleiste) die Übersicht:
@@ -187,7 +226,12 @@ findest dort **Agent-Zugriff**:
   Ohne Eintrag darf der Agent nur vorschlagen.
 - **Protokoll** der Änderungen mit **Rückgängig**.
 
-Die Rechte gelten sofort. Ein widerrufenes Token wird beim nächsten Aufruf abgelehnt. Was der Server
+Die Rechte gelten sofort. Ein abgelaufenes oder widerrufenes Token wird auf jedem Weg beim nächsten Aufruf
+mit 401 abgelehnt (nur eine Live-Bearbeitung, die schon offen ist, behält das beim Öffnen vergebene Recht,
+bis sie geschlossen wird). Ein Token mit Scope `read` schreibt nirgends, auch keine Vorschläge. Rechte,
+Vorschläge, Protokoll und Rückgängig sind Werkzeuge des Workspace-Besitzers; ein Agent-Token erreicht sie nicht
+und kann sich nicht selbst freigeben. Das Protokoll nennt zu jeder Änderung den Agenten, das Werkzeug und – wenn
+der Agent sie nennt – Quelle und Grund; die Oberfläche zeigt sie an. Was der Server
 im Einzelnen prüft: `read` lehnt jede Änderung mit einer Meldung ab, die den Bereich nennt; `propose`
 legt nur einen Vorschlag an; `write` schreibt direkt und protokolliert. Auch Umbenennen, Löschen,
 Lese-Links und die Live-Bearbeitung brauchen `write` im Bereich.

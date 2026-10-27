@@ -21,6 +21,38 @@ describe("agent access tokens", () => {
     expect(accessTokenAllows(request("POST", "/api/sync-ticket"), read)).toBe(false);
   });
 
+  test("a read-only token writes nowhere: no map, node, rename, delete, share link, undo or proposal", () => {
+    // The scope decides before any right of the agent does, so not even a proposal can be stored.
+    for (const agentName of [null, "OpenClaw"]) {
+      const read = { scope: "read" as const, workspaceIds: null, agentName };
+      expect(accessTokenAllows(request("GET", "/api/mindmaps/a.md/nodes/n1"), read)).toBe(true);
+      for (const [method, path] of [
+        ["PUT", "/api/mindmaps/a.md"],
+        ["PATCH", "/api/mindmaps/a.md"],
+        ["DELETE", "/api/mindmaps/a.md"],
+        ["POST", "/api/mindmaps"],
+        ["POST", "/api/mindmaps/a.md/nodes"],
+        ["PATCH", "/api/mindmaps/a.md/nodes/n1"],
+        ["POST", "/api/mindmaps/a.md/share-links"],
+        ["DELETE", "/api/mindmaps/a.md/share-links"],
+        ["POST", "/api/mindmaps/agent-access/undo"],
+        ["POST", "/api/sync-ticket"],
+      ] as const) {
+        expect(accessTokenAllows(request(method, path), read)).toBe(false);
+      }
+    }
+  });
+
+  test("a write token of an agent reaches the node routes and nothing outside the documents", () => {
+    const agent = { scope: "write" as const, workspaceIds: null, agentName: "OpenClaw" };
+    expect(accessTokenAllows(request("POST", "/api/mindmaps/a.md/nodes"), agent)).toBe(true);
+    expect(accessTokenAllows(request("PATCH", "/api/mindmaps/a.md/nodes/n1"), agent)).toBe(true);
+    expect(accessTokenAllows(request("PATCH", "/api/workspaces/x/agent-rights"), agent)).toBe(false);
+    expect(accessTokenAllows(request("GET", "/api/workspaces/x/agent-log"), agent)).toBe(false);
+    expect(accessTokenAllows(request("GET", "/api/workspaces/x/agent-token-proposals"), agent)).toBe(false);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/agent-proposals/p1"), agent)).toBe(false);
+  });
+
   test("a workspace-bound token reaches documents and sync, nothing else", () => {
     const bound = { scope: "write" as const, workspaceIds: ["0b5e8f3e-8a0c-4c55-9a43-6f4a3f9a0b11"] };
     expect(accessTokenAllows(request("PUT", "/api/mindmaps/a.md"), bound)).toBe(true);

@@ -10,6 +10,7 @@ OKF/LLM Wiki bundles. It does not need a BloomMD server, an LLM, or an OpenClaw 
 bloommd-wiki init ./wiki "My Knowledge Wiki"
 bloommd-wiki status ./wiki
 bloommd-wiki lint ./wiki
+bloommd-wiki export ./wiki ./wiki-export --overwrite   # static, offline-readable copy
 bloommd-wiki propose ./wiki ./changes.json ./proposal.json
 bloommd-wiki approve ./proposal.json "reviewer"
 bloommd-wiki apply ./wiki ./proposal.json
@@ -23,7 +24,7 @@ bloommd-wiki workspace backlinks "Note.md" ./docs
 ```
 
 The binary writes only where the command explicitly requests it: `init`, `index`, `log`,
-`approve`, and `apply`. `apply` needs a named approval and verifies source hashes before writing.
+`approve`, `apply`, and `export` (only into the target folder; a non-empty one needs `--overwrite` and must be an earlier export). `apply` needs a named approval and verifies source hashes before writing.
 
 ## Library API
 

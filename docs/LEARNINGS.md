@@ -117,8 +117,9 @@ und Undo.
   die Map sie hat.
 - **Abgelaufenes:** Die Suche liefert Maps mit überschrittenem `stale_after` und Status `veraltet` oder `ersetzt`
   nur mit `includeStale: true`; ein `status`-Filter hat Vorrang. `bloommd_stale` (nur lesend) listet Maps mit
-  `stale_after` bis heute, mit `days` auch die der nächsten n Tage; `bloommd-wiki agent stale <ziel> [--days <n>]`
-  gibt dasselbe als kurze Liste aus (leer: `NO_REPLY`), z. B. für eine tägliche Routine.
+  `stale_after` bis heute, mit `days` auch die der nächsten n Tage (ohne Treffer ist der Text genau `NO_REPLY`,
+  `structuredContent` bleibt `{stale: []}`); `bloommd-wiki agent stale <ziel> [--days <n>]` gibt dasselbe als
+  kurze Liste aus (leer: `NO_REPLY`), z. B. für eine tägliche Routine.
 
 ## Anlegen
 

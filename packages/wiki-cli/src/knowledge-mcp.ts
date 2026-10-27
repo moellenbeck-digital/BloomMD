@@ -3,7 +3,7 @@
  * BloomMD maps and act on them. There is deliberately no tool to approve proposals.
  */
 import { KNOWLEDGE_NODE_PATCH_FIELDS, KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
-import type { McpServerOptions, McpTool } from "./mcp";
+import { McpTextResult, type McpServerOptions, type McpTool } from "./mcp";
 import type { KnowledgeService } from "./knowledge-service";
 
 export type KnowledgeTargets = Partial<Record<"vault" | "cloud", KnowledgeService>>;
@@ -93,7 +93,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_stale",
     title: "Abgelaufene Maps",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt.",
+    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Nothing to check: the text is exactly NO_REPLY. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -283,12 +283,16 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           scope: string(args, "scope"),
           includeStale: args.includeStale === true,
         });
-        case "bloommd_stale": return service.stale({
-          area: string(args, "area"),
-          tag: string(args, "tag"),
-          scope: string(args, "scope"),
-          days: typeof args.days === "number" && Number.isInteger(args.days) && args.days >= 0 ? args.days : undefined,
-        });
+        case "bloommd_stale": {
+          const result = await service.stale({
+            area: string(args, "area"),
+            tag: string(args, "tag"),
+            scope: string(args, "scope"),
+            days: typeof args.days === "number" && Number.isInteger(args.days) && args.days >= 0 ? args.days : undefined,
+          });
+          // Like `agent stale`: nothing to check reads as exactly NO_REPLY, so a routine stays silent.
+          return result.stale.length === 0 ? new McpTextResult("NO_REPLY", result) : result;
+        }
         case "bloommd_get_map": return service.getMap(string(args, "path", true)!);
         case "bloommd_templates": return service.templates(string(args, "id"));
         case "bloommd_create_map": return service.createMap({

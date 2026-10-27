@@ -23,6 +23,11 @@ export interface McpServerOptions {
   call(name: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
+/** A tool result whose text for the model differs from its structured value (e.g. `NO_REPLY` for an empty list). */
+export class McpTextResult {
+  constructor(readonly text: string, readonly value: unknown) {}
+}
+
 type JsonRpcRequest = { jsonrpc: "2.0"; id?: number | string; method: string; params?: Record<string, unknown> };
 type Framing = "line" | "content-length";
 type Writer = (text: string) => void;
@@ -66,7 +71,8 @@ export async function handleMcpMessage(options: McpServerOptions, message: JsonR
       const args = params.arguments ?? {};
       if (!args || typeof args !== "object" || Array.isArray(args)) throw new Error("Tool arguments must be an object.");
       const value = await options.call(name, args as Record<string, unknown>);
-      reply({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: value } });
+      const text = value instanceof McpTextResult ? value.text : JSON.stringify(value, null, 2);
+      reply({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }], structuredContent: value instanceof McpTextResult ? value.value : value } });
     } catch (error) {
       reply({ jsonrpc: "2.0", id: message.id, result: { isError: true, content: [{ type: "text", text: error instanceof Error ? error.message : "Tool failed." }] } });
     }

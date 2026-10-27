@@ -29,6 +29,7 @@ import {
   type WikiSourceHashes,
 } from "@bloommd/core/wiki";
 import { WIKI_AGENT_TOOLS, callWikiAgentTool } from "@bloommd/core/wiki-agent";
+import { exportWikiBundle } from "@bloommd/core/wiki-export";
 import { readWorkspace } from "./workspace";
 import { formatFindings, formatGithub, formatJson, plural } from "./report";
 import { forwardToRunningDesktop } from "./desktop-handoff";
@@ -41,6 +42,8 @@ export const WIKI_USAGE = `bloommd-wiki ${WIKI_VERSION} — lokaler Markdown- un
 Befehle:
   init <pfad> [titel]                         Wiki-Bundle anlegen
   index <pfad>                                Wiki-Index aktualisieren
+  export <pfad> <zielordner> [--overwrite]    Statischer Export (index.html + wiki.json, offline lesbar);
+                                              --overwrite ersetzt einen früheren Export im Zielordner
   status <pfad> [source-hashes.json]          Wiki-Status und Vertrauensstufen prüfen
   lint <pfad> [source-hashes.json]            Wiki-Bundle prüfen
   log <pfad> <nachricht> [autor]              Wiki-Log ergänzen
@@ -80,6 +83,7 @@ interface Options {
   orphans: boolean;
   strict: boolean;
   quiet: boolean;
+  overwrite?: boolean;
   folder?: string;
 }
 
@@ -302,6 +306,7 @@ function wikiOptions(args: string[]): { positional: string[]; options: Options }
     }
     if (argument === "--strict") { options.strict = true; continue; }
     if (argument === "--quiet") { options.quiet = true; continue; }
+    if (argument === "--overwrite") { options.overwrite = true; continue; }
     if (argument.startsWith("-")) throw new WikiUsageError(`Unbekannte Option: ${argument}`);
     positional.push(argument);
   }
@@ -325,6 +330,14 @@ export async function runWikiCommand(args: string[]): Promise<number> {
     const root = requiredArgument(positional, 1, "Bundle-Ordner");
     await regenerateWikiIndex(root);
     console.log(JSON.stringify({ ok: true, command: "wiki index", root }, null, 2));
+    return 0;
+  }
+
+  if (command === "export") {
+    const root = requiredArgument(positional, 1, "Bundle-Ordner");
+    const outDir = requiredArgument(positional, 2, "Zielordner");
+    const result = await exportWikiBundle(root, outDir, { overwrite: options.overwrite === true });
+    console.log(JSON.stringify({ ok: true, command: "wiki export", root, outDir: result.outDir, pageCount: result.pageCount, resourceCount: result.resourceCount, unavailableCount: result.unavailableCount }, null, 2));
     return 0;
   }
 
@@ -445,7 +458,7 @@ export async function runWikiCli(argv: string[]): Promise<number> {
       throw error;
     }
   }
-  const wikiCommands = new Set(["init", "index", "status", "lint", "log", "propose", "approve", "apply", "mcp"]);
+  const wikiCommands = new Set(["init", "index", "export", "status", "lint", "log", "propose", "approve", "apply", "mcp"]);
   if (wikiCommands.has(commandArgs[0] ?? "")) return runWikiCommand(commandArgs);
   if (commandArgs[0] !== "workspace") {
     throw new WikiUsageError(`Unbekannter Befehl: ${commandArgs[0] ?? "(keiner)"}. Nutze Wiki-Befehle direkt oder \`bloommd-wiki workspace <befehl> <pfad>\`.`);

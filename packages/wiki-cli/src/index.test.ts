@@ -291,6 +291,37 @@ describe("wiki commands", () => {
       await rm(wiki, { recursive: true, force: true });
     }
   });
+
+  test("exports a vault with agent state as an offline static wiki and replaces it only on request", async () => {
+    const vault = await mkdtemp(join(tmpdir(), "bloommd-wiki-export-"));
+    const out = join(vault, "..", `${vault.split("/").pop()}-export`);
+    try {
+      await mkdir(join(vault, "Learnings", "coder"), { recursive: true });
+      await mkdir(join(vault, ".bloommd"), { recursive: true });
+      await writeFile(join(vault, ".bloommd", "agent.json"), JSON.stringify({ access: "read", areas: {} }));
+      await writeFile(join(vault, "Learnings", "coder", "pipefail.md"), "---\ntitle: Pipefail nutzen\nscope: coder\n---\n# Pipefail nutzen\n\n## Befund\n\nOhne pipefail ist tail immer grün.\n");
+
+      const first = await run(["export", vault, out]);
+      expect(first.code).toBe(0);
+      expect(JSON.parse(first.stdout)).toMatchObject({ ok: true, command: "wiki export", pageCount: 1 });
+      const data = JSON.parse(await readFile(join(out, "wiki.json"), "utf8"));
+      expect(JSON.stringify(data)).toContain("Ohne pipefail ist tail immer grün.");
+      expect(await readFile(join(out, "index.html"), "utf8")).toContain("<html");
+      expect(await readFile(join(out, "Learnings", "coder", "pipefail.md"), "utf8")).toContain("Pipefail nutzen");
+      // Agent state never ships.
+      expect(JSON.stringify(data)).not.toContain("agent.json");
+
+      // A second run replaces the earlier export only with --overwrite.
+      expect((await run(["export", vault, out])).code).not.toBe(0);
+      expect((await run(["export", vault, out, "--overwrite"])).code).toBe(0);
+      // The target may not sit inside the vault.
+      expect((await run(["export", vault, join(vault, "export")])).code).not.toBe(0);
+      expect((await run(["export", vault])).code).toBe(2);
+    } finally {
+      await rm(vault, { recursive: true, force: true });
+      await rm(out, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("report rendering", () => {

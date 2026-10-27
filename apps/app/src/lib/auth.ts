@@ -38,17 +38,22 @@ export interface ApiRequestIdentity {
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+/** Rights, proposals and change log of agent tokens: tools of the workspace owner, never of an agent. */
+const AGENT_OWNER_PATH = /^\/api\/workspaces\/[^/]+\/(agent-rights|agent-token-proposals|agent-log)(\/|$)/;
+
 /**
- * Whether a token's limits allow this request. Limited tokens (read-only or bound to workspaces)
- * exist for agents and only reach the document API; everything else (account, members, billing)
- * needs a full token or a session.
+ * Whether a token's limits allow this request. Limited tokens (read-only, bound to workspaces or
+ * named for an agent) exist for agents and only reach the document API; everything else (account,
+ * members, billing) needs a full token or a session. A person's limited token may also use the
+ * owner tools for agent rights; an agent token never may, so it cannot widen its own rights.
  */
-export function accessTokenAllows(request: Request, token: { scope: "read" | "write"; workspaceIds: string[] | null }): boolean {
+export function accessTokenAllows(request: Request, token: { scope: "read" | "write"; workspaceIds: string[] | null; agentName?: string | null }): boolean {
   if (token.scope === "read" && !READ_METHODS.has(request.method.toUpperCase())) return false;
-  const limited = token.scope === "read" || Boolean(token.workspaceIds?.length);
+  const limited = token.scope === "read" || Boolean(token.workspaceIds?.length) || Boolean(token.agentName);
   if (!limited) return true;
   try {
     const path = new URL(request.url).pathname;
+    if (!token.agentName && AGENT_OWNER_PATH.test(path)) return true;
     return path === "/api/mindmaps" || path.startsWith("/api/mindmaps/") || (token.scope === "write" && path === "/api/sync-ticket");
   } catch {
     return false;

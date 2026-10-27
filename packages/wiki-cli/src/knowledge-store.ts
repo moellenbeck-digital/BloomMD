@@ -5,7 +5,7 @@
  */
 import { appendFile, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative, sep } from "node:path";
-import { accessFor, AgentLedger, foldName, type AgentAccessConfig, type AgentStateFiles } from "@bloommd/core/agent-ledger";
+import { accessFor, AgentLedger, areaSegments, CLOUD_AREA_SEPARATOR, cloudAreaOf, foldName, vaultAreaPath, type AgentAccessConfig, type AgentStateFiles } from "@bloommd/core/agent-ledger";
 import { knowledgeVersion, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { sanitizeMarkdownFilename } from "@bloommd/core/paths";
@@ -120,7 +120,7 @@ export class VaultKnowledgeStore implements KnowledgeStore {
         if (entry.isDirectory()) await walk(full);
         else if (entry.isFile() && /\.md$/i.test(entry.name)) {
           const path = relative(this.root, full).split(sep).join("/");
-          const area = path.includes("/") ? path.split("/")[0]! : "";
+          const area = vaultAreaPath(path);
           // Like Obsidian, the file name is the title; listing never opens files. iCloud keeps
           // rarely used files only in the cloud (no local blocks); opening one can block or fail
           // (EDEADLK), so they are reported instead of read.
@@ -253,7 +253,7 @@ export class CloudKnowledgeStore implements KnowledgeStore {
     if (!response.ok) throw new Error(`BloomMD cloud list failed (${response.status}).`);
     const body = (await response.json()) as { files?: Array<{ filename: string; title?: string }> };
     return (body.files ?? []).map((file) => {
-      const area = /^(.+?) – /.exec(file.filename)?.[1] ?? "";
+      const area = cloudAreaOf(file.filename);
       return { path: file.filename, title: file.title ?? file.filename.replace(/\.md$/i, ""), area };
     });
   }
@@ -315,7 +315,9 @@ export class CloudKnowledgeStore implements KnowledgeStore {
 
   async freePath(area: string, title: string): Promise<string> {
     const taken = new Set((await this.list()).map((entry) => entry.path));
-    const base = `${area ? `${safeSegment(area)} – ` : ""}${safeSegment(title) || "Notiz"}`;
+    // Sub-areas ("Learnings/dev-team") are joined by " › ": a file name cannot contain "/".
+    const prefix = areaSegments(area).map((segment) => safeSegment(segment).replace(/ [–›] /g, " - ")).filter(Boolean).join(CLOUD_AREA_SEPARATOR);
+    const base = `${prefix ? `${prefix} – ` : ""}${safeSegment(title) || "Notiz"}`;
     for (let index = 1; index < 100; index += 1) {
       const candidate = `${base}${index > 1 ? ` ${index}` : ""}.md`;
       if (!taken.has(candidate)) return candidate;

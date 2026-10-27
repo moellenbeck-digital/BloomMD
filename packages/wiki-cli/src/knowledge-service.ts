@@ -2,7 +2,7 @@
  * The agent-facing knowledge operations on top of a store: access rules per area, a change log,
  * undo, and proposals that only a person can apply (never the agent itself).
  */
-import { AgentLedger, type AgentDocuments, type AgentProposal, type AgentRequest } from "@bloommd/core/agent-ledger";
+import { AgentLedger, areaCovers, cloudAreaOf, vaultAreaPath, type AgentDocuments, type AgentProposal, type AgentRequest } from "@bloommd/core/agent-ledger";
 import {
   applyKnowledgeFrontmatter,
   applyKnowledgeNodes,
@@ -93,8 +93,9 @@ function trustFields(lifecycle: ReturnType<typeof knowledgeLifecycle>) {
   };
 }
 
-function sameArea(a: string, b: string): boolean {
-  return foldName(a) === foldName(b);
+/** The map's area is `filter` or lies below it ("Learnings" also finds "Learnings/dev-team"). */
+function inArea(area: string, filter: string): boolean {
+  return areaCovers(filter, area);
 }
 
 export class KnowledgeService {
@@ -144,8 +145,7 @@ export class KnowledgeService {
 
   /** The area of a path as stored (vault paths come back from the store with the on-disk spelling). */
   private areaOf(path: string): string {
-    if (this.store.kind === "cloud") return /^(.+?) – /.exec(path)?.[1] ?? "";
-    return path.includes("/") ? path.split("/")[0]! : "";
+    return this.store.kind === "cloud" ? cloudAreaOf(path) : vaultAreaPath(path);
   }
 
   private access(area: string): Promise<KnowledgeAccess> {
@@ -192,7 +192,7 @@ export class KnowledgeService {
     const filter: KnowledgeFilter = { status: options.status, tag: options.tag, scope: options.scope };
     const filtered = filter.status !== undefined || filter.tag !== undefined || filter.scope !== undefined;
     if (!query.trim() && !filtered) throw new KnowledgeInputError("query must not be empty unless status, tag or scope is given.");
-    const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || sameArea(map.area, options.area)));
+    const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || inArea(map.area, options.area)));
     const hits: SearchHit[] = [];
     for (const map of maps) {
       if (hits.length >= limit) break;
@@ -226,7 +226,7 @@ export class KnowledgeService {
     const until = horizon.toISOString().slice(0, 10);
     const filter: KnowledgeFilter = { tag: options.tag, scope: options.scope };
     const stale = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || sameArea(entry.area, options.area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || inArea(entry.area, options.area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       const frontmatter = readKnowledgeFrontmatter(document.markdown);
@@ -246,7 +246,7 @@ export class KnowledgeService {
 
   async tasks(options: { area?: string; includeDone?: boolean; assignee?: string; dueBefore?: string } = {}) {
     const result = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || sameArea(entry.area, options.area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || inArea(entry.area, options.area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       for (const task of knowledgeTasks(document.markdown, options.includeDone)) {
@@ -260,7 +260,7 @@ export class KnowledgeService {
 
   async decisions(area?: string) {
     const result = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (area === undefined || sameArea(entry.area, area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (area === undefined || inArea(entry.area, area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       for (const decision of knowledgeDecisions(document.markdown)) result.push({ path: map.path, mapTitle: map.title, ...decision });

@@ -45,6 +45,21 @@ describe("vault knowledge", () => {
     expect(overview.areas.map((area) => area.area)).toEqual(["Arbeit", "Schule"]);
   });
 
+  test("a sub-area rule beats its parent area; the parent still governs the rest", async () => {
+    const { root, service } = await vault("propose", { Learnings: "read", "Learnings/dev-team": "write" });
+    const written = await service.createMap({ area: "Learnings/dev-team", title: "Coder-Regel", nodes: [{ title: "Immer testen" }] });
+    expect(written.mode).toBe("written");
+    expect(written.path).toBe("Learnings/dev-team/Coder-Regel.md");
+    expect(await readFile(join(root, written.path), "utf8")).toContain("Immer testen");
+    await expect(service.createMap({ area: "Learnings", title: "Allgemein" })).rejects.toThrow(/may only read in "Learnings"/);
+    await expect(service.createMap({ area: "Learnings/andere", title: "Fremd" })).rejects.toThrow(/may only read in "Learnings\/andere"/);
+    const proposed = await service.createMap({ area: "Arbeit", title: "Plan" });
+    expect(proposed.mode).toBe("proposed");
+    const overview = await service.overview();
+    expect(overview.areas.find((area) => area.area === "Learnings/dev-team")?.access).toBe("write");
+    expect((await service.search("Immer", { area: "Learnings" })).hits.map((hit) => hit.path)).toEqual(["Learnings/dev-team/Coder-Regel.md"]);
+  });
+
   test("a learning from the template gets lint-valid frontmatter; other templates get none", async () => {
     const { root, service } = await vault();
     expect((service.templates("learning") as { area: string; skeleton: Array<{ title: string }> })).toEqual(expect.objectContaining({ id: "learning", area: "Learnings" }));

@@ -2,6 +2,7 @@
  * `bloommd-wiki agent …`: run the knowledge MCP server for an agent and let the owner set its
  * rights, review proposals, read the change log and undo changes.
  */
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { KnowledgeAccess } from "@bloommd/core/knowledge";
@@ -30,6 +31,11 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   agent log <ziel> [--limit <n>] [--agent <name|id>]
                                             Änderungsprotokoll
   agent undo <ziel> <change-id>             Änderung zurücknehmen (auch freigegebene)
+  agent update-node <ziel> <map-pfad> <knoten-id> --patch <json|-> [--version <v>] [--reason <text>] [--source <text>]
+        Einen Knoten teilweise ändern: --patch ist ein JSON-Objekt mit title, content (+ contentMode),
+        kind, status, decision, due, assignee, note, citation, url, relations und/oder children (neue
+        Knoten, ans Ende des Knotens); nicht genannte Felder bleiben. "-" liest das JSON von stdin.
+        Gleiche Rechte und gleiches Protokoll wie bloommd_update_node: Vorschlag oder direkt.
   agent migrate <ziel> --agent <name|id> [--apply | --discard]
                                             Alte lokale Cloud-Rechte (agent.json) auf den Server
                                             übernehmen (höchstens diese Rechte) oder verwerfen
@@ -41,7 +47,10 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   log, undo und migrate; --agent wählt den Agent-Token (bei nur einem Agent-Token entfällt es).
   approve/reject nennen im Protokoll den Namen des angemeldeten Token-Besitzers; --reviewer gilt nur
   für Vault-Ordner. Ein Vorschlag, dessen Map sich inzwischen geändert hat, wird nur mit --overwrite
-  übernommen.`;
+  übernommen.
+  update-node mit --cloud ruft PATCH /api/mindmaps/<map>/nodes/<id> auf: mit einem Agent-Token gelten
+  dessen Rechte (Vorschlag oder direkt, im Protokoll mit Agent und Quelle), mit dem Besitzer-Token
+  schreibt es wie der Besitzer.`;
 
 export class AgentUsageError extends Error {}
 
@@ -59,7 +68,7 @@ function flags(args: string[], name: string): string[] {
 }
 
 function positional(args: string[]): string[] {
-  const valued = new Set(["--vault", "--cloud", "--workspace", "--name", "--access", "--area", "--reviewer", "--limit", "--days", "--reason", "--agent"]);
+  const valued = new Set(["--vault", "--cloud", "--workspace", "--name", "--access", "--area", "--reviewer", "--limit", "--days", "--reason", "--agent", "--patch", "--source", "--version"]);
   return args.filter((value, index) => !value.startsWith("--") && !valued.has(args[index - 1] ?? ""));
 }
 
@@ -223,6 +232,20 @@ export async function runAgentCli(args: string[], version: string): Promise<numb
       if (!changeId) throw new AgentUsageError("Change-ID fehlt.");
       // The owner may undo any change, including approved proposals (the agent may not).
       console.log(JSON.stringify(await service.undo(changeId, { asOwner: true }), null, 2));
+      return 0;
+    }
+    case "update-node": {
+      const { service, args: [path, nodeId] } = await ownerTarget(rest, params);
+      if (!path || !nodeId) throw new AgentUsageError("update-node braucht <map-pfad> und <knoten-id>.");
+      const raw = flag(rest, "--patch");
+      if (!raw) throw new AgentUsageError("--patch <json> fehlt (oder - für stdin).");
+      let patch: unknown;
+      try {
+        patch = JSON.parse(raw === "-" ? readFileSync(0, "utf8") : raw);
+      } catch {
+        throw new AgentUsageError("--patch ist kein gültiges JSON.");
+      }
+      console.log(JSON.stringify(await service.updateNode({ path, nodeId, patch, version: flag(rest, "--version"), reason: flag(rest, "--reason"), source: flag(rest, "--source") }), null, 2));
       return 0;
     }
     default:

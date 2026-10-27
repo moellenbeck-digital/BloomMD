@@ -2,7 +2,7 @@
  * `bloommd-wiki agent-mcp`: the MCP tools an agent (OpenClaw, Claude) uses to file notes into
  * BloomMD maps and act on them. There is deliberately no tool to approve proposals.
  */
-import { KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
+import { KNOWLEDGE_NODE_PATCH_FIELDS, KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import type { McpServerOptions, McpTool } from "./mcp";
 import type { KnowledgeService } from "./knowledge-service";
 
@@ -148,6 +148,26 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     },
   },
   {
+    name: "bloommd_update_node",
+    title: "Knoten ändern",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: "Change ONE existing node partially: only the fields you pass change (title, content, kind, status, decision, due, assignee, note, citation, url, relations); everything else of the node and the map stays as it is. content is appended to the existing content unless contentMode is replace. children adds new nodes below this node, after its existing children (same fields as nodes of bloommd_update_map; a child may use ref and parent to build a sub-tree). Works while people edit the map. Same rights as bloommd_update_map: written directly or kept as a proposal for the owner. An unknown nodeId is refused.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        path: { type: "string" },
+        nodeId: { type: "string", description: "Id of the node to change (from bloommd_get_map)." },
+        version: { type: "string", description: "Map version from bloommd_get_map, to avoid changing a node of a map that moved on." },
+        ...Object.fromEntries(Object.entries(nodeSchema.properties).filter(([key]) => KNOWLEDGE_NODE_PATCH_FIELDS.includes(key))),
+        children: { type: "array", description: "New nodes below this node, appended at its end.", items: { ...nodeSchema, properties: Object.fromEntries(Object.entries(nodeSchema.properties).filter(([key]) => key !== "id")) } },
+        ...changeMeta,
+        ...targetProperty,
+      },
+      required: ["path", "nodeId"],
+    },
+  },
+  {
     name: "bloommd_tasks",
     title: "Aufgaben",
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -219,7 +239,7 @@ export const KNOWLEDGE_INSTRUCTIONS = [
   "BloomMD shows Markdown notes as mind maps: every heading is a node, the document is the map.",
   "File information so that a person can understand and explain it from the map alone:",
   "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt maps are left out unless includeStale is true).",
-  "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
+  "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent (several nodes at once) or bloommd_update_node to change one node (status, content, relations) and/or add children below it. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",
   "If a change comes back as 'proposed', the owner reviews it; tell them. Never try to approve proposals yourself.",
@@ -284,6 +304,13 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           const trust = parseKnowledgeFrontmatterInput(args);
           return service.updateMap({ path: string(args, "path", true)!, version: string(args, "version"), nodes: nodes(args, trust ? 0 : 1), frontmatter: trust, ...meta });
         }
+        case "bloommd_update_node": return service.updateNode({
+          path: string(args, "path", true)!,
+          nodeId: string(args, "nodeId", true)!,
+          version: string(args, "version"),
+          patch: Object.fromEntries(KNOWLEDGE_NODE_PATCH_FIELDS.filter((field) => args[field] !== undefined).map((field) => [field, args[field]])),
+          ...meta,
+        });
         case "bloommd_tasks": return service.tasks({
           area: string(args, "area"),
           includeDone: args.includeDone === true,

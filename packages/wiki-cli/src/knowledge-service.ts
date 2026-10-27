@@ -16,6 +16,7 @@ import {
   matchesKnowledgeFilter,
   newKnowledgeMap,
   outlineMarkdown,
+  parseKnowledgeNodePatch,
   readKnowledgeFrontmatter,
   searchKnowledge,
   searchKnowledgeFrontmatter,
@@ -376,6 +377,33 @@ export class KnowledgeService {
       return { path: document.path, mode: "written", changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
     }
     return this.commit("bloommd_update_map", document.path, document.markdown, document.version, change.markdown, change, input);
+  }
+
+  /**
+   * Changes one existing node partially: the fields in `patch` (title, content, kind, status,
+   * decision, due, assignee, note, citation, url, relations) and/or new `children`, appended at the
+   * end of the node. Everything not named stays as it is. Same rules as `updateMap` and the server's
+   * `PATCH …/nodes/:nodeId`: the rights of the agent decide between proposal and direct write, and
+   * the change is logged for undo. An unknown node id is refused.
+   */
+  async updateNode(input: { path: string; nodeId: string; patch: unknown; version?: string } & ChangeMeta): Promise<CommitResult> {
+    return this.withLock(input.path, async () => {
+      const nodes = parseKnowledgeNodePatch(input.patch, input.nodeId);
+      const document = await this.store.read(input.path);
+      if (input.version && input.version !== document.version) {
+        throw new Error(`${input.path} changed since version ${input.version} (now ${document.version}). Read it again with bloommd_get_map.`);
+      }
+      // Fails for an unknown node before anything is sent or written.
+      const change = applyKnowledgeNodes(document.markdown, nodes);
+      const tool = "bloommd_update_node";
+      if (this.cloud && this.store.patchNode) {
+        // The server merges the change into the live document and decides by the token's rights.
+        const applied = await this.store.patchNode(document.path, input.nodeId, input.patch as Record<string, unknown>, { tool, reason: input.reason, source: input.source });
+        if (applied.proposalId) return { path: document.path, mode: "proposed", proposalId: applied.proposalId, ids: change.ids, created: change.created, updated: change.updated };
+        return { path: document.path, mode: "written", changeId: applied.changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
+      }
+      return this.commit(tool, document.path, document.markdown, document.version, change.markdown, change, input);
+    });
   }
 
   private async commit(

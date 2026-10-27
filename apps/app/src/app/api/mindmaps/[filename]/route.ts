@@ -5,9 +5,9 @@ import { NextResponse } from "next/server";
 import { getApiRequestIdentity } from "../../../../lib/auth";
 import { auditAgentWrite } from "../../../../lib/agent-audit";
 import { agentProposalResponse, logAgentChange } from "../../../../lib/agent-access";
-import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta } from "../../../../lib/agent-gate";
+import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta, type AgentChangeMeta } from "../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../lib/mindmap-storage";
-import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../../lib/request-security";
+import { assertSameOriginForIdentity, readJsonBody, readTextBody, RequestSecurityError } from "../../../../lib/request-security";
 import {
   deleteThroughSyncServer,
   renameThroughSyncServer,
@@ -18,6 +18,17 @@ import { workspaceErrorResponse } from "../../../../lib/workspace-api";
 
 function serializeNodes(nodes: Map<string, MindMapNode>) {
   return Object.fromEntries(nodes);
+}
+
+/** What an agent says about a delete (the body is optional for DELETE): { agentMeta: { source, reason, … } }. */
+async function readOptionalAgentMeta(request: Request): Promise<AgentChangeMeta> {
+  const text = (await readTextBody(request, 16 * 1024)).trim();
+  if (!text) return {};
+  try {
+    return readAgentMeta((JSON.parse(text) as { agentMeta?: unknown } | null)?.agentMeta);
+  } catch {
+    throw new RequestSecurityError("Invalid JSON body.", 400);
+  }
 }
 
 interface RouteParams {
@@ -158,7 +169,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
     const store = await getMindmapStorage(request, identity);
-    const { newFilename } = await readJsonBody<{ newFilename?: string }>(request, 16 * 1024);
+    const { newFilename, agentMeta } = await readJsonBody<{ newFilename?: string; agentMeta?: unknown }>(request, 16 * 1024);
     if (!newFilename) return NextResponse.json({ error: "newFilename field is required" }, { status: 400 });
     const current = await store.read(filename);
     if (current.storage?.mode === "database") {
@@ -180,7 +191,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         });
         await auditAgentWrite(identity, current.storage, "rename");
         if (gate) {
-          await logAgentChange(gate, { event: "renamed", afterVersion: renamed.version, meta: {}, defaultTool: "api:rename", defaultSummary: `Renamed to "${renamed.newFilename}"` }).catch((error: unknown) => {
+          await logAgentChange(gate, { event: "renamed", afterVersion: renamed.version, meta: readAgentMeta(agentMeta), defaultTool: "api:rename", defaultSummary: `Renamed to "${renamed.newFilename}"` }).catch((error: unknown) => {
             console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
           });
         }
@@ -230,6 +241,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       }
       const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
       if (gate && gate.access !== "write") return agentWriteRequiredResponse(gate, "deleting a map");
+      const meta = gate ? await readOptionalAgentMeta(request) : {};
       try {
         await deleteThroughSyncServer(current.storage.documentId, {
           filename,
@@ -239,7 +251,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         });
         await auditAgentWrite(identity, current.storage, "delete");
         if (gate) {
-          await logAgentChange(gate, { event: "deleted", meta: {}, defaultTool: "api:delete", defaultSummary: `Deleted "${current.filePath}"` }).catch((error: unknown) => {
+          await logAgentChange(gate, { event: "deleted", meta, defaultTool: "api:delete", defaultSummary: `Deleted "${current.filePath}"` }).catch((error: unknown) => {
             console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
           });
         }

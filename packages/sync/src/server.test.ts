@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import type { ServerWebSocket } from "bun";
+import { KnowledgeNodeNotFoundError } from "@bloommd/core/knowledge";
 import { createSyncServer, getSyncRoomOpenFailure, isSyncOriginAllowed, isSyncTokenAuthorized, processSyncClientMessage, refreshSyncClientPermission, type SyncWebSocketState } from "./server";
 import { SyncRoomBusyError, SyncRoomCapacityError } from "./rooms";
 import { createSyncTelemetry } from "./observability";
@@ -367,6 +368,20 @@ describe("single-writer document mutations", () => {
       const bad = await app.request("/internal/documents/doc-1/nodes", { method: "POST", headers, body: JSON.stringify({ ...base, nodes }) });
       expect(bad.status).toBe(400);
     }
+  });
+
+  test("reports a node id that is not in the live document as 404 NODE_NOT_FOUND, other bad input as 400", async () => {
+    let failure: Error = new KnowledgeNodeNotFoundError("fehlt");
+    const roomManager = { applyKnowledgeNodes: async () => { throw failure; } };
+    const { app } = createSyncServer(roomManager as never, { syncSecret: secret });
+    const body = JSON.stringify({ filename: "plan.md", workspaceId: "workspace-1", userId: "user-1", nodes: [{ id: "fehlt", status: "done" }] });
+    const missing = await app.request("/internal/documents/doc-1/nodes", { method: "POST", headers, body });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({ code: "NODE_NOT_FOUND", error: expect.stringContaining("fehlt") });
+    failure = new Error("Unknown node \"x\": use an existing id or a ref created earlier in this call.");
+    const invalid = await app.request("/internal/documents/doc-1/nodes", { method: "POST", headers, body });
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ code: "INVALID_NODES" });
   });
 
   test("returns an explicit active-room response instead of allowing a snapshot overwrite", async () => {

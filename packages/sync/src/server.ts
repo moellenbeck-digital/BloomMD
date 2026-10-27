@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { isKnowledgeInputError, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
+import { isKnowledgeInputError, KnowledgeNodeNotFoundError, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { cors } from "hono/cors";
 import { timingSafeEqual } from "node:crypto";
 import { createBunWebSocket } from "hono/bun";
@@ -420,6 +420,8 @@ export function createSyncServer(roomManager: RoomManager, config: Pick<SyncServ
     } catch (error) {
       if (isKnowledgeInputError(error)) {
         telemetry.event({ operation: "document.nodes", outcome: "error", durationMs: Date.now() - startedAt, roomKey: descriptor.key, correlationId, error });
+        // The caller decides how an unknown node id is reported: 404 for a node route, 400 for the batch route.
+        if (error instanceof KnowledgeNodeNotFoundError) return c.json({ error: error.message, code: "NODE_NOT_FOUND" }, 404);
         return c.json({ error: error.message, code: "INVALID_NODES" }, 400);
       }
       const response = mutationErrorResponse(error);

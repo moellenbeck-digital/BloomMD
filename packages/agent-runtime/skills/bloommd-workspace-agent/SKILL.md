@@ -62,6 +62,15 @@ bloommd-agent result --profile <profile-name> --task <task.id> --input <result-j
 If the task cannot be completed, submit the defined failure code through `bloommd-agent fail`; do
 not retry unboundedly and do not make direct writes.
 
+## Not part of a task: changing nodes of other maps
+
+A workspace task never edits nodes itself; it only returns a proposal through `bloommd-agent result`.
+Changing a single node of a map outside a task (`PATCH /api/mindmaps/<file>/nodes/<nodeId>`, with
+`children` for new sub-items) is a different path: it needs an agent access token and goes through the
+knowledge tools `bloommd_update_node` / `bloommd-wiki agent update-node` (skill `bloommd-knowledge`).
+Rights, proposal or direct write and the change log apply there. Never call that endpoint from a
+workspace task.
+
 ## Local cleanup
 
 After the human revokes the agent in BloomMD, remove its local credential:

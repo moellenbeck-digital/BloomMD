@@ -78,6 +78,13 @@ describe("who may manage agent rights", () => {
     identity = {};
     await expect(context()).rejects.toMatchObject({ status: 401 });
   });
+
+  test("only the workspace owner, not every member: an editor cannot manage, review or undo", async () => {
+    role = "editor";
+    await expect(context()).rejects.toMatchObject({ status: 403, code: "OWNER_REQUIRED" });
+    identity = { authKind: "access-token", userId: USER, tokenId: "t2", agentName: null, tokenScope: "write" };
+    await expect(context()).rejects.toMatchObject({ status: 403, code: "OWNER_REQUIRED" });
+  });
 });
 
 describe("approving and rejecting proposals", () => {

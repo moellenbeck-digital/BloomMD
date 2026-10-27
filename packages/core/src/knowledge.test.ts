@@ -4,6 +4,8 @@ import {
   applyKnowledgeNodes,
   isKnowledgeInputError,
   isKnowledgeRetired,
+  KnowledgeInputError,
+  KnowledgeNodeNotFoundError,
   knowledgeDecisions,
   knowledgeLifecycle,
   knowledgeTasks,
@@ -13,6 +15,7 @@ import {
   outlineMarkdown,
   parseKnowledgeFrontmatterInput,
   parseKnowledgeNodeInputs,
+  parseKnowledgeNodePatch,
   readKnowledgeFrontmatter,
   searchKnowledge,
   searchKnowledgeFrontmatter,
@@ -301,5 +304,55 @@ describe("trust fields in the frontmatter", () => {
     expect(isKnowledgeRetired({ status: "bestätigt", stale_after: "2026-01-01", expired: true })).toBe(true);
     expect(isKnowledgeRetired({ status: "neu", stale_after: "2027-01-01", expired: false })).toBe(false);
     expect(isKnowledgeRetired({})).toBe(false);
+  });
+});
+
+describe("parseKnowledgeNodePatch", () => {
+  const map = "# Plan <!-- bloommd:id=root01 -->\n\n## Aufgaben <!-- bloommd:id=aufg01 --> <!-- bloommd:meta={\"kind\":\"task\",\"status\":\"open\",\"due\":\"2026-10-01\"} -->\n\nErste Zeile.\n\n### Alt <!-- bloommd:id=alt001 -->\n\n## Ideen <!-- bloommd:id=idee01 -->\n";
+
+  test("is the node itself with the given fields, followed by children below it", () => {
+    expect(parseKnowledgeNodePatch({ status: "done", children: [{ ref: "a", title: "A" }, { parent: "a", title: "B" }, { parent: "idee01", title: "C" }] }, "aufg01")).toEqual([
+      { id: "aufg01", status: "done" },
+      { ref: "a", title: "A", parent: "aufg01" },
+      { parent: "a", title: "B" },
+      { parent: "idee01", title: "C" },
+    ]);
+    expect(parseKnowledgeNodePatch({ children: [{ title: "Nur Kind" }] }, "aufg01")).toEqual([{ id: "aufg01" }, { title: "Nur Kind", parent: "aufg01" }]);
+  });
+
+  test("leaves everything it does not name as it is and appends children after the existing ones", () => {
+    const change = applyKnowledgeNodes(map, parseKnowledgeNodePatch({ assignee: "Anna", children: [{ ref: "k", title: "Neu" }] }, "aufg01"));
+    const doc = parseFile("plan.md", change.markdown);
+    expect(doc.nodes.get("aufg01")?.metadata).toEqual({ kind: "task", status: "open", due: "2026-10-01", assignee: "Anna" });
+    expect(doc.nodes.get("aufg01")?.content.trim()).toBe("Erste Zeile.");
+    expect(doc.nodes.get("aufg01")?.title).toBe("Aufgaben");
+    expect(doc.nodes.get("aufg01")!.children.map((id) => doc.nodes.get(id)!.title)).toEqual(["Alt", "Neu"]);
+    expect(change.updated).toEqual(["aufg01"]);
+    expect(change.created).toEqual([change.ids.k!]);
+  });
+
+  test("content is appended unless contentMode says replace, like the batch route", () => {
+    const appended = parseFile("plan.md", applyKnowledgeNodes(map, parseKnowledgeNodePatch({ content: "Zweite." }, "aufg01")).markdown);
+    expect(appended.nodes.get("aufg01")?.content.trim()).toBe("Erste Zeile.\n\nZweite.");
+    const replaced = parseFile("plan.md", applyKnowledgeNodes(map, parseKnowledgeNodePatch({ content: "Neu.", contentMode: "replace" }, "aufg01")).markdown);
+    expect(replaced.nodes.get("aufg01")?.content.trim()).toBe("Neu.");
+  });
+
+  test("an unknown node id is a KnowledgeNodeNotFoundError (a KnowledgeInputError)", () => {
+    const run = () => applyKnowledgeNodes(map, parseKnowledgeNodePatch({ status: "done" }, "fehlt"));
+    expect(run).toThrow(KnowledgeNodeNotFoundError);
+    expect(run).toThrow(/does not exist/);
+    try {
+      run();
+    } catch (error) {
+      expect(isKnowledgeInputError(error)).toBe(true);
+      expect((error as KnowledgeNodeNotFoundError).nodeId).toBe("fehlt");
+    }
+  });
+
+  test("refuses what a partial change must not contain", () => {
+    for (const bad of [null, "x", [], {}, { children: [] }, { id: "x", status: "done" }, { ref: "x" }, { parent: "root01", status: "done" }, { nope: 1 }, { status: "kaputt" }, { due: "bald" }, { content: "## Kopf" }, { title: "a\nb" }, { children: "x" }, { children: ["x"] }, { children: [{ id: "alt001", content: "x" }] }, { children: [{ title: "ok" }, { title: 3 }] }, { children: Array.from({ length: 200 }, (_, index) => ({ title: `k${index}` })) }]) {
+      expect(() => parseKnowledgeNodePatch(bad, "aufg01")).toThrow(KnowledgeInputError);
+    }
   });
 });

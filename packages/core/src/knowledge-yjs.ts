@@ -4,7 +4,7 @@
  * people are editing the same map; Yjs merges both.
  */
 import type * as Y from "yjs";
-import { assertKnowledgeNodeInput, KNOWLEDGE_MAX_NODES_PER_CALL, KnowledgeInputError, knowledgeMetadata, type KnowledgeChange, type KnowledgeNodeInput } from "./knowledge";
+import { assertKnowledgeNodeInput, KNOWLEDGE_MAX_NODES_PER_CALL, KnowledgeInputError, KnowledgeNodeNotFoundError, knowledgeMetadata, type KnowledgeChange, type KnowledgeNodeInput } from "./knowledge";
 import type { MarkdownNodeMetadata } from "./obsidian-markdown";
 import { MAX_HEADING_LEVEL, type MindMapNodeMetadata } from "./types";
 import { yUpdateContentDiff } from "./yjs-content-sync";
@@ -32,7 +32,7 @@ export function applyKnowledgeNodesToYDoc(yDoc: Y.Doc, inputs: KnowledgeNodeInpu
     if (input.id && input.ref) throw new Error("A node input has either an id (update) or a ref (create), not both.");
     if (input.due && !DATE_RE.test(input.due)) throw new Error(`Due date must be YYYY-MM-DD, got "${input.due}".`);
     if (input.id) {
-      if (!yNodes.has(input.id)) throw new Error(`Node "${input.id}" does not exist in this map.`);
+      if (!yNodes.has(input.id)) throw new KnowledgeNodeNotFoundError(input.id);
       continue;
     }
     if (!input.title?.trim()) throw new Error("A new node needs a title.");

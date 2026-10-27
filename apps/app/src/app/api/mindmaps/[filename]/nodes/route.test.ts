@@ -11,6 +11,11 @@ let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read"
 let proposals: Array<Record<string, unknown>> = [];
 let changes: Array<Record<string, unknown>> = [];
 let asOwner = false;
+let syncFailure: Error | null = null;
+
+class SyncMutationError extends Error {
+  constructor(readonly code: string, readonly status: number, message: string) { super(message); }
+}
 
 mock.module("../../../../../lib/auth", () => ({
   getApiRequestIdentity: async () => asOwner
@@ -45,11 +50,10 @@ mock.module("../../../../../lib/mindmap-storage", () => ({
 }));
 
 mock.module("../../../../../lib/sync-room-status", () => ({
-  SyncMutationError: class SyncMutationError extends Error {
-    constructor(readonly code: string, readonly status: number, message: string) { super(message); }
-  },
+  SyncMutationError,
   applyKnowledgeNodesThroughSyncServer: async (documentId: string, input: Record<string, unknown>) => {
     syncCalls.push({ documentId, input });
+    if (syncFailure) throw syncFailure;
     return { filePath: "plan.md", storage: { documentId, version: 6 }, version: 6, ids: { t: "n1" }, created: ["n1"], updated: [] };
   },
   // Bun shares module mocks across test files; every export a route imports must exist here.
@@ -80,6 +84,7 @@ describe("POST /api/mindmaps/:filename/nodes", () => {
     proposals = [];
     changes = [];
     asOwner = false;
+    syncFailure = null;
   });
 
   test("merges cloud node operations through the sync server and audits the agent", async () => {
@@ -89,6 +94,14 @@ describe("POST /api/mindmaps/:filename/nodes", () => {
     expect(changes).toMatchObject([{ tokenId: "tok-1", agentName: "OpenClaw", event: "written", filename: "plan.md", area: "", afterVersion: 6, beforeMarkdown: expect.stringContaining("Aufgaben") }]);
     expect(syncCalls[0]?.input).toMatchObject({ filename: "plan.md", userId: "11111111-1111-4111-8111-111111111111", nodes: [{ ref: "t", title: "Folien" }] });
     expect(audits).toHaveLength(1);
+  });
+
+  test("an unknown node id stays a 400 on the batch route, also when the live document reports it", async () => {
+    syncFailure = new SyncMutationError("NODE_NOT_FOUND", 404, "Node \"nope\" does not exist in this map.");
+    const response = await call([{ id: "nope", content: "x" }]);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "INVALID_NODES" });
+    expect(changes).toHaveLength(0);
   });
 
   test("applies node operations to filesystem documents", async () => {

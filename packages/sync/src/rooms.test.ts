@@ -9,7 +9,8 @@ import { createRoomManager, SyncNodeConflictError, SyncRoomBusyError, SyncServer
 import { TestClock } from "./clock";
 import { createSyncTelemetry } from "./observability";
 import { releaseAwarenessClients } from "./sync-handler";
-import { parseFile, yDocToDocument } from "@bloommd/core";
+import { parseFile, yDocToDocument, yUpdateContentDiff } from "@bloommd/core";
+import { KnowledgeNodeNotFoundError, parseKnowledgeNodePatch } from "@bloommd/core/knowledge";
 import {
   SyncDocumentVersionConflictError,
   SyncPersistenceCommitUnknownError,
@@ -599,6 +600,51 @@ describe("createRoomManager", () => {
     // Saved once: no scheduled second save that would bump the version past the one returned.
     expect(room.persistTimer).toBeNull();
     await expect(manager.applyKnowledgeNodes(descriptor, [{ id: "missing", content: "x" }])).rejects.toThrow(/does not exist/);
+  });
+
+  test("a partial node change (PATCH …/nodes/:nodeId) merges into a room a person is editing, and saves once", async () => {
+    let saved: ReturnType<typeof yDocToDocument> | null = null;
+    let saves = 0;
+    const persistence: DocumentPersistence = {
+      authorize: async () => "write",
+      load: async (descriptor) => ({
+        ...parseFile(descriptor.filename, SAMPLE_MD),
+        storage: { mode: "database", documentId: descriptor.documentId!, workspaceId: descriptor.workspaceId!, version: 3 },
+      }),
+      save: async (_descriptor, document) => {
+        saves += 1;
+        saved = document;
+        return { ...document, storage: { ...document.storage!, version: 3 + saves } };
+      },
+    };
+    const manager = createRoomManager(config, persistence);
+    managers.push(manager);
+    const descriptor: RoomDescriptor = { key: "document-id", filename: "test.md", documentId: "document-id", workspaceId: "workspace-id", userId: "user-a" };
+    const room = await manager.getOrCreateRoom(descriptor);
+    manager.addClient(room, createMockWs("document-id"));
+    const before = yDocToDocument(room.yDoc);
+    const target = before.nodes.get(before.rootId)!.children.map((id) => before.nodes.get(id)!).find((node) => node.title === "Child A")!;
+    const other = before.nodes.get(before.rootId)!;
+
+    // A person types into the root node while the agent's change arrives.
+    yUpdateContentDiff(room.yDoc, other.id, other.content, "Von Hand geschrieben.");
+    const result = await manager.applyKnowledgeNodes(descriptor, parseKnowledgeNodePatch({ status: "done", children: [{ ref: "k", title: "Folgeaufgabe", status: "open" }] }, target.id));
+
+    expect(result.updated).toEqual([target.id]);
+    expect(result.created).toEqual([result.ids.k!]);
+    const live = yDocToDocument(room.yDoc);
+    expect(live.nodes.get(target.id)?.metadata).toMatchObject({ status: "done" });
+    expect(live.nodes.get(target.id)?.title).toBe("Child A");
+    expect(live.nodes.get(target.id)?.content).toBe(target.content);
+    expect(live.nodes.get(target.id)?.children.at(-1)).toBe(result.ids.k!);
+    expect(live.nodes.get(other.id)?.content.trim()).toBe("Von Hand geschrieben.");
+    // The saved document carries both changes; the version is the one the route returns.
+    expect(saves).toBe(1);
+    expect(saved!.nodes.get(other.id)?.content.trim()).toBe("Von Hand geschrieben.");
+    expect(result.document.storage?.version).toBe(4);
+    // An unknown node changes nothing and says so by type, so the route can answer 404.
+    await expect(manager.applyKnowledgeNodes(descriptor, parseKnowledgeNodePatch({ status: "done" }, "fehlt"))).rejects.toBeInstanceOf(KnowledgeNodeNotFoundError);
+    expect(saves).toBe(1);
   });
 
   test("applies typed task and decision children through the checked node mutation", async () => {

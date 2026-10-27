@@ -5,9 +5,9 @@ import type { AppLocale } from "../../lib/locale";
 
 function wikiCopy(locale: AppLocale) {
   return locale === "en" ? {
-    rejected: "blocked", missing: "missing", externalAddress: "an external address", preview: "Load preview — sends a request to", bundle: "KB in bundle", mapTitle: "Knowledge Map", mapIntro: "Nodes are concept pages; edges come from wiki links, tags and cited sources — not from the folder structure. Broken references remain visible.", withoutSource: "without source", pointsTo: "Points to: ", nothing: "nothing", linkedBy: "Linked from: ", nobody: "nobody", sources: "Sources: ", view: "View", pages: "Pages", map: "Knowledge Map", log: "Log", brokenLinks: "broken links", search: "Search the wiki", placeholder: "Title, path, tag, status, content", onlyProblems: "Only pages with problems", count: "of", changed: " · source changed", noSource: " · without source", logTitle: "Wiki log", noLog: "No log available.", wikiPages: "Wiki pages", citations: "Citations", noCitations: "This page names no source. Its claims cannot be verified.", changedBadge: "Source has changed", unknown: "unknown source", noHash: "without hash — drift cannot be detected", references: "References and media", external: "External previews load only after a click. No request leaves this page beforehand.", noPage: "No page found."
+    rejected: "blocked", missing: "missing", externalAddress: "an external address", preview: "Load preview — sends a request to", bundle: "KB in bundle", mapTitle: "Knowledge Map", mapIntro: "Nodes are concept pages; edges come from wiki links, tags and cited sources — not from the folder structure. Broken references remain visible.", withoutSource: "without source", pointsTo: "Points to: ", nothing: "nothing", linkedBy: "Linked from: ", nobody: "nobody", sources: "Sources: ", view: "View", proposals: "Proposals", pages: "Pages", map: "Knowledge Map", log: "Log", brokenLinks: "broken links", search: "Search the wiki", placeholder: "Title, path, tag, status, content", onlyProblems: "Only pages with problems", count: "of", changed: " · source changed", noSource: " · without source", logTitle: "Wiki log", noLog: "No log available.", wikiPages: "Wiki pages", citations: "Citations", noCitations: "This page names no source. Its claims cannot be verified.", changedBadge: "Source has changed", unknown: "unknown source", noHash: "without hash — drift cannot be detected", references: "References and media", external: "External previews load only after a click. No request leaves this page beforehand.", noPage: "No page found."
   } : {
-    rejected: "abgelehnt", missing: "fehlt", externalAddress: "eine externe Adresse", preview: "Vorschau laden — sendet eine Anfrage an", bundle: "KB im Bundle", mapTitle: "Knowledge Map", mapIntro: "Knoten sind Konzeptseiten, Kanten stammen aus Wiki-Links, Tags und zitierten Quellen — nicht aus der Ordnerstruktur. Defekte Verweise bleiben sichtbar.", withoutSource: "ohne Quelle", pointsTo: "Verweist auf: ", nothing: "nichts", linkedBy: "Wird verlinkt von: ", nobody: "niemandem", sources: "Quellen: ", view: "Ansicht", pages: "Seiten", map: "Knowledge Map", log: "Log", brokenLinks: "defekte Links", search: "Wiki durchsuchen", placeholder: "Titel, Pfad, Tag, Status, Inhalt", onlyProblems: "Nur Seiten mit Problemen", count: "von", changed: " · Quelle verändert", noSource: " · ohne Quelle", logTitle: "Wiki-Log", noLog: "Kein Log verfügbar.", wikiPages: "Wiki-Seiten", citations: "Zitate", noCitations: "Diese Seite nennt keine Quelle. Aussagen darauf lassen sich nicht überprüfen.", changedBadge: "Quelle hat sich geändert", unknown: "unbekannte Quelle", noHash: "ohne Hash — Drift nicht feststellbar", references: "Verweise und Medien", external: "Externe Vorschauen werden erst auf Klick geladen. Vorher verlässt keine Anfrage diese Seite.", noPage: "Keine Seite gefunden."
+    rejected: "abgelehnt", missing: "fehlt", externalAddress: "eine externe Adresse", preview: "Vorschau laden — sendet eine Anfrage an", bundle: "KB im Bundle", mapTitle: "Knowledge Map", mapIntro: "Knoten sind Konzeptseiten, Kanten stammen aus Wiki-Links, Tags und zitierten Quellen — nicht aus der Ordnerstruktur. Defekte Verweise bleiben sichtbar.", withoutSource: "ohne Quelle", pointsTo: "Verweist auf: ", nothing: "nichts", linkedBy: "Wird verlinkt von: ", nobody: "niemandem", sources: "Quellen: ", view: "Ansicht", proposals: "Vorschläge", pages: "Seiten", map: "Knowledge Map", log: "Log", brokenLinks: "defekte Links", search: "Wiki durchsuchen", placeholder: "Titel, Pfad, Tag, Status, Inhalt", onlyProblems: "Nur Seiten mit Problemen", count: "von", changed: " · Quelle verändert", noSource: " · ohne Quelle", logTitle: "Wiki-Log", noLog: "Kein Log verfügbar.", wikiPages: "Wiki-Seiten", citations: "Zitate", noCitations: "Diese Seite nennt keine Quelle. Aussagen darauf lassen sich nicht überprüfen.", changedBadge: "Quelle hat sich geändert", unknown: "unbekannte Quelle", noHash: "ohne Hash — Drift nicht feststellbar", references: "Verweise und Medien", external: "Externe Vorschauen werden erst auf Klick geladen. Vorher verlässt keine Anfrage diese Seite.", noPage: "Keine Seite gefunden."
   };
 }
 
@@ -215,11 +215,14 @@ export interface WikiExplorerProps {
   graphHealth: { brokenLinks: number; pagesWithoutProvenance: number; concepts: number } | null;
   log: string | null;
   locale?: AppLocale;
+  /** Review view for agent proposals. Passed only when the proposal feature is active; no view button otherwise. */
+  proposals?: React.ReactNode;
+  proposalCount?: number;
 }
 
-type ViewMode = "pages" | "map" | "log";
+type ViewMode = "pages" | "map" | "log" | "proposals";
 
-export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de" }: WikiExplorerProps) {
+export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", proposals, proposalCount = 0 }: WikiExplorerProps) {
   const copy = wikiCopy(locale);
   const [view, setView] = useState<ViewMode>("pages");
   const [selectedPath, setSelectedPath] = useState<string | null>(pages[0]?.path ?? null);
@@ -252,11 +255,12 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de" }: 
   }, [pages, query, tagFilter, onlyProblems]);
 
   const selected = pages.find((page) => page.path === selectedPath) ?? filtered[0] ?? null;
+  const views: ViewMode[] = proposals ? ["pages", "map", "log", "proposals"] : ["pages", "map", "log"];
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2 border-b border-neutral-200 pb-4" role="group" aria-label={copy.view}>
-        {(["pages", "map", "log"] as ViewMode[]).map((mode) => (
+        {views.map((mode) => (
           <button
             key={mode}
             type="button"
@@ -267,7 +271,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de" }: 
               view === mode ? "border-[#FF6B35] bg-[#FFF4EE] text-[#B84218]" : "border-neutral-300 text-neutral-600 hover:bg-neutral-50"
             }`}
           >
-            {mode === "pages" ? copy.pages : mode === "map" ? copy.map : copy.log}
+            {mode === "pages" ? copy.pages : mode === "map" ? copy.map : mode === "log" ? copy.log : `${copy.proposals} (${proposalCount})`}
           </button>
         ))}
         {graphHealth && (
@@ -293,6 +297,8 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de" }: 
             }}
           />
         </div>
+      ) : view === "proposals" && proposals ? (
+        proposals
       ) : view === "log" ? (
         <div className="py-8">
           <h2 className="text-2xl font-semibold">{copy.logTitle}</h2>

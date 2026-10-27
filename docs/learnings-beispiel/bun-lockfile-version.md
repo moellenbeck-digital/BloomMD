@@ -1,37 +1,39 @@
 ---
 type: learning
-title: "Bun-Lockfile nur mit der festgelegten Bun-Version erzeugen"
+title: "Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer"
 area: "Learnings"
 status: neu
-scope: "BloomMD, coder"
-source: "Aufbau Dev-Team, 2026-10-26"
+scope: "bloommd-cluster, md-agents, coder"
+source: "bloommd-cluster, Commit 1da7950, 2026-10-26"
 stale_after: 2027-01-24
 tags: ["bereich/learnings", "coder"]
 ---
 
-# Bun-Lockfile nur mit der festgelegten Bun-Version erzeugen
+# Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer
+
+> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Die Fakten stammen aus dem Auftrag zu #109 (Vorfälle vom 26.10.2026); die Belege liegen im Repo `bloommd-cluster` (Forgejo).
 
 ## Symptom
 
-`bun install --frozen-lockfile` schlägt fehl (Auszug: „lockfile had changes, but lockfile is frozen“) oder ändert `bun.lock`, sobald eine andere Bun-Version als die festgelegte läuft.
+Das Lockfile von `md-agents` scheiterte auf Bun 1.3.14 mit `UnknownLockfileVersion`.
 
 ## Ursache
 
-Das Repo legt Bun 1.3.14 fest (`packageManager` in `package.json`, Dockerfile, CI). Eine andere Bun-Version schreibt bzw. liest das Lockfile anders; die eingefrorene Installation sieht dann „Änderungen“.
+Das dev-team-Image braucht Bun ab 1.4; mit Bun 1.3.14 lässt sich das Lockfile von `md-agents` dort nicht lesen.
 
 ## Regel
 
-- Vor jeder Installation `bun --version` mit `packageManager` in `package.json` abgleichen und im Arbeitsumfeld (Agenten-Image, Runner) dieselbe Version bereitstellen.
-- `bun.lock` nur mit dieser Version erzeugen und committen; ein von anderer Version umgeschriebenes Lockfile nicht committen.
-- Nicht auf `--frozen-lockfile` verzichten, um den Fehler zu umgehen: erst die Version angleichen.
+- Die Bun-Version je Repo festhalten, statt eine Version für alle Repos anzunehmen.
+- Behoben wurde es im dev-team-Image mit Bun 1.4.2 (Commit `1da7950`).
+- BloomMD selbst bleibt auf Bun 1.3.14.
 
 ## Beleg
 
-- Aufbau des Dev-Teams, 2026-10-26 (Ticket-/Lauf-Link bei Bestätigung ergänzen)
-- Festlegung der Version: `package.json` (`packageManager`), `Dockerfile`, `.github/workflows/ci.yml`
+- Commit `1da7950` im Repo `bloommd-cluster` (Forgejo), 2026-10-26
+- Offen: Ticket- und CI-Link (nicht bekannt)
 
 ## Gilt für
 
 - Brand: BloomMD
 - Rolle: coder
-- Komponente: Bun-Workspace, Docker-Build, CI
+- Komponente: dev-team-Image, Bun-Lockfile von `md-agents`

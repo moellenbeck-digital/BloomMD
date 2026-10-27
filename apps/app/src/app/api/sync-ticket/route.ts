@@ -1,6 +1,7 @@
 import { normalizeMarkdownFilename } from "@bloommd/core/paths";
 import { signSyncTicket } from "@bloommd/core/sync-ticket";
 import { NextResponse } from "next/server";
+import { agentGate } from "../../../lib/agent-gate";
 import { getApiRequestIdentity } from "../../../lib/auth";
 import { getWorkspaceForUser, normalizeUuid, readCloudDocument } from "../../../lib/db";
 import { assertRateLimit, assertSameOriginForIdentity, RateLimitError, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
@@ -28,20 +29,24 @@ export async function POST(request: Request) {
     const document = await readCloudDocument(userId, normalizeMarkdownFilename(body.filename), workspace.id);
     if (!document) return NextResponse.json({ error: "Document not found." }, { status: 404 });
 
+    // A live editing session would bypass the rights of an agent token: it edits only where it may write.
+    const gate = await agentGate(identity!, workspace.id, document.filename);
+    const permission = workspace.role === "viewer" || (gate && gate.access !== "write") ? "read" : "write";
+
     const exp = Math.floor(Date.now() / 1000) + 5 * 60;
     const ticket = signSyncTicket({
       userId,
       workspaceId: workspace.id,
       documentId: document.id,
       filename: document.filename,
-      permission: workspace.role === "viewer" ? "read" : "write",
+      permission,
       exp,
     }, secret);
 
     return NextResponse.json({
       websocketUrl: buildSyncTicketWebSocketUrl(syncUrl, document.id, ticket),
       expiresAt: new Date(exp * 1000).toISOString(),
-      permission: workspace.role === "viewer" ? "read" : "write",
+      permission,
       identity: {
         name: identity?.name ?? null,
         email: identity?.email ?? null,

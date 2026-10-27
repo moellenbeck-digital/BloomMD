@@ -203,6 +203,34 @@ export function accessFor(config: AgentAccessConfig, area: string): AgentAccess 
   return access ?? config.access;
 }
 
+/**
+ * Rights from an API or CLI request: strict, unlike `parseAccessConfig` (which reads a file and
+ * falls back to "propose"). Area names are stored trimmed and joined by "/"; two spellings of one
+ * area keep the strictest right.
+ */
+export function strictAccessConfig(input: unknown, maxAreas = 100): AgentAccessConfig {
+  const value = (input ?? {}) as { access?: unknown; areas?: unknown };
+  if (!AGENT_ACCESS.includes(value.access as AgentAccess)) throw new Error("Access must be read, propose or write.");
+  const raw = value.areas ?? {};
+  if (typeof raw !== "object" || Array.isArray(raw) || raw === null) throw new Error("Areas must be an object of area names and rights.");
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > maxAreas) throw new Error(`At most ${maxAreas} areas can have their own right.`);
+  const areas: Record<string, AgentAccess> = {};
+  const byKey = new Map<string, string>();
+  for (const [name, access] of entries) {
+    const area = normalizeAreaPath(name);
+    if (!area || area.length > 200) throw new Error("An area needs a name of 1 to 200 characters.");
+    if (!AGENT_ACCESS.includes(access as AgentAccess)) throw new Error(`The right for "${area}" must be read, propose or write.`);
+    const key = areaKey(area);
+    const existing = byKey.get(key);
+    if (existing !== undefined && STRICTNESS[areas[existing]!] <= STRICTNESS[access as AgentAccess]) continue;
+    if (existing !== undefined) delete areas[existing];
+    byKey.set(key, area);
+    areas[area] = access as AgentAccess;
+  }
+  return { access: value.access as AgentAccess, areas };
+}
+
 export function newAgentId(prefix: "p" | "c" | "r"): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }

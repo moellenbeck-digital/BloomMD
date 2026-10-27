@@ -6,6 +6,7 @@ let created: unknown[] = [];
 let revoked: unknown[] = [];
 const SESSION = { authKind: "session", userId: "11111111-1111-4111-8111-111111111111" };
 let identity: Record<string, unknown> = SESSION;
+let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 
 mock.module("../../../../../lib/auth", () => ({
   getApiRequestIdentity: async () => identity,
@@ -31,6 +32,7 @@ mock.module("../../../../../lib/mindmap-storage", () => ({
 mock.module("../../../../../lib/db", () => ({
   // Bun shares module mocks across test files; keep what request-security needs from lib/db.
   consumeRateLimit: async () => null,
+  getAgentTokenRights: async () => rights,
   createShareLink: async (input: unknown) => { created.push(input); return { token: "bloom_share_abc", id: "l1", createdAt: "2026-10-01T00:00:00Z", expiresAt: "2026-10-31T00:00:00Z" }; },
   listShareLinks: async () => [{ id: "l1", createdAt: "x", expiresAt: "y", revokedAt: null, lastViewedAt: null }],
   revokeShareLink: async (...args: unknown[]) => { revoked.push(args); return true; },
@@ -46,6 +48,7 @@ describe("share links API", () => {
     created = [];
     revoked = [];
     identity = SESSION;
+    rights = { access: "write", areas: {} };
     process.env.NEXT_PUBLIC_SITE_URL = "https://app.bloommd.app";
   });
 
@@ -78,6 +81,19 @@ describe("share links API", () => {
     expect(created[0]).toMatchObject({ tokenId: "tok-1", agentName: "OpenClaw" });
     // Plain scripts' tokens (no agent name) act for their owner.
     identity = { ...SESSION, authKind: "access-token", tokenId: "tok-2", tokenScope: "write", agentName: null };
+    expect((await route.POST(request("POST", {}), params)).status).toBe(201);
+  });
+
+  test("an agent token that may not write in the area creates and revokes no links", async () => {
+    identity = { ...SESSION, authKind: "access-token", tokenId: "tok-1", tokenScope: "write", agentName: "OpenClaw", tokenAllowShare: true };
+    rights = { access: "propose", areas: {} };
+    const refused = await route.POST(request("POST", {}), params);
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { code: string }).code).toBe("AGENT_WRITE_REQUIRED");
+    expect((await route.DELETE(request("DELETE", { id: "l1" }), params)).status).toBe(403);
+    expect(created).toHaveLength(0);
+    expect(revoked).toHaveLength(0);
+    rights = { access: "read", areas: { "": "write" } };
     expect((await route.POST(request("POST", {}), params)).status).toBe(201);
   });
 

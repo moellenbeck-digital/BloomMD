@@ -5,6 +5,7 @@ const WORKSPACE_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const WORKSPACE_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 let tokenWorkspaceIds: string[] | null = [WORKSPACE_A];
 let requested: Array<string | null | undefined> = [];
+let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 
 mock.module("../../../lib/auth", () => ({
   getApiRequestIdentity: async () => ({ authKind: "access-token", userId: USER, tokenId: "tok-1", tokenScope: "write", tokenWorkspaceIds, agentName: "OpenClaw" }),
@@ -20,6 +21,7 @@ mock.module("../../../lib/db", () => ({
     return { id: workspaceId ?? WORKSPACE_B, role: "owner" };
   },
   readCloudDocument: async (_userId: string, filename: string, workspaceId: string) => ({ id: "doc-1", filename, workspaceId }),
+  getAgentTokenRights: async () => rights,
 }));
 
 process.env.NEXT_PUBLIC_SYNC_URL = "wss://sync.bloommd.test";
@@ -36,6 +38,7 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
   beforeEach(() => {
     tokenWorkspaceIds = [WORKSPACE_A];
     requested = [];
+    rights = { access: "write", areas: {} };
   });
 
   test("refuses a ticket for another workspace", async () => {
@@ -54,5 +57,15 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
     tokenWorkspaceIds = null;
     expect((await ticket({ filename: "plan.md", workspaceId: WORKSPACE_B })).status).toBe(200);
     expect(requested).toEqual([WORKSPACE_B]);
+  });
+
+  test("a live editing ticket is read-only where the agent token may not write", async () => {
+    rights = { access: "write", areas: { Arbeit: "propose", Learnings: "read" } };
+    const permission = async (filename: string) => ((await (await ticket({ filename })).json()) as { permission: string }).permission;
+    expect(await permission("Arbeit – Plan.md")).toBe("read");
+    expect(await permission("Learnings – Idee.md")).toBe("read");
+    expect(await permission("Privat – Plan.md")).toBe("write");
+    rights = { access: "propose", areas: {} };
+    expect(await permission("Privat – Plan.md")).toBe("read");
   });
 });

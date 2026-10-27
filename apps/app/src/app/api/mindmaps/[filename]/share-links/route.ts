@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { agentGate, agentWriteRequiredResponse } from "../../../../../lib/agent-gate";
 import { getApiRequestIdentity, type ApiRequestIdentity } from "../../../../../lib/auth";
 import { createShareLink, listShareLinks, revokeShareLink } from "../../../../../lib/db";
 import { publicAppUrl } from "../../../../../lib/deployment";
@@ -18,7 +19,7 @@ async function cloudDocument(request: Request, identity: ApiRequestIdentity, fil
   const store = await getMindmapStorage(request, identity);
   const current = await store.read(filename);
   if (current.storage?.mode !== "database") return null;
-  return current.storage.documentId;
+  return { documentId: current.storage.documentId, workspaceId: current.storage.workspaceId, filename: current.filePath };
 }
 
 function errorResponse(error: unknown) {
@@ -37,8 +38,8 @@ export async function GET(request: Request, { params }: RouteParams) {
   const identity = await getApiRequestIdentity(request);
   if (!identity?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const documentId = await cloudDocument(request, identity, (await params).filename);
-    return NextResponse.json({ links: documentId ? await listShareLinks(identity.userId, documentId) : [] });
+    const document = await cloudDocument(request, identity, (await params).filename);
+    return NextResponse.json({ links: document ? await listShareLinks(identity.userId, document.documentId) : [] });
   } catch (error) {
     return errorResponse(error);
   }
@@ -56,9 +57,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (body.expiresInDays != null && (!Number.isInteger(body.expiresInDays) || body.expiresInDays < 1 || body.expiresInDays > 365)) {
       return NextResponse.json({ error: "Link expiry must be between 1 and 365 days." }, { status: 400 });
     }
-    const documentId = await cloudDocument(request, identity, (await params).filename);
-    if (!documentId) return NextResponse.json({ error: "Read-only links need a map in a BloomMD cloud workspace." }, { status: 400 });
-    const link = await createShareLink({ userId: identity.userId, documentId, expiresInDays: body.expiresInDays, tokenId: identity.tokenId, agentName: identity.agentName });
+    const document = await cloudDocument(request, identity, (await params).filename);
+    if (!document) return NextResponse.json({ error: "Read-only links need a map in a BloomMD cloud workspace." }, { status: 400 });
+    // Publishing a map outside BloomMD needs the right to write in its area.
+    const gate = await agentGate(identity, document.workspaceId, document.filename);
+    if (gate && gate.access !== "write") return agentWriteRequiredResponse(gate, "creating a share link");
+    const link = await createShareLink({ userId: identity.userId, documentId: document.documentId, expiresInDays: body.expiresInDays, tokenId: identity.tokenId, agentName: identity.agentName });
     return NextResponse.json({ id: link.id, url: `${publicAppUrl().replace(/\/+$/, "")}/share/${link.token}`, createdAt: link.createdAt, expiresAt: link.expiresAt }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
@@ -72,8 +76,10 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     assertSameOriginForIdentity(request, identity);
     const { id } = (await readJsonBody<{ id?: string } | null>(request, 16 * 1024)) ?? {};
-    const documentId = await cloudDocument(request, identity, (await params).filename);
-    const revoked = Boolean(id && documentId && await revokeShareLink(identity.userId, documentId, id));
+    const document = await cloudDocument(request, identity, (await params).filename);
+    const gate = document ? await agentGate(identity, document.workspaceId, document.filename) : null;
+    if (gate && gate.access !== "write") return agentWriteRequiredResponse(gate, "revoking a share link");
+    const revoked = Boolean(id && document && await revokeShareLink(identity.userId, document.documentId, id));
     return revoked ? NextResponse.json({ revoked: true }) : NextResponse.json({ error: "Share link not found." }, { status: 404 });
   } catch (error) {
     return errorResponse(error);

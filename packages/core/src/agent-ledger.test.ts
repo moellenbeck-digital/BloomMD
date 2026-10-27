@@ -12,6 +12,7 @@ import {
   knowledgeVersion,
   outlineDiff,
   parseAccessConfig,
+  strictAccessConfig,
   vaultArea,
   type AgentDocuments,
   type AgentStateFiles,
@@ -73,6 +74,17 @@ describe("rights", () => {
     expect(accessFor({ access: "write", areas: { "Arbeit/Plan": "write", "arbeit/PLAN": "propose" } }, "Arbeit/Plan")).toBe("propose");
     expect(accessFor({ access: "write", areas: { "": "read" } }, "")).toBe("read");
     expect(accessFor({ access: "write", areas: { "": "read" } }, "Arbeit")).toBe("write");
+  });
+
+  test("strict rights from a request are normalized; invalid ones are refused", () => {
+    expect(strictAccessConfig({ access: "propose", areas: { " Learnings / dev-team ": "write", Arbeit: "read", arbeit: "write" } })).toEqual({ access: "propose", areas: { "Learnings/dev-team": "write", Arbeit: "read" } });
+    expect(strictAccessConfig({ access: "read" })).toEqual({ access: "read", areas: {} });
+    expect(() => strictAccessConfig({ access: "admin" })).toThrow(/read, propose or write/);
+    expect(() => strictAccessConfig(null)).toThrow(/read, propose or write/);
+    expect(() => strictAccessConfig({ access: "read", areas: { Arbeit: "nope" } })).toThrow(/"Arbeit" must be/);
+    expect(() => strictAccessConfig({ access: "read", areas: { " / ": "read" } })).toThrow(/needs a name/);
+    expect(() => strictAccessConfig({ access: "read", areas: [] })).toThrow(/object/);
+    expect(() => strictAccessConfig({ access: "read", areas: Object.fromEntries(Array.from({ length: 101 }, (_, index) => [`a${index}`, "read"])) })).toThrow(/At most 100/);
   });
 
   test("area helpers fold names and read the area from a cloud file name", () => {

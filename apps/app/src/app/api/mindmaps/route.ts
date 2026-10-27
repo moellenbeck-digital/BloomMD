@@ -4,6 +4,8 @@ import type { MindMapDocument, MindMapNode } from "@bloommd/core/types";
 import { NextResponse } from "next/server";
 import { getApiRequestIdentity } from "../../../lib/auth";
 import { auditAgentWrite } from "../../../lib/agent-audit";
+import { agentProposalResponse, logAgentChange } from "../../../lib/agent-access";
+import { agentGate, agentReadOnlyResponse, readAgentMeta } from "../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
 import { createThroughSyncServer, SyncMutationError, type SyncRoomSaveResult } from "../../../lib/sync-room-status";
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
   try {
     assertSameOriginForIdentity(request, identity);
     const store = await getMindmapStorage(request, identity);
-    const { filename, markdown } = await readJsonBody<{ filename?: string; markdown?: string }>(request, 11 * 1024 * 1024);
+    const { filename, markdown, agentMeta } = await readJsonBody<{ filename?: string; markdown?: string; agentMeta?: unknown }>(request, 11 * 1024 * 1024);
     if (!filename || !markdown) {
       return NextResponse.json({ error: "filename and markdown are required" }, { status: 400 });
     }
@@ -85,6 +87,11 @@ export async function POST(request: Request) {
       safeName = `${stem}-${crypto.randomUUID().slice(0, 8)}${extension}`;
     }
     const doc = parseFile(safeName, markdown);
+    // Agent tokens create maps only within their rights; the area comes from the file name.
+    const gate = store.mode === "database" ? await agentGate(identity, store.workspace?.id, safeName) : null;
+    const meta = readAgentMeta(agentMeta);
+    if (gate?.access === "read") return agentReadOnlyResponse(gate);
+    if (gate?.access === "propose") return agentProposalResponse(gate, { markdown, baseVersion: null, defaultSummary: `New map "${safeName}"`, meta, defaultTool: "api:create" });
     let saved: MindMapDocument | SyncRoomSaveResult;
     if (store.mode === "database") {
       if (!identity.userId || !store.workspace) {
@@ -106,9 +113,13 @@ export async function POST(request: Request) {
       saved = await store.write(doc);
     }
     await auditAgentWrite(identity, saved.storage);
+    const changeId = gate ? await logAgentChange(gate, { event: "written", createdMap: true, afterVersion: saved.storage?.version, meta, defaultTool: "api:create", defaultSummary: `New map "${safeName}"`, filename: saved.filePath }).catch((error: unknown) => {
+      console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
+      return undefined;
+    }) : undefined;
 
     return NextResponse.json(
-      { filePath: saved.filePath, frontmatter: saved.frontmatter, storage: saved.storage },
+      { filePath: saved.filePath, frontmatter: saved.frontmatter, storage: saved.storage, ...(gate ? { mode: "written", changeId } : {}) },
       { status: 201 },
     );
   } catch (err) {

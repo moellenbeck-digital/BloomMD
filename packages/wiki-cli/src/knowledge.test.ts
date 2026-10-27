@@ -9,7 +9,7 @@ import { parseFile } from "@bloommd/core/parser";
 import { lintWikiBundle } from "@bloommd/core/wiki";
 import { createMcpParser } from "./mcp";
 import { knowledgeServerOptions } from "./knowledge-mcp";
-import { dueSummary } from "./agent-cli";
+import { AGENT_USAGE, dueSummary, runAgentCli, staleSummary } from "./agent-cli";
 import { KnowledgeService } from "./knowledge-service";
 import { CloudKnowledgeStore, nodeStateFiles, safeVaultPath, VaultKnowledgeStore, writeAccessConfig } from "./knowledge-store";
 
@@ -50,7 +50,7 @@ describe("vault knowledge", () => {
     expect((service.templates("learning") as { area: string; skeleton: Array<{ title: string }> })).toEqual(expect.objectContaining({ id: "learning", area: "Learnings" }));
     expect((service.templates() as { templates: Array<{ id: string }> }).templates.map((template) => template.id)).toContain("learning");
     const created = await service.createMap({
-      area: "", title: "Bun-Lockfile", template: "learning", scope: "BloomMD, coder", source: "Ticket #109", tags: ["coder"],
+      area: "", title: "Bun-Lockfile", template: "learning", frontmatter: { scope: "BloomMD, coder" }, source: "Ticket #109", tags: ["coder"],
       nodes: [{ parent: "regel", title: "bun install --frozen-lockfile nutzen" }],
     });
     expect(created.path).toBe("Learnings/Bun-Lockfile.md");
@@ -67,8 +67,8 @@ describe("vault knowledge", () => {
     // The same file passes the wiki lint (only the missing index.md link is reported).
     const issues = await lintWikiBundle(join(root, "Learnings"));
     expect(issues.filter((issue) => !["unindexed-page", "missing-reserved-file"].includes(issue.code))).toEqual([]);
-    // Other templates stay without type/status/stale_after.
-    const meeting = await service.createMap({ area: "Arbeit", title: "Sync", template: "meeting", scope: "ignored" });
+    // Other templates stay without type/status/stale_after/scope unless the call sets them.
+    const meeting = await service.createMap({ area: "Arbeit", title: "Sync", template: "meeting" });
     const meetingMarkdown = await readFile(join(root, meeting.path), "utf8");
     expect(meetingMarkdown).not.toMatch(/^(type|status|stale_after|scope):/m);
   });
@@ -501,5 +501,273 @@ describe("requests from map nodes", () => {
     const failed = await owner.createRequest({ path: "Arbeit/Plan.md", question: "?" });
     expect(((await call("bloommd_answer_request", { id: failed.id, answer: "Unklar", failed: true })) as { request: { status: string } }).request.status).toBe("failed");
     await expect(call("bloommd_answer_request", { id: "rnope", answer: "x" })).rejects.toThrow(/not found/);
+  });
+});
+
+const NOW = new Date("2026-10-27T08:00:00Z");
+
+/** A vault with learnings in every state the search has to tell apart. */
+async function learnings() {
+  const { root, service } = await vault();
+  await mkdir(join(root, "Learnings"), { recursive: true });
+  const note = (name: string, fields: string[], body: string) => writeFile(join(root, "Learnings", `${name}.md`), `---\ntitle: "${name}"\n${fields.join("\n")}\n---\n\n# ${name}\n\n## Regel\n\n${body}\n`, "utf8");
+  await note("Bun-Lockfile", ['status: "neu"', 'scope: "BloomMD, coder"', "created: 2026-10-01", 'stale_after: "2027-01-01"', 'tags: ["bereich/learnings", "coder"]'], "Lockfile nur mit festgelegter Version erzeugen.");
+  await note("Alt-Learning", ['status: "bestätigt"', 'scope: "BloomMD, tester"', "created: 2026-06-01", 'stale_after: "2026-10-01"', 'tags: ["tester"]', "verified:", "  - by: Max", "    at: 2026-09-15"], "Lockfile prüfen.");
+  await note("Ersetzt-Learning", ['status: "ersetzt"', 'replaced_by: "Learnings/Bun-Lockfile.md"', 'scope: "BloomMD, coder"', 'stale_after: "2027-02-01"', 'tags: ["coder"]'], "Lockfile alt.");
+  await note("Veraltet-Learning", ['status: "veraltet"', 'tags: ["coder"]'], "Lockfile veraltet.");
+  await note("Heute-Learning", ['status: "neu"', 'stale_after: "2026-10-27"', 'tags: ["architect"]'], "Läuft heute ab.");
+  await note("Bald-Learning", ['status: "neu"', 'scope: "BloomMD, Wiki-CLI"', 'stale_after: "2026-11-03"', 'tags: ["coder"]'], "Läuft nächste Woche ab.");
+  await writeFile(join(root, "Learnings", "Ohne-Felder.md"), "# Ohne-Felder\n\n## Notiz\n\nLockfile erwähnt.\n", "utf8");
+  return { root, service };
+}
+
+const paths = (hits: Array<{ path: string }>) => [...new Set(hits.map((hit) => hit.path.replace("Learnings/", "").replace(".md", "")))].sort();
+
+describe("trust fields through the knowledge service", () => {
+  test("create_map writes the fields; given values override the learning template, others keep its defaults", async () => {
+    const { root, service } = await vault();
+    const defaults = await service.createMap({ area: "", title: "Standard", template: "learning" });
+    expect(await readFile(join(root, defaults.path), "utf8")).toContain('status: "neu"');
+    expect(defaults.frontmatter).toBeUndefined();
+    const created = await service.createMap({
+      area: "", title: "Überschrieben", template: "learning",
+      frontmatter: { status: "bestätigt", stale_after: "2027-06-30", scope: "BloomMD, tester", verified: { by: "Max", at: "2026-10-27" } },
+    });
+    expect(created.frontmatter).toEqual(["status", "stale_after", "scope", "verified"]);
+    const markdown = await readFile(join(root, created.path), "utf8");
+    const data = parseFile(created.path, markdown).frontmatter as unknown as Record<string, unknown>;
+    expect(data).toEqual(expect.objectContaining({ type: "learning", status: "bestätigt", stale_after: "2027-06-30", scope: "BloomMD, tester", verified: [{ by: "Max", at: "2026-10-27" }] }));
+    expect(markdown.match(/^status:/gm)).toHaveLength(1);
+    expect(markdown.match(/^stale_after:/gm)).toHaveLength(1);
+    // A map without a template gets exactly the fields it was given.
+    const plain = await service.createMap({ area: "Arbeit", title: "Alt", frontmatter: { status: "ersetzt", replaced_by: "Arbeit/Neu.md" } });
+    const plainMarkdown = await readFile(join(root, plain.path), "utf8");
+    expect(plainMarkdown).toContain('status: "ersetzt"');
+    expect(plainMarkdown).toContain('replaced_by: "Arbeit/Neu.md"');
+    expect(plainMarkdown).not.toMatch(/^(type|stale_after|scope|verified):/m);
+    expect(await service.createMap({ area: "Arbeit", title: "Ohne" }).then((result) => result.frontmatter)).toBeUndefined();
+  });
+
+  test("update_map changes only the fields given, keeps the rest byte for byte, and can be undone", async () => {
+    const { root, service } = await vault();
+    const created = await service.createMap({ area: "Learnings", title: "Regel", template: "learning", frontmatter: { scope: "BloomMD, coder" }, source: "Ticket #110", nodes: [{ parent: "regel", title: "Tue es", content: "Details" }] });
+    const before = await readFile(join(root, created.path), "utf8");
+    const read = await service.getMap(created.path);
+    const result = await service.updateMap({ path: created.path, version: read.version, frontmatter: { status: "bestätigt", stale_after: "2027-03-01", verified: { by: "Max", at: "2026-10-27" } }, reason: "Zweiter Beleg" });
+    expect(result).toEqual(expect.objectContaining({ mode: "written", created: [], updated: [], frontmatter: ["status", "stale_after", "verified"] }));
+    expect(result.version).not.toBe(read.version);
+    const after = await readFile(join(root, created.path), "utf8");
+    const staleBefore = /^stale_after: ".*"$/m.exec(before)![0];
+    expect(after).toBe(before
+      .replace('status: "neu"', 'status: "bestätigt"')
+      .replace(staleBefore, 'stale_after: "2027-03-01"')
+      .replace(/\n---\n/, '\nverified:\n  - by: "Max"\n    at: "2026-10-27"\n---\n'));
+    // A second sign-off is appended to the list.
+    const second = await service.updateMap({ path: created.path, frontmatter: { verified: { by: "Anna", at: "2026-10-28" } } });
+    expect(parseFile(created.path, await readFile(join(root, created.path), "utf8")).frontmatter).toEqual(expect.objectContaining({ verified: [{ by: "Max", at: "2026-10-27" }, { by: "Anna", at: "2026-10-28" }] }));
+    // Log and undo work like for node changes.
+    expect((await service.changes()).changes[0]).toEqual(expect.objectContaining({ tool: "bloommd_update_map", path: created.path }));
+    await service.undo(second.changeId!);
+    await service.undo(result.changeId!);
+    expect(await readFile(join(root, created.path), "utf8")).toBe(before);
+  });
+
+  test("nodes and fields in one call; a map without ids is not touched when only fields change", async () => {
+    const { root, service } = await vault();
+    const raw = "# Physik\n\n## Optik\n\nLicht.\n";
+    await writeFile(join(root, "Schule", "Roh.md"), raw, "utf8");
+    await service.updateMap({ path: "Schule/Roh.md", frontmatter: { status: "neu" } });
+    expect(await readFile(join(root, "Schule", "Roh.md"), "utf8")).toBe(`---\nstatus: "neu"\n---\n${raw}`);
+    const both = await service.updateMap({ path: "Schule/Roh.md", nodes: [{ title: "Neu", content: "x" }], frontmatter: { scope: "Physik" } });
+    expect(both.created).toHaveLength(1);
+    expect(both.frontmatter).toEqual(["scope"]);
+    expect(await readFile(join(root, "Schule", "Roh.md"), "utf8")).toContain('scope: "Physik"');
+  });
+
+  test("invalid input writes nothing; neither nodes nor fields is refused", async () => {
+    const { root, service } = await vault();
+    const before = await readFile(join(root, "Schule", "Physik.md"), "utf8");
+    await expect(service.updateMap({ path: "Schule/Physik.md" })).rejects.toThrow(/nodes or at least one of status/);
+    await writeFile(join(root, "Schule", "Kaputt.md"), "---\nverified: Max\n---\n# K\n", "utf8");
+    await expect(service.updateMap({ path: "Schule/Kaputt.md", frontmatter: { verified: { by: "A", at: "2026-10-27" } } })).rejects.toThrow(/not a list/);
+    expect(await readFile(join(root, "Schule", "Physik.md"), "utf8")).toBe(before);
+    expect(await readFile(join(root, "Schule", "Kaputt.md"), "utf8")).toBe("---\nverified: Max\n---\n# K\n");
+  });
+
+  test("in a propose area the field change becomes a proposal and the file stays as it is", async () => {
+    const { root, service } = await vault("propose");
+    const before = await readFile(join(root, "Schule", "Physik.md"), "utf8");
+    const result = await service.updateMap({ path: "Schule/Physik.md", frontmatter: { status: "veraltet" } });
+    expect(result.mode).toBe("proposed");
+    expect(result.frontmatter).toEqual(["status"]);
+    expect(await readFile(join(root, "Schule", "Physik.md"), "utf8")).toBe(before);
+    await service.applyProposal(result.proposalId!, "Max");
+    expect(await readFile(join(root, "Schule", "Physik.md"), "utf8")).toContain('status: "veraltet"');
+  });
+});
+
+describe("search with frontmatter, filters and expiry", () => {
+  test("finds tags and frontmatter values with their own hit kind, and shows status, expiry and age", async () => {
+    const { service } = await learnings();
+    const byTag = await service.search("tester", { now: NOW, includeStale: true });
+    expect(byTag.hits).toEqual([expect.objectContaining({ path: "Learnings/Alt-Learning.md", nodeId: "", kind: "frontmatter", field: "tags", snippet: "tags: tester", status: "bestätigt", stale_after: "2026-10-01", expired: true, ageDays: 148 })]);
+    const byScope = await service.search("wiki-cli", { now: NOW });
+    expect(byScope.hits).toEqual([expect.objectContaining({ path: "Learnings/Bald-Learning.md", kind: "frontmatter", field: "scope", expired: false })]);
+    const byStatus = await service.search("neu", { now: NOW });
+    expect(paths(byStatus.hits)).toEqual(["Bald-Learning", "Bun-Lockfile", "Heute-Learning"]);
+    // Node hits keep their shape and carry the trust fields of their map.
+    const node = (await service.search("festgelegter version", { now: NOW })).hits;
+    expect(node).toEqual([expect.objectContaining({ path: "Learnings/Bun-Lockfile.md", kind: "node", title: "Regel", status: "neu", stale_after: "2027-01-01", expired: false, ageDays: 26 })]);
+    expect(node[0]!.nodeId).not.toBe("");
+    // Age counts from the last verification when there is no `created`.
+    const verified = await service.search("lockfile prüfen", { now: NOW, includeStale: true });
+    expect(verified.hits[0]).toEqual(expect.objectContaining({ ageDays: 148 }));
+  });
+
+  test("hits of a map without these fields stay as before", async () => {
+    const { service } = await learnings();
+    const { hits } = await service.search("erwähnt", { now: NOW });
+    expect(hits).toEqual([{ path: "Learnings/Ohne-Felder.md", kind: "node", nodeId: expect.any(String), title: "Notiz", snippet: "Notiz Lockfile erwähnt." }]);
+    expect(hits[0]).not.toHaveProperty("status");
+    expect(hits[0]).not.toHaveProperty("expired");
+    expect(hits[0]).not.toHaveProperty("ageDays");
+  });
+
+  test("expired and veraltet/ersetzt maps are left out unless includeStale is set", async () => {
+    const { service } = await learnings();
+    const standard = await service.search("lockfile", { now: NOW });
+    expect(paths(standard.hits)).toEqual(["Bun-Lockfile", "Ohne-Felder"]);
+    const all = await service.search("lockfile", { now: NOW, includeStale: true });
+    expect(paths(all.hits)).toEqual(["Alt-Learning", "Bun-Lockfile", "Ersetzt-Learning", "Ohne-Felder", "Veraltet-Learning"]);
+    // A map that expires today is not expired yet in the search.
+    expect(paths((await service.search("läuft heute", { now: NOW })).hits)).toEqual(["Heute-Learning"]);
+    expect(paths((await service.search("läuft heute", { now: new Date("2026-10-28T08:00:00Z") })).hits)).toEqual([]);
+  });
+
+  test("an explicit status filter wins over the default exclusion", async () => {
+    const { service } = await learnings();
+    expect(paths((await service.search("lockfile", { now: NOW, status: "veraltet" })).hits)).toEqual(["Veraltet-Learning"]);
+    expect(paths((await service.search("lockfile", { now: NOW, status: "ersetzt" })).hits)).toEqual(["Ersetzt-Learning"]);
+    // Also for an expired map whose status is not veraltet.
+    expect(paths((await service.search("lockfile", { now: NOW, status: "bestätigt" })).hits)).toEqual(["Alt-Learning"]);
+  });
+
+  test("tag is exact and case-insensitive, scope a substring; an empty query lists the matching maps", async () => {
+    const { service } = await learnings();
+    const coder = await service.search("", { now: NOW, tag: "CODER" });
+    expect(coder.hits.map((hit) => [hit.path, hit.kind, hit.nodeId])).toEqual([
+      ["Learnings/Bald-Learning.md", "map", ""],
+      ["Learnings/Bun-Lockfile.md", "map", ""],
+    ]);
+    expect(coder.hits[1]).toEqual(expect.objectContaining({ title: "Bun-Lockfile", snippet: "status: neu; scope: BloomMD, coder; tags: bereich/learnings, coder", status: "neu", ageDays: 26 }));
+    expect(paths((await service.search("", { now: NOW, tag: "code" })).hits)).toEqual([]);
+    expect(paths((await service.search("", { now: NOW, scope: "bloommd" })).hits)).toEqual(["Bald-Learning", "Bun-Lockfile"]);
+    expect(paths((await service.search("", { now: NOW, scope: "WIKI" })).hits)).toEqual(["Bald-Learning"]);
+    expect(paths((await service.search("", { now: NOW, tag: "coder", scope: "coder", includeStale: true })).hits)).toEqual(["Bun-Lockfile", "Ersetzt-Learning"]);
+    expect(paths((await service.search("lockfile", { now: NOW, tag: "coder", scope: "wiki" })).hits)).toEqual([]);
+    expect(paths((await service.search("", { now: NOW, status: "neu", area: "learnings" })).hits)).toEqual(["Bald-Learning", "Bun-Lockfile", "Heute-Learning"]);
+    await expect(service.search("", { now: NOW })).rejects.toThrow(/query must not be empty/);
+    await expect(service.search("  ")).rejects.toThrow(/query must not be empty/);
+  });
+
+  test("the limit counts frontmatter hits too", async () => {
+    const { service } = await learnings();
+    const { hits } = await service.search("coder", { now: NOW, includeStale: true, limit: 2 });
+    expect(hits).toHaveLength(2);
+  });
+});
+
+describe("stale maps", () => {
+  test("lists expired maps most overdue first, with the days overdue", async () => {
+    const { service } = await learnings();
+    const { stale } = await service.stale({ now: NOW });
+    expect(stale).toEqual([
+      { path: "Learnings/Alt-Learning.md", title: "Alt-Learning", status: "bestätigt", stale_after: "2026-10-01", daysOverdue: 26, scope: "BloomMD, tester" },
+      { path: "Learnings/Heute-Learning.md", title: "Heute-Learning", status: "neu", stale_after: "2026-10-27", daysOverdue: 0 },
+    ]);
+  });
+
+  test("days adds maps that expire soon; filters narrow the list", async () => {
+    const { service } = await learnings();
+    const week = await service.stale({ now: NOW, days: 7 });
+    expect(week.stale.map((entry) => [entry.title, entry.daysOverdue])).toEqual([["Alt-Learning", 26], ["Heute-Learning", 0], ["Bald-Learning", -7]]);
+    expect((await service.stale({ now: NOW, days: 6 })).stale.map((entry) => entry.title)).toEqual(["Alt-Learning", "Heute-Learning"]);
+    expect((await service.stale({ now: NOW, days: 7, tag: "coder" })).stale.map((entry) => entry.title)).toEqual(["Bald-Learning"]);
+    expect((await service.stale({ now: NOW, days: 7, scope: "tester" })).stale.map((entry) => entry.title)).toEqual(["Alt-Learning"]);
+    expect((await service.stale({ now: NOW, days: 365, area: "schule" })).stale).toEqual([]);
+    expect((await service.stale({ now: NOW, days: 365, area: "LEARNINGS" })).stale.map((entry) => entry.title)).toEqual(["Alt-Learning", "Heute-Learning", "Bald-Learning", "Bun-Lockfile", "Ersetzt-Learning"]);
+  });
+
+  test("maps without stale_after never show up", async () => {
+    const { service } = await vault();
+    expect(await service.stale({ now: NOW, days: 3650 })).toEqual({ stale: [] });
+  });
+
+  test("agent stale: a short text list, NO_REPLY when there is nothing", async () => {
+    const empty = await vault();
+    expect(await staleSummary(empty.service, 0, NOW)).toBe("NO_REPLY");
+    const { service } = await learnings();
+    expect(await staleSummary(service, 0, NOW)).toBe([
+      "🗂️ BloomMD-Maps zur Prüfung",
+      "",
+      "Abgelaufen (2):",
+      "• Alt-Learning (BloomMD, tester) – Learnings/Alt-Learning.md, bestätigt, seit 2026-10-01 (26 Tage überfällig)",
+      "• Heute-Learning – Learnings/Heute-Learning.md, neu, heute abgelaufen",
+    ].join("\n"));
+    const week = await staleSummary(service, 7, NOW);
+    expect(week).toContain("Läuft in den nächsten 7 Tagen ab (1):\n• Bald-Learning (BloomMD, Wiki-CLI) – Learnings/Bald-Learning.md, neu, läuft ab 2026-11-03");
+    expect(AGENT_USAGE).toContain("agent stale <ziel> [--days <n>]");
+  });
+
+  test("bloommd-wiki agent stale prints the list, and NO_REPLY for an empty vault", async () => {
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => { lines.push(args.join(" ")); };
+    try {
+      const empty = await vault();
+      expect(await runAgentCli(["stale", empty.root], "test")).toBe(0);
+      const { root } = await learnings();
+      expect(await runAgentCli(["stale", root, "--days", "7"], "test")).toBe(0);
+    } finally {
+      console.log = original;
+    }
+    expect(lines[0]).toBe("NO_REPLY");
+    expect(lines[1]).toContain("Läuft in den nächsten 7 Tagen ab");
+    expect(lines[1]).toContain("Alt-Learning");
+  });
+});
+
+describe("trust fields through the MCP tools", () => {
+  test("lists bloommd_stale as read-only and documents the new parameters", () => {
+    const tools = knowledgeServerOptions({}, "test").tools;
+    const byName = new Map(tools.map((tool) => [tool.name, tool]));
+    expect(byName.get("bloommd_stale")?.annotations?.readOnlyHint).toBe(true);
+    const props = (name: string) => Object.keys((byName.get(name)!.inputSchema as { properties: Record<string, unknown> }).properties);
+    expect(props("bloommd_create_map")).toEqual(expect.arrayContaining(["title", "area", "tags", "source", "status", "stale_after", "verified", "scope", "replaced_by"]));
+    expect(props("bloommd_update_map")).toEqual(expect.arrayContaining(["nodes", "status", "stale_after", "verified", "scope", "replaced_by"]));
+    expect(props("bloommd_search")).toEqual(expect.arrayContaining(["query", "area", "status", "tag", "scope", "includeStale"]));
+    expect((byName.get("bloommd_search")!.inputSchema as { required?: string[] }).required).toBeUndefined();
+    expect((byName.get("bloommd_update_map")!.inputSchema as { required: string[] }).required).toEqual(["path"]);
+    expect(knowledgeServerOptions({}, "test").instructions).toContain("bloommd_stale");
+    expect(byName.get("bloommd_templates")!.description).toContain("bloommd_stale");
+  });
+
+  test("create, update, search and stale work end to end; invalid input is an input error", async () => {
+    const { service } = await vault();
+    const call = knowledgeServerOptions({ vault: service }, "test").call;
+    const created = await call("bloommd_create_map", { area: "Learnings", title: "Per MCP", template: "learning", scope: "BloomMD, coder", stale_after: "2020-01-01", status: "neu", tags: ["coder"] }) as { path: string; frontmatter: string[] };
+    expect(created.frontmatter).toEqual(["status", "stale_after", "scope"]);
+    expect(((await call("bloommd_search", { query: "per mcp" })) as { hits: unknown[] }).hits).toEqual([]);
+    expect(((await call("bloommd_search", { query: "", tag: "coder", includeStale: true })) as { hits: Array<{ expired: boolean }> }).hits).toEqual([expect.objectContaining({ expired: true })]);
+    expect(((await call("bloommd_stale", { tag: "coder" })) as { stale: Array<{ path: string; daysOverdue: number }> }).stale).toEqual([expect.objectContaining({ path: created.path })]);
+    await call("bloommd_update_map", { path: created.path, stale_after: "2099-01-01", status: "bestätigt", verified: { by: "Max", at: "2026-10-27" } });
+    expect(((await call("bloommd_stale", {})) as { stale: unknown[] }).stale).toEqual([]);
+    expect(((await call("bloommd_stale", { days: 100000 })) as { stale: unknown[] }).stale).toHaveLength(1);
+    expect(((await call("bloommd_search", { query: "per mcp" })) as { hits: unknown[] }).hits.length).toBeGreaterThan(0);
+    for (const args of [{ status: "stable" }, { stale_after: "2026-02-30" }, { verified: { by: "Max" } }, { scope: "a".repeat(400) }, { replaced_by: "x.md" }, { status: "bestätigt", replaced_by: "x.md" }, {}]) {
+      await expect(call("bloommd_update_map", { path: created.path, ...args })).rejects.toThrow();
+    }
+    await expect(call("bloommd_create_map", { area: "A", title: "B", replaced_by: "x.md" })).rejects.toThrow(/only allowed together with status ersetzt/);
+    expect(await service.getMap(created.path).then((map) => map.nodes.length)).toBeGreaterThan(0);
   });
 });

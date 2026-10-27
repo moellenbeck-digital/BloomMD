@@ -21,12 +21,14 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   agent reject <ziel> <id> --reviewer <name> [--reason <text>]
   agent due <ziel> [--days <n>]             Fällige und überfällige Aufgaben (für Routinen;
                                             ohne Treffer: NO_REPLY)
+  agent stale <ziel> [--days <n>]           Maps mit abgelaufenem stale_after, mit --days auch
+                                            die der nächsten n Tage (ohne Treffer: NO_REPLY)
   agent log <ziel> [--limit <n>]            Änderungsprotokoll
   agent undo <ziel> <change-id>             Änderung zurücknehmen (auch freigegebene)
 
   <ziel> ist ein Vault-Ordner oder --cloud <url> [--workspace <id>] wie bei agent mcp
   (Rechte, Protokoll und Vorschläge des Cloud-Workspace liegen auf diesem Rechner).
-  approve, undo, due und log mit --cloud brauchen BLOOMMD_TOKEN.`;
+  approve, undo, due, stale und log mit --cloud brauchen BLOOMMD_TOKEN.`;
 
 export class AgentUsageError extends Error {}
 
@@ -142,6 +144,11 @@ export async function runAgentCli(args: string[], version: string): Promise<numb
       console.log(await dueSummary(ownerTarget(rest, params).service, Number.isFinite(days) && days >= 0 ? days : 0));
       return 0;
     }
+    case "stale": {
+      const days = Number(flag(rest, "--days") ?? 0);
+      console.log(await staleSummary(ownerTarget(rest, params).service, Number.isInteger(days) && days >= 0 ? days : 0));
+      return 0;
+    }
     case "log": {
       const limit = Number(flag(rest, "--limit") ?? 20);
       console.log(JSON.stringify(await ownerTarget(rest, params).service.changes(Number.isFinite(limit) ? limit : 20), null, 2));
@@ -179,5 +186,22 @@ export async function dueSummary(service: KnowledgeService, days: number, now = 
     "📋 BloomMD-Aufgaben",
     ...(overdue.length ? ["", `Überfällig (${overdue.length}):`, ...overdue.map(line)] : []),
     ...(due.length ? ["", days === 0 ? `Heute fällig (${due.length}):` : `Fällig bis ${isoDay(days, now)} (${due.length}):`, ...due.map(line)] : []),
+  ].join("\n");
+}
+
+/**
+ * Maps whose `stale_after` has passed (and, with `days`, those expiring within that many days) as
+ * a short message; `NO_REPLY` when there are none, so a scheduled routine stays silent.
+ */
+export async function staleSummary(service: KnowledgeService, days: number, now = new Date()): Promise<string> {
+  const { stale } = await service.stale({ days, now });
+  if (stale.length === 0) return "NO_REPLY";
+  const line = (entry: (typeof stale)[number]) => `• ${entry.title}${entry.scope ? ` (${entry.scope})` : ""} – ${entry.path}${entry.status ? `, ${entry.status}` : ""}, ${entry.daysOverdue > 0 ? `seit ${entry.stale_after} (${entry.daysOverdue} ${entry.daysOverdue === 1 ? "Tag" : "Tage"} überfällig)` : entry.daysOverdue === 0 ? "heute abgelaufen" : `läuft ab ${entry.stale_after}`}`;
+  const expired = stale.filter((entry) => entry.daysOverdue >= 0);
+  const expiring = stale.filter((entry) => entry.daysOverdue < 0);
+  return [
+    "🗂️ BloomMD-Maps zur Prüfung",
+    ...(expired.length ? ["", `Abgelaufen (${expired.length}):`, ...expired.map(line)] : []),
+    ...(expiring.length ? ["", `Läuft in den nächsten ${days} ${days === 1 ? "Tag" : "Tagen"} ab (${expiring.length}):`, ...expiring.map(line)] : []),
   ].join("\n");
 }

@@ -102,6 +102,24 @@ neu → bestätigt → veraltet → ersetzt
 Statuswechsel sind Änderungen wie jede andere: `bloommd_update_map` bzw. Bearbeitung der Datei, mit Protokoll
 und Undo.
 
+## Felder setzen, finden und prüfen (Wissens-MCP)
+
+- **Schreiben:** `bloommd_create_map` und `bloommd_update_map` nehmen `status`, `stale_after`, `verified`
+  (`{by, at}`), `scope` und `replaced_by`. Beim Anlegen überschreiben `status` und `stale_after` die Werte der
+  Vorlage (`neu`, heute plus 90 Tage). `bloommd_update_map` ändert nur die mitgegebenen Felder und braucht dann
+  keine `nodes`. `verified` hängt einen Eintrag an die Liste an und ersetzt sie nie. `replaced_by` ist nur
+  zusammen mit `status: ersetzt` erlaubt. Ungültige Eingaben (Status außerhalb der vier Wörter, kein echtes
+  Datum, Text über mehrere Zeilen oder zu lang) lehnt der Server ab.
+- **Finden:** `bloommd_search` durchsucht zusätzlich `tags`, `scope`, `source`, `status` und `title` im
+  Frontmatter (Trefferart `frontmatter`, `nodeId` leer) und filtert mit `status` (exakt), `tag` (exakt, ohne
+  Beachtung der Groß-/Kleinschreibung) und `scope` (Teilstring); mit Filter darf `query` leer sein. Jeder Treffer
+  nennt `status`, `stale_after`, `expired` und `ageDays` (ab `created`, sonst ab dem letzten `verified.at`), soweit
+  die Map sie hat.
+- **Abgelaufenes:** Die Suche liefert Maps mit überschrittenem `stale_after` und Status `veraltet` oder `ersetzt`
+  nur mit `includeStale: true`; ein `status`-Filter hat Vorrang. `bloommd_stale` (nur lesend) listet Maps mit
+  `stale_after` bis heute, mit `days` auch die der nächsten n Tage; `bloommd-wiki agent stale <ziel> [--days <n>]`
+  gibt dasselbe als kurze Liste aus (leer: `NO_REPLY`), z. B. für eine tägliche Routine.
+
 ## Anlegen
 
 1. **Suchen vor anlegen:** `bloommd_search` im Bereich `Learnings` nach Symptom und Stichworten. Gibt es das

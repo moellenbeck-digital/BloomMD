@@ -2,7 +2,7 @@
  * `bloommd-wiki agent-mcp`: the MCP tools an agent (OpenClaw, Claude) uses to file notes into
  * BloomMD maps and act on them. There is deliberately no tool to approve proposals.
  */
-import { parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
+import { KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import type { McpServerOptions, McpTool } from "./mcp";
 import type { KnowledgeService } from "./knowledge-service";
 
@@ -47,6 +47,21 @@ const changeMeta = {
   source: { type: "string", description: "Where the information came from (file, meeting, recording)." },
 };
 
+/** Trust and lifecycle fields of a map (frontmatter); see docs/LEARNINGS.md. */
+const trustProperties = {
+  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet or ersetzt." },
+  stale_after: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date YYYY-MM-DD from which the map is to be checked again." },
+  verified: {
+    type: "object",
+    additionalProperties: false,
+    description: "Who confirmed the map; appended to the existing verified list, never replacing it.",
+    properties: { by: { type: "string", description: "Short one-line name of who confirmed it." }, at: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date YYYY-MM-DD." } },
+    required: ["by", "at"],
+  },
+  scope: { type: "string", description: "Where the map applies (brand, role, component), one line, e.g. 'BloomMD, coder'." },
+  replaced_by: { type: "string", description: "Path of the successor map; only together with status ersetzt." },
+};
+
 export const KNOWLEDGE_TOOLS: McpTool[] = [
   {
     name: "bloommd_overview",
@@ -59,8 +74,31 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_search",
     title: "Suchen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Full-text search over node titles and content, to find where new information belongs before creating a map.",
-    inputSchema: { type: "object", additionalProperties: false, properties: { query: { type: "string" }, area: { type: "string" }, ...targetProperty }, required: ["query"] },
+    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt are left out unless includeStale is true (a status filter always applies as given).",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        query: { type: "string", description: "Text to find; may be empty when status, tag or scope is given." },
+        area: { type: "string" },
+        status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt)." },
+        tag: { type: "string", description: "Only maps with this tag (exact, case-insensitive), e.g. a role like coder." },
+        scope: { type: "string", description: "Only maps whose scope contains this text (case-insensitive), e.g. a component." },
+        includeStale: { type: "boolean", description: "Also return expired maps and maps with status veraltet or ersetzt." },
+        ...targetProperty,
+      },
+    },
+  },
+  {
+    name: "bloommd_stale",
+    title: "Abgelaufene Maps",
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { area: { type: "string" }, tag: { type: "string" }, scope: { type: "string", description: "Only maps whose scope contains this text." }, days: { type: "integer", minimum: 0, maximum: 3650, description: "Also list maps that expire within the next n days." }, ...targetProperty },
+    },
   },
   {
     name: "bloommd_get_map",
@@ -73,14 +111,14 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_templates",
     title: "Vorlagen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Templates for filing material: meeting, conversation, discussion, lesson (school), project, weekly, learning. Without id: the list; with id: skeleton and filling guidance.",
+    description: "Templates for filing material: meeting, conversation, discussion, lesson (school), project, weekly, learning. Without id: the list; with id: skeleton and filling guidance. Learnings carry status, scope, stale_after and verified in the frontmatter: set them with bloommd_create_map/bloommd_update_map, find them with the status, tag and scope filters of bloommd_search, and list expired ones with bloommd_stale.",
     inputSchema: { type: "object", additionalProperties: false, properties: { id: { type: "string" } } },
   },
   {
     name: "bloommd_create_map",
     title: "Map anlegen",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: "Create a new map in an area, optionally from a template whose skeleton refs (e.g. 'aufgaben', 'begriffe') can be used as parents of your nodes.",
+    description: "Create a new map in an area, optionally from a template whose skeleton refs (e.g. 'aufgaben', 'begriffe') can be used as parents of your nodes. status, stale_after, verified, scope and replaced_by go into the frontmatter; for the learning template they override the template's defaults (neu, today + 90 days).",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -90,7 +128,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
         template: { type: "string" },
         nodes: { type: "array", items: nodeSchema },
         tags: { type: "array", items: { type: "string" } },
-        scope: { type: "string", description: "Where the map applies (brand, role, component); written to the frontmatter by templates that define frontmatter, e.g. learning." },
+        ...trustProperties,
         ...changeMeta,
         ...targetProperty,
       },
@@ -101,12 +139,12 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_update_map",
     title: "Map ergänzen",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: "Add nodes to or update nodes of an existing map by id. Never rewrites the rest of the map. Pass the version from bloommd_get_map to avoid overwriting edits made meanwhile.",
+    description: "Add nodes to or update nodes of an existing map by id, and/or set frontmatter fields (status, stale_after, verified, scope, replaced_by): only the fields you pass change, the rest of the map stays as it is; give nodes, frontmatter fields or both. verified appends one sign-off to the list. Pass the version from bloommd_get_map to avoid overwriting edits made meanwhile.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
-      properties: { path: { type: "string" }, version: { type: "string" }, nodes: { type: "array", items: nodeSchema, minItems: 1 }, ...changeMeta, ...targetProperty },
-      required: ["path", "nodes"],
+      properties: { path: { type: "string" }, version: { type: "string" }, nodes: { type: "array", items: nodeSchema, minItems: 1 }, ...trustProperties, ...changeMeta, ...targetProperty },
+      required: ["path"],
     },
   },
   {
@@ -180,11 +218,12 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
 export const KNOWLEDGE_INSTRUCTIONS = [
   "BloomMD shows Markdown notes as mind maps: every heading is a node, the document is the map.",
   "File information so that a person can understand and explain it from the map alone:",
-  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic.",
+  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt maps are left out unless includeStale is true).",
   "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",
   "If a change comes back as 'proposed', the owner reviews it; tell them. Never try to approve proposals yourself.",
+  "Trust fields (status, stale_after, verified, scope, replaced_by) can be set with bloommd_create_map and bloommd_update_map; verified appends. bloommd_stale lists maps that are expired or about to expire, so they can be re-checked, renewed or retired.",
   "The owner can leave requests on map nodes: check bloommd_requests regularly, read the map, and answer each with bloommd_answer_request (optionally with nodes for that map).",
 ].join("\n");
 
@@ -217,7 +256,19 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
       const meta = { reason: string(args, "reason"), source: string(args, "source") };
       switch (name) {
         case "bloommd_overview": return { ...(await service.overview()), targets: Object.keys(targets) };
-        case "bloommd_search": return service.search(string(args, "query", true)!, string(args, "area"));
+        case "bloommd_search": return service.search(string(args, "query") ?? "", {
+          area: string(args, "area"),
+          status: string(args, "status"),
+          tag: string(args, "tag"),
+          scope: string(args, "scope"),
+          includeStale: args.includeStale === true,
+        });
+        case "bloommd_stale": return service.stale({
+          area: string(args, "area"),
+          tag: string(args, "tag"),
+          scope: string(args, "scope"),
+          days: typeof args.days === "number" && Number.isInteger(args.days) && args.days >= 0 ? args.days : undefined,
+        });
         case "bloommd_get_map": return service.getMap(string(args, "path", true)!);
         case "bloommd_templates": return service.templates(string(args, "id"));
         case "bloommd_create_map": return service.createMap({
@@ -226,10 +277,13 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           template: string(args, "template"),
           nodes: nodes(args, 0),
           tags: Array.isArray(args.tags) ? args.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
-          scope: string(args, "scope"),
+          frontmatter: parseKnowledgeFrontmatterInput(args),
           ...meta,
         });
-        case "bloommd_update_map": return service.updateMap({ path: string(args, "path", true)!, version: string(args, "version"), nodes: nodes(args, 1)!, ...meta });
+        case "bloommd_update_map": {
+          const trust = parseKnowledgeFrontmatterInput(args);
+          return service.updateMap({ path: string(args, "path", true)!, version: string(args, "version"), nodes: nodes(args, trust ? 0 : 1), frontmatter: trust, ...meta });
+        }
         case "bloommd_tasks": return service.tasks({
           area: string(args, "area"),
           includeDone: args.includeDone === true,

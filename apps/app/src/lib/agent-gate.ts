@@ -32,10 +32,14 @@ export function isAgentTokenIdentity(identity: ApiRequestIdentity): identity is 
   return identity.authKind === "access-token" && Boolean(identity.agentName && identity.tokenId && identity.userId);
 }
 
-/** The right of the calling agent token for a map, read from the database on every call; null for everyone else. */
+/**
+ * The right of the calling agent token for a map, read from the database on every call; null for
+ * everyone else. Without a workspace no right can be looked up: an agent token then only reads.
+ */
 export async function agentGate(identity: ApiRequestIdentity, workspaceId: string | undefined, filename: string): Promise<AgentGate | null> {
-  if (!isAgentTokenIdentity(identity) || !workspaceId) return null;
+  if (!isAgentTokenIdentity(identity)) return null;
   const area = cloudAreaOf(filename);
+  if (!workspaceId) return { tokenId: identity.tokenId, userId: identity.userId, agentName: identity.agentName, workspaceId: "", filename, area, access: "read" };
   const rights = await getAgentTokenRights(identity.tokenId, workspaceId);
   return { tokenId: identity.tokenId, userId: identity.userId, agentName: identity.agentName, workspaceId, filename, area, access: accessFor(rights, area) };
 }
@@ -53,6 +57,15 @@ function areaLabel(area: string) {
 
 function denied(gate: AgentGate, message: string, code: string) {
   return NextResponse.json({ error: message, code, area: gate.area, access: gate.access, agent: gate.agentName }, { status: 403 });
+}
+
+/**
+ * Agent tokens have rights only in a cloud workspace. Where the storage is not the cloud database
+ * (BLOOMMD_STORAGE_MODE=filesystem), no right exists to check, so the change is refused.
+ */
+export function agentOutsideCloudResponse(identity: ApiRequestIdentity, storageMode: string) {
+  if (storageMode === "database" || !isAgentTokenIdentity(identity)) return null;
+  return NextResponse.json({ error: `The agent "${identity.agentName}" works only in a cloud workspace, where its rights are enforced.`, code: "AGENT_WORKSPACE_REQUIRED", agent: identity.agentName }, { status: 403 });
 }
 
 /** The agent may only read in this area: the change is refused. */

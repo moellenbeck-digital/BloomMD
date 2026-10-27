@@ -80,7 +80,70 @@ openclaw mcp reload         # neue Konfiguration ab dem nächsten Lauf
 
 Vor dem Eintragen `openclaw.json` sichern; `openclaw mcp set` ergänzt nur den Abschnitt `mcp.servers`. Ein Agent
 nutzt den Server, der seiner Rolle entspricht (Werkzeuge `bloommd_search`, `bloommd_create_map`,
-`bloommd_update_map`, `bloommd_changes`, `bloommd_undo` u. a.).
+`bloommd_update_map`, `bloommd_changes`, `bloommd_undo` u. a.). Für Skripte und den Adapter gibt es zusätzlich die
+Einzelbefehle mit JSON (siehe unten).
+
+## Einzelbefehle für Skripte und den Adapter
+
+Neben dem MCP gibt es unter `bloommd-wiki agent …` fünf Einzelbefehle mit **JSON auf stdout** (Meldungen auf
+stderr). **Sie sind die Grundlage des künftigen Adapters `wissen/bloommd` in `md-agents`**: Der Adapter ruft sie
+auf, statt den MCP zu sprechen. Sie arbeiten nur im Bereich `Learnings`, mit denselben Rechten, demselben
+Protokoll und demselben Undo wie der MCP (`--name` nennt die Rolle). Freigeben kann ein Agent nichts: Liegt das
+Recht auf `propose`, kommt `"modus":"vorgeschlagen"` mit einer Vorschlags-ID zurück, und ein Mensch gibt mit
+`agent approve` frei. Ziel ist `--vault /data/learnings` (oder `--cloud <url> [--workspace <id>]` mit
+`BLOOMMD_TOKEN`).
+
+```bash
+V=/data/learnings
+# Suchen: nur gültige Learnings (nicht veraltet/ersetzt, nicht abgelaufen); --include-stale nimmt die übrigen mit
+bloommd-wiki agent search "lockfile" --vault $V --name coder --rolle coder --tag bun --komponente Dockerfile --limit 5
+# {"treffer":[{"pfad":"Learnings/coder/Bun-Version je Repo festhalten.md","titel":"Bun-Version je Repo festhalten","status":"neu","rolle":"coder","tags":["bereich/learnings/coder","coder"],"auszug":"Symptom Lockfile scheitert.","stale_after":"2027-01-25","abgelaufen":false}],"anzahl":1,"gesamt":1,"limit":5}
+
+# Lesen: Frontmatter, Inhalt (Markdown ohne Frontmatter) und Version
+bloommd-wiki agent read "Learnings/coder/Bun-Version je Repo festhalten.md" --vault $V
+# {"pfad":"…","version":"d7e468b17e7313d7","bereich":"Learnings/coder","frontmatter":{"titel":"…","status":"neu","rolle":"coder","tags":[…],"scope":"Dockerfile, coder","source":"Ticket 113, …","created":"2026-10-27","stale_after":"2027-01-25","abgelaufen":false,"verified":[]},"inhalt":"# …\n\n## Symptom\n\n…"}
+
+# Anlegen nach der Vorlage (Pflicht: --titel --rolle --beleg --inhalt --ticket --name); --inhalt - liest stdin,
+# mit "## Symptom", "## Ursache", "## Regel" im Text je Abschnitt, sonst kommt der Text unter „Regel“
+bloommd-wiki agent create --vault $V --name coder --ticket 113 --titel "Bun-Version je Repo festhalten" \
+  --rolle coder --beleg https://github.com/org/repo/issues/113 --inhalt "Version je Repo festhalten" --komponente Dockerfile
+# {"ok":true,"pfad":"Learnings/coder/Bun-Version je Repo festhalten.md","modus":"geschrieben","aenderung":"cmvr43otp11l8p","version":"d7e468b17e7313d7","status":"neu","ticket":"113","schreibvorgang":1,"limit":3}
+
+# Ergänzen: neuer Knoten (--abschnitt, --titel) und/oder Beleg-Link; hängt verified an (by = --name) und
+# verlängert stale_after auf heute + 90 Tage, außer bei veraltet/ersetzt; der Status bleibt
+bloommd-wiki agent append "Learnings/coder/Bun-Version je Repo festhalten.md" --vault $V --name tester --ticket 113 \
+  --inhalt "Zweiter Vorfall" --beleg https://github.com/org/repo/actions/runs/1
+# {"ok":true,"pfad":"…","modus":"geschrieben","aenderung":"…","version":"…","verified":{"by":"tester","at":"2026-10-27"},"stale_after":"2027-01-25","ticket":"113","schreibvorgang":2,"limit":3}
+
+# Abgelaufene und bald ablaufende Learnings (gleiche Logik wie bloommd_stale)
+bloommd-wiki agent stale --vault $V --days 14
+# {"stale":[{"pfad":"…","titel":"…","status":"neu","stale_after":"2026-10-20","tage_ueberfaellig":7,"abgelaufen":true,"scope":"Dockerfile, coder"}],"anzahl":1,"tage":14}
+```
+
+`agent stale <ordner>` ohne `--vault`/`--json` bleibt die Textform für Routinen (leer: `NO_REPLY`).
+
+**Duplikatprüfung vor `create`:** Gibt es ein Learning mit gleichem Titel (ohne Beachtung von Groß-/Kleinschreibung
+und Satzzeichen) oder ein sehr ähnliches (70 % Wortüberlappung des Titels, 30 % der Tags, mindestens ein gemeinsamer
+Tag, Schwelle 0,7; `veraltet` und `ersetzt` zählen nicht), wird nichts angelegt. Der Befehl endet mit Exitcode 3 und
+`{"fehler":"…","duplicate":true,"pfad":"Learnings/coder/…md","titel":"…","aehnlichkeit":1}`; der Aufrufer nimmt dann
+`append`. Ein `--force` gibt es nicht.
+
+**Schreibzähler je Ticket:** `create` und `append` brauchen `--ticket <id>` und erlauben höchstens 3 Schreibvorgänge
+je Ticket-ID (`113` und `#113` sind dasselbe Ticket). Der vierte Versuch endet mit Exitcode 4 und
+`{"fehler":"…","limit":3,"ticket":"113","geschrieben":3}`. Lesen und Suchen zählen nicht, ein Duplikat oder ein
+abgelehnter Schreibversuch auch nicht; ein Vorschlag zählt. Der Zähler liegt im Vault unter
+`.bloommd/ticket-writes/<ticket>/` (je Schreibvorgang eine Datei, exklusiv angelegt) und gehört zum Vault-Backup. Er
+ist auch bei parallelen Aufrufen genau.
+
+**Fehler und Exitcodes:** Fehler stehen als `{"fehler":"…"}` auf stdout (ein falscher Aufruf zusätzlich mit
+`"aufruf"`), die Meldung auf stderr. `0` ok, `1` Fehler (z. B. fehlendes Recht, Learning nicht gefunden), `2` Aufruf
+(fehlende Pflichtfelder, ungültiger Pfad oder Pfad außerhalb von `Learnings/`), `3` Duplikat, `4` Limit.
+`agent <befehl> --help` zeigt die Hilfe als Text.
+
+**Rechte je Rolle:** Im Vault gelten die Rechte der einen `agent.json` für alle Rollen (siehe „Rechte“); `--name` ist
+nur das Etikett im Protokoll und in `verified`. Eine Rolle, die nur lesen und eigene Learnings anlegen darf (tester),
+lässt sich im Vault deshalb nur über die Bereiche `Learnings/<rolle>` und die Konvention trennen, mit `--cloud` über
+Agent-Tokens mit eigenen Rechten.
 
 ## Änderungen nachvollziehen und zurücknehmen
 

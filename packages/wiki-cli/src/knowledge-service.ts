@@ -54,6 +54,8 @@ export interface SearchOptions extends KnowledgeFilter {
   area?: string;
   /** Also return expired maps and maps marked veraltet/ersetzt. */
   includeStale?: boolean;
+  /** More tags, all of which a map must carry (in addition to `tag`); like a role plus a topic. */
+  tags?: string[];
   limit?: number;
   now?: Date;
 }
@@ -286,7 +288,8 @@ export class KnowledgeService {
     const limit = options.limit ?? 40;
     const day = today(options.now);
     const filter: KnowledgeFilter = { status: options.status, tag: options.tag, scope: options.scope };
-    const filtered = filter.status !== undefined || filter.tag !== undefined || filter.scope !== undefined;
+    const moreTags = options.tags ?? [];
+    const filtered = filter.status !== undefined || filter.tag !== undefined || filter.scope !== undefined || moreTags.length > 0;
     if (!query.trim() && !filtered) throw new KnowledgeInputError("query must not be empty unless status, tag or scope is given.");
     const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || inArea(map.area, options.area)));
     const hits: SearchHit[] = [];
@@ -295,7 +298,7 @@ export class KnowledgeService {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       const frontmatter = readKnowledgeFrontmatter(document.markdown);
-      if (!matchesKnowledgeFilter(frontmatter, filter)) continue;
+      if (!matchesKnowledgeFilter(frontmatter, filter) || moreTags.some((tag) => !matchesKnowledgeFilter(frontmatter, { tag }))) continue;
       const lifecycle = knowledgeLifecycle(frontmatter, day);
       if (!options.includeStale && filter.status === undefined && isKnowledgeRetired(lifecycle)) continue;
       const trust = trustFields(lifecycle);

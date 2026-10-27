@@ -376,17 +376,266 @@ describe("review hardening", () => {
   });
 });
 
-describe("owner CLI for a cloud workspace", () => {
-  test("setup, rights and proposals work with --cloud", async () => {
-    const home = await mkdtemp(join(tmpdir(), "bloommd-home-"));
-    const cli = (...args: string[]) => execFileSync("bun", [join(import.meta.dir, "cli.ts"), "agent", ...args], { env: { ...process.env, HOME: home, BLOOMMD_TOKEN: "" }, encoding: "utf8" });
-    cli("setup", "--cloud", "https://app.example", "--workspace", "ws1", "--access", "write", "--area", "Arbeit=propose");
-    const stateDir = join(home, ".bloommd", "agent-cloud", "app.example-ws1");
-    expect(JSON.parse(await readFile(join(stateDir, "agent.json"), "utf8"))).toEqual({ access: "write", areas: { Arbeit: "propose" } });
-    expect(JSON.parse(cli("rights", "--cloud", "https://app.example", "--workspace", "ws1"))).toEqual({ access: "write", areas: { Arbeit: "propose" } });
-    expect(JSON.parse(cli("proposals", "--cloud", "https://app.example", "--workspace", "ws1"))).toEqual([]);
+/** A BloomMD server in memory: the endpoints for rights, proposals and the log of agent tokens. */
+function fakeCloud(options: { tokens?: Array<{ tokenId: string; agentName: string; configured?: boolean }> } = {}) {
+  const calls: Array<{ method: string; path: string; body: Record<string, unknown> | null; workspace: string | null; auth: string | null }> = [];
+  const tokens = (options.tokens ?? [{ tokenId: "t1", agentName: "OpenClaw" }]).map((token) => ({ tokenName: `${token.agentName} token`, userEmail: "owner@example.test", scope: "write", rights: { access: "propose", areas: {} }, configured: false, ...token }));
+  const state = { proposalResult: 200, mode: "proposed" as "proposed" | "written", denyWith: null as null | { error: string; code: string } };
+  const fetcher = (async (input: URL | string, init?: RequestInit) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    const headers = init?.headers as Record<string, string>;
+    const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+    calls.push({ method, path: `${decodeURIComponent(url.pathname)}${url.search}`, body, workspace: headers["X-BloomMD-Workspace-ID"] ?? null, auth: headers.Authorization ?? null });
+    const path = decodeURIComponent(url.pathname);
+    if (state.denyWith && method !== "GET") return Response.json(state.denyWith, { status: 403 });
+    if (path === "/api/mindmaps" && method === "GET") return Response.json({ files: ["Arbeit – Plan.md", "Learnings › dev-team – Idee.md", "Learnings › andere – Notiz.md"].map((filename) => ({ filename })) });
+    if (path === "/api/mindmaps/agent-access/rights") return Response.json({ agent: "OpenClaw", unrestricted: false, rights: { access: "propose", areas: { "Learnings/dev-team": "write", Learnings: "read" } } });
+    if (path === "/api/mindmaps/agent-access/changes") return Response.json({ changes: [{ id: "c1", tokenId: "t1", agentName: "OpenClaw", event: "written", origin: "agent", tool: "bloommd_update_map", filename: "Arbeit – Plan.md", area: "Arbeit", proposalId: null, summary: "1 node(s) created", reason: null, source: null, reviewerName: null, undoable: true, undoneAt: null, createdAt: "2026-10-27T08:00:00Z" }] });
+    if (path === "/api/mindmaps/agent-access/undo") return Response.json({ undone: body?.changeId, path: "Arbeit – Plan.md" });
+    if (path === "/api/mindmaps/Arbeit – Plan.md/nodes") {
+      return state.mode === "proposed"
+        ? Response.json({ mode: "proposed", proposalId: "p1", filename: "Arbeit – Plan.md", area: "Arbeit" }, { status: 202 })
+        : Response.json({ ids: { t: "n1" }, created: ["n1"], updated: [], version: 6, mode: "written", changeId: "c-new" });
+    }
+    if (path === "/api/mindmaps/Arbeit – Plan.md") {
+      const doc = parseFile("Arbeit – Plan.md", "# Plan <!-- bloommd:id=root01 -->\n\n## Ziel <!-- bloommd:id=ziel01 -->\n");
+      return Response.json({ filePath: doc.filePath, frontmatter: doc.frontmatter, nodes: Object.fromEntries(doc.nodes), rootId: doc.rootId, preamble: "", storage: { version: 5 } });
+    }
+    if (/^\/api\/workspaces\/[^/]+\/agent-rights$/.test(path)) {
+      if (method === "PUT") return Response.json({ rights: { access: body?.access, areas: body?.areas } });
+      return Response.json({ workspaceId: "ws1", tokens });
+    }
+    if (/\/agent-token-proposals$/.test(path)) return Response.json({ proposals: [{ id: "p1", tokenId: "t1", agentName: "OpenClaw", tool: "bloommd_update_map", filename: "Arbeit – Plan.md", area: "Arbeit", baseVersion: 5, summary: "1 node(s) created", reason: "Meeting", source: null, status: "pending", reviewerName: null, createdAt: "2026-10-27T08:00:00Z", stale: false, changes: [{ mark: "+", id: "n1", title: "Neu", level: 2 }] }] });
+    if (/\/agent-token-proposals\/p1$/.test(path)) return Response.json(body?.action === "approve" ? { applied: "p1", changeId: "c-ap", path: "Arbeit – Plan.md", reviewer: "Olivia Owner" } : { rejected: "p1", reviewer: "Olivia Owner", ...(body?.reason ? { reason: body.reason } : {}) });
+    if (/\/agent-log$/.test(path)) return Response.json({ changes: [{ id: "c-ap", tokenId: "t1", agentName: "OpenClaw", event: "approved", origin: "approved", tool: "bloommd_update_map", filename: "Arbeit – Plan.md", area: "Arbeit", proposalId: "p1", summary: "x", reason: null, source: null, reviewerName: "Olivia Owner", undoable: true, undoneAt: null, createdAt: "2026-10-27T09:00:00Z" }] });
+    if (/\/agent-log\/c-ap$/.test(path)) return Response.json({ undone: "c-ap", path: "Arbeit – Plan.md" });
+    return new Response("missing", { status: 404 });
+  }) as typeof fetch;
+  return { calls, state, fetcher, tokens };
+}
+
+describe("cloud agent rights on the server", () => {
+  async function cloudService(fake = fakeCloud()) {
+    const stateDir = await mkdtemp(join(tmpdir(), "bloommd-cloud-"));
+    const service = new KnowledgeService(new CloudKnowledgeStore({ url: "https://app.example", token: "bloom_pat_x", workspaceId: "ws1", stateDir, fetch: fake.fetcher }), "OpenClaw");
+    return { fake, service, stateDir };
+  }
+
+  test("the overview shows the server's rights per area and does not read a local agent.json", async () => {
+    const { service, stateDir } = await cloudService();
+    // An old local file that says "write" must not widen anything.
+    await writeAccessConfig(stateDir, { access: "write" });
+    const overview = await service.overview();
+    expect(overview.defaultAccess).toBe("propose");
+    expect(overview.areas).toEqual([
+      { area: "Arbeit", maps: 1, access: "propose" },
+      { area: "Learnings/andere", maps: 1, access: "read" },
+      { area: "Learnings/dev-team", maps: 1, access: "write" },
+    ]);
+    expect(overview.maps.map((map) => map.path)).toContain("Learnings › dev-team – Idee.md");
+  });
+
+  test("a change the server keeps as a proposal comes back as proposed", async () => {
+    const { service, fake } = await cloudService();
+    const result = await service.updateMap({ path: "Arbeit – Plan.md", nodes: [{ ref: "t", parent: "ziel01", title: "Folien" }], reason: "Meeting" });
+    expect(result).toMatchObject({ mode: "proposed", proposalId: "p1", path: "Arbeit – Plan.md" });
+    // The agent's words travel with the request; the decision is the server's.
+    expect(fake.calls.find((call) => call.path.endsWith("/nodes"))?.body).toMatchObject({ agentMeta: { tool: "bloommd_update_map", reason: "Meeting" } });
+    expect(fake.calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  test("a direct write returns the server's change id; a refusal names the area", async () => {
+    const { service, fake } = await cloudService();
+    fake.state.mode = "written";
+    expect(await service.updateMap({ path: "Arbeit – Plan.md", nodes: [{ ref: "t", parent: "ziel01", title: "Folien" }] })).toMatchObject({ mode: "written", changeId: "c-new", version: "6", created: ["n1"] });
+    fake.state.denyWith = { error: 'The agent "OpenClaw" may only read in "Arbeit". Ask the workspace owner to allow proposals or writing there.', code: "AGENT_READ_ONLY" };
+    await expect(service.updateMap({ path: "Arbeit – Plan.md", nodes: [{ title: "x" }] })).rejects.toThrow(/may only read in "Arbeit"/);
+  });
+
+  test("log and undo of the agent come from the server", async () => {
+    const { service, fake } = await cloudService();
+    expect((await service.changes(5)).changes).toEqual([expect.objectContaining({ changeId: "c1", agent: "OpenClaw", event: "written", path: "Arbeit – Plan.md", area: "Arbeit", undoable: true })]);
+    expect(await service.undo("c1")).toEqual({ undone: "c1", path: "Arbeit – Plan.md" });
+    expect(fake.calls.map((call) => `${call.method} ${call.path}`)).toEqual(["GET /api/mindmaps/agent-access/changes?limit=5", "POST /api/mindmaps/agent-access/undo"]);
   });
 });
+
+describe("owner CLI for a cloud workspace", () => {
+  const url = "https://app.example";
+  async function run(fake: ReturnType<typeof fakeCloud>, args: string[], extra: { home?: string; token?: string } = {}) {
+    const home = extra.home ?? (await mkdtemp(join(tmpdir(), "bloommd-home-")));
+    const original = { fetch: globalThis.fetch, home: process.env.HOME, token: process.env.BLOOMMD_TOKEN, log: console.log, write: process.stderr.write };
+    const out: string[] = [];
+    const err: string[] = [];
+    globalThis.fetch = fake.fetcher;
+    process.env.HOME = home;
+    process.env.BLOOMMD_TOKEN = extra.token ?? "bloom_pat_owner";
+    console.log = (...values: unknown[]) => void out.push(values.join(" "));
+    process.stderr.write = ((text: string) => { err.push(String(text)); return true; }) as typeof process.stderr.write;
+    try {
+      const code = await runAgentCli(args, "test");
+      return { code, out: out.join("\n"), err: err.join(""), home, stateDir: join(home, ".bloommd", "agent-cloud", "app.example-ws1") };
+    } finally {
+      globalThis.fetch = original.fetch;
+      if (original.home === undefined) delete process.env.HOME; else process.env.HOME = original.home;
+      if (original.token === undefined) delete process.env.BLOOMMD_TOKEN; else process.env.BLOOMMD_TOKEN = original.token;
+      console.log = original.log;
+      process.stderr.write = original.write;
+    }
+  }
+
+  test("setup, rights, proposals, approve, reject, log and undo all go to the server, not to a local folder", async () => {
+    const fake = fakeCloud();
+    const setup = await run(fake, ["setup", "--cloud", url, "--workspace", "ws1", "--access", "propose", "--area", "Learnings/dev-team=write", "--area", "Learnings=read"]);
+    expect(JSON.parse(setup.out)).toMatchObject({ ok: true, agent: "OpenClaw", rights: { access: "propose", areas: { "Learnings/dev-team": "write", Learnings: "read" } } });
+    expect(fake.calls.at(-1)).toMatchObject({ method: "PUT", path: "/api/workspaces/ws1/agent-rights", auth: "Bearer bloom_pat_owner", body: { tokenId: "t1", access: "propose", areas: { "Learnings/dev-team": "write", Learnings: "read" } } });
+    // Nothing was written to this machine.
+    await expect(readFile(join(setup.stateDir, "agent.json"), "utf8")).rejects.toThrow();
+
+    expect(JSON.parse((await run(fake, ["rights", "--cloud", url, "--workspace", "ws1"])).out)).toEqual([expect.objectContaining({ agent: "OpenClaw", tokenId: "t1", configured: false, rights: { access: "propose", areas: {} } })]);
+    const proposals = JSON.parse((await run(fake, ["proposals", "--cloud", url, "--workspace", "ws1"])).out) as Array<Record<string, unknown>>;
+    expect(proposals).toEqual([expect.objectContaining({ id: "p1", agent: "OpenClaw", path: "Arbeit – Plan.md", area: "Arbeit", target: "cloud", changes: [expect.objectContaining({ mark: "+" })] })]);
+    expect(proposals[0]).not.toHaveProperty("markdown");
+
+    // The server names the signed-in reviewer; no --reviewer is needed.
+    expect(JSON.parse((await run(fake, ["approve", "--cloud", url, "--workspace", "ws1", "p1"])).out)).toMatchObject({ applied: "p1", reviewer: "Olivia Owner" });
+    expect(fake.calls.at(-1)).toMatchObject({ method: "POST", path: "/api/workspaces/ws1/agent-token-proposals/p1", body: { action: "approve", overwrite: false } });
+    await run(fake, ["approve", "--cloud", url, "--workspace", "ws1", "p1", "--overwrite"]);
+    expect(fake.calls.at(-1)?.body).toMatchObject({ overwrite: true });
+    expect(JSON.parse((await run(fake, ["reject", "--cloud", url, "--workspace", "ws1", "p1", "--reason", "Zu vage"])).out)).toMatchObject({ rejected: "p1", reason: "Zu vage" });
+    expect(fake.calls.at(-1)?.body).toEqual({ action: "reject", reason: "Zu vage" });
+
+    const log = JSON.parse((await run(fake, ["log", "--cloud", url, "--workspace", "ws1", "--limit", "5", "--agent", "OpenClaw"])).out) as { changes: Array<Record<string, unknown>> };
+    expect(log.changes[0]).toMatchObject({ event: "approved", reviewer: "Olivia Owner", agent: "OpenClaw" });
+    expect(fake.calls.at(-1)?.path).toBe("/api/workspaces/ws1/agent-log?limit=5&tokenId=t1");
+    expect(JSON.parse((await run(fake, ["undo", "--cloud", url, "--workspace", "ws1", "c-ap"])).out)).toEqual({ undone: "c-ap", path: "Arbeit – Plan.md" });
+  });
+
+  test("without --workspace the personal workspace is meant", async () => {
+    const fake = fakeCloud();
+    await run(fake, ["rights", "--cloud", url]);
+    expect(fake.calls[0]?.path).toBe("/api/workspaces/personal/agent-rights");
+  });
+
+  test("with several agent tokens --agent says which; unknown names are listed", async () => {
+    const fake = fakeCloud({ tokens: [{ tokenId: "t1", agentName: "OpenClaw" }, { tokenId: "t2", agentName: "Claude" }] });
+    await expect(run(fake, ["setup", "--cloud", url, "--workspace", "ws1", "--access", "read"])).rejects.toThrow(/--agent <name\|id> fehlt.*OpenClaw.*Claude/);
+    await expect(run(fake, ["setup", "--cloud", url, "--workspace", "ws1", "--access", "read", "--agent", "Nobody"])).rejects.toThrow(/Kein Agent-Token „Nobody“/);
+    await run(fake, ["setup", "--cloud", url, "--workspace", "ws1", "--access", "read", "--agent", "claude"]);
+    expect(fake.calls.at(-1)?.body).toMatchObject({ tokenId: "t2", access: "read" });
+    expect(fake.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+  });
+
+  test("the server's refusal reaches the owner as it is", async () => {
+    const fake = fakeCloud();
+    fake.state.denyWith = { error: "Only workspace owners can manage agent rights and proposals.", code: "FORBIDDEN" };
+    await expect(run(fake, ["setup", "--cloud", url, "--workspace", "ws1", "--access", "write"])).rejects.toThrow("Only workspace owners can manage agent rights and proposals.");
+  });
+});
+
+describe("old local rights of a cloud workspace", () => {
+  const url = "https://app.example";
+  async function legacyHome(rights: unknown = { access: "write", areas: { Arbeit: "propose" } }) {
+    const home = await mkdtemp(join(tmpdir(), "bloommd-home-"));
+    const stateDir = join(home, ".bloommd", "agent-cloud", "app.example-ws1");
+    await mkdir(join(stateDir, "proposals"), { recursive: true });
+    await writeFile(join(stateDir, "agent.json"), JSON.stringify(rights), "utf8");
+    await writeFile(join(stateDir, "agent-log.jsonl"), `${JSON.stringify({ event: "written" })}\n`, "utf8");
+    await writeFile(join(stateDir, "proposals", "p1.json"), "{}", "utf8");
+    return { home, stateDir };
+  }
+  async function run(fake: ReturnType<typeof fakeCloud>, home: string, args: string[]) {
+    const original = { fetch: globalThis.fetch, home: process.env.HOME, token: process.env.BLOOMMD_TOKEN, log: console.log, write: process.stderr.write };
+    const out: string[] = [];
+    const err: string[] = [];
+    globalThis.fetch = fake.fetcher;
+    process.env.HOME = home;
+    process.env.BLOOMMD_TOKEN = "bloom_pat_owner";
+    console.log = (...values: unknown[]) => void out.push(values.join(" "));
+    process.stderr.write = ((text: string) => { err.push(String(text)); return true; }) as typeof process.stderr.write;
+    try {
+      const code = await runAgentCli(args, "test");
+      return { code, out: out.join("\n"), err: err.join("") };
+    } finally {
+      globalThis.fetch = original.fetch;
+      if (original.home === undefined) delete process.env.HOME; else process.env.HOME = original.home;
+      if (original.token === undefined) delete process.env.BLOOMMD_TOKEN; else process.env.BLOOMMD_TOKEN = original.token;
+      console.log = original.log;
+      process.stderr.write = original.write;
+    }
+  }
+  const target = ["--cloud", url, "--workspace", "ws1"];
+
+  test("the first start announces them once and widens nothing; old data stays", async () => {
+    const { home, stateDir } = await legacyHome();
+    const fake = fakeCloud();
+    const first = await run(fake, home, ["rights", ...target]);
+    expect(first.err).toContain("lokale Agent-Rechte");
+    expect(first.err).toContain("Standard write, Bereiche: Arbeit=propose");
+    expect(first.err).toContain("NICHT stillschweigend übernommen");
+    expect(first.err).toContain("1 offene Vorschläge");
+    expect(first.err).toContain("nicht gelöscht");
+    expect(first.err).toContain(`agent migrate --cloud ${url} --workspace ws1 --agent <name> --apply`);
+    // The server's right is what counts: the agent still only proposes.
+    expect(JSON.parse(first.out)[0].rights).toEqual({ access: "propose", areas: {} });
+    expect(fake.calls.some((call) => call.method === "PUT")).toBe(false);
+    const second = await run(fake, home, ["rights", ...target]);
+    expect(second.err).toBe("");
+    expect(JSON.parse(await readFile(join(stateDir, "cloud-migration.json"), "utf8"))).toMatchObject({ decision: "announced" });
+    expect(await readdir(join(stateDir, "proposals"))).toEqual(["p1.json"]);
+  });
+
+  test("migrate without a flag changes nothing; --apply sets exactly the old local rights", async () => {
+    const { home, stateDir } = await legacyHome({ access: "propose", areas: { "Learnings/dev-team": "write", Arbeit: "read" } });
+    const fake = fakeCloud();
+    const plan = await run(fake, home, ["migrate", ...target, "--agent", "OpenClaw"]);
+    expect(plan.out).toContain("Noch nichts geändert");
+    expect(fake.calls.some((call) => call.method === "PUT")).toBe(false);
+    const applied = await run(fake, home, ["migrate", ...target, "--agent", "OpenClaw", "--apply"]);
+    expect(fake.calls.at(-1)).toMatchObject({ method: "PUT", body: { tokenId: "t1", access: "propose", areas: { "Learnings/dev-team": "write", Arbeit: "read" } } });
+    expect(applied.out).toContain("höchstens die bisherigen lokalen Rechte");
+    expect(JSON.parse(await readFile(join(stateDir, "cloud-migration.json"), "utf8"))).toMatchObject({ decision: "migrated", agent: "OpenClaw" });
+    expect(await readFile(join(stateDir, "agent.json"), "utf8")).toContain("Learnings/dev-team");
+    expect(await readFile(join(stateDir, "agent-log.jsonl"), "utf8")).toContain("written");
+    // Decided once: a second call neither asks nor writes.
+    const again = await run(fake, home, ["migrate", ...target, "--agent", "OpenClaw", "--apply"]);
+    expect(again.out).toContain("Schon entschieden");
+    expect(fake.calls.filter((call) => call.method === "PUT")).toHaveLength(1);
+  });
+
+  test("rights the owner set on the server are never overwritten by old local ones", async () => {
+    const { home, stateDir } = await legacyHome({ access: "write" });
+    const fake = fakeCloud({ tokens: [{ tokenId: "t1", agentName: "OpenClaw", configured: true }] });
+    fake.tokens[0]!.rights = { access: "read", areas: {} };
+    await expect(run(fake, home, ["migrate", ...target, "--agent", "OpenClaw", "--apply"])).rejects.toThrow(/schon Rechte gesetzt.*nicht überschrieben/);
+    expect(fake.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(await readMigrationMarkerDecision(stateDir)).not.toBe("migrated");
+  });
+
+  test("--discard keeps the server's rights and records the decision; nothing is deleted", async () => {
+    const { home, stateDir } = await legacyHome();
+    const fake = fakeCloud();
+    const discarded = await run(fake, home, ["migrate", ...target, "--discard"]);
+    expect(discarded.out).toContain("Verworfen");
+    expect(fake.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(await readMigrationMarkerDecision(stateDir)).toBe("discarded");
+    expect(await readdir(stateDir).then((names) => names.sort())).toEqual(["agent-log.jsonl", "agent.json", "cloud-migration.json", "proposals"]);
+    expect(await run(fake, home, ["rights", ...target]).then((result) => result.err)).toBe("");
+  });
+
+  test("a vault is unaffected and without old files there is nothing to announce", async () => {
+    const home = await mkdtemp(join(tmpdir(), "bloommd-home-"));
+    const fake = fakeCloud();
+    expect((await run(fake, home, ["rights", ...target])).err).toBe("");
+    expect((await run(fake, home, ["migrate", ...target, "--apply"])).out).toContain("Nichts zu übernehmen");
+    await expect(run(fake, home, ["migrate", "--apply"])).rejects.toThrow(/nur für --cloud/);
+  });
+});
+
+async function readMigrationMarkerDecision(stateDir: string): Promise<string | null> {
+  return readFile(join(stateDir, "cloud-migration.json"), "utf8").then((text) => (JSON.parse(text) as { decision: string }).decision, () => null);
+}
 
 describe("MCP transport robustness", () => {
   const options = () => knowledgeServerOptions({}, "test");

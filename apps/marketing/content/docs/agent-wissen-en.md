@@ -33,6 +33,14 @@ Everything is stored as plain Markdown:
    | `propose` | changes become proposals; you apply them |
    | `write` | the agent writes directly, with change log and undo |
 
+   An area may be a sub-area: `--area Learnings/dev-team=write` applies to everything below
+   `Learnings/dev-team`. The longest matching area always wins – sub-area before parent area before
+   default. So `Learnings` can be `read` while `Learnings/dev-team` is `write`.
+
+   In a cloud workspace the rights are kept **per agent token on the server** (see below): you set
+   them in the browser under **Manage agents** or with `agent setup --cloud …`, and the server
+   enforces them – even against a modified client.
+
 3. Add the MCP server to the agent, for OpenClaw:
 
    ```bash
@@ -87,7 +95,8 @@ The icon counts open proposals, and a notice appears when a new one arrives.
 - **History:** who changed what and when. **Undo** restores the state before an agent change or an
   approved proposal – after a confirmation, and only if nobody edited the note since.
 - **Rights:** the default and, per top-level folder, `read`, `propose` or `write`, exactly like
-  `bloommd-wiki agent setup`. For your own agent, `write` is the usual choice.
+  `bloommd-wiki agent setup`. Sub-areas such as `Learnings/dev-team` are set with
+  `agent setup --area …`. For your own agent, `write` is the usual choice.
 
 The panel and `bloommd-wiki agent …` share the same files in `.bloommd/` and the same rules. Only a
 person can approve; the agent has no tool for it.
@@ -143,23 +152,65 @@ bloommd-wiki agent reject "/path/to/vault" <id> --reviewer Max --reason "Belongs
 ```
 
 For the cloud workspace use `--cloud <url> --workspace <id>` instead of the folder – the same values
-as for the MCP server. The workspace's rights, log and proposals live on your machine under
-`~/.bloommd/agent-cloud/`; `approve`, `undo`, `log` and `due` also need the token in
-`BLOOMMD_TOKEN`:
+as for the MCP server. Rights, proposals and log live there **per agent token on the server** and are
+enforced there, no longer on the agent's machine; several pods or machines using the same token share
+the same rights and the same log. All commands with `--cloud` need your owner token in
+`BLOOMMD_TOKEN`; `--agent <name|id>` picks the agent token (not needed with only one):
 
 ```bash
-bloommd-wiki agent setup --cloud https://… --workspace <id> --access write --area Arbeit=propose
+bloommd-wiki agent setup --cloud https://… --workspace <id> --agent OpenClaw --access propose \
+  --area Learnings=read --area Learnings/dev-team=write
+bloommd-wiki agent rights --cloud https://… --workspace <id>
 bloommd-wiki agent proposals --cloud https://… --workspace <id>
-bloommd-wiki agent approve --cloud https://… --workspace <id> <proposal-id> --reviewer Max
+bloommd-wiki agent approve --cloud https://… --workspace <id> <proposal-id>
+bloommd-wiki agent log --cloud https://… --workspace <id> --agent OpenClaw
 ```
+
+### Approve and set rights in the browser
+
+As workspace owner open **Manage agents** (workspace menu) in the cloud workspace and find
+**Agent access**:
+
+- **Open proposals** with agent, area, time, reason and an outline of the change (+ added,
+  ~ changed, − removed). **Approve** applies the proposal, **Reject** discards it (with an optional
+  reason). If the map changed since, you see that and decide whether to apply it anyway. The log
+  records who approved or rejected – with your signed-in name. `agent approve|reject` with your
+  token takes the same server path; `--reviewer` is not needed there.
+- **Rights** per agent token: a default right and rights per area (sub-areas too). Without an entry
+  the agent may only propose.
+- The **change log** with **Undo**.
+
+Rights apply immediately. A revoked token is refused on its next call. What the server checks:
+`read` refuses every change with a message naming the area; `propose` only stores a proposal;
+`write` writes directly and logs. Renaming, deleting, read-only links and live editing need `write`
+in the area as well.
+
+### Old local rights
+
+Rights of a cloud workspace used to live in `agent.json` under
+`~/.bloommd/agent-cloud/<host>-<workspace>/`. The first start with a cloud target says so once.
+**Local rights are never carried over silently:** until you decide, the server's right applies
+(without an entry: `propose`).
+
+```bash
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw           # only shows what applies
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw --apply   # set exactly the old rights
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw --discard # discard them
+```
+
+`--apply` sets at most the former local rights, and only if nothing has been set for the token on
+the server yet. Old local logs and proposals stay untouched; they are neither carried over to the
+server nor deleted.
 
 - The agent never rewrites whole files; it adds or extends nodes. If someone changed the map
   meanwhile, it stops and reads again.
 - Only a person can apply proposals; the agent has no tool for it.
 - The agent can only undo its own direct changes, and only within its rights: in a `propose` area
   the undo becomes a proposal. Approved proposals can only be undone by you (`agent undo`).
-- Areas match regardless of spelling: a rule for `Arbeit` also covers `arbeit`.
+- Areas match regardless of spelling: a rule for `Arbeit` also covers `arbeit`. In a cloud workspace
+  the area is part of the file name (`Learnings › dev-team – Idee.md`).
 - In the cloud, whole maps can only be replaced (undo, approved proposal) while nobody has them open;
   otherwise you get a message and try again after closing the map.
-- Log, history and proposals live in the vault under `.bloommd/` and sync with it.
+- In a vault, log, history and proposals live under `.bloommd/` and sync with it; in a cloud
+  workspace they live on the server.
 - Files that iCloud keeps only in the cloud are skipped and reported in the overview.

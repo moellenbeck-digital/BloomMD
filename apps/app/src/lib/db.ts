@@ -4200,6 +4200,8 @@ export interface AgentTokenSummary {
   expiresAt: string | null;
   lastUsedAt: string | null;
   rights: AgentAccessConfig;
+  /** The owner has set rights for this token; otherwise it only proposes. */
+  configured: boolean;
 }
 
 /** Agent tokens that can work in the workspace, with their rights; for the workspace owner. */
@@ -4235,6 +4237,7 @@ export async function listAgentTokensForWorkspace(userId: string, workspaceId: s
     expiresAt: row.expires_at,
     lastUsedAt: row.last_used_at,
     rights: { access: agentAccessOrPropose(defaultByToken.get(row.id)), areas: areasByToken.get(row.id) ?? {} },
+    configured: defaultByToken.has(row.id) || areasByToken.has(row.id),
   }));
 }
 

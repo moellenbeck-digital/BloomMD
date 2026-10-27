@@ -104,6 +104,8 @@ export function createFilePersistence(config: SyncServerConfig): DocumentPersist
 /** Cloud persistence against any TLS-reachable Postgres, including CloudNativePG. */
 export function createDatabasePersistence(databaseUrl: string): DocumentPersistence {
   const sql: SqlClient = createSqlClient(databaseUrl);
+  // sql.json stores an object; JSON.stringify(...)::jsonb would store a JSON string instead.
+  const jsonb = (value: unknown) => sql.json(value as Parameters<SqlClient["json"]>[0]);
 
   return {
     async authorize(descriptor) {
@@ -166,7 +168,7 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
       const rows = await sql`
         update bloom_documents
         set markdown = ${markdown},
-            frontmatter = ${JSON.stringify(document.frontmatter)}::jsonb,
+            frontmatter = ${jsonb(document.frontmatter)},
             version = version + 1,
             updated_by = ${descriptor.userId ?? null},
             updated_at = now(),
@@ -242,7 +244,7 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
       const rows = await sql`
         insert into bloom_documents (workspace_id, filename, markdown, frontmatter, created_by, updated_by)
         select ${descriptor.workspaceId}, ${descriptor.filename}, ${markdown},
-               ${JSON.stringify(document.frontmatter)}::jsonb, ${descriptor.userId}, ${descriptor.userId}
+               ${jsonb(document.frontmatter)}, ${descriptor.userId}, ${descriptor.userId}
         where exists (
           select 1
           from bloom_workspace_members m

@@ -6,11 +6,11 @@ let queryTexts: string[] = [];
 let queryResults: unknown[][] = [];
 
 mock.module("./sql-client", () => ({
-  createSqlClient: () => async (strings: TemplateStringsArray) => {
+  createSqlClient: () => Object.assign(async (strings: TemplateStringsArray) => {
     queryCount += 1;
     queryTexts.push(strings.join("?"));
     return queryResults.shift() ?? [];
-  },
+  }, { json: (value: unknown) => value }),
 }));
 
 const { createDatabasePersistence, SyncDocumentVersionConflictError } = await import("./persistence");

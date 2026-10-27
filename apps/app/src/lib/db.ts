@@ -101,6 +101,33 @@ function getSql() {
   return sqlClient;
 }
 
+/**
+ * Binds a value as a real jsonb object/array. postgres.js stores `JSON.stringify(x)::jsonb` as a
+ * jsonb *string*, which breaks `col->>'key'`, indexes and reports.
+ */
+function jsonb(value: unknown) {
+  return getSql().json(value as Parameters<SqlClient["json"]>[0]);
+}
+
+/**
+ * Reads a jsonb column that holds an object or array. Rows written before #31 contain the JSON
+ * text as a jsonb string; both forms are returned as the parsed value. Unparseable legacy strings
+ * fall back to `fallback`.
+ */
+function readJsonb(value: unknown, fallback: unknown = {}) {
+  if (typeof value !== "string") return value ?? fallback;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return fallback;
+  }
+}
+
+function readJsonbObject(value: unknown): Record<string, unknown> {
+  const parsed = readJsonb(value);
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+}
+
 export function __setMarketSqlForTest(sql: SqlClient | null) {
   if (process.env.NODE_ENV !== "test") return;
   sqlClient = sql;
@@ -1386,7 +1413,8 @@ function agentProposalFromRow(row: AgentProposalRow): AgentProposalRecord {
   };
 }
 
-function parseAgentChildNodeProposals(value: unknown): AgentChildNodeProposal[] {
+function parseAgentChildNodeProposals(raw: unknown): AgentChildNodeProposal[] {
+  const value = readJsonb(raw, []);
   if (!Array.isArray(value)) return [];
   return value.flatMap((child) => {
     if (!child || typeof child !== "object") return [];
@@ -1719,7 +1747,7 @@ export async function completeWorkspaceAgentTaskByAgent(input: {
       if ((proposal.nodeContent || proposal.childNodes.length > 0) && !task.node_id)
         throw new Error("Node proposal requires a node-scoped task.");
       const proposalRows =
-        await transaction`insert into bloom_agent_proposals (task_id, workspace_id, document_id, filename, before_version, before_markdown_hash, proposed_markdown, proposed_node_content, proposed_child_nodes, rationale) values (${task.id}, ${task.workspace_id}, ${task.document_id}, ${task.filename}, ${Number(task.source_version)}, ${task.source_markdown_hash}, ${proposal.markdown}, ${proposal.nodeContent || null}, ${JSON.stringify(proposal.childNodes)}::jsonb, ${proposal.rationale}) returning id`;
+        await transaction`insert into bloom_agent_proposals (task_id, workspace_id, document_id, filename, before_version, before_markdown_hash, proposed_markdown, proposed_node_content, proposed_child_nodes, rationale) values (${task.id}, ${task.workspace_id}, ${task.document_id}, ${task.filename}, ${Number(task.source_version)}, ${task.source_markdown_hash}, ${proposal.markdown}, ${proposal.nodeContent || null}, ${jsonb(proposal.childNodes)}, ${proposal.rationale}) returning id`;
       proposalId = (proposalRows[0] as { id: string } | undefined)?.id ?? null;
       if (!proposalId) throw new Error("Agent proposal could not be stored.");
     }
@@ -2279,7 +2307,7 @@ export async function listCloudDocuments(
         id: item.id,
         workspaceId: item.workspace_id,
         filename: item.filename,
-        frontmatter: item.frontmatter,
+        frontmatter: readJsonbObject(item.frontmatter),
         version: Number(item.version),
         updatedAt: item.updated_at,
       };
@@ -2318,7 +2346,7 @@ export async function readCloudDocument(
     workspaceId: row.workspace_id,
     filename: row.filename,
     markdown: row.markdown,
-    frontmatter: row.frontmatter,
+    frontmatter: readJsonbObject(row.frontmatter),
     version: Number(row.version),
     updatedAt: row.updated_at,
   };
@@ -2350,7 +2378,7 @@ export async function writeCloudDocument(input: {
     rows = await getSql()`
       update bloom_documents
       set markdown = ${input.markdown},
-          frontmatter = ${JSON.stringify(input.frontmatter)}::jsonb,
+          frontmatter = ${jsonb(input.frontmatter)},
           version = version + 1,
           updated_by = ${dbUserId},
           updated_at = now(),
@@ -2366,7 +2394,7 @@ export async function writeCloudDocument(input: {
   } else {
     rows = await getSql()`
       insert into bloom_documents (workspace_id, filename, markdown, frontmatter, created_by, updated_by)
-      values (${workspace.id}, ${input.filename}, ${input.markdown}, ${JSON.stringify(input.frontmatter)}::jsonb, ${dbUserId}, ${dbUserId})
+      values (${workspace.id}, ${input.filename}, ${input.markdown}, ${jsonb(input.frontmatter)}, ${dbUserId}, ${dbUserId})
       on conflict (workspace_id, lower(filename)) where deleted_at is null
       do update set
         markdown = excluded.markdown,
@@ -2394,7 +2422,7 @@ export async function writeCloudDocument(input: {
     workspaceId: row.workspace_id,
     filename: row.filename,
     markdown: row.markdown,
-    frontmatter: row.frontmatter,
+    frontmatter: readJsonbObject(row.frontmatter),
     version: Number(row.version),
     updatedAt: row.updated_at,
   };
@@ -2480,7 +2508,7 @@ export async function saveCloudDocumentView(input: {
   const workspace = await getWorkspaceForUser(input.userId, input.workspaceId);
   const rows = await getSql()`
     insert into bloom_document_views (workspace_id, document_id, user_id, name, view)
-    select ${workspace.id}, d.id, ${input.userId}, ${input.name}, ${JSON.stringify(input.view)}::jsonb
+    select ${workspace.id}, d.id, ${input.userId}, ${input.name}, ${jsonb(input.view)}
     from bloom_documents d
     where d.id = ${input.documentId} and d.workspace_id = ${workspace.id} and d.deleted_at is null
     on conflict (document_id, user_id, name)
@@ -2488,7 +2516,11 @@ export async function saveCloudDocumentView(input: {
     returning id, name, view, updated_at
   `;
   if (!rows[0]) throw new Error("Document not found or access denied.");
-  return rows[0];
+  return normalizeViewRow(rows[0]);
+}
+
+function normalizeViewRow<T extends { view?: unknown }>(row: T): T {
+  return { ...row, view: readJsonbObject(row.view) };
 }
 
 export async function listCloudDocumentViews(
@@ -2497,7 +2529,7 @@ export async function listCloudDocumentViews(
   workspaceId?: string | null,
 ) {
   const workspace = await getWorkspaceForUser(userId, workspaceId);
-  return getSql()`
+  const rows = await getSql()`
     select v.id, v.name, v.view, v.updated_at
     from bloom_document_views v
     join bloom_documents d on d.id = v.document_id and d.workspace_id = v.workspace_id
@@ -2507,6 +2539,7 @@ export async function listCloudDocumentViews(
       and d.deleted_at is null
     order by v.updated_at desc
   `;
+  return rows.map(normalizeViewRow);
 }
 
 export interface MarketUserInput {
@@ -3944,8 +3977,8 @@ export async function exportAccountData(userId: string) {
     subscriptions,
     entitlements,
     memberships,
-    documents,
-    views,
+    documents: documents.map((document) => ({ ...document, frontmatter: readJsonbObject(document.frontmatter) })),
+    views: views.map(normalizeViewRow),
     accessTokens,
   };
 }
@@ -4019,7 +4052,7 @@ export async function recordStripeEvent(event: {
 
   const result = await getSql()`
     insert into bloom_stripe_events (id, type, payload, processing_started_at, attempts)
-    values (${event.id}, ${event.type}, ${JSON.stringify(event.payload)}::jsonb, now(), 1)
+    values (${event.id}, ${event.type}, ${jsonb(event.payload)}, now(), 1)
     on conflict (id) do update set
       type = excluded.type,
       payload = excluded.payload,
@@ -4111,7 +4144,7 @@ export async function recordStripeSubscription(
           ${input.stripeCheckoutSessionId ?? null},
           ${periodEnd},
           ${input.cancelAtPeriodEnd ?? false},
-          ${JSON.stringify(input.raw)}::jsonb
+          ${jsonb(input.raw)}
         )
         on conflict (stripe_subscription_id)
         do update set
@@ -4147,7 +4180,7 @@ export async function recordStripeSubscription(
           ${input.stripeCheckoutSessionId ?? null},
           ${periodEnd},
           ${input.cancelAtPeriodEnd ?? false},
-          ${JSON.stringify(input.raw)}::jsonb
+          ${jsonb(input.raw)}
         )
         on conflict (stripe_checkout_session_id)
         do update set

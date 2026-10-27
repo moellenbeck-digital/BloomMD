@@ -87,11 +87,11 @@ async function seed() {
     `;
     await tx`
       insert into bloom_documents (id, workspace_id, filename, markdown, frontmatter, version, created_by, updated_by)
-      values (${ids.document}, ${ids.workspace}, ${ids.filename}, ${ids.markdown}, ${JSON.stringify({ restoreDrill: runId })}::jsonb, 7, ${ids.userA}, ${ids.userB})
+      values (${ids.document}, ${ids.workspace}, ${ids.filename}, ${ids.markdown}, ${tx.json({ restoreDrill: runId })}, 7, ${ids.userA}, ${ids.userB})
     `;
     await tx`
       insert into bloom_document_views (id, workspace_id, document_id, user_id, name, view)
-      values (${ids.view}, ${ids.workspace}, ${ids.document}, ${ids.userA}, 'Restore Drill View', ${JSON.stringify({ x: 12, y: 34, zoom: 1.25 })}::jsonb)
+      values (${ids.view}, ${ids.workspace}, ${ids.document}, ${ids.userA}, 'Restore Drill View', ${tx.json({ x: 12, y: 34, zoom: 1.25 })})
     `;
     await tx`
       insert into bloom_sessions (id, user_id, expires_at)
@@ -111,7 +111,7 @@ async function seed() {
     `;
     await tx`
       insert into bloom_stripe_events (id, type, processed_at, payload)
-      values (${ids.eventId}, 'restore.drill', now(), ${JSON.stringify(buildPayload(ids))}::jsonb)
+      values (${ids.eventId}, 'restore.drill', now(), ${tx.json(buildPayload(ids))})
     `;
   });
 

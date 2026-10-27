@@ -55,6 +55,70 @@ Abgelegt wird als normales Markdown:
 4. Für OpenClaw den Skill `bloommd-knowledge` installieren (liegt im OpenClaw-Plugin von BloomMD). Er
    erklärt dem Agenten, wie er ablegt, welche Vorlage passt und was in Vault oder Cloud gehört.
 
+### Einrichtung in Claude Code
+
+Claude Code startet den MCP-Server als lokalen Prozess (stdio). Die Rechte (Schritt 2) gelten
+unverändert; `--name` erscheint im Protokoll.
+
+Für einen **Vault** trägst du den Server für alle deine Projekte ein (`--scope user`) und prüfst ihn:
+
+```bash
+claude mcp add --scope user bloommd -- \
+  bloommd-wiki agent mcp --vault "/Pfad/zum/Vault" --name "Claude Code"
+claude mcp list
+```
+
+Für einen **Cloud-Workspace** (oder beides zusammen) kommt `--cloud` und `--workspace` dazu. Das
+Zugriffstoken steht nie im Befehl und nie in der Konfiguration: Setze `BLOOMMD_TOKEN` in der Umgebung,
+in der du Claude Code startest, und lass Claude Code die Variable beim Start einsetzen (die
+einfachen Anführungszeichen verhindern, dass die Shell sie schon vorher ersetzt):
+
+```bash
+export BLOOMMD_TOKEN=…   # Zugriffstoken des Agenten, z. B. aus dem Passwortmanager
+claude mcp add-json --scope user bloommd '{
+  "type": "stdio",
+  "command": "bloommd-wiki",
+  "args": ["agent", "mcp", "--vault", "/Pfad/zum/Vault",
+           "--cloud", "https://…", "--workspace", "<id>", "--name", "Claude Code"],
+  "env": { "BLOOMMD_TOKEN": "${BLOOMMD_TOKEN}" }
+}'
+```
+
+Ohne `--vault` arbeitet der Server nur mit der Cloud, ohne `--cloud` nur mit dem Vault; Werkzeuge
+wählen mit `target` zwischen beiden. Läuft der Server, steht er in Claude Code unter `/mcp`. Teams
+können denselben Eintrag mit `--scope project` in die `.mcp.json` des Projekts legen – auch dort steht
+nur `${BLOOMMD_TOKEN}`, nie der Wert.
+
+## Werkzeuge
+
+Der Server bietet 17 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
+
+| Werkzeug | Zweck |
+|---|---|
+| `bloommd_overview` | Bereiche, Rechte und Maps |
+| `bloommd_search` | Suche in Knoten, Tags und Frontmatter (Filter `status`, `tag`, `scope`) |
+| `bloommd_get_map` | eine Map als Gliederung mit `version` |
+| `bloommd_get_node` | **ein** Knoten: Titel, Inhalt, Metadaten, Eltern, Kinder-IDs, Beziehungen und `version` der Map |
+| `bloommd_backlinks` | **Rückverweise**: Maps und Knoten, die auf eine Map oder Note verlinken |
+| `bloommd_changes` | Änderungsprotokoll des Agenten, mit `since` ab einem Zeitpunkt |
+| `bloommd_tasks`, `bloommd_decisions`, `bloommd_stale`, `bloommd_templates`, `bloommd_requests` | Aufgaben, Entscheidungen, ablaufende Maps, Vorlagen, Anfragen |
+
+Schreibend, nach den Rechten des Agenten: `bloommd_create_map`, `bloommd_update_map`,
+`bloommd_update_node`, `bloommd_answer_request`, `bloommd_undo` und `bloommd_share_link`.
+
+### Einzelner Knoten, Rückverweise, Änderungen seit
+
+- `bloommd_get_node {path, nodeId}` liest einen Knoten samt `version` der Map, ohne die ganze Map zu
+  laden. Eine unbekannte `nodeId` wird abgelehnt.
+- `bloommd_backlinks {path}` nennt je Treffer Map, Knoten (`nodeId`, `nodeTitle`), Zeile und den Link,
+  wie er geschrieben steht (`[[Note]]` oder Markdown-Link). Es werden nur Maps durchsucht, die der Agent
+  lesen kann; Treffer aus Maps, die der Speicher nicht lesen lässt, fehlen.
+- `bloommd_changes {since}` zeigt nur Änderungen ab einem ISO-Datum (`2026-10-27`, ab Tagesbeginn UTC)
+  oder Zeitpunkt (`2026-10-27T08:30:00Z`; ohne Zeitzone gilt UTC). Ohne `since` bleibt alles wie bisher;
+  `limit` begrenzt weiter. Ein ungültiges `since` wird abgelehnt.
+
+Alle drei gelten für `target` `vault` und `cloud` und ändern nie etwas.
+
 ## Benutzen
 
 - „Leg das Teammeeting in BloomMD ab“ und die Mitschrift einfügen.

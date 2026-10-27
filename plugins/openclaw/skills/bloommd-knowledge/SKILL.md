@@ -52,7 +52,11 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
   you pass change, `children` are appended after the node's existing children, an unknown `nodeId` is
   refused. Same rights as `bloommd_update_map`: written or proposed. Add `reason` and `source` so the
   log says why and where from.
-- Mistake → `bloommd_changes`, then `bloommd_undo {changeId}`.
+- Read one node → `bloommd_get_node {path, nodeId}`: title, content, metadata, parent, child ids,
+  relations and the map `version`; an unknown `nodeId` is refused.
+- Who links here → `bloommd_backlinks {path}`: maps and nodes that link to a map or note (`path`, `nodeId`,
+  `line`, `link`). Read-only; maps you cannot read are left out.
+- Mistake → `bloommd_changes` (`since` = ISO date or date-time keeps only newer changes), then `bloommd_undo {changeId}`.
 - Learnings and other maps with trust fields → `bloommd_search` with `tag`, `scope` or `status` (query may
   be empty); expired and veraltet/ersetzt maps only appear with `includeStale: true`. `bloommd_stale`
   lists maps whose `stale_after` has passed (`days` adds those expiring soon). Set `status`, `stale_after`,

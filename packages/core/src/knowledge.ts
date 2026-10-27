@@ -225,6 +225,35 @@ export function outlineMarkdown(markdown: string): KnowledgeOutline {
   return { title: roots[0]?.title ?? "", rootId: roots[0]?.id ?? null, nodes };
 }
 
+/** One node of a map with its place in the tree: parent, child ids and relations. */
+export interface KnowledgeNodeDetail extends KnowledgeNodeView {
+  parentTitle: string | null;
+  childIds: string[];
+  relations: NonNullable<MarkdownNodeMetadata["relations"]>;
+}
+
+/** A single node by id; an unknown id is a `KnowledgeNodeNotFoundError`. */
+export function knowledgeNodeDetail(markdown: string, nodeId: string): KnowledgeNodeDetail {
+  const { nodes } = outlineMarkdown(markdown);
+  const node = nodes.find((entry) => entry.id === nodeId);
+  if (!node) throw new KnowledgeNodeNotFoundError(nodeId);
+  return {
+    ...node,
+    parentTitle: nodes.find((entry) => entry.id === node.parentId)?.title ?? null,
+    childIds: nodes.filter((entry) => entry.parentId === node.id).map((entry) => entry.id),
+    relations: node.metadata?.relations ?? [],
+  };
+}
+
+/** The node a 1-based line of the file belongs to (the last heading above it); null in the frontmatter or above the first heading. */
+export function knowledgeNodeAtLine(markdown: string, line: number): { id: string; title: string } | null {
+  let owner: MarkdownHeadingNode | null = null;
+  for (const node of flattenHeadings(parseHeadingTree(markdown))) {
+    if (node.startLine <= line - 1 && (!owner || node.startLine > owner.startLine)) owner = node;
+  }
+  return owner ? { id: owner.id, title: owner.title } : null;
+}
+
 function yamlString(value: string): string {
   return JSON.stringify(value);
 }

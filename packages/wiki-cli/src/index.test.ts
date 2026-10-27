@@ -155,6 +155,17 @@ describe("exit codes", () => {
     expect(version.code).toBe(0);
     expect(version.stdout.trim()).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
   });
+
+  test("agent learning commands print their own help through the binary", async () => {
+    for (const command of ["search", "read", "create", "append", "stale"]) {
+      const help = await run(["agent", command, "--help"]);
+      expect(help.code).toBe(0);
+      expect(help.stdout).toStartWith(`bloommd-wiki agent ${command}`);
+    }
+    // Other agent commands and the bare help keep the general usage.
+    expect((await run(["agent", "--help"])).stdout).toContain("Agent-Befehle");
+    expect((await run(["agent", "rights", "--help"])).stdout).toContain("Agent-Befehle");
+  });
 });
 
 describe("desktop handoff", () => {

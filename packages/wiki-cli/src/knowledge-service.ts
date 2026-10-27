@@ -4,14 +4,24 @@
  */
 import { AgentLedger, type AgentDocuments, type AgentProposal, type AgentRequest } from "@bloommd/core/agent-ledger";
 import {
+  applyKnowledgeFrontmatter,
   applyKnowledgeNodes,
+  isKnowledgeRetired,
+  KnowledgeInputError,
+  knowledgeDaysBetween,
   knowledgeDecisions,
+  knowledgeLifecycle,
   knowledgeTasks,
   knowledgeVersion,
+  matchesKnowledgeFilter,
   newKnowledgeMap,
   outlineMarkdown,
+  readKnowledgeFrontmatter,
   searchKnowledge,
+  searchKnowledgeFrontmatter,
   type KnowledgeAccess,
+  type KnowledgeFilter,
+  type KnowledgeFrontmatterInput,
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
@@ -31,12 +41,56 @@ export interface CommitResult {
   created: string[];
   updated: string[];
   ids: Record<string, string>;
+  /** Frontmatter fields this change set (status, stale_after, …). */
+  frontmatter?: string[];
+}
+
+export interface SearchOptions extends KnowledgeFilter {
+  area?: string;
+  /** Also return expired maps and maps marked veraltet/ersetzt. */
+  includeStale?: boolean;
+  limit?: number;
+  now?: Date;
+}
+
+export interface StaleOptions {
+  area?: string;
+  tag?: string;
+  scope?: string;
+  /** Maps that expire within this many days are listed too (default 0: only expired ones). */
+  days?: number;
+  now?: Date;
+}
+
+export interface SearchHit {
+  path: string;
+  /** Empty for hits outside a node (`kind` frontmatter or map). */
+  nodeId: string;
+  /** `node`: text of a node; `frontmatter`: tags/scope/source/status/title; `map`: a filter matched the whole map (empty query). */
+  kind: "node" | "frontmatter" | "map";
+  title: string;
+  snippet: string;
+  field?: string;
+  status?: string;
+  stale_after?: string;
+  expired?: boolean;
+  ageDays?: number;
 }
 
 export type Proposal = AgentProposal;
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
+function today(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** Frontmatter fields shown on every search hit: only those the map has. */
+function trustFields(lifecycle: ReturnType<typeof knowledgeLifecycle>) {
+  return {
+    ...(lifecycle.status ? { status: lifecycle.status } : {}),
+    ...(lifecycle.stale_after ? { stale_after: lifecycle.stale_after } : {}),
+    ...(lifecycle.expired !== undefined ? { expired: lifecycle.expired } : {}),
+    ...(lifecycle.ageDays !== undefined ? { ageDays: lifecycle.ageDays } : {}),
+  };
 }
 
 function sameArea(a: string, b: string): boolean {
@@ -126,16 +180,68 @@ export class KnowledgeService {
     return { path: document.path, version: document.version, area: this.areaOf(document.path), ...outlineMarkdown(document.markdown) };
   }
 
-  async search(query: string, area?: string, limit = 40) {
-    const maps = (await this.store.list()).filter((map) => map.available !== false && (area === undefined || sameArea(map.area, area)));
-    const hits: Array<{ path: string; nodeId: string; title: string; snippet: string }> = [];
+  /**
+   * Search over node titles and content and, additionally, tags, scope, source, status and title
+   * of the frontmatter. `status`, `tag` and `scope` filter maps (the query may then be empty:
+   * one `map` hit per matching map). Expired maps and maps marked veraltet/ersetzt are left out
+   * unless `includeStale` is set or a `status` filter is given.
+   */
+  async search(query: string, options: SearchOptions = {}) {
+    const limit = options.limit ?? 40;
+    const day = today(options.now);
+    const filter: KnowledgeFilter = { status: options.status, tag: options.tag, scope: options.scope };
+    const filtered = filter.status !== undefined || filter.tag !== undefined || filter.scope !== undefined;
+    if (!query.trim() && !filtered) throw new KnowledgeInputError("query must not be empty unless status, tag or scope is given.");
+    const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || sameArea(map.area, options.area)));
+    const hits: SearchHit[] = [];
     for (const map of maps) {
       if (hits.length >= limit) break;
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
-      for (const hit of searchKnowledge(document.markdown, query, limit - hits.length)) hits.push({ path: map.path, ...hit });
+      const frontmatter = readKnowledgeFrontmatter(document.markdown);
+      if (!matchesKnowledgeFilter(frontmatter, filter)) continue;
+      const lifecycle = knowledgeLifecycle(frontmatter, day);
+      if (!options.includeStale && filter.status === undefined && isKnowledgeRetired(lifecycle)) continue;
+      const trust = trustFields(lifecycle);
+      if (!query.trim()) {
+        const snippet = [frontmatter.status && `status: ${frontmatter.status}`, frontmatter.scope && `scope: ${frontmatter.scope}`, frontmatter.tags.length > 0 && `tags: ${frontmatter.tags.join(", ")}`].filter(Boolean).join("; ");
+        hits.push({ path: map.path, nodeId: "", kind: "map", title: frontmatter.title ?? map.title, snippet, ...trust });
+        continue;
+      }
+      const inFrontmatter = searchKnowledgeFrontmatter(frontmatter, query);
+      if (inFrontmatter) hits.push({ path: map.path, nodeId: "", kind: "frontmatter", title: frontmatter.title ?? map.title, snippet: inFrontmatter.snippet, field: inFrontmatter.field, ...trust });
+      for (const hit of searchKnowledge(document.markdown, query, Math.max(0, limit - hits.length))) hits.push({ path: map.path, kind: "node", ...hit, ...trust });
     }
-    return { query, hits };
+    return { query, hits: hits.slice(0, limit) };
+  }
+
+  /**
+   * Maps whose `stale_after` is today or earlier (and, with `days`, those expiring within that
+   * many days), most overdue first. `daysOverdue` is negative for a map that has not expired yet.
+   */
+  async stale(options: StaleOptions = {}) {
+    const day = today(options.now);
+    const horizon = new Date(`${day}T00:00:00Z`);
+    horizon.setUTCDate(horizon.getUTCDate() + Math.max(0, options.days ?? 0));
+    const until = horizon.toISOString().slice(0, 10);
+    const filter: KnowledgeFilter = { tag: options.tag, scope: options.scope };
+    const stale = [];
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || sameArea(entry.area, options.area)))) {
+      const document = await this.store.read(map.path).catch(() => null);
+      if (!document) continue;
+      const frontmatter = readKnowledgeFrontmatter(document.markdown);
+      const { stale_after: staleAfter } = knowledgeLifecycle(frontmatter, day);
+      if (!staleAfter || staleAfter > until || !matchesKnowledgeFilter(frontmatter, filter)) continue;
+      stale.push({
+        path: map.path,
+        title: frontmatter.title ?? map.title,
+        ...(frontmatter.status ? { status: frontmatter.status } : {}),
+        stale_after: staleAfter,
+        daysOverdue: knowledgeDaysBetween(staleAfter, day),
+        ...(frontmatter.scope ? { scope: frontmatter.scope } : {}),
+      });
+    }
+    return { stale: stale.sort((a, b) => a.stale_after.localeCompare(b.stale_after) || a.path.localeCompare(b.path)) };
   }
 
   async tasks(options: { area?: string; includeDone?: boolean; assignee?: string; dueBefore?: string } = {}) {
@@ -171,13 +277,18 @@ export class KnowledgeService {
     return { templates: KNOWLEDGE_TEMPLATES.map(({ id: key, name, area, description }) => ({ id: key, name, area, description })) };
   }
 
-  async createMap(input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; scope?: string } & ChangeMeta): Promise<CommitResult> {
+  /**
+   * `frontmatter` (status, stale_after, verified, scope, replaced_by) is written into the new map
+   * and overrides the template's values; without it a template's defaults apply as before.
+   */
+  async createMap(input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta): Promise<CommitResult> {
     const template = input.template ? knowledgeTemplate(input.template) : null;
     if (input.template && !template) throw new Error(`Unknown template "${input.template}".`);
     const area = input.area.trim() || template?.area || "";
     const date = today();
-    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date, frontmatter: templateFrontmatter(template, { date, scope: input.scope }) });
-    const change = applyKnowledgeNodes(base, [...(template?.skeleton ?? []), ...(input.nodes ?? [])]);
+    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date, frontmatter: templateFrontmatter(template, { date }) });
+    const withFrontmatter = input.frontmatter ? applyKnowledgeFrontmatter(base, input.frontmatter) : { markdown: base, fields: [] };
+    const change = { ...applyKnowledgeNodes(withFrontmatter.markdown, [...(template?.skeleton ?? []), ...(input.nodes ?? [])]), ...(withFrontmatter.fields.length > 0 ? { frontmatter: withFrontmatter.fields } : {}) };
     // One lock per area: two maps with the same title must not both get the same free path.
     return this.withLock(`create:${area}`, async () => {
       const path = await this.store.freePath(area, input.title);
@@ -185,20 +296,30 @@ export class KnowledgeService {
     });
   }
 
-  async updateMap(input: { path: string; version?: string; nodes: KnowledgeNodeInput[] } & ChangeMeta): Promise<CommitResult> {
+  /**
+   * Adds or updates nodes and/or sets frontmatter fields (`frontmatter`); at least one of the two.
+   * Only the fields given are touched, the rest of the map stays as it is. In a cloud workspace
+   * a change with frontmatter is a whole-document save (refused while the map is open).
+   */
+  async updateMap(input: { path: string; version?: string; nodes?: KnowledgeNodeInput[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta): Promise<CommitResult> {
+    if (!input.nodes?.length && !input.frontmatter) throw new KnowledgeInputError("Give nodes or at least one of status, stale_after, verified, scope, replaced_by.");
     return this.withLock(input.path, () => this.updateMapNow(input));
   }
 
-  private async updateMapNow(input: { path: string; version?: string; nodes: KnowledgeNodeInput[] } & ChangeMeta): Promise<CommitResult> {
+  private async updateMapNow(input: { path: string; version?: string; nodes?: KnowledgeNodeInput[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta): Promise<CommitResult> {
     const document = await this.store.read(input.path);
     if (input.version && input.version !== document.version) {
       throw new Error(`${input.path} changed since version ${input.version} (now ${document.version}). Read it again with bloommd_get_map.`);
     }
-    const change = applyKnowledgeNodes(document.markdown, input.nodes);
+    const nodes = input.nodes ?? [];
+    // Without nodes the map is left byte for byte as it is (applying nothing would still add heading ids).
+    const nodeChange = nodes.length > 0 ? applyKnowledgeNodes(document.markdown, nodes) : { markdown: document.markdown, ids: {}, created: [], updated: [] };
+    const withFrontmatter = input.frontmatter ? applyKnowledgeFrontmatter(nodeChange.markdown, input.frontmatter) : { markdown: nodeChange.markdown, fields: [] };
+    const change = { ...nodeChange, markdown: withFrontmatter.markdown, ...(withFrontmatter.fields.length > 0 ? { frontmatter: withFrontmatter.fields } : {}) };
     const area = this.areaOf(document.path);
-    if (this.store.applyNodes && (await this.access(area)) === "write") {
+    if (this.store.applyNodes && nodes.length > 0 && !input.frontmatter && (await this.access(area)) === "write") {
       // Cloud: node operations merge into the live document instead of replacing it.
-      const applied = await this.store.applyNodes(document.path, input.nodes);
+      const applied = await this.store.applyNodes(document.path, nodes);
       const changeId = await this.remember({ origin: "agent", tool: "bloommd_update_map", path: document.path, before: document.markdown, afterVersion: applied.version, reason: input.reason, source: input.source });
       await this.log({ event: "written", tool: "bloommd_update_map", path: document.path, changeId, summary: `${applied.created.length} node(s) created, ${applied.updated.length} updated`, created: applied.created, updated: applied.updated, reason: input.reason, source: input.source });
       return { path: document.path, mode: "written", changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
@@ -212,12 +333,13 @@ export class KnowledgeService {
     before: string | null,
     baseVersion: string | null,
     after: string,
-    change: { created: string[]; updated: string[]; ids: Record<string, string> },
+    change: { created: string[]; updated: string[]; ids: Record<string, string>; frontmatter?: string[] },
     meta: ChangeMeta,
   ): Promise<CommitResult> {
     const area = this.areaOf(path);
     const access = await this.access(area);
-    const summary = `${change.created.length} node(s) created, ${change.updated.length} updated`;
+    const fields = change.frontmatter ?? [];
+    const summary = `${change.created.length} node(s) created, ${change.updated.length} updated${fields.length > 0 ? `, frontmatter: ${fields.join(", ")}` : ""}`;
     if (access === "read") throw new Error(`The agent may only read in "${area || "(top level)"}". Ask the owner to allow proposals or writing there.`);
     if (access === "propose") {
       const proposalId = await this.propose({ tool, path, area, baseVersion, markdown: after, summary, ...meta });
@@ -225,7 +347,7 @@ export class KnowledgeService {
     }
     const written = await this.store.write(path, after, baseVersion);
     const changeId = await this.remember({ origin: "agent", tool, path, before, afterVersion: written.version, ...meta });
-    await this.log({ event: "written", tool, path, changeId, summary, created: change.created, updated: change.updated, reason: meta.reason, source: meta.source });
+    await this.log({ event: "written", tool, path, changeId, summary, created: change.created, updated: change.updated, ...(fields.length > 0 ? { frontmatter: fields } : {}), reason: meta.reason, source: meta.source });
     return { path, mode: "written", changeId, version: written.version, ...change };
   }
 

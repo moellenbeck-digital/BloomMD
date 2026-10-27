@@ -18,6 +18,7 @@ import {
   type MarkdownNodeMetadata,
 } from "./obsidian-markdown";
 import type { AgentAccess } from "./agent-ledger";
+import { parseFrontmatter } from "./frontmatter";
 
 /** What an agent may do in an area: read only, write proposals for review, or write directly. */
 export type KnowledgeAccess = AgentAccess;
@@ -391,4 +392,263 @@ export function searchKnowledge(markdown: string, query: string, limit = 20): Ar
     if (hits.length >= limit) break;
   }
   return hits;
+}
+
+/** Lifecycle of a learning (`docs/LEARNINGS.md`); the frontmatter field `status`. */
+export const KNOWLEDGE_STATUSES = ["neu", "bestätigt", "veraltet", "ersetzt"] as const;
+export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
+
+/** Maps with one of these statuses are left out of the default search. */
+const RETIRED_STATUSES = new Set<string>(["veraltet", "ersetzt"]);
+
+const MAX_SCOPE_LENGTH = 300;
+const MAX_REPLACED_BY_LENGTH = 300;
+const MAX_VERIFIED_BY_LENGTH = 120;
+
+/** Trust and lifecycle fields an agent may write into a map's frontmatter. */
+export interface KnowledgeFrontmatterInput {
+  status?: KnowledgeStatus;
+  /** Date `YYYY-MM-DD` from which the map is to be checked again. */
+  stale_after?: string;
+  /** One sign-off; appended to the existing `verified` list, never replacing it. */
+  verified?: { by: string; at: string };
+  scope?: string;
+  /** Path of the successor; only together with `status: ersetzt`. */
+  replaced_by?: string;
+}
+
+/** A real calendar day: `2026-02-30` has the right shape but does not exist. */
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** Line breaks become spaces, so a value stays on its one frontmatter line. */
+function frontmatterText(value: unknown, field: string, max: number): string {
+  if (typeof value !== "string") throw new KnowledgeInputError(`${field} must be a string.`);
+  const text = value.replace(/[\r\n\u0085\u2028\u2029]+/g, " ").trim();
+  if (!text) throw new KnowledgeInputError(`${field} must not be empty.`);
+  if (text.length > max) throw new KnowledgeInputError(`${field} is too long (at most ${max} characters).`);
+  return text;
+}
+
+function frontmatterDate(value: unknown, field: string): string {
+  if (typeof value !== "string" || !isRealDate(value)) throw new KnowledgeInputError(`${field} must be a real date YYYY-MM-DD.`);
+  return value;
+}
+
+/**
+ * Validates the optional trust fields of a tool call (`status`, `stale_after`, `verified`, `scope`,
+ * `replaced_by`). Returns undefined when none is given. Throws `KnowledgeInputError`.
+ */
+export function parseKnowledgeFrontmatterInput(args: Record<string, unknown>): KnowledgeFrontmatterInput | undefined {
+  const input: KnowledgeFrontmatterInput = {};
+  if (args.status !== undefined) {
+    if (typeof args.status !== "string" || !(KNOWLEDGE_STATUSES as readonly string[]).includes(args.status)) {
+      throw new KnowledgeInputError(`status must be one of ${KNOWLEDGE_STATUSES.join(", ")}.`);
+    }
+    input.status = args.status as KnowledgeStatus;
+  }
+  if (args.stale_after !== undefined) input.stale_after = frontmatterDate(args.stale_after, "stale_after");
+  if (args.verified !== undefined) {
+    const verified = args.verified;
+    if (!verified || typeof verified !== "object" || Array.isArray(verified)) throw new KnowledgeInputError("verified must be an object {by, at}.");
+    const record = verified as Record<string, unknown>;
+    const unknown = Object.keys(record).find((key) => key !== "by" && key !== "at");
+    if (unknown) throw new KnowledgeInputError(`verified has an unknown field "${unknown}"; use by and at.`);
+    input.verified = { by: frontmatterText(record.by, "verified.by", MAX_VERIFIED_BY_LENGTH), at: frontmatterDate(record.at, "verified.at") };
+  }
+  if (args.scope !== undefined) input.scope = frontmatterText(args.scope, "scope", MAX_SCOPE_LENGTH);
+  if (args.replaced_by !== undefined) {
+    if (input.status !== "ersetzt") throw new KnowledgeInputError("replaced_by is only allowed together with status ersetzt.");
+    input.replaced_by = frontmatterText(args.replaced_by, "replaced_by", MAX_REPLACED_BY_LENGTH);
+  }
+  return Object.keys(input).length > 0 ? input : undefined;
+}
+
+const FRONTMATTER_BLOCK_RE = /^(﻿?---[ \t]*\r?\n)([\s\S]*?)(\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$))/;
+const FRONTMATTER_KEY_RE = /^([A-Za-z_][A-Za-z0-9_-]*)[ \t]*:(?:[ \t]|$)/;
+
+/** The `verified` entries already in the map, as they are; anything that is not a list of objects is refused. */
+function existingVerified(markdown: string): Array<Record<string, unknown>> {
+  let value: unknown;
+  try {
+    value = parseFrontmatter(markdown).data.verified;
+  } catch {
+    throw new KnowledgeInputError("The frontmatter of this map is not valid YAML; fix it before adding a verification.");
+  }
+  if (value === undefined || value === null) return [];
+  return (Array.isArray(value) ? value : [value]).map((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new KnowledgeInputError("The existing verified field is not a list of {by, at} entries; fix it before adding one.");
+    }
+    return entry as Record<string, unknown>;
+  });
+}
+
+function verifiedLines(entries: Array<Record<string, unknown>>): string[] {
+  const lines = ["verified:"];
+  for (const entry of entries) {
+    const keys = Object.keys(entry);
+    if (keys.length === 0) lines.push("  - {}");
+    keys.forEach((key, index) => lines.push(`${index === 0 ? "  - " : "    "}${/^[A-Za-z_][A-Za-z0-9_-]*$/.test(key) ? key : yamlString(key)}: ${JSON.stringify(entry[key])}`));
+  }
+  return lines;
+}
+
+/**
+ * Sets trust fields in the frontmatter and leaves every other line as it is: a field that exists
+ * is replaced in place (with its continuation lines), a new one is added at the end of the block,
+ * and a map without frontmatter gets one. Values are written through `yamlString`, so they cannot
+ * add YAML of their own. `verified` keeps the existing entries and appends the new one.
+ * Returns the changed field names in the order written.
+ */
+export function applyKnowledgeFrontmatter(markdown: string, input: KnowledgeFrontmatterInput): { markdown: string; fields: string[] } {
+  const edits: Array<{ key: string; lines: string[] }> = [];
+  if (input.status !== undefined) edits.push({ key: "status", lines: [`status: ${yamlString(input.status)}`] });
+  if (input.stale_after !== undefined) edits.push({ key: "stale_after", lines: [`stale_after: ${yamlString(input.stale_after)}`] });
+  if (input.scope !== undefined) edits.push({ key: "scope", lines: [`scope: ${yamlString(input.scope)}`] });
+  if (input.replaced_by !== undefined) edits.push({ key: "replaced_by", lines: [`replaced_by: ${yamlString(input.replaced_by)}`] });
+  if (input.verified !== undefined) {
+    edits.push({ key: "verified", lines: verifiedLines([...existingVerified(markdown), { by: input.verified.by, at: input.verified.at }]) });
+  }
+  if (edits.length === 0) return { markdown, fields: [] };
+
+  const match = FRONTMATTER_BLOCK_RE.exec(markdown);
+  const eol = match ? (/\r\n/.test(match[1]!) ? "\r\n" : "\n") : "\n";
+  const lines = match ? match[2]!.split(/\r?\n/) : [];
+  for (const { key, lines: replacement } of edits) {
+    const start = lines.findIndex((line) => FRONTMATTER_KEY_RE.exec(line)?.[1] === key);
+    if (start < 0) {
+      let end = lines.length;
+      while (end > 0 && lines[end - 1]!.trim() === "") end -= 1;
+      lines.splice(end, 0, ...replacement);
+      continue;
+    }
+    // The key's own value continues on indented lines, list items and blank lines.
+    let end = start + 1;
+    while (end < lines.length && (lines[end]!.trim() === "" || /^[ \t]/.test(lines[end]!) || /^-(?:[ \t]|$)/.test(lines[end]!))) end += 1;
+    while (end > start + 1 && lines[end - 1]!.trim() === "") end -= 1;
+    lines.splice(start, end - start, ...replacement);
+  }
+  const fields = edits.map((edit) => edit.key);
+  if (!match) return { markdown: `---${eol}${lines.join(eol)}${eol}---${eol}${markdown}`, fields };
+  return { markdown: `${match[1]}${lines.join(eol)}${match[3]}${markdown.slice(match[0].length)}`, fields };
+}
+
+/** What the frontmatter says about a map's trust; everything optional is left out when missing. */
+export interface KnowledgeFrontmatter {
+  title?: string;
+  status?: string;
+  scope?: string;
+  source?: string;
+  stale_after?: string;
+  replaced_by?: string;
+  created?: string;
+  tags: string[];
+  verified: Array<{ by: string; at: string }>;
+}
+
+function frontmatterString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/** Reads the frontmatter leniently: invalid YAML or odd types give a map without these fields, never an error. */
+export function readKnowledgeFrontmatter(markdown: string): KnowledgeFrontmatter {
+  let data: Record<string, unknown> = {};
+  try {
+    data = parseFrontmatter(markdown).data;
+  } catch {
+    // A map with broken frontmatter is still searchable by its nodes.
+  }
+  const rawTags = Array.isArray(data.tags) ? data.tags : typeof data.tags === "string" ? data.tags.split(/[,\s]+/) : [];
+  const tags = rawTags.flatMap((tag) => (typeof tag === "string" && tag.trim().replace(/^#/, "") ? [tag.trim().replace(/^#/, "")] : []));
+  const rawVerified = Array.isArray(data.verified) ? data.verified : data.verified ? [data.verified] : [];
+  const verified = rawVerified.flatMap((entry) => {
+    const record = entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as Record<string, unknown>) : {};
+    const by = frontmatterString(record.by);
+    const at = frontmatterString(record.at);
+    return by && at ? [{ by, at }] : [];
+  });
+  const field = <K extends keyof KnowledgeFrontmatter>(key: K, value: unknown): Partial<KnowledgeFrontmatter> => {
+    const text = frontmatterString(value);
+    return text ? ({ [key]: text } as Partial<KnowledgeFrontmatter>) : {};
+  };
+  return {
+    ...field("title", data.title),
+    ...field("status", data.status),
+    ...field("scope", data.scope),
+    ...field("source", data.source),
+    ...field("stale_after", data.stale_after),
+    ...field("replaced_by", data.replaced_by),
+    ...field("created", data.created),
+    tags,
+    verified,
+  };
+}
+
+/** Where a query matches in the frontmatter (tags, scope, source, status, title), or null. */
+export function searchKnowledgeFrontmatter(frontmatter: KnowledgeFrontmatter, query: string): { field: "tags" | "scope" | "source" | "status" | "title"; snippet: string } | null {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return null;
+  const tag = frontmatter.tags.find((entry) => entry.toLowerCase().includes(needle));
+  if (tag) return { field: "tags", snippet: `tags: ${tag}` };
+  for (const field of ["scope", "source", "status", "title"] as const) {
+    const value = frontmatter[field];
+    if (value?.toLowerCase().includes(needle)) return { field, snippet: `${field}: ${value}`.slice(0, 160) };
+  }
+  return null;
+}
+
+export interface KnowledgeFilter {
+  /** Exact status, case-insensitive. */
+  status?: string;
+  /** Exact tag, case-insensitive, with or without a leading `#`. */
+  tag?: string;
+  /** Substring of `scope`, case-insensitive. */
+  scope?: string;
+}
+
+export function matchesKnowledgeFilter(frontmatter: KnowledgeFrontmatter, filter: KnowledgeFilter): boolean {
+  if (filter.status !== undefined && frontmatter.status?.toLowerCase() !== filter.status.trim().toLowerCase()) return false;
+  if (filter.tag !== undefined) {
+    const tag = filter.tag.trim().replace(/^#/, "").toLowerCase();
+    if (!frontmatter.tags.some((entry) => entry.toLowerCase() === tag)) return false;
+  }
+  if (filter.scope !== undefined && !frontmatter.scope?.toLowerCase().includes(filter.scope.trim().toLowerCase())) return false;
+  return true;
+}
+
+export interface KnowledgeLifecycle {
+  status?: string;
+  stale_after?: string;
+  /** `stale_after` lies before today (like the wiki lint's `expired-page`); only with `stale_after`. */
+  expired?: boolean;
+  /** Days since `created`, else since the latest `verified.at`; only when one of them is a date. */
+  ageDays?: number;
+}
+
+const DATE_PREFIX_RE = /^\d{4}-\d{2}-\d{2}/;
+
+/** Whole days from `from` to `to` (both `YYYY-MM-DD`); negative when `to` is earlier. */
+export function knowledgeDaysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+/** Status, expiry and age of a map as of `today` (`YYYY-MM-DD`). */
+export function knowledgeLifecycle(frontmatter: KnowledgeFrontmatter, today: string): KnowledgeLifecycle {
+  const staleAfter = frontmatter.stale_after?.match(DATE_PREFIX_RE)?.[0];
+  const verifiedAt = frontmatter.verified.flatMap((entry) => entry.at.match(DATE_PREFIX_RE)?.[0] ?? []).sort().pop();
+  const since = frontmatter.created?.match(DATE_PREFIX_RE)?.[0] ?? verifiedAt;
+  return {
+    ...(frontmatter.status ? { status: frontmatter.status } : {}),
+    ...(staleAfter ? { stale_after: staleAfter, expired: staleAfter < today } : {}),
+    ...(since ? { ageDays: Math.max(0, knowledgeDaysBetween(since, today)) } : {}),
+  };
+}
+
+/** Default search leaves out maps that are expired or marked `veraltet`/`ersetzt`. */
+export function isKnowledgeRetired(lifecycle: KnowledgeLifecycle): boolean {
+  return lifecycle.expired === true || (lifecycle.status !== undefined && RETIRED_STATUSES.has(lifecycle.status));
 }

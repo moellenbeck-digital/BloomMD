@@ -126,6 +126,17 @@ openclaw cron add --name bloommd-faellige-aufgaben --cron "50 7 * * *" --tz Euro
 
 `--days 7` zeigt die ganze kommende Woche.
 
+Ebenso meldet `bloommd-wiki agent stale <vault>` Maps, deren `stale_after` erreicht oder überschritten ist
+(mit `--days 14` auch die der nächsten zwei Wochen), und gibt `NO_REPLY` aus, wenn nichts abläuft.
+
+### Vertrauen und Veraltung
+
+Der Agent kann `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`), `stale_after`, `verified` (wird angehängt),
+`scope` und `replaced_by` beim Anlegen und später gezielt setzen; `bloommd_update_map` ändert dann nur diese
+Felder. `bloommd_search` findet zusätzlich Tags und Frontmatter-Werte und filtert nach `status`, `tag` und
+`scope`. Abgelaufene sowie als `veraltet` oder `ersetzt` markierte Maps liefert die Suche nur mit
+`includeStale: true` (oder mit einem `status`-Filter). `bloommd_stale` listet die abgelaufenen Maps.
+
 ## Kontrolle
 
 ```bash

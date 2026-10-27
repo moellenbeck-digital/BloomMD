@@ -1,5 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { applyKnowledgeNodes, isKnowledgeInputError, knowledgeDecisions, knowledgeTasks, knowledgeVersion, newKnowledgeMap, outlineMarkdown, parseKnowledgeNodeInputs, searchKnowledge } from "./knowledge";
+import {
+  applyKnowledgeFrontmatter,
+  applyKnowledgeNodes,
+  isKnowledgeInputError,
+  isKnowledgeRetired,
+  knowledgeDecisions,
+  knowledgeLifecycle,
+  knowledgeTasks,
+  knowledgeVersion,
+  matchesKnowledgeFilter,
+  newKnowledgeMap,
+  outlineMarkdown,
+  parseKnowledgeFrontmatterInput,
+  parseKnowledgeNodeInputs,
+  readKnowledgeFrontmatter,
+  searchKnowledge,
+  searchKnowledgeFrontmatter,
+} from "./knowledge";
+import { parseFrontmatter } from "./frontmatter";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "./knowledge-templates";
 import { parseFile } from "./parser";
 
@@ -172,5 +190,116 @@ describe("structure-safe agent input", () => {
       expect(isKnowledgeInputError(error)).toBe(true);
     }
     expect(parseKnowledgeNodeInputs([], { minItems: 0 })).toEqual([]);
+  });
+});
+
+describe("trust fields in the frontmatter", () => {
+  const rejected = (args: Record<string, unknown>) => {
+    let error: unknown;
+    try { parseKnowledgeFrontmatterInput(args); } catch (caught) { error = caught; }
+    expect(isKnowledgeInputError(error)).toBe(true);
+    return (error as Error).message;
+  };
+
+  test("parseKnowledgeFrontmatterInput accepts the lifecycle fields and returns nothing without them", () => {
+    expect(parseKnowledgeFrontmatterInput({ title: "x" })).toBeUndefined();
+    expect(parseKnowledgeFrontmatterInput({
+      status: "ersetzt", stale_after: "2026-12-31", scope: "BloomMD,\ncoder", replaced_by: "Learnings/Neu.md", verified: { by: "Max", at: "2026-10-27" },
+    })).toEqual({ status: "ersetzt", stale_after: "2026-12-31", scope: "BloomMD, coder", replaced_by: "Learnings/Neu.md", verified: { by: "Max", at: "2026-10-27" } });
+  });
+
+  test("parseKnowledgeFrontmatterInput refuses invalid values with KnowledgeInputError", () => {
+    expect(rejected({ status: "stable" })).toMatch(/neu, bestätigt, veraltet, ersetzt/);
+    rejected({ status: 1 });
+    for (const date of ["morgen", "2026-02-30", "2026-13-01", "26-01-01", "2026-10-27T10:00", 20261027]) rejected({ stale_after: date });
+    for (const verified of ["Max", null, [], { by: "Max" }, { at: "2026-10-27" }, { by: "", at: "2026-10-27" }, { by: "Max", at: "gestern" }, { by: "Max", at: "2026-10-27", role: "x" }, { by: "x".repeat(121), at: "2026-10-27" }]) rejected({ verified });
+    rejected({ scope: "" });
+    rejected({ scope: "x".repeat(301) });
+    rejected({ scope: 5 });
+    expect(rejected({ replaced_by: "Neu.md" })).toMatch(/only allowed together with status ersetzt/);
+    rejected({ status: "bestätigt", replaced_by: "Neu.md" });
+    rejected({ status: "ersetzt", replaced_by: "x".repeat(301) });
+  });
+
+  test("line breaks never reach the YAML: a value stays on its line and cannot add fields", () => {
+    const input = parseKnowledgeFrontmatterInput({ scope: "a\nstatus: ersetzt\r\n---\n# Boom", verified: { by: "Max\nat: 1999-01-01", at: "2026-10-27" } })!;
+    const { markdown } = applyKnowledgeFrontmatter(meeting(), input);
+    const { data } = parseFrontmatter(markdown);
+    expect(data.scope).toBe("a status: ersetzt --- # Boom");
+    expect(data.status).toBeUndefined();
+    expect(data.verified).toEqual([{ by: "Max at: 1999-01-01", at: "2026-10-27" }]);
+    expect(outlineMarkdown(markdown).nodes.map((node) => node.title)).toEqual(["Teammeeting 30.09."]);
+  });
+
+  test("applyKnowledgeFrontmatter replaces fields in place and leaves every other line alone", () => {
+    const original = ["---", "title: \"Learning\"", "type: \"learning\"", "status: \"neu\"", "# Kommentar bleibt", "tags: [\"a\", \"b\"]", "stale_after: \"2026-10-01\"", "custom: [1,", "  2]", "---", "", "# Learning", "", "Text.", ""].join("\n");
+    const result = applyKnowledgeFrontmatter(original, { status: "bestätigt", stale_after: "2027-01-01", scope: "BloomMD" });
+    expect(result.fields).toEqual(["status", "stale_after", "scope"]);
+    expect(result.markdown).toBe(["---", "title: \"Learning\"", "type: \"learning\"", "status: \"bestätigt\"", "# Kommentar bleibt", "tags: [\"a\", \"b\"]", "stale_after: \"2027-01-01\"", "custom: [1,", "  2]", "scope: \"BloomMD\"", "---", "", "# Learning", "", "Text.", ""].join("\n"));
+  });
+
+  test("a field with a block value is replaced including its continuation lines", () => {
+    const original = "---\ntitle: T\nverified:\n  - by: Max\n    at: 2026-01-01\nscope: x\n---\n# T\n";
+    const result = applyKnowledgeFrontmatter(original, { replaced_by: "N.md", status: "ersetzt" });
+    expect(result.markdown).toBe("---\ntitle: T\nverified:\n  - by: Max\n    at: 2026-01-01\nscope: x\nstatus: \"ersetzt\"\nreplaced_by: \"N.md\"\n---\n# T\n");
+    const swapped = applyKnowledgeFrontmatter(original, { scope: "neu" });
+    expect(parseFrontmatter(swapped.markdown).data).toEqual({ title: "T", verified: [{ by: "Max", at: "2026-01-01" }], scope: "neu" });
+  });
+
+  test("verified appends to a list, a single entry or nothing, and keeps the rest", () => {
+    const first = applyKnowledgeFrontmatter(meeting(), { verified: { by: "Max", at: "2026-10-01" } }).markdown;
+    expect(parseFrontmatter(first).data.verified).toEqual([{ by: "Max", at: "2026-10-01" }]);
+    const second = applyKnowledgeFrontmatter(first, { verified: { by: "Anna", at: "2026-10-27" } }).markdown;
+    expect(parseFrontmatter(second).data.verified).toEqual([{ by: "Max", at: "2026-10-01" }, { by: "Anna", at: "2026-10-27" }]);
+    expect(parseFrontmatter(second).data.title).toBe("Teammeeting 30.09.");
+    const single = "---\ntitle: T\nverified: { by: Max, at: 2026-01-01 }\n---\n# T\n";
+    expect(parseFrontmatter(applyKnowledgeFrontmatter(single, { verified: { by: "Anna", at: "2026-02-02" } }).markdown).data.verified).toEqual([{ by: "Max", at: "2026-01-01" }, { by: "Anna", at: "2026-02-02" }]);
+    const empty = "---\ntitle: T\nverified: []\n---\n# T\n";
+    expect(parseFrontmatter(applyKnowledgeFrontmatter(empty, { verified: { by: "Anna", at: "2026-02-02" } }).markdown).data.verified).toEqual([{ by: "Anna", at: "2026-02-02" }]);
+    expect(readKnowledgeFrontmatter(second).verified).toEqual([{ by: "Max", at: "2026-10-01" }, { by: "Anna", at: "2026-10-27" }]);
+    // The Wiki lint reads the same shape: by and at as strings.
+    expect(() => applyKnowledgeFrontmatter("---\ntitle: T\nverified: Max\n---\n# T\n", { verified: { by: "Anna", at: "2026-02-02" } })).toThrow(/not a list/);
+  });
+
+  test("a map without frontmatter gets a block; CRLF files keep their line endings", () => {
+    const bare = applyKnowledgeFrontmatter("# Physik\n\nText\n", { status: "neu" });
+    expect(bare.markdown).toBe("---\nstatus: \"neu\"\n---\n# Physik\n\nText\n");
+    const crlf = applyKnowledgeFrontmatter("---\r\ntitle: T\r\nstatus: x\r\n---\r\n# T\r\n", { status: "veraltet", scope: "s" });
+    expect(crlf.markdown).toBe("---\r\ntitle: T\r\nstatus: \"veraltet\"\r\nscope: \"s\"\r\n---\r\n# T\r\n");
+    expect(applyKnowledgeFrontmatter("# T\n", {}).markdown).toBe("# T\n");
+  });
+
+  test("readKnowledgeFrontmatter and the lifecycle", () => {
+    const markdown = "---\ntitle: \"Bun\"\nstatus: bestätigt\nscope: \"BloomMD, coder\"\ncreated: 2026-09-01\nstale_after: 2026-10-20\ntags: [\"#Coder\", \"bereich/learnings\"]\nverified:\n  - by: Max\n    at: 2026-10-10\n---\n# Bun\n";
+    const frontmatter = readKnowledgeFrontmatter(markdown);
+    expect(frontmatter).toEqual(expect.objectContaining({ title: "Bun", status: "bestätigt", scope: "BloomMD, coder", stale_after: "2026-10-20", tags: ["Coder", "bereich/learnings"] }));
+    expect(knowledgeLifecycle(frontmatter, "2026-10-27")).toEqual({ status: "bestätigt", stale_after: "2026-10-20", expired: true, ageDays: 56 });
+    expect(knowledgeLifecycle(frontmatter, "2026-10-20").expired).toBe(false);
+    // Without `created` the latest verification dates the map.
+    expect(knowledgeLifecycle({ ...frontmatter, created: undefined }, "2026-10-27").ageDays).toBe(17);
+    // Maps without the fields give nothing: no status, no expiry, no age.
+    expect(knowledgeLifecycle(readKnowledgeFrontmatter("# Plain\n"), "2026-10-27")).toEqual({});
+    expect(readKnowledgeFrontmatter("---\n: [broken\n---\n# X\n")).toEqual({ tags: [], verified: [] });
+  });
+
+  test("filters, frontmatter search and the default exclusion", () => {
+    const frontmatter = readKnowledgeFrontmatter("---\ntitle: Bun\nstatus: neu\nscope: BloomMD, Coder\nsource: Ticket 109\ntags: [coder, Bereich/Learnings]\n---\n# Bun\n");
+    expect(matchesKnowledgeFilter(frontmatter, {})).toBe(true);
+    expect(matchesKnowledgeFilter(frontmatter, { tag: "CODER" })).toBe(true);
+    expect(matchesKnowledgeFilter(frontmatter, { tag: "cod" })).toBe(false);
+    expect(matchesKnowledgeFilter(frontmatter, { scope: "bloom" })).toBe(true);
+    expect(matchesKnowledgeFilter(frontmatter, { scope: "tester" })).toBe(false);
+    expect(matchesKnowledgeFilter(frontmatter, { status: "neu", tag: "coder", scope: "coder" })).toBe(true);
+    expect(matchesKnowledgeFilter(frontmatter, { status: "bestätigt" })).toBe(false);
+    expect(searchKnowledgeFrontmatter(frontmatter, "learn")).toEqual({ field: "tags", snippet: "tags: Bereich/Learnings" });
+    expect(searchKnowledgeFrontmatter(frontmatter, "ticket 109")?.field).toBe("source");
+    expect(searchKnowledgeFrontmatter(frontmatter, "neu")?.field).toBe("status");
+    expect(searchKnowledgeFrontmatter(frontmatter, "nirgends")).toBeNull();
+    expect(searchKnowledgeFrontmatter(frontmatter, " ")).toBeNull();
+    expect(isKnowledgeRetired({ status: "veraltet" })).toBe(true);
+    expect(isKnowledgeRetired({ status: "ersetzt" })).toBe(true);
+    expect(isKnowledgeRetired({ status: "bestätigt", stale_after: "2026-01-01", expired: true })).toBe(true);
+    expect(isKnowledgeRetired({ status: "neu", stale_after: "2027-01-01", expired: false })).toBe(false);
+    expect(isKnowledgeRetired({})).toBe(false);
   });
 });

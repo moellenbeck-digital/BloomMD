@@ -48,6 +48,10 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
 - Explaining to colleagues → `bloommd_share_link {path}` (cloud maps only) gives a read-only link
   without an account; only when the user asks to share, and tell them how long it is valid.
 - Mistake → `bloommd_changes`, then `bloommd_undo {changeId}`.
+- Learnings and other maps with trust fields → `bloommd_search` with `tag`, `scope` or `status` (query may
+  be empty); expired and veraltet/ersetzt maps only appear with `includeStale: true`. `bloommd_stale`
+  lists maps whose `stale_after` has passed (`days` adds those expiring soon). Set `status`, `stale_after`,
+  `verified {by, at}`, `scope` and `replaced_by` with `bloommd_update_map` (only those fields change).
 
 ## Requests from the owner
 

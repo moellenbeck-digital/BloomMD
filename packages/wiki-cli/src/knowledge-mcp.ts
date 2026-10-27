@@ -108,6 +108,20 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string" }, ...targetProperty }, required: ["path"] },
   },
   {
+    name: "bloommd_get_node",
+    title: "Knoten lesen",
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description: "ONE node of a map: title, content, metadata, parent, child ids and relations, plus the map's version for safe updates (bloommd_update_node). An unknown nodeId is refused. Use bloommd_get_map for the whole outline.",
+    inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string" }, nodeId: { type: "string", description: "Node id from bloommd_get_map or bloommd_search." }, ...targetProperty }, required: ["path", "nodeId"] },
+  },
+  {
+    name: "bloommd_backlinks",
+    title: "Rückverweise",
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description: "Which maps and nodes link to a map or note ([[Note]] or Markdown link): per hit path, area, title, nodeId and nodeTitle (empty above the first heading), line and the link as written. Only maps the agent can read are searched.",
+    inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string", description: "The map or note that is linked to." }, ...targetProperty }, required: ["path"] },
+  },
+  {
     name: "bloommd_templates",
     title: "Vorlagen",
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -196,8 +210,8 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_changes",
     title: "Änderungsprotokoll",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "The agent's recent changes (change log) with change ids for undo.",
-    inputSchema: { type: "object", additionalProperties: false, properties: { limit: { type: "integer", minimum: 1, maximum: 200 }, ...targetProperty } },
+    description: "The agent's recent changes (change log, newest first) with change ids for undo. since (ISO date or date-time, e.g. 2026-10-27 or 2026-10-27T08:30:00Z; without an offset UTC) keeps only changes from then on; limit still caps the list.",
+    inputSchema: { type: "object", additionalProperties: false, properties: { limit: { type: "integer", minimum: 1, maximum: 200 }, since: { type: "string", description: "Only changes at or after this ISO date or date-time." }, ...targetProperty } },
   },
   {
     name: "bloommd_undo",
@@ -243,6 +257,7 @@ export const KNOWLEDGE_INSTRUCTIONS = [
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",
   "If a change comes back as 'proposed', the owner reviews it; tell them. Never try to approve proposals yourself.",
+  "Reading: bloommd_get_node returns one node (parent, child ids, relations, map version); bloommd_backlinks lists the maps and nodes that link to a map or note; bloommd_changes with since lists your changes from a date or time on.",
   "Trust fields (status, stale_after, verified, scope, replaced_by) can be set with bloommd_create_map and bloommd_update_map; verified appends. bloommd_stale lists maps that are expired or about to expire, so they can be re-checked, renewed or retired.",
   "The owner can leave requests on map nodes: check bloommd_requests regularly, read the map, and answer each with bloommd_answer_request (optionally with nodes for that map).",
 ].join("\n");
@@ -294,6 +309,8 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           return result.stale.length === 0 ? new McpTextResult("NO_REPLY", result) : result;
         }
         case "bloommd_get_map": return service.getMap(string(args, "path", true)!);
+        case "bloommd_get_node": return service.getNode(string(args, "path", true)!, string(args, "nodeId", true)!);
+        case "bloommd_backlinks": return service.backlinks(string(args, "path", true)!);
         case "bloommd_templates": return service.templates(string(args, "id"));
         case "bloommd_create_map": return service.createMap({
           area: string(args, "area", true)!,
@@ -323,7 +340,7 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
         });
         case "bloommd_decisions": return service.decisions(string(args, "area"));
         case "bloommd_share_link": return service.shareLink(string(args, "path", true)!, typeof args.expiresInDays === "number" ? args.expiresInDays : 30);
-        case "bloommd_changes": return service.changes(typeof args.limit === "number" ? args.limit : 20);
+        case "bloommd_changes": return service.changes(typeof args.limit === "number" ? args.limit : 20, string(args, "since"));
         case "bloommd_undo": return service.undo(string(args, "changeId", true)!, { asOwner: false });
         case "bloommd_requests": return service.requests(args.includeDone === true);
         case "bloommd_answer_request": return service.answerRequest({

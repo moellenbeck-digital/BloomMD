@@ -11,7 +11,7 @@ import { createMcpParser, McpTextResult } from "./mcp";
 import { knowledgeServerOptions } from "./knowledge-mcp";
 import { AGENT_USAGE, dueSummary, runAgentCli, staleSummary } from "./agent-cli";
 import { KnowledgeService } from "./knowledge-service";
-import { CloudKnowledgeStore, nodeStateFiles, safeVaultPath, VaultKnowledgeStore, writeAccessConfig } from "./knowledge-store";
+import { CloudKnowledgeStore, nodeStateFiles, safeVaultPath, VaultKnowledgeStore, writeAccessConfig, type KnowledgeStore } from "./knowledge-store";
 
 async function vault(access: "read" | "propose" | "write" = "write", areas: Record<string, "read" | "propose" | "write"> = {}) {
   const root = await mkdtemp(join(tmpdir(), "bloommd-knowledge-"));
@@ -1213,6 +1213,154 @@ describe("trust fields through the MCP tools", () => {
     expect(due.structuredContent.stale).toHaveLength(1);
     // A filter without a match is idle as well.
     expect((await ask(3, { tag: "gibtsnicht" })).content).toEqual([{ type: "text", text: "NO_REPLY" }]);
+  });
+});
+
+type ChangeList = { changes: Array<Record<string, unknown>> };
+
+describe("bloommd_get_node, bloommd_backlinks and changes since", () => {
+  test("lists the new tools as read-only and mentions them in the instructions", () => {
+    const options = knowledgeServerOptions({}, "test");
+    const byName = new Map(options.tools.map((tool) => [tool.name, tool]));
+    for (const name of ["bloommd_get_node", "bloommd_backlinks", "bloommd_changes"]) expect(byName.get(name)?.annotations?.readOnlyHint).toBe(true);
+    const schema = (name: string) => byName.get(name)!.inputSchema as { properties: Record<string, unknown>; required?: string[] };
+    expect(schema("bloommd_get_node").required).toEqual(["path", "nodeId"]);
+    expect(schema("bloommd_backlinks").required).toEqual(["path"]);
+    expect(Object.keys(schema("bloommd_get_node").properties)).toContain("target");
+    expect(Object.keys(schema("bloommd_backlinks").properties)).toContain("target");
+    expect(Object.keys(schema("bloommd_changes").properties)).toEqual(expect.arrayContaining(["limit", "since", "target"]));
+    expect(options.instructions).toMatch(/bloommd_get_node.*bloommd_backlinks.*since/);
+    // Existing tools are still there.
+    expect(options.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["bloommd_update_node", "bloommd_get_map", "bloommd_changes", "bloommd_stale"]));
+  });
+
+  test("tools/list over the wire contains the new tools", async () => {
+    const out: string[] = [];
+    const pending = new Set<Promise<void>>();
+    const feed = createMcpParser(knowledgeServerOptions({}, "test"), (text) => out.push(text), pending);
+    feed(Buffer.from(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`));
+    await Promise.allSettled([...pending]);
+    await Bun.sleep(5);
+    const names = (JSON.parse(out[0]!).result.tools as Array<{ name: string }>).map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(["bloommd_get_node", "bloommd_backlinks"]));
+    expect(names).toHaveLength(17);
+  });
+
+  test("get_node returns the node with parent, child ids, relations and the map version; an unknown id is refused", async () => {
+    const { service } = await vault();
+    const created = await service.createMap({
+      area: "Projekte",
+      title: "Plan",
+      nodes: [
+        { ref: "ziel", title: "Ziel", content: "Release bauen." },
+        { ref: "a", parent: "ziel", title: "Schritt A" },
+        { ref: "b", parent: "ziel", title: "Schritt B", status: "open", assignee: "Max", relations: [{ target: "a", label: "nach" }] },
+      ],
+    });
+    const call = knowledgeServerOptions({ vault: service }, "test").call;
+    const map = await service.getMap(created.path);
+    const result = await call("bloommd_get_node", { path: created.path, nodeId: created.ids.ziel! }) as Awaited<ReturnType<KnowledgeService["getNode"]>>;
+    expect(result).toMatchObject({ path: created.path, version: map.version, area: "Projekte" });
+    expect(result.node).toMatchObject({ id: created.ids.ziel, title: "Ziel", content: "Release bauen.", parentId: map.rootId, parentTitle: "Plan", childIds: [created.ids.a, created.ids.b], relations: [] });
+    const task = await service.getNode(created.path, created.ids.b!);
+    expect(task.node).toMatchObject({ title: "Schritt B", parentId: created.ids.ziel, parentTitle: "Ziel", childIds: [], relations: [{ target: created.ids.a, label: "nach" }] });
+    expect(task.node.metadata).toMatchObject({ kind: "task", status: "open", assignee: "Max" });
+    await expect(call("bloommd_get_node", { path: created.path, nodeId: "gibtsnicht" })).rejects.toThrow(/Node "gibtsnicht" does not exist/);
+    await expect(call("bloommd_get_node", { path: created.path })).rejects.toThrow(/nodeId/);
+    await expect(call("bloommd_get_node", { path: "Projekte/Fehlt.md", nodeId: "x" })).rejects.toThrow();
+    // Read only: the map is unchanged.
+    expect((await service.getMap(created.path)).version).toBe(map.version);
+  });
+
+  test("backlinks name the map and the node that link, also with a read-only right", async () => {
+    const { root, service } = await vault("read");
+    await mkdir(join(root, "Arbeit"), { recursive: true });
+    await writeFile(join(root, "Arbeit", "Lernplan.md"), "# Lernplan <!-- bloommd:id=lp-root -->\n\n## Vorbereitung <!-- bloommd:id=lp-vor -->\n\nZuerst [[Physik]] wiederholen.\n\n## Später <!-- bloommd:id=lp-spaeter -->\n\nSiehe [Skript](../Schule/Physik.md).\n", "utf8");
+    await writeFile(join(root, "Arbeit", "Ohne.md"), "# Ohne\n\nKein Verweis.\n", "utf8");
+    const call = knowledgeServerOptions({ vault: service }, "test").call;
+    const result = await call("bloommd_backlinks", { path: "Schule/Physik.md" }) as Awaited<ReturnType<KnowledgeService["backlinks"]>>;
+    expect(result.path).toBe("Schule/Physik.md");
+    expect(result.backlinks).toEqual([
+      expect.objectContaining({ path: "Arbeit/Lernplan.md", area: "Arbeit", nodeId: "lp-vor", nodeTitle: "Vorbereitung", link: "[[Physik]]" }),
+      expect.objectContaining({ path: "Arbeit/Lernplan.md", nodeId: "lp-spaeter", nodeTitle: "Später" }),
+    ]);
+    expect((await service.backlinks("Arbeit/Ohne.md")).backlinks).toEqual([]);
+    await expect(service.backlinks("Schule/Fehlt.md")).rejects.toThrow();
+  });
+
+  test("backlinks leave out maps the agent cannot read", async () => {
+    const markdown: Record<string, string> = {
+      "Schule/Physik.md": "# Physik\n",
+      "Arbeit/Offen.md": "# Offen <!-- bloommd:id=o1 -->\n\nSiehe [[Physik]].\n",
+      "Gesperrt/Geheim.md": "# Geheim\n\nSiehe [[Physik]].\n",
+      "Cloud/Weg.md": "# Weg\n\nSiehe [[Physik]].\n",
+    };
+    const store: KnowledgeStore = {
+      kind: "cloud",
+      stateDir: await mkdtemp(join(tmpdir(), "bloommd-stub-")),
+      list: async () => Object.keys(markdown).map((path) => ({ path, title: path, area: path.split("/")[0]!, ...(path === "Cloud/Weg.md" ? { available: false } : {}) })),
+      read: async (path) => {
+        if (path === "Gesperrt/Geheim.md") throw new Error("BloomMD cloud could not read Gesperrt/Geheim.md (403).");
+        const text = markdown[path];
+        if (text === undefined) throw new Error(`not found: ${path}`);
+        return { path, markdown: text, version: "1" };
+      },
+      write: async () => { throw new Error("read only"); },
+      freePath: async () => "x.md",
+    };
+    const service = new KnowledgeService(store, "OpenClaw");
+    const result = await service.backlinks("Schule/Physik.md");
+    expect(result.backlinks.map((entry) => entry.path)).toEqual(["Arbeit/Offen.md"]);
+    expect(JSON.stringify(result)).not.toContain("Geheim");
+    expect(JSON.stringify(result)).not.toContain("Weg");
+    // A target that is not readable is an error, not an empty answer.
+    await expect(service.backlinks("Gesperrt/Geheim.md")).rejects.toThrow(/403/);
+  });
+
+  test("changes with since keep only newer entries; without since nothing changes; an invalid since is refused", async () => {
+    const { root, service } = await vault();
+    const entry = (at: string, path: string) => JSON.stringify({ at, agent: "OpenClaw", target: "vault", event: "written", tool: "bloommd_update_map", path });
+    await mkdir(join(root, ".bloommd"), { recursive: true });
+    await writeFile(join(root, ".bloommd", "agent-log.jsonl"), `${[
+      entry("2026-10-20T10:00:00.000Z", "alt.md"),
+      entry("2026-10-27T00:00:00.000Z", "tagesbeginn.md"),
+      entry("2026-10-27T08:30:00.000Z", "morgens.md"),
+      entry("2026-10-27T15:00:00.000Z", "nachmittags.md"),
+    ].join("\n")}\n`, "utf8");
+    const paths = (result: ChangeList) => result.changes.map((change) => change.path);
+    const call = knowledgeServerOptions({ vault: service }, "test").call;
+
+    expect(paths(await call("bloommd_changes", {}) as ChangeList)).toEqual(["nachmittags.md", "morgens.md", "tagesbeginn.md", "alt.md"]);
+    expect(paths(await call("bloommd_changes", { limit: 2 }) as ChangeList)).toEqual(["nachmittags.md", "morgens.md"]);
+    // A date counts from the start of that day (UTC).
+    expect(paths(await call("bloommd_changes", { since: "2026-10-27" }) as ChangeList)).toEqual(["nachmittags.md", "morgens.md", "tagesbeginn.md"]);
+    expect(paths(await call("bloommd_changes", { since: "2026-10-27T08:30:00Z" }) as ChangeList)).toEqual(["nachmittags.md", "morgens.md"]);
+    // Without an offset UTC applies; an offset moves the moment.
+    expect(paths(await service.changes(20, "2026-10-27T08:30:01"))).toEqual(["nachmittags.md"]);
+    expect(paths(await service.changes(20, "2026-10-27T10:00:00+02:00"))).toEqual(["nachmittags.md", "morgens.md"]);
+    // The limit still applies on top of since.
+    expect(paths(await call("bloommd_changes", { since: "2026-10-01", limit: 1 }) as ChangeList)).toEqual(["nachmittags.md"]);
+    expect(paths(await call("bloommd_changes", { since: "2030-01-01" }) as ChangeList)).toEqual([]);
+    for (const since of ["gestern", "2026-02-30", "2026-13-01", "2026-10-27T25:00:00Z", "27.10.2026", "", "2026"]) {
+      await expect(call("bloommd_changes", { since })).rejects.toThrow(/since must be an ISO date/);
+    }
+    await expect(call("bloommd_changes", { since: 20261027 })).rejects.toThrow(/since/);
+  });
+
+  test("changes with since in a cloud workspace read the server log whole and filter it", async () => {
+    const fake = fakeCloud();
+    const stateDir = await mkdtemp(join(tmpdir(), "bloommd-cloud-"));
+    const service = new KnowledgeService(new CloudKnowledgeStore({ url: "https://app.example", token: "bloom_pat_x", workspaceId: "ws1", stateDir, fetch: fake.fetcher }), "OpenClaw");
+    // The server's entry is from 2026-10-27T08:00:00Z.
+    expect((await service.changes(5, "2026-10-27")).changes).toEqual([expect.objectContaining({ changeId: "c1", path: "Arbeit – Plan.md" })]);
+    expect((await service.changes(5, "2026-10-27T08:00:01Z")).changes).toEqual([]);
+    expect((await service.changes(5)).changes).toHaveLength(1);
+    expect(fake.calls.map((call) => call.path)).toEqual([
+      "/api/mindmaps/agent-access/changes?limit=200",
+      "/api/mindmaps/agent-access/changes?limit=200",
+      "/api/mindmaps/agent-access/changes?limit=5",
+    ]);
+    await expect(service.changes(5, "bald")).rejects.toThrow(/since must be an ISO date/);
   });
 });
 

@@ -8,6 +8,8 @@ import {
   KnowledgeNodeNotFoundError,
   knowledgeDecisions,
   knowledgeLifecycle,
+  knowledgeNodeAtLine,
+  knowledgeNodeDetail,
   knowledgeTasks,
   knowledgeVersion,
   matchesKnowledgeFilter,
@@ -354,5 +356,49 @@ describe("parseKnowledgeNodePatch", () => {
     for (const bad of [null, "x", [], {}, { children: [] }, { id: "x", status: "done" }, { ref: "x" }, { parent: "root01", status: "done" }, { nope: 1 }, { status: "kaputt" }, { due: "bald" }, { content: "## Kopf" }, { title: "a\nb" }, { children: "x" }, { children: ["x"] }, { children: [{ id: "alt001", content: "x" }] }, { children: [{ title: "ok" }, { title: 3 }] }, { children: Array.from({ length: 200 }, (_, index) => ({ title: `k${index}` })) }]) {
       expect(() => parseKnowledgeNodePatch(bad, "aufg01")).toThrow(KnowledgeInputError);
     }
+  });
+});
+
+describe("knowledgeNodeDetail and knowledgeNodeAtLine", () => {
+  const markdown = [
+    "---",
+    "title: \"Plan\"",
+    "---",
+    "",
+    "# Plan <!-- bloommd:id=root01 -->",
+    "",
+    "Einleitung mit [[Link]].",
+    "",
+    "## Ziel <!-- bloommd:id=ziel01 -->",
+    "",
+    "Text.",
+    "",
+    "### Schritt <!-- bloommd:id=schr01 -->",
+    "",
+    "Mehr [[Link]] hier.",
+    "",
+  ].join("\n");
+
+  test("returns the node with parent, child ids and relations", () => {
+    expect(knowledgeNodeDetail(markdown, "ziel01")).toMatchObject({ id: "ziel01", title: "Ziel", parentId: "root01", parentTitle: "Plan", childIds: ["schr01"], relations: [] });
+    expect(knowledgeNodeDetail(markdown, "root01")).toMatchObject({ parentId: null, parentTitle: null, childIds: ["ziel01"] });
+    expect(knowledgeNodeDetail(markdown, "schr01").childIds).toEqual([]);
+  });
+
+  test("an unknown id is a KnowledgeNodeNotFoundError", () => {
+    expect(() => knowledgeNodeDetail(markdown, "fehlt")).toThrow(KnowledgeNodeNotFoundError);
+    try {
+      knowledgeNodeDetail(markdown, "fehlt");
+    } catch (error) {
+      expect(isKnowledgeInputError(error)).toBe(true);
+    }
+  });
+
+  test("finds the node a 1-based line belongs to; the frontmatter belongs to none", () => {
+    expect(knowledgeNodeAtLine(markdown, 2)).toBeNull();
+    expect(knowledgeNodeAtLine(markdown, 7)).toEqual({ id: "root01", title: "Plan" });
+    expect(knowledgeNodeAtLine(markdown, 9)).toEqual({ id: "ziel01", title: "Ziel" });
+    expect(knowledgeNodeAtLine(markdown, 11)).toEqual({ id: "ziel01", title: "Ziel" });
+    expect(knowledgeNodeAtLine(markdown, 15)).toEqual({ id: "schr01", title: "Schritt" });
   });
 });

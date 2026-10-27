@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Der Wissens-MCP kann mehr lesen: `bloommd_get_node` liefert einen einzelnen Knoten mit Inhalt, Metadaten, Eltern, Kinder-IDs, Beziehungen und der `version` der Map (eine unbekannte Knoten-ID wird abgelehnt), `bloommd_backlinks` nennt die Maps und Knoten, die auf eine Map oder Note verlinken (nur aus Maps, die der Agent lesen kann), und `bloommd_changes` zeigt mit `since` (ISO-Datum oder -Zeitpunkt) nur Änderungen ab diesem Zeitpunkt; ein ungültiges `since` wird abgelehnt. Alle drei ändern nichts. Die Hilfe „Agent-Wissen“ (DE/EN) beschreibt zusätzlich die Einrichtung in Claude Code und listet die Werkzeuge.
+- The knowledge MCP can read more: `bloommd_get_node` returns a single node with content, metadata, parent, child ids, relations and the map's `version` (an unknown node id is refused), `bloommd_backlinks` names the maps and nodes that link to a map or note (only from maps the agent can read), and `bloommd_changes` with `since` (ISO date or date-time) shows only changes from that point on; an invalid `since` is refused. All three change nothing. The “Agent knowledge” help (DE/EN) also describes the setup in Claude Code and lists the tools.
+
 - Das Werkzeug `bloommd_stale` des Wissens-MCP antwortet ohne Treffer mit genau `NO_REPLY` (wie `bloommd-wiki agent stale`), damit Routinen still bleiben; die Liste bleibt unverändert. Die Suche behandelt `veraltet` und `ersetzt` auch in anderer Groß-/Kleinschreibung als ausgeschlossen
 - The `bloommd_stale` tool of the knowledge MCP answers with exactly `NO_REPLY` when nothing is due (like `bloommd-wiki agent stale`), so routines stay silent; the list is unchanged otherwise. Search also treats `veraltet` and `ersetzt` as excluded in any letter case
 

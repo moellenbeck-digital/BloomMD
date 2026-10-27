@@ -11,6 +11,8 @@ import {
   knowledgeDaysBetween,
   knowledgeDecisions,
   knowledgeLifecycle,
+  knowledgeNodeAtLine,
+  knowledgeNodeDetail,
   knowledgeTasks,
   knowledgeVersion,
   matchesKnowledgeFilter,
@@ -26,6 +28,7 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
+import { backlinksFor } from "@bloommd/core/workspace-search";
 import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
 
@@ -102,6 +105,25 @@ function cloudLogEntry(change: CloudChange): Record<string, unknown> {
     ...(change.reviewerName ? { reviewer: change.reviewerName } : {}),
     undoable: change.undoable,
   };
+}
+
+/** The most entries the server returns for the change log of a token. */
+const CLOUD_LOG_MAX = 200;
+
+const SINCE_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})?)?$/;
+
+/** An ISO date (`2026-10-27`, start of that day) or date-time (`2026-10-27T08:30:00Z`; without an offset: UTC). */
+export function parseKnowledgeSince(value: string): Date {
+  const text = value.trim();
+  const invalid = () => new KnowledgeInputError(`since must be an ISO date (2026-10-27) or date-time (2026-10-27T08:30:00Z), got "${value}".`);
+  if (!SINCE_RE.test(text)) throw invalid();
+  // An impossible day (2026-02-30) must not roll over into the next month.
+  const [year, month, day] = text.slice(0, 10).split("-").map(Number) as [number, number, number];
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== day) throw invalid();
+  const parsed = new Date(text.includes("T") && !/(?:Z|[+-]\d{2}:\d{2})$/.test(text) ? `${text}Z` : text);
+  if (Number.isNaN(parsed.getTime())) throw invalid();
+  return parsed;
 }
 
 function today(now = new Date()): string {
@@ -225,6 +247,33 @@ export class KnowledgeService {
   async getMap(path: string) {
     const document = await this.store.read(path);
     return { path: document.path, version: document.version, area: this.areaOf(document.path), ...outlineMarkdown(document.markdown) };
+  }
+
+  /** One node with title, content, metadata, parent, child ids and relations, plus the map's version for safe updates. */
+  async getNode(path: string, nodeId: string) {
+    const document = await this.store.read(path);
+    return { path: document.path, version: document.version, area: this.areaOf(document.path), node: knowledgeNodeDetail(document.markdown, nodeId) };
+  }
+
+  /**
+   * Maps and nodes that link to a map or note, with the line and the link as written. Only maps the
+   * agent can read are searched: a map the store refuses to read (a cloud area the token may not
+   * see, an unavailable file) never shows up as a source, so it cannot leak through its links.
+   */
+  async backlinks(path: string) {
+    const target = await this.store.read(path);
+    const files = [{ path: target.path, markdown: target.markdown }];
+    for (const map of await this.store.list()) {
+      if (map.available === false || map.path === target.path) continue;
+      const document = await this.store.read(map.path).catch(() => null);
+      if (document) files.push({ path: document.path, markdown: document.markdown });
+    }
+    const markdownOf = new Map(files.map((file) => [file.path, file.markdown]));
+    const backlinks = backlinksFor(files, target.path).map((entry) => {
+      const node = knowledgeNodeAtLine(markdownOf.get(entry.path) ?? "", entry.line);
+      return { path: entry.path, area: this.areaOf(entry.path), title: entry.title, nodeId: node?.id ?? "", nodeTitle: node?.title ?? "", line: entry.line, link: entry.raw };
+    });
+    return { path: target.path, backlinks };
   }
 
   /**
@@ -457,9 +506,19 @@ export class KnowledgeService {
     return { path, ...link };
   }
 
-  async changes(limit = 20) {
+  /**
+   * The agent's change log, newest first. `since` (ISO date or date-time, see `parseKnowledgeSince`)
+   * keeps only entries from that moment on; `limit` still caps the result.
+   */
+  async changes(limit = 20, since?: string) {
+    const from = since === undefined ? undefined : parseKnowledgeSince(since);
+    // With `since` the log is filtered after reading, so it is read whole (the server caps it at 200 entries).
     const cloud = this.cloud;
-    return { changes: cloud ? (await cloud.agent.selfChanges(limit)).map(cloudLogEntry) : await this.ledger.changes(limit) };
+    const entries = cloud
+      ? (await cloud.agent.selfChanges(from === undefined ? limit : CLOUD_LOG_MAX)).map(cloudLogEntry)
+      : await this.ledger.changes(from === undefined ? limit : Number.MAX_SAFE_INTEGER);
+    if (from === undefined) return { changes: entries };
+    return { since: from.toISOString(), changes: entries.filter((entry) => Date.parse(String(entry.at)) >= from.getTime()).slice(0, limit) };
   }
 
   /** The owner's view of the change log of the agent tokens of a cloud workspace (all, or one token). */

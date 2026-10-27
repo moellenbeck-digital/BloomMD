@@ -282,6 +282,11 @@ async function walkMarkdown(rootDir: string, currentDir = rootDir): Promise<stri
 async function readPage(rootDir: string, path: string): Promise<WikiPage> {
   const raw = await readFile(absoluteWikiPath(rootDir, path), "utf8");
   if (Buffer.byteLength(raw, "utf8") > MAX_PAGE_BYTES) throw new Error(`Wiki page exceeds ${MAX_PAGE_BYTES} bytes: ${path}`);
+  return parseWikiPage(path, raw);
+}
+
+/** Parses Markdown that is not (yet) on disk — e.g. the proposed content of a Wiki proposal — into a page. */
+export function parseWikiPage(path: string, raw: string): WikiPage {
   const parsed = parseFrontmatter(raw);
   const data = parsed.data;
   const generated = parseActorEvent(data.generated);

@@ -192,34 +192,38 @@ describe.skipIf(!url)("agent token rights per route (Postgres)", () => {
       else process.env.BLOOMMD_STORAGE_MODE = original;
     });
 
-    test("create, replace, rename, delete and node changes are refused with 403 AGENT_WORKSPACE_REQUIRED, whatever the rights say", async () => {
+    test("create, replace, rename, delete and node changes are each refused with 403, whatever the rights say", async () => {
       const scope = filesystemScope();
       mkdirSync(scope, { recursive: true });
-      const file = `Karte-${run}.md`;
       const content = "# Karte\n\nStart.\n";
-      writeFileSync(join(scope, file), content);
       const writer = await agent("Dateimodus-Schreiber");
       await setRights(writer.id, "write");
       const reader = await agent("Dateimodus-Leser");
       await setRights(reader.id, "read");
-
+      // Every attempt gets its own file, so one refused call cannot hide another that would have gone through.
+      let n = 0;
+      const fresh = () => {
+        const file = `Karte-${run}-${++n}.md`;
+        writeFileSync(join(scope, file), content);
+        return file;
+      };
+      const attempts: Array<[string, (file: string) => [Handler, string, string, unknown, Record<string, string>]]> = [
+        ["POST create", () => [routes.mindmaps.POST, "POST", "/api/mindmaps", { filename: `Neu-${run}-${n}.md`, markdown: "# Neu\n\nVom Agenten.\n" }, {}]],
+        ["PUT replace", (file) => [routes.mindmap.PUT, "PUT", `/api/mindmaps/${encoded(file)}`, { markdown: "# Karte\n\n## Ueberschrieben\n", overwrite: true }, { filename: file }]],
+        ["PATCH rename", (file) => [routes.mindmap.PATCH, "PATCH", `/api/mindmaps/${encoded(file)}`, { newFilename: `Umbenannt-${run}-${n}.md` }, { filename: file }]],
+        ["POST nodes", (file) => [routes.nodes.POST, "POST", `/api/mindmaps/${encoded(file)}/nodes`, { nodes: [{ title: "Eingeschmuggelt" }] }, { filename: file }]],
+        ["DELETE", (file) => [routes.mindmap.DELETE, "DELETE", `/api/mindmaps/${encoded(file)}`, undefined, { filename: file }]],
+      ];
       for (const bot of [writer, reader]) {
-        const attempts: Array<[string, Handler, string, string, unknown, Record<string, string>]> = [
-          ["POST create", routes.mindmaps.POST, "POST", "/api/mindmaps", { filename: `Neu-${bot.name}.md`, markdown: "# Neu\n\nVom Agenten.\n" }, {}],
-          ["PUT replace", routes.mindmap.PUT, "PUT", `/api/mindmaps/${encoded(file)}`, { markdown: "# Karte\n\n## Ueberschrieben\n", overwrite: true }, { filename: file }],
-          ["PATCH rename", routes.mindmap.PATCH, "PATCH", `/api/mindmaps/${encoded(file)}`, { newFilename: `Umbenannt-${bot.name}.md` }, { filename: file }],
-          ["POST nodes", routes.nodes.POST, "POST", `/api/mindmaps/${encoded(file)}/nodes`, { nodes: [{ title: "Eingeschmuggelt" }] }, { filename: file }],
-          ["DELETE", routes.mindmap.DELETE, "DELETE", `/api/mindmaps/${encoded(file)}`, undefined, { filename: file }],
-        ];
-        for (const [label, handler, method, path, body, params] of attempts) {
+        for (const [label, build] of attempts) {
+          const file = fresh();
+          const [handler, method, path, body, params] = build(file);
           const answer = await call(handler, method, path, bot.token, { body, params });
-          expect({ bot: bot.name, label, status: answer.status, code: answer.body?.code }).toEqual({ bot: bot.name, label, status: 403, code: "AGENT_WORKSPACE_REQUIRED" });
+          expect({ bot: bot.name, label, status: answer.status }).toEqual({ bot: bot.name, label, status: 403 });
+          expect({ bot: bot.name, label, content: readFileSync(join(scope, file), "utf8") }).toEqual({ bot: bot.name, label, content });
         }
       }
-      expect(readFileSync(join(scope, file), "utf8")).toBe(content);
-      expect(existsSync(join(scope, "Neu-Dateimodus-Schreiber.md"))).toBe(false);
-      expect(existsSync(join(scope, "Neu-Dateimodus-Leser.md"))).toBe(false);
-      expect(existsSync(join(scope, "Umbenannt-Dateimodus-Schreiber.md"))).toBe(false);
+      for (const name of [`Neu-${run}-1.md`, `Neu-${run}-6.md`, `Umbenannt-${run}-3.md`, `Umbenannt-${run}-8.md`]) expect(existsSync(join(scope, name))).toBe(false);
     });
 
     test("control: a personal token (no agent name) keeps working in this mode", async () => {

@@ -683,5 +683,5 @@ export function knowledgeLifecycle(frontmatter: KnowledgeFrontmatter, today: str
 
 /** Default search leaves out maps that are expired or marked `veraltet`/`ersetzt`. */
 export function isKnowledgeRetired(lifecycle: KnowledgeLifecycle): boolean {
-  return lifecycle.expired === true || (lifecycle.status !== undefined && RETIRED_STATUSES.has(lifecycle.status));
+  return lifecycle.expired === true || (lifecycle.status !== undefined && RETIRED_STATUSES.has(lifecycle.status.toLowerCase()));
 }

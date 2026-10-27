@@ -7,7 +7,7 @@ import { AgentLedger, knowledgeVersion, vaultArea, type AgentDocuments, type Age
 import { applyKnowledgeNodes } from "@bloommd/core/knowledge";
 import { parseFile } from "@bloommd/core/parser";
 import { lintWikiBundle } from "@bloommd/core/wiki";
-import { createMcpParser } from "./mcp";
+import { createMcpParser, McpTextResult } from "./mcp";
 import { knowledgeServerOptions } from "./knowledge-mcp";
 import { AGENT_USAGE, dueSummary, runAgentCli, staleSummary } from "./agent-cli";
 import { KnowledgeService } from "./knowledge-service";
@@ -1179,7 +1179,7 @@ describe("trust fields through the MCP tools", () => {
     expect(((await call("bloommd_search", { query: "", tag: "coder", includeStale: true })) as { hits: Array<{ expired: boolean }> }).hits).toEqual([expect.objectContaining({ expired: true })]);
     expect(((await call("bloommd_stale", { tag: "coder" })) as { stale: Array<{ path: string; daysOverdue: number }> }).stale).toEqual([expect.objectContaining({ path: created.path })]);
     await call("bloommd_update_map", { path: created.path, stale_after: "2099-01-01", status: "bestätigt", verified: { by: "Max", at: "2026-10-27" } });
-    expect(((await call("bloommd_stale", {})) as { stale: unknown[] }).stale).toEqual([]);
+    expect(await call("bloommd_stale", {})).toEqual(new McpTextResult("NO_REPLY", { stale: [] }));
     expect(((await call("bloommd_stale", { days: 100000 })) as { stale: unknown[] }).stale).toHaveLength(1);
     expect(((await call("bloommd_search", { query: "per mcp" })) as { hits: unknown[] }).hits.length).toBeGreaterThan(0);
     for (const args of [{ status: "stable" }, { stale_after: "2026-02-30" }, { verified: { by: "Max" } }, { scope: "a".repeat(400) }, { replaced_by: "x.md" }, { status: "bestätigt", replaced_by: "x.md" }, {}]) {
@@ -1187,5 +1187,46 @@ describe("trust fields through the MCP tools", () => {
     }
     await expect(call("bloommd_create_map", { area: "A", title: "B", replaced_by: "x.md" })).rejects.toThrow(/only allowed together with status ersetzt/);
     expect(await service.getMap(created.path).then((map) => map.nodes.length)).toBeGreaterThan(0);
+  });
+
+  test("bloommd_stale answers exactly NO_REPLY when nothing is due, and the list otherwise (over the wire)", async () => {
+    const { service } = await vault();
+    const options = knowledgeServerOptions({ vault: service }, "test");
+    const ask = async (id: number, args: Record<string, unknown>) => {
+      const out: string[] = [];
+      const pending = new Set<Promise<void>>();
+      const feed = createMcpParser(options, (text) => out.push(text), pending);
+      feed(Buffer.from(`${JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name: "bloommd_stale", arguments: args } })}\n`));
+      await Promise.allSettled([...pending]);
+      await Bun.sleep(5);
+      return JSON.parse(out[0]!).result as { isError?: boolean; content: Array<{ type: string; text: string }>; structuredContent: { stale: unknown[] } };
+    };
+    const empty = await ask(1, {});
+    expect(empty.content).toEqual([{ type: "text", text: "NO_REPLY" }]);
+    expect(empty.structuredContent).toEqual({ stale: [] });
+    expect(empty.isError).toBeUndefined();
+
+    await service.createMap({ area: "Learnings", title: "Abgelaufen", tags: ["coder"], frontmatter: { stale_after: "2020-01-01" } });
+    const due = await ask(2, {});
+    expect(due.content[0]!.text).not.toBe("NO_REPLY");
+    expect(JSON.parse(due.content[0]!.text).stale).toHaveLength(1);
+    expect(due.structuredContent.stale).toHaveLength(1);
+    // A filter without a match is idle as well.
+    expect((await ask(3, { tag: "gibtsnicht" })).content).toEqual([{ type: "text", text: "NO_REPLY" }]);
+  });
+});
+
+describe("status spelling of hand-written maps", () => {
+  test("Veraltet and ERSETZT in any case are left out of the default search like the lowercase words", async () => {
+    const { root, service } = await vault();
+    await mkdir(join(root, "Learnings"), { recursive: true });
+    const note = (name: string, status: string) => writeFile(join(root, "Learnings", `${name}.md`), `---\ntitle: "${name}"\nstatus: "${status}"\n---\n\n# ${name}\n\nSchreibweise prüfen.\n`, "utf8");
+    await note("Klein", "veraltet");
+    await note("Gross", "Veraltet");
+    await note("Alles-Gross", "ERSETZT");
+    await note("Gueltig", "bestätigt");
+    const names = (hits: Array<{ path: string }>) => [...new Set(hits.map((hit) => hit.path))].sort();
+    expect(names((await service.search("schreibweise")).hits)).toEqual(["Learnings/Gueltig.md"]);
+    expect(names((await service.search("schreibweise", { includeStale: true })).hits)).toEqual(["Learnings/Alles-Gross.md", "Learnings/Gross.md", "Learnings/Gueltig.md", "Learnings/Klein.md"]);
   });
 });

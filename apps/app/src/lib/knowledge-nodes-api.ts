@@ -3,7 +3,7 @@ import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { NextResponse } from "next/server";
 import { agentProposalResponse, logAgentChange } from "./agent-access";
 import { auditAgentWrite } from "./agent-audit";
-import { agentGate, agentReadOnlyResponse, readAgentMeta } from "./agent-gate";
+import { agentGate, agentOutsideCloudResponse, agentReadOnlyResponse, readAgentMeta } from "./agent-gate";
 import { getApiRequestIdentity } from "./auth";
 import { getMindmapStorage } from "./mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "./request-security";
@@ -39,6 +39,8 @@ export async function applyNodeOperations(request: Request, filename: string, re
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new KnowledgeInputError("The request body must be a JSON object.");
     const nodes = readNodes(body);
     const store = await getMindmapStorage(request, identity);
+    const outside = agentOutsideCloudResponse(identity, store.mode);
+    if (outside) return outside;
     const current = await store.read(filename);
     if (current.storage?.permission === "read") return NextResponse.json({ error: "This workspace is read-only." }, { status: 403 });
 

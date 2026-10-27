@@ -183,6 +183,7 @@ describe("PATCH /api/mindmaps/:filename/nodes/:nodeId", () => {
     expect(await proposed.json()).toMatchObject({ code: "NODE_NOT_FOUND" });
     expect(proposals).toHaveLength(0);
     mode = "filesystem";
+    who = "session";
     expect((await call({ status: "done" }, "nope")).status).toBe(404);
     expect(written).toBeNull();
     expect(changes).toHaveLength(0);
@@ -223,8 +224,18 @@ describe("PATCH /api/mindmaps/:filename/nodes/:nodeId", () => {
     expect(syncCalls).toHaveLength(0);
   });
 
+  test("an agent token is refused outside the cloud database, whatever its rights say", async () => {
+    mode = "filesystem";
+    const response = await call({ status: "done" });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "AGENT_WORKSPACE_REQUIRED" });
+    expect(written).toBeNull();
+    expect(changes).toHaveLength(0);
+  });
+
   test("a filesystem map keeps what the change does not name", async () => {
     mode = "filesystem";
+    who = "session";
     const response = await call({ note: "Notiz", children: [{ ref: "k", title: "Kind", status: "open" }] });
     expect(response.status).toBe(200);
     const body = await response.json() as { ids: { k: string }; created: string[]; updated: string[] };

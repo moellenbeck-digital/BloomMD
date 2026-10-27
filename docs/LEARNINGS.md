@@ -56,10 +56,10 @@ Beispiel:
 ```yaml
 ---
 type: learning
-title: "Bun-Lockfile nur mit der festgelegten Bun-Version erzeugen"
+title: "Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer"
 status: neu
-scope: "BloomMD, coder"
-source: "Aufbau Dev-Team, 2026-10-26"
+scope: "bloommd-cluster, md-agents, coder"
+source: "bloommd-cluster, Commit 1da7950, 2026-10-26"
 stale_after: 2027-01-24
 tags: ["bereich/learnings", "coder"]
 ---
@@ -129,7 +129,7 @@ und Undo.
    ```json
    {
      "area": "Learnings",
-     "title": "Bun-Lockfile nur mit der festgelegten Bun-Version erzeugen",
+     "title": "Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer",
      "template": "learning",
      "scope": "BloomMD, coder",
      "source": "Ticket #109",
@@ -154,5 +154,9 @@ und Undo.
 
 ## Beispielbündel
 
-[learnings-beispiel/index.md](learnings-beispiel/index.md) enthält drei Learnings aus dem Aufbau des Dev-Teams
-am 26.10.2026 als lint-fähiges Wiki-Bundle (`bloommd-wiki lint docs/learnings-beispiel`).
+> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Der Hinweis entfällt erst mit dieser
+> Bestätigung.
+
+[learnings-beispiel/index.md](learnings-beispiel/index.md) enthält drei Learnings aus den Vorfällen vom
+26.10.2026 (kubectl/NetworkPolicy, GHCR-Platzhalter, Bun-Lockfile) als lint-fähiges Wiki-Bundle
+(`bloommd-wiki lint docs/learnings-beispiel`).

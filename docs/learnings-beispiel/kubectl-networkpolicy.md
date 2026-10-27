@@ -1,37 +1,38 @@
 ---
 type: learning
-title: "NetworkPolicy begrenzt den Egress des Pods, nicht kubectl"
+title: "Nach Umbau der Control-Plane die API-Egress-Ziele der NetworkPolicies prüfen"
 area: "Learnings"
 status: neu
-scope: "BloomMD, coder"
-source: "Aufbau Dev-Team, 2026-10-26"
+scope: "bloommd-cluster, chief"
+source: "bloommd-cluster, Commit d8de6f2, 2026-10-26"
 stale_after: 2027-01-24
-tags: ["bereich/learnings", "coder"]
+tags: ["bereich/learnings", "chief"]
 ---
 
-# NetworkPolicy begrenzt den Egress des Pods, nicht kubectl
+# Nach Umbau der Control-Plane die API-Egress-Ziele der NetworkPolicies prüfen
+
+> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Die Fakten stammen aus dem Auftrag zu #109 (Vorfälle vom 26.10.2026); die Belege liegen im Repo `bloommd-cluster` (Forgejo).
 
 ## Symptom
 
-`kubectl logs`, `kubectl exec` und `kubectl cp` funktionieren, aber der Pod erreicht ein Ziel nicht (Timeout nach außen), sobald eine neue Verbindung nötig ist, z. B. zu einem weiteren Dienst.
+Aus dem Brand-Chief-Pod scheiterte `kubectl`: 9 von 12 Aufrufen schlugen fehl.
 
 ## Ursache
 
-`kubectl` läuft über den API-Server und wird von einer NetworkPolicy nicht berührt. Die Policy in `deploy/openclaw/kubernetes.yaml` erlaubt dem Pod nur DNS (Port 53 in `kube-system`) und ausgehend TCP 443 und sperrt alles andere, auch eingehend. Dass kubectl funktioniert, sagt also nichts über den Netzwerkzugang des Pods.
+Die NetworkPolicy `brand-chief-kubernetes-api-egress` erlaubte als Ziel nur `10.42.0.11/32:6443`. Die Aufrufe, die einen anderen Control-Plane-Knoten erreichten, wurden gesperrt.
 
 ## Regel
 
-- Braucht eine Änderung neue Verbindungen vom Pod (anderer Port, anderes Ziel), die NetworkPolicy in derselben Änderung erweitern, so eng wie möglich.
-- Erreichbarkeit aus dem Pod prüfen (`kubectl exec … --` mit einem Verbindungstest), nicht aus dem Terminal.
-- Die Policy nicht pauschal öffnen oder entfernen, um einen Timeout zu beheben.
+- Nach einem Umbau der Control-Plane die API-Egress-Ziele der NetworkPolicies prüfen: Sind alle Control-Plane-Knoten erlaubt?
+- Behoben wurde es, indem die Policy alle drei Control-Plane-Knoten erlaubt (Commit `d8de6f2`). Gegenprobe: 12 von 12 Aufrufen gelingen.
 
 ## Beleg
 
-- Aufbau des Dev-Teams, 2026-10-26 (Ticket-/Lauf-Link bei Bestätigung ergänzen)
-- Policy: `deploy/openclaw/kubernetes.yaml` (`bloommd-openclaw-agent-egress`)
+- Commit `d8de6f2` im Repo `bloommd-cluster` (Forgejo), 2026-10-26
+- Offen: Ticket- und CI-Link (nicht bekannt)
 
 ## Gilt für
 
 - Brand: BloomMD
-- Rolle: coder
-- Komponente: Kubernetes, NetworkPolicy
+- Rolle: chief
+- Komponente: NetworkPolicy `brand-chief-kubernetes-api-egress`, Kubernetes-API-Zugriff des Brand-Chief-Pods

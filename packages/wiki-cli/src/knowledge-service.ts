@@ -2,7 +2,7 @@
  * The agent-facing knowledge operations on top of a store: access rules per area, a change log,
  * undo, and proposals that only a person can apply (never the agent itself).
  */
-import { AgentLedger, type AgentDocuments, type AgentProposal, type AgentRequest } from "@bloommd/core/agent-ledger";
+import { AgentLedger, areaCovers, cloudAreaOf, vaultAreaPath, type AgentDocuments, type AgentProposal, type AgentRequest } from "@bloommd/core/agent-ledger";
 import {
   applyKnowledgeFrontmatter,
   applyKnowledgeNodes,
@@ -25,7 +25,8 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
-import { accessFor, foldName, nodeStateFiles, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
+import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
+import type { CloudChange } from "./cloud-agent";
 
 export interface ChangeMeta {
   reason?: string;
@@ -79,6 +80,29 @@ export interface SearchHit {
 
 export type Proposal = AgentProposal;
 
+/** A proposal as the owner lists it (no document text); cloud proposals also say whether the map moved on. */
+export type ProposalSummary = Omit<AgentProposal, "markdown"> & { stale?: boolean; changes?: Array<{ mark: string; id: string; title: string; level: number }> };
+
+/** A change log entry of the server in the shape of the local log. */
+function cloudLogEntry(change: CloudChange): Record<string, unknown> {
+  return {
+    at: change.createdAt,
+    agent: change.agentName,
+    target: "cloud",
+    event: change.event,
+    ...(change.tool ? { tool: change.tool } : {}),
+    ...(change.filename ? { path: change.filename } : {}),
+    area: change.area,
+    changeId: change.id,
+    ...(change.proposalId ? { proposalId: change.proposalId } : {}),
+    ...(change.summary ? { summary: change.summary } : {}),
+    ...(change.reason ? { reason: change.reason } : {}),
+    ...(change.source ? { source: change.source } : {}),
+    ...(change.reviewerName ? { reviewer: change.reviewerName } : {}),
+    undoable: change.undoable,
+  };
+}
+
 function today(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
@@ -93,8 +117,9 @@ function trustFields(lifecycle: ReturnType<typeof knowledgeLifecycle>) {
   };
 }
 
-function sameArea(a: string, b: string): boolean {
-  return foldName(a) === foldName(b);
+/** The map's area is `filter` or lies below it ("Learnings" also finds "Learnings/dev-team"). */
+function inArea(area: string, filter: string): boolean {
+  return areaCovers(filter, area);
 }
 
 export class KnowledgeService {
@@ -144,8 +169,18 @@ export class KnowledgeService {
 
   /** The area of a path as stored (vault paths come back from the store with the on-disk spelling). */
   private areaOf(path: string): string {
-    if (this.store.kind === "cloud") return /^(.+?) – /.exec(path)?.[1] ?? "";
-    return path.includes("/") ? path.split("/")[0]! : "";
+    return this.store.kind === "cloud" ? cloudAreaOf(path) : vaultAreaPath(path);
+  }
+
+  /** The server side of a cloud workspace (rights, proposals, log); for the owner's commands. */
+  cloudAgent() {
+    if (!this.cloud) throw new Error("Rechte, Vorschläge und Protokoll auf dem Server gibt es nur mit --cloud.");
+    return this.cloud.agent;
+  }
+
+  /** In a cloud workspace the server holds the rights of the token and enforces them. */
+  private get cloud(): CloudKnowledgeStore | null {
+    return this.store instanceof CloudKnowledgeStore ? this.store : null;
   }
 
   private access(area: string): Promise<KnowledgeAccess> {
@@ -158,7 +193,7 @@ export class KnowledgeService {
 
   async overview() {
     const maps = await this.store.list();
-    const config = await this.ledger.rights();
+    const config = await this.rights();
     const areas = [...new Set(maps.map((map) => map.area))].sort().map((area) => ({
       area: area || "(top level)",
       maps: maps.filter((map) => map.area === area).length,
@@ -173,6 +208,17 @@ export class KnowledgeService {
       truncated: maps.length > 300,
       ...(unavailable ? { unavailable, hint: `${unavailable} file(s) could not be read (probably only in iCloud); search skips them.` } : {}),
     };
+  }
+
+  /**
+   * The rights of the agent: the local `agent.json` for a vault, the server's rights of the token
+   * for a cloud workspace (a person's own token is not limited there and counts as "write").
+   */
+  private async rights() {
+    const cloud = this.cloud;
+    if (!cloud) return this.ledger.rights();
+    const { unrestricted, rights } = await cloud.agent.selfRights();
+    return unrestricted || !rights ? { access: "write" as const, areas: {} } : rights;
   }
 
   async getMap(path: string) {
@@ -192,7 +238,7 @@ export class KnowledgeService {
     const filter: KnowledgeFilter = { status: options.status, tag: options.tag, scope: options.scope };
     const filtered = filter.status !== undefined || filter.tag !== undefined || filter.scope !== undefined;
     if (!query.trim() && !filtered) throw new KnowledgeInputError("query must not be empty unless status, tag or scope is given.");
-    const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || sameArea(map.area, options.area)));
+    const maps = (await this.store.list()).filter((map) => map.available !== false && (options.area === undefined || inArea(map.area, options.area)));
     const hits: SearchHit[] = [];
     for (const map of maps) {
       if (hits.length >= limit) break;
@@ -226,7 +272,7 @@ export class KnowledgeService {
     const until = horizon.toISOString().slice(0, 10);
     const filter: KnowledgeFilter = { tag: options.tag, scope: options.scope };
     const stale = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || sameArea(entry.area, options.area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || inArea(entry.area, options.area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       const frontmatter = readKnowledgeFrontmatter(document.markdown);
@@ -246,7 +292,7 @@ export class KnowledgeService {
 
   async tasks(options: { area?: string; includeDone?: boolean; assignee?: string; dueBefore?: string } = {}) {
     const result = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || sameArea(entry.area, options.area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || inArea(entry.area, options.area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       for (const task of knowledgeTasks(document.markdown, options.includeDone)) {
@@ -260,7 +306,7 @@ export class KnowledgeService {
 
   async decisions(area?: string) {
     const result = [];
-    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (area === undefined || sameArea(entry.area, area)))) {
+    for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (area === undefined || inArea(entry.area, area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
       for (const decision of knowledgeDecisions(document.markdown)) result.push({ path: map.path, mapTitle: map.title, ...decision });
@@ -317,9 +363,14 @@ export class KnowledgeService {
     const withFrontmatter = input.frontmatter ? applyKnowledgeFrontmatter(nodeChange.markdown, input.frontmatter) : { markdown: nodeChange.markdown, fields: [] };
     const change = { ...nodeChange, markdown: withFrontmatter.markdown, ...(withFrontmatter.fields.length > 0 ? { frontmatter: withFrontmatter.fields } : {}) };
     const area = this.areaOf(document.path);
-    if (this.store.applyNodes && nodes.length > 0 && !input.frontmatter && (await this.access(area)) === "write") {
-      // Cloud: node operations merge into the live document instead of replacing it.
-      const applied = await this.store.applyNodes(document.path, nodes);
+    if (this.store.applyNodes && nodes.length > 0 && !input.frontmatter && (this.cloud || (await this.access(area)) === "write")) {
+      // Cloud: node operations merge into the live document instead of replacing it. The server
+      // decides by the token's rights: it writes, or keeps the change as a proposal.
+      const applied = await this.store.applyNodes(document.path, nodes, { tool: "bloommd_update_map", reason: input.reason, source: input.source });
+      if (this.cloud) {
+        if (applied.proposalId) return { path: document.path, mode: "proposed", proposalId: applied.proposalId, ids: nodeChange.ids, created: nodeChange.created, updated: nodeChange.updated };
+        return { path: document.path, mode: "written", changeId: applied.changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
+      }
       const changeId = await this.remember({ origin: "agent", tool: "bloommd_update_map", path: document.path, before: document.markdown, afterVersion: applied.version, reason: input.reason, source: input.source });
       await this.log({ event: "written", tool: "bloommd_update_map", path: document.path, changeId, summary: `${applied.created.length} node(s) created, ${applied.updated.length} updated`, created: applied.created, updated: applied.updated, reason: input.reason, source: input.source });
       return { path: document.path, mode: "written", changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
@@ -337,9 +388,15 @@ export class KnowledgeService {
     meta: ChangeMeta,
   ): Promise<CommitResult> {
     const area = this.areaOf(path);
-    const access = await this.access(area);
     const fields = change.frontmatter ?? [];
     const summary = `${change.created.length} node(s) created, ${change.updated.length} updated${fields.length > 0 ? `, frontmatter: ${fields.join(", ")}` : ""}`;
+    if (this.cloud) {
+      // The server checks the token's right for the area: refused, kept as a proposal, or written and logged.
+      const result = await this.cloud.write(path, after, baseVersion, { tool, summary, reason: meta.reason, source: meta.source });
+      if (result.proposalId) return { path, mode: "proposed", proposalId: result.proposalId, ...change };
+      return { path: result.path, mode: "written", changeId: result.changeId, version: result.version, ...change };
+    }
+    const access = await this.access(area);
     if (access === "read") throw new Error(`The agent may only read in "${area || "(top level)"}". Ask the owner to allow proposals or writing there.`);
     if (access === "propose") {
       const proposalId = await this.propose({ tool, path, area, baseVersion, markdown: after, summary, ...meta });
@@ -362,15 +419,24 @@ export class KnowledgeService {
   /** A read-only link for colleagues (cloud maps only). */
   async shareLink(path: string, expiresInDays = 30) {
     if (!this.store.shareLink) throw new Error("Read-only links exist only for maps in a BloomMD cloud workspace. For vault notes, export the map as PDF in Obsidian.");
-    const access = await this.access(this.areaOf(path));
-    if (access !== "write") throw new Error(`Sharing needs write access in "${this.areaOf(path) || "(top level)"}".`);
+    // In a cloud workspace the server refuses a link outside the token's write rights.
+    if (!this.cloud) {
+      const access = await this.access(this.areaOf(path));
+      if (access !== "write") throw new Error(`Sharing needs write access in "${this.areaOf(path) || "(top level)"}".`);
+    }
     const link = await this.store.shareLink(path, expiresInDays);
-    await this.log({ event: "shared", path, expiresAt: link.expiresAt });
+    if (!this.cloud) await this.log({ event: "shared", path, expiresAt: link.expiresAt });
     return { path, ...link };
   }
 
   async changes(limit = 20) {
-    return { changes: await this.ledger.changes(limit) };
+    const cloud = this.cloud;
+    return { changes: cloud ? (await cloud.agent.selfChanges(limit)).map(cloudLogEntry) : await this.ledger.changes(limit) };
+  }
+
+  /** The owner's view of the change log of the agent tokens of a cloud workspace (all, or one token). */
+  async ownerChanges(limit = 20, tokenId?: string) {
+    return { changes: (await this.cloudAgent().log({ limit, tokenId })).map(cloudLogEntry) };
   }
 
   /**
@@ -379,25 +445,54 @@ export class KnowledgeService {
    * By default (the agent through MCP) only the agent's own direct writes can be undone, and only
    * within its rights: in a `propose` area the undo becomes a proposal, in a `read` area it is
    * refused. A change a person approved is never undone by the agent. `asOwner` (the CLI) may undo
-   * any change.
+   * any change. In a cloud workspace the server holds the history and applies these rules.
    */
   async undo(changeId: string, options: { asOwner?: boolean } = {}) {
+    const cloud = this.cloud;
+    if (cloud) return options.asOwner ? cloud.agent.ownerUndo(changeId) : cloud.agent.selfUndo(changeId);
     const record = await this.ledger.change(changeId);
     return this.withLock(record.path, () => this.ledger.undo(changeId, this.documents, { asOwner: options.asOwner, areaOf: (path) => this.areaOf(path) }));
   }
 
+  /** Open proposals of a vault, oldest first (with the proposed document). */
   proposals(): Promise<Proposal[]> {
     return this.ledger.proposals();
   }
 
-  /** For people only (CLI); the MCP server does not offer this. */
-  async applyProposal(id: string, reviewer: string) {
+  /** Open proposals without their document text, for the owner's list (vault and cloud). */
+  async listProposals(): Promise<ProposalSummary[]> {
+    const cloud = this.cloud;
+    if (cloud) {
+      return (await cloud.agent.proposals()).map((proposal) => ({
+        id: proposal.id,
+        at: proposal.createdAt,
+        agent: proposal.agentName,
+        tool: proposal.tool,
+        target: "cloud" as const,
+        path: proposal.filename,
+        area: proposal.area,
+        baseVersion: proposal.baseVersion === null ? null : String(proposal.baseVersion),
+        summary: proposal.summary,
+        ...(proposal.reason ? { reason: proposal.reason } : {}),
+        ...(proposal.source ? { source: proposal.source } : {}),
+        stale: proposal.stale,
+        changes: proposal.changes,
+      }));
+    }
+    return (await this.ledger.proposals()).map(({ markdown: _markdown, ...entry }) => entry);
+  }
+
+  /** For people only (CLI); the MCP server does not offer this. In the cloud the server names the signed-in reviewer. */
+  async applyProposal(id: string, reviewer: string, options: { overwrite?: boolean } = {}) {
+    const cloud = this.cloud;
+    if (cloud) return cloud.agent.approve(id, options);
     const proposal = await this.ledger.proposal(id);
-    return this.withLock(proposal.path, () => this.ledger.applyProposal(proposal, reviewer, this.documents));
+    return this.withLock(proposal.path, () => this.ledger.applyProposal(proposal, reviewer, this.documents, options));
   }
 
   rejectProposal(id: string, reviewer: string, reason?: string) {
-    return this.ledger.rejectProposal(id, reviewer, reason);
+    const cloud = this.cloud;
+    return cloud ? cloud.agent.reject(id, reason) : this.ledger.rejectProposal(id, reviewer, reason);
   }
 
   /** Questions and instructions people left on map nodes; open ones unless `includeDone`. */

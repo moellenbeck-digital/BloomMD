@@ -39,7 +39,8 @@ export function workspaceErrorResponse(error: unknown, fallback: string) {
       error.message === "Workspace agent or document not found." ||
       error.message === "Shared document not found." ||
       error.message === "Agent task is not available." ||
-      error.message === "Agent proposal is not available."
+      error.message === "Agent proposal is not available." ||
+      error.message === "Agent token not found."
     ) {
       return NextResponse.json({ error: error.message }, { status: 404 });
     }

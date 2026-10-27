@@ -14,12 +14,25 @@ let syncMutationResult: {
   version: number | null;
 } | null = null;
 
+let agent = false;
+let storedName = "synced.md";
+let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
+let proposals: Array<Record<string, unknown>> = [];
+let changes: Array<Record<string, unknown>> = [];
+
 mock.module("../../../../lib/auth", () => ({
-  getApiRequestIdentity: async () => ({
-    authKind: "session",
-    userId: "11111111-1111-4111-8111-111111111111",
-    email: "tester@example.test",
-  }),
+  getApiRequestIdentity: async () => agent
+    ? { authKind: "access-token", userId: "11111111-1111-4111-8111-111111111111", tokenId: "tok-1", agentName: "OpenClaw", tokenScope: "write" }
+    : { authKind: "session", userId: "11111111-1111-4111-8111-111111111111", email: "tester@example.test" },
+}));
+
+mock.module("../../../../lib/db", () => ({
+  // Bun shares module mocks across test files; keep what request-security and the rights check need from lib/db.
+  consumeRateLimit: async () => null,
+  normalizeUuid: (value: string | undefined) => value ?? null,
+  getAgentTokenRights: async () => rights,
+  createAgentTokenProposal: async (input: Record<string, unknown>) => { proposals.push(input); return "p-1"; },
+  recordAgentTokenChange: async (input: Record<string, unknown>) => { changes.push(input); return "c-1"; },
 }));
 
 let audits: Array<{ action?: string; documentId?: string }> = [];
@@ -31,7 +44,7 @@ mock.module("../../../../lib/mindmap-storage", () => ({
   getMindmapStorage: async () => ({
     mode: "database",
     read: async () => {
-      const document = parseFile("synced.md", "# Synced\n");
+      const document = parseFile(storedName, "# Synced\n");
       return {
         ...document,
         storage: {
@@ -107,6 +120,11 @@ describe("mindmap save route", () => {
     storeDeleteCalls = 0;
     syncMutationFailure = null;
     syncMutationResult = null;
+    agent = false;
+    storedName = "synced.md";
+    rights = { access: "write", areas: {} };
+    proposals = [];
+    changes = [];
     console.warn = () => undefined;
   });
 
@@ -175,5 +193,66 @@ describe("mindmap save route", () => {
       { action: "rename", documentId: "22222222-2222-4222-8222-222222222222" },
       { action: "delete", documentId: "22222222-2222-4222-8222-222222222222" },
     ]);
+  });
+
+  const send = (method: "PUT" | "PATCH" | "DELETE", body?: unknown) => {
+    const request = new Request(`https://bloommd.app/api/mindmaps/${encodeURIComponent(storedName)}`, { method, headers: { "Content-Type": "application/json", Origin: "https://bloommd.app" }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    const params = { params: Promise.resolve({ filename: storedName }) };
+    return method === "PUT" ? PUT(request, params) : method === "PATCH" ? PATCH(request, params) : DELETE(request, params);
+  };
+  const saved = (version: number) => ({ filePath: storedName, frontmatter: {}, storage: { mode: "database" as const, documentId: "22222222-2222-4222-8222-222222222222", workspaceId: "33333333-3333-4333-8333-333333333333", version }, version });
+
+  test("an agent saves a whole map only where it may write, and the log keeps the old state", async () => {
+    agent = true;
+    storedName = "Arbeit – Plan.md";
+    rights = { access: "propose", areas: { Arbeit: "write" } };
+    syncMutationResult = saved(8);
+    const response = await send("PUT", { markdown: "# Synced\n\nNeu", expectedVersion: 7, agentMeta: { tool: "bloommd_update_map", summary: "Absatz ergänzt" } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ mode: "written", changeId: "c-1" });
+    expect(changes).toMatchObject([{ event: "written", area: "Arbeit", tool: "bloommd_update_map", summary: "Absatz ergänzt", afterVersion: 8, beforeMarkdown: expect.stringContaining("Synced") }]);
+  });
+
+  test("an agent that may only propose stores the proposal with the expected version; nothing is saved", async () => {
+    agent = true;
+    storedName = "Arbeit – Plan.md";
+    rights = { access: "write", areas: { Arbeit: "propose" } };
+    syncMutationResult = saved(8);
+    const response = await send("PUT", { markdown: "# Synced\n\nVorschlag", expectedVersion: 6 });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ mode: "proposed", proposalId: "p-1", area: "Arbeit" });
+    expect(proposals).toMatchObject([{ filename: "Arbeit – Plan.md", baseVersion: 6, markdown: "# Synced\n\nVorschlag" }]);
+    expect(changes).toHaveLength(0);
+  });
+
+  test("an agent in a read-only area is refused, whatever the client sends", async () => {
+    agent = true;
+    storedName = "Learnings › dev-team – Idee.md";
+    rights = { access: "write", areas: { Learnings: "read" } };
+    for (const body of [{ markdown: "# x" }, { markdown: "# x", overwrite: true, expectedVersion: 7 }]) {
+      const response = await send("PUT", body);
+      expect(response.status).toBe(403);
+      expect(((await response.json()) as { error: string }).error).toContain('may only read in "Learnings/dev-team"');
+    }
+    expect(proposals).toHaveLength(0);
+    expect(changes).toHaveLength(0);
+  });
+
+  test("renaming and deleting need the right to write in the old and the new area", async () => {
+    agent = true;
+    storedName = "Arbeit – Plan.md";
+    rights = { access: "propose", areas: { Arbeit: "write" } };
+    const blockedRename = await send("PATCH", { newFilename: "Privat – Plan.md" });
+    expect(blockedRename.status).toBe(403);
+    expect(((await blockedRename.json()) as { error: string }).error).toContain('only propose changes in "Privat"');
+    expect((await send("PATCH", { newFilename: "Arbeit – Neu.md" })).status).toBe(200);
+    expect(changes).toMatchObject([{ event: "renamed", area: "Arbeit" }]);
+    rights = { access: "write", areas: { Arbeit: "propose" } };
+    const blockedDelete = await send("DELETE");
+    expect(blockedDelete.status).toBe(403);
+    expect(((await blockedDelete.json()) as { code: string }).code).toBe("AGENT_WRITE_REQUIRED");
+    rights = { access: "propose", areas: { Arbeit: "write" } };
+    expect((await send("DELETE")).status).toBe(200);
+    expect(changes.map((change) => change.event)).toEqual(["renamed", "deleted"]);
   });
 });

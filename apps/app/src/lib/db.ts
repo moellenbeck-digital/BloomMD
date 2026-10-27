@@ -1,6 +1,7 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
+import { AGENT_ACCESS, areaKey, normalizeAreaPath, type AgentAccess, type AgentAccessConfig } from "@bloommd/core/agent-ledger";
 import {
   hashSecret,
   isValidAuthCode,
@@ -27,7 +28,10 @@ type WorkspaceAgentEventType =
   | "task.completed"
   | "task.failed"
   | "proposal.reviewed"
-  | "agent.presence";
+  | "agent.presence"
+  | "token.proposal.created"
+  | "token.proposal.reviewed"
+  | "token.rights.changed";
 export interface WorkspaceAgentEvent {
   workspaceId: string;
   agentId?: string;
@@ -152,6 +156,10 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_workspace_agents') as workspace_agents,
       to_regclass('public.bloom_agent_tasks') as agent_tasks,
       to_regclass('public.bloom_agent_proposals') as agent_proposals,
+      to_regclass('public.bloom_agent_token_rights') as agent_token_rights,
+      to_regclass('public.bloom_agent_token_area_rights') as agent_token_area_rights,
+      to_regclass('public.bloom_agent_token_proposals') as agent_token_proposals,
+      to_regclass('public.bloom_agent_token_changes') as agent_token_changes,
       to_regclass('public.bloom_documents') as documents,
       to_regclass('public.bloom_document_views') as document_views
   `;
@@ -726,6 +734,83 @@ async function createMarketSchema() {
   await sql`alter table bloom_agent_proposals add column if not exists proposed_child_nodes jsonb not null default '[]'::jsonb`;
   await sql`create index if not exists bloom_agent_proposals_workspace_created_idx on bloom_agent_proposals(workspace_id, created_at desc)`;
   await sql`create index if not exists bloom_agent_proposals_task_idx on bloom_agent_proposals(task_id)`;
+
+  // Rights, proposals and change log of agent tokens (cloud workspaces); see db/009_agent_token_rights.sql.
+  await sql`
+    create table if not exists bloom_agent_token_rights (
+      access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      default_access text not null default 'propose',
+      updated_by uuid references bloom_users(id) on delete set null,
+      updated_at timestamptz not null default now(),
+      primary key (access_token_id, workspace_id),
+      check (default_access in ('read', 'propose', 'write'))
+    )
+  `;
+  await sql`
+    create table if not exists bloom_agent_token_area_rights (
+      access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      area_key text not null,
+      area text not null,
+      access text not null,
+      primary key (access_token_id, workspace_id, area_key),
+      check (access in ('read', 'propose', 'write')),
+      check (length(area) between 1 and 200)
+    )
+  `;
+  await sql`
+    create table if not exists bloom_agent_token_proposals (
+      id uuid primary key default gen_random_uuid(),
+      access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      agent_name text not null,
+      tool text not null,
+      filename text not null,
+      area text not null default '',
+      base_version bigint,
+      proposed_markdown text not null,
+      summary text not null default '',
+      reason text,
+      source text,
+      status text not null default 'pending',
+      reviewed_by uuid references bloom_users(id) on delete set null,
+      reviewer_name text,
+      reviewed_at timestamptz,
+      review_reason text,
+      created_at timestamptz not null default now(),
+      check (status in ('pending', 'approved', 'rejected', 'stale'))
+    )
+  `;
+  await sql`create index if not exists bloom_agent_token_proposals_workspace_idx on bloom_agent_token_proposals(workspace_id, status, created_at desc)`;
+  await sql`
+    create table if not exists bloom_agent_token_changes (
+      id uuid primary key default gen_random_uuid(),
+      access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      agent_name text not null,
+      event text not null,
+      origin text not null default 'agent',
+      tool text,
+      filename text,
+      area text not null default '',
+      proposal_id uuid,
+      summary text,
+      reason text,
+      source text,
+      reviewer_name text,
+      reviewer_user_id uuid references bloom_users(id) on delete set null,
+      before_markdown text,
+      created_map boolean not null default false,
+      after_version bigint,
+      undone_at timestamptz,
+      created_at timestamptz not null default now(),
+      check (event in ('written', 'proposed', 'approved', 'rejected', 'undone', 'renamed', 'deleted')),
+      check (origin in ('agent', 'approved', 'owner'))
+    )
+  `;
+  await sql`create index if not exists bloom_agent_token_changes_workspace_idx on bloom_agent_token_changes(workspace_id, created_at desc)`;
+  await sql`create index if not exists bloom_agent_token_changes_token_idx on bloom_agent_token_changes(access_token_id, workspace_id, created_at desc)`;
 
   await sql`
     create table if not exists bloom_document_views (
@@ -3062,6 +3147,10 @@ type AuditEventType =
   | "agent.proposal.rejected"
   | "agent.proposal.stale"
   | "agent.proposal.applied"
+  | "agent.token.rights_changed"
+  | "agent.token.proposal_approved"
+  | "agent.token.proposal_rejected"
+  | "agent.token.change_undone"
   | "document.agent_write"
   | "document.share_link.created"
   | "document.share_link.revoked"
@@ -3084,6 +3173,7 @@ async function recordAuditEvent(input: {
     | "workspace_agent"
     | "agent_task"
     | "agent_proposal"
+    | "agent_token_proposal"
     | "share_link";
   targetId?: string | null;
   details?: Record<string, string>;
@@ -4085,4 +4175,479 @@ export async function recordStripeSubscription(
     on conflict (user_id, feature, source)
     do update set active = excluded.active, expires_at = excluded.expires_at, updated_at = now()
   `;
+}
+
+// ---------------------------------------------------------------------------
+// Agent tokens: rights, proposals and change log of cloud workspaces.
+// Tokens with an agent_name only change maps within these rights; the routes enforce them.
+// ---------------------------------------------------------------------------
+
+export const AGENT_TOKEN_HISTORY_LIMIT = 300;
+
+function agentAccessOrPropose(value: unknown): AgentAccess {
+  // An unknown value never grants more than a proposal.
+  return AGENT_ACCESS.includes(value as AgentAccess) ? (value as AgentAccess) : "propose";
+}
+
+async function requireWorkspaceOwner(userId: string, workspaceId: string) {
+  const workspace = await getWorkspaceForUser(userId, workspaceId);
+  if (workspace.role !== "owner") throw new Error("Only workspace owners can manage agent rights and proposals.");
+  return workspace;
+}
+
+/** The rights of an agent token in a workspace, read from the database on every call (no cache). */
+export async function getAgentTokenRights(tokenId: string, workspaceId: string): Promise<AgentAccessConfig> {
+  const token = normalizeUuid(tokenId);
+  const workspace = normalizeUuid(workspaceId);
+  if (!token || !workspace) return { access: "propose", areas: {} };
+  await ensureMarketSchema();
+  const sql = getSql();
+  const [defaults, areas] = await Promise.all([
+    sql`select default_access from bloom_agent_token_rights where access_token_id = ${token} and workspace_id = ${workspace}`,
+    sql`select area, access from bloom_agent_token_area_rights where access_token_id = ${token} and workspace_id = ${workspace} order by area_key`,
+  ]);
+  return {
+    access: agentAccessOrPropose((defaults[0] as { default_access?: string } | undefined)?.default_access),
+    areas: Object.fromEntries((areas as unknown as Array<{ area: string; access: string }>).map((row) => [row.area, agentAccessOrPropose(row.access)])),
+  };
+}
+
+export interface AgentTokenSummary {
+  tokenId: string;
+  tokenName: string;
+  agentName: string;
+  userEmail: string;
+  userName: string | null;
+  scope: AccessTokenScope;
+  allowShare: boolean;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  rights: AgentAccessConfig;
+  /** The owner has set rights for this token; otherwise it only proposes. */
+  configured: boolean;
+}
+
+/** Agent tokens that can work in the workspace, with their rights; for the workspace owner. */
+export async function listAgentTokensForWorkspace(userId: string, workspaceId: string): Promise<AgentTokenSummary[]> {
+  const workspace = await requireWorkspaceOwner(userId, workspaceId);
+  const sql = getSql();
+  const [tokens, defaults, areas] = await Promise.all([
+    sql`
+      select t.id, t.name, t.agent_name, t.scope, t.allow_share, t.expires_at, t.last_used_at, u.email, u.name as user_name
+      from bloom_access_tokens t
+      join bloom_workspace_members m on m.user_id = t.user_id and m.workspace_id = ${workspace.id}
+      join bloom_users u on u.id = t.user_id
+      where t.agent_name is not null and t.revoked_at is null and (t.expires_at is null or t.expires_at > now())
+        and (t.workspace_ids is null or ${workspace.id} = any(t.workspace_ids))
+      order by t.created_at desc
+    `,
+    sql`select access_token_id, default_access from bloom_agent_token_rights where workspace_id = ${workspace.id}`,
+    sql`select access_token_id, area, access from bloom_agent_token_area_rights where workspace_id = ${workspace.id} order by area_key`,
+  ]);
+  const defaultByToken = new Map((defaults as unknown as Array<{ access_token_id: string; default_access: string }>).map((row) => [row.access_token_id, row.default_access]));
+  const areasByToken = new Map<string, Record<string, AgentAccess>>();
+  for (const row of areas as unknown as Array<{ access_token_id: string; area: string; access: string }>) {
+    areasByToken.set(row.access_token_id, { ...(areasByToken.get(row.access_token_id) ?? {}), [row.area]: agentAccessOrPropose(row.access) });
+  }
+  return (tokens as unknown as Array<{ id: string; name: string; agent_name: string; scope: string | null; allow_share: boolean | null; expires_at: string | null; last_used_at: string | null; email: string; user_name: string | null }>).map((row) => ({
+    tokenId: row.id,
+    tokenName: row.name,
+    agentName: row.agent_name,
+    userEmail: row.email,
+    userName: row.user_name,
+    scope: row.scope === "read" ? "read" : "write",
+    allowShare: Boolean(row.allow_share),
+    expiresAt: row.expires_at,
+    lastUsedAt: row.last_used_at,
+    rights: { access: agentAccessOrPropose(defaultByToken.get(row.id)), areas: areasByToken.get(row.id) ?? {} },
+    configured: defaultByToken.has(row.id) || areasByToken.has(row.id),
+  }));
+}
+
+/** Replaces the rights of an agent token in a workspace; only its owner may. `rights` must be validated. */
+export async function setAgentTokenRights(input: { userId: string; workspaceId: string; tokenId: string; rights: AgentAccessConfig }): Promise<AgentAccessConfig> {
+  const workspace = await requireWorkspaceOwner(input.userId, input.workspaceId);
+  const tokenId = normalizeUuid(input.tokenId);
+  if (!tokenId) throw new Error("Agent token not found.");
+  const sql = getSql();
+  const eligible = await sql`
+    select t.id
+    from bloom_access_tokens t
+    join bloom_workspace_members m on m.user_id = t.user_id and m.workspace_id = ${workspace.id}
+    where t.id = ${tokenId} and t.agent_name is not null and t.revoked_at is null
+      and (t.workspace_ids is null or ${workspace.id} = any(t.workspace_ids))
+    limit 1
+  `;
+  if (!eligible[0]) throw new Error("Agent token not found.");
+  const areas = Object.entries(input.rights.areas ?? {}).map(([area, access]) => ({ area: normalizeAreaPath(area), access }));
+  await sql.begin(async (transaction) => {
+    await transaction`
+      insert into bloom_agent_token_rights (access_token_id, workspace_id, default_access, updated_by, updated_at)
+      values (${tokenId}, ${workspace.id}, ${input.rights.access}, ${input.userId}, now())
+      on conflict (access_token_id, workspace_id)
+      do update set default_access = excluded.default_access, updated_by = excluded.updated_by, updated_at = now()
+    `;
+    await transaction`delete from bloom_agent_token_area_rights where access_token_id = ${tokenId} and workspace_id = ${workspace.id}`;
+    for (const { area, access } of areas) {
+      await transaction`
+        insert into bloom_agent_token_area_rights (access_token_id, workspace_id, area_key, area, access)
+        values (${tokenId}, ${workspace.id}, ${areaKey(area)}, ${area}, ${access})
+      `;
+    }
+  });
+  await recordAuditEvent({ actorUserId: input.userId, eventType: "agent.token.rights_changed", targetType: "access_token", targetId: tokenId, details: { workspaceId: workspace.id, access: input.rights.access, areas: String(areas.length) } });
+  await emitWorkspaceAgentEvent({ workspaceId: workspace.id, type: "token.rights.changed" });
+  return getAgentTokenRights(tokenId, workspace.id);
+}
+
+export type AgentTokenChangeEvent = "written" | "proposed" | "approved" | "rejected" | "undone" | "renamed" | "deleted";
+
+export interface AgentTokenChangeInput {
+  tokenId: string;
+  workspaceId: string;
+  agentName: string;
+  event: AgentTokenChangeEvent;
+  origin?: "agent" | "approved" | "owner";
+  tool?: string | null;
+  filename?: string | null;
+  area?: string;
+  proposalId?: string | null;
+  summary?: string | null;
+  reason?: string | null;
+  source?: string | null;
+  reviewerName?: string | null;
+  reviewerUserId?: string | null;
+  /** The map before the change, for undo. Not for entries that cannot be undone. */
+  beforeMarkdown?: string | null;
+  /** The change created the map: undoing it removes the map. */
+  createdMap?: boolean;
+  afterVersion?: number | null;
+}
+
+type Sql = ReturnType<typeof getSql>;
+
+async function insertAgentTokenChange(sql: Sql, input: AgentTokenChangeInput): Promise<string> {
+  const rows = await sql`
+    insert into bloom_agent_token_changes (access_token_id, workspace_id, agent_name, event, origin, tool, filename, area, proposal_id, summary, reason, source, reviewer_name, reviewer_user_id, before_markdown, created_map, after_version)
+    values (${input.tokenId}, ${input.workspaceId}, ${input.agentName}, ${input.event}, ${input.origin ?? "agent"}, ${input.tool ?? null}, ${input.filename ?? null}, ${input.area ?? ""}, ${input.proposalId ?? null}, ${input.summary ?? null}, ${input.reason ?? null}, ${input.source ?? null}, ${input.reviewerName ?? null}, ${normalizeUuid(input.reviewerUserId)}, ${input.beforeMarkdown ?? null}, ${input.createdMap ?? false}, ${input.afterVersion ?? null})
+    returning id
+  `;
+  const id = (rows[0] as { id?: string } | undefined)?.id;
+  if (!id) throw new Error("Agent change could not be logged.");
+  if (input.beforeMarkdown != null) {
+    // Only the newest changes keep their old state for undo.
+    await sql`
+      update bloom_agent_token_changes set before_markdown = null
+      where id in (
+        select id from bloom_agent_token_changes
+        where access_token_id = ${input.tokenId} and workspace_id = ${input.workspaceId} and before_markdown is not null
+        order by created_at desc, id offset ${AGENT_TOKEN_HISTORY_LIMIT}
+      )
+    `;
+  }
+  return id;
+}
+
+/** Writes one entry to the change log of an agent token and returns its id (the change id for undo). */
+export async function recordAgentTokenChange(input: AgentTokenChangeInput): Promise<string> {
+  await ensureMarketSchema();
+  return insertAgentTokenChange(getSql(), input);
+}
+
+export interface AgentTokenChangeRecord {
+  id: string;
+  tokenId: string;
+  agentName: string;
+  event: AgentTokenChangeEvent;
+  origin: "agent" | "approved" | "owner";
+  tool: string | null;
+  filename: string | null;
+  area: string;
+  proposalId: string | null;
+  summary: string | null;
+  reason: string | null;
+  source: string | null;
+  reviewerName: string | null;
+  afterVersion: number | null;
+  /** The entry kept the state before the change and was not undone yet. */
+  undoable: boolean;
+  undoneAt: string | null;
+  createdAt: string;
+}
+
+interface AgentTokenChangeRow {
+  id: string;
+  access_token_id: string;
+  agent_name: string;
+  event: AgentTokenChangeEvent;
+  origin: "agent" | "approved" | "owner";
+  tool: string | null;
+  filename: string | null;
+  area: string;
+  proposal_id: string | null;
+  summary: string | null;
+  reason: string | null;
+  source: string | null;
+  reviewer_name: string | null;
+  after_version: string | number | null;
+  undone_at: string | null;
+  created_at: string;
+  undoable?: boolean;
+  before_markdown?: string | null;
+  created_map?: boolean;
+}
+
+function agentTokenChangeFromRow(row: AgentTokenChangeRow): AgentTokenChangeRecord {
+  return {
+    id: row.id,
+    tokenId: row.access_token_id,
+    agentName: row.agent_name,
+    event: row.event,
+    origin: row.origin,
+    tool: row.tool,
+    filename: row.filename,
+    area: row.area,
+    proposalId: row.proposal_id,
+    summary: row.summary,
+    reason: row.reason,
+    source: row.source,
+    reviewerName: row.reviewer_name,
+    afterVersion: row.after_version == null ? null : Number(row.after_version),
+    undoable: Boolean(row.undoable),
+    undoneAt: row.undone_at,
+    createdAt: row.created_at,
+  };
+}
+
+const AGENT_CHANGE_COLUMNS = `id, access_token_id, agent_name, event, origin, tool, filename, area, proposal_id, summary, reason, source, reviewer_name, after_version, undone_at, created_at`;
+
+/**
+ * The change log, newest first. With `tokenId` the entries of that agent token (the agent itself:
+ * the caller has checked the workspace membership); without it all of the workspace, for its owner.
+ */
+export async function listAgentTokenChanges(input: { workspaceId: string; userId?: string; tokenId?: string; limit?: number }): Promise<AgentTokenChangeRecord[]> {
+  // The agent's own entries need no owner check: its route has resolved the workspace membership.
+  const workspaceId = input.tokenId ? normalizeUuid(input.workspaceId) : (await requireWorkspaceOwner(input.userId ?? "", input.workspaceId)).id;
+  const tokenId = input.tokenId ? normalizeUuid(input.tokenId) : null;
+  if (!workspaceId || (input.tokenId && !tokenId)) return [];
+  const limit = Math.max(1, Math.min(200, Math.floor(input.limit ?? 50)));
+  const rows = await getSql()`
+    select id, access_token_id, agent_name, event, origin, tool, filename, area, proposal_id, summary, reason, source, reviewer_name, after_version, undone_at, created_at,
+      (undone_at is null and event in ('written', 'approved') and (before_markdown is not null or created_map)) as undoable
+    from bloom_agent_token_changes
+    where workspace_id = ${workspaceId} and (${tokenId}::uuid is null or access_token_id = ${tokenId})
+    order by created_at desc, id
+    limit ${limit}
+  `;
+  return (rows as unknown as AgentTokenChangeRow[]).map(agentTokenChangeFromRow);
+}
+
+/** One change with the state before it, for undo. */
+export async function getAgentTokenChangeForUndo(workspaceId: string, changeId: string) {
+  const id = normalizeUuid(changeId);
+  const workspace = normalizeUuid(workspaceId);
+  if (!id || !workspace) return null;
+  await ensureMarketSchema();
+  const rows = await getSql()`
+    select id, access_token_id, agent_name, event, origin, tool, filename, area, proposal_id, summary, reason, source, reviewer_name, after_version, undone_at, created_at, before_markdown, created_map,
+      (undone_at is null and event in ('written', 'approved') and (before_markdown is not null or created_map)) as undoable
+    from bloom_agent_token_changes
+    where id = ${id} and workspace_id = ${workspace}
+    limit 1
+  `;
+  const row = rows[0] as AgentTokenChangeRow | undefined;
+  return row ? { ...agentTokenChangeFromRow(row), beforeMarkdown: row.before_markdown ?? null, createdMap: Boolean(row.created_map) } : null;
+}
+
+/** Marks a change as undone and logs the undo; false when it was already undone. */
+export async function completeAgentTokenUndo(input: { workspaceId: string; changeId: string; tokenId: string; agentName: string; filename: string; area: string; byName: string; byUserId?: string | null; byAgent?: boolean }): Promise<boolean> {
+  const id = normalizeUuid(input.changeId);
+  if (!id) return false;
+  await ensureMarketSchema();
+  const sql = getSql();
+  const rows = await sql`update bloom_agent_token_changes set undone_at = now(), before_markdown = null where id = ${id} and workspace_id = ${input.workspaceId} and undone_at is null returning id`;
+  if (!rows[0]) return false;
+  await insertAgentTokenChange(sql, {
+    tokenId: input.tokenId,
+    workspaceId: input.workspaceId,
+    agentName: input.agentName,
+    event: "undone",
+    origin: input.byAgent ? "agent" : "owner",
+    filename: input.filename,
+    area: input.area,
+    summary: `Undo of change ${id}`,
+    reviewerName: input.byAgent ? null : input.byName,
+    reviewerUserId: input.byUserId,
+  });
+  if (input.byUserId) await recordAuditEvent({ actorUserId: input.byUserId, eventType: "agent.token.change_undone", targetType: "access_token", targetId: input.tokenId, details: { workspaceId: input.workspaceId, changeId: id } });
+  return true;
+}
+
+export interface AgentTokenProposalRecord {
+  id: string;
+  tokenId: string;
+  workspaceId: string;
+  agentName: string;
+  tool: string;
+  filename: string;
+  area: string;
+  /** Version of the map the proposal is based on; null for a new map. */
+  baseVersion: number | null;
+  proposedMarkdown: string;
+  summary: string;
+  reason: string | null;
+  source: string | null;
+  status: "pending" | "approved" | "rejected" | "stale";
+  reviewerName: string | null;
+  reviewReason: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+interface AgentTokenProposalRow {
+  id: string;
+  access_token_id: string;
+  workspace_id: string;
+  agent_name: string;
+  tool: string;
+  filename: string;
+  area: string;
+  base_version: string | number | null;
+  proposed_markdown: string;
+  summary: string;
+  reason: string | null;
+  source: string | null;
+  status: AgentTokenProposalRecord["status"];
+  reviewer_name: string | null;
+  review_reason: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+function agentTokenProposalFromRow(row: AgentTokenProposalRow): AgentTokenProposalRecord {
+  return {
+    id: row.id,
+    tokenId: row.access_token_id,
+    workspaceId: row.workspace_id,
+    agentName: row.agent_name,
+    tool: row.tool,
+    filename: row.filename,
+    area: row.area,
+    baseVersion: row.base_version == null ? null : Number(row.base_version),
+    proposedMarkdown: row.proposed_markdown,
+    summary: row.summary,
+    reason: row.reason,
+    source: row.source,
+    status: row.status,
+    reviewerName: row.reviewer_name,
+    reviewReason: row.review_reason,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  };
+}
+
+/** A change an agent token may only propose: stored for the workspace owner to review, and logged. */
+export async function createAgentTokenProposal(input: {
+  tokenId: string;
+  workspaceId: string;
+  agentName: string;
+  tool: string;
+  filename: string;
+  area: string;
+  baseVersion: number | null;
+  markdown: string;
+  summary: string;
+  reason?: string | null;
+  source?: string | null;
+}): Promise<string> {
+  await ensureMarketSchema();
+  const id = await getSql().begin(async (transaction) => {
+    const rows = await transaction`
+      insert into bloom_agent_token_proposals (access_token_id, workspace_id, agent_name, tool, filename, area, base_version, proposed_markdown, summary, reason, source)
+      values (${input.tokenId}, ${input.workspaceId}, ${input.agentName}, ${input.tool}, ${input.filename}, ${input.area}, ${input.baseVersion}, ${input.markdown}, ${input.summary}, ${input.reason ?? null}, ${input.source ?? null})
+      returning id
+    `;
+    const proposalId = (rows[0] as { id?: string } | undefined)?.id;
+    if (!proposalId) throw new Error("Agent proposal could not be stored.");
+    await insertAgentTokenChange(transaction as unknown as Sql, { tokenId: input.tokenId, workspaceId: input.workspaceId, agentName: input.agentName, event: "proposed", tool: input.tool, filename: input.filename, area: input.area, proposalId, summary: input.summary, reason: input.reason, source: input.source });
+    return proposalId;
+  });
+  await emitWorkspaceAgentEvent({ workspaceId: input.workspaceId, taskId: id as string, type: "token.proposal.created" });
+  return id as string;
+}
+
+/** Proposals of agent tokens, newest first; for the workspace owner. */
+export async function listAgentTokenProposals(input: { userId: string; workspaceId: string; status?: AgentTokenProposalRecord["status"] | "all"; limit?: number }): Promise<AgentTokenProposalRecord[]> {
+  const workspace = await requireWorkspaceOwner(input.userId, input.workspaceId);
+  const status = input.status ?? "pending";
+  const limit = Math.max(1, Math.min(100, Math.floor(input.limit ?? 50)));
+  const rows = await getSql()`
+    select id, access_token_id, workspace_id, agent_name, tool, filename, area, base_version, proposed_markdown, summary, reason, source, status, reviewer_name, review_reason, reviewed_at, created_at
+    from bloom_agent_token_proposals
+    where workspace_id = ${workspace.id} and (${status} = 'all' or status = ${status})
+    order by created_at desc
+    limit ${limit}
+  `;
+  return (rows as unknown as AgentTokenProposalRow[]).map(agentTokenProposalFromRow);
+}
+
+export async function getAgentTokenProposal(input: { userId: string; workspaceId: string; proposalId: string }): Promise<AgentTokenProposalRecord> {
+  const workspace = await requireWorkspaceOwner(input.userId, input.workspaceId);
+  const id = normalizeUuid(input.proposalId);
+  if (!id) throw new Error("Invalid agent proposal.");
+  const rows = await getSql()`
+    select id, access_token_id, workspace_id, agent_name, tool, filename, area, base_version, proposed_markdown, summary, reason, source, status, reviewer_name, review_reason, reviewed_at, created_at
+    from bloom_agent_token_proposals
+    where id = ${id} and workspace_id = ${workspace.id} and status = 'pending'
+    limit 1
+  `;
+  const row = rows[0] as AgentTokenProposalRow | undefined;
+  if (!row) throw new Error("Agent proposal is not available.");
+  return agentTokenProposalFromRow(row);
+}
+
+/**
+ * Closes a pending proposal and logs the decision with the reviewer's name. After an approval
+ * `applied` carries the state before and after, so the owner can undo it later.
+ */
+export async function finishAgentTokenProposal(input: {
+  userId: string;
+  workspaceId: string;
+  proposal: AgentTokenProposalRecord;
+  action: "approved" | "rejected" | "stale";
+  reviewerName: string;
+  reason?: string | null;
+  applied?: { beforeMarkdown: string | null; createdMap: boolean; afterVersion: number | null };
+}): Promise<string> {
+  const workspace = await requireWorkspaceOwner(input.userId, input.workspaceId);
+  await ensureMarketSchema();
+  const changeId = await getSql().begin(async (transaction) => {
+    const rows = await transaction`
+      update bloom_agent_token_proposals
+      set status = ${input.action}, reviewed_by = ${input.userId}, reviewer_name = ${input.reviewerName}, reviewed_at = now(), review_reason = ${input.reason ?? null}
+      where id = ${input.proposal.id} and workspace_id = ${workspace.id} and status = 'pending'
+      returning id
+    `;
+    if (!rows[0]) throw new Error("Agent proposal is not available.");
+    return insertAgentTokenChange(transaction as unknown as Sql, {
+      tokenId: input.proposal.tokenId,
+      workspaceId: workspace.id,
+      agentName: input.proposal.agentName,
+      event: input.action === "approved" ? "approved" : "rejected",
+      origin: "approved",
+      tool: input.proposal.tool,
+      filename: input.proposal.filename,
+      area: input.proposal.area,
+      proposalId: input.proposal.id,
+      summary: input.action === "stale" ? `Marked outdated: ${input.proposal.summary}` : input.proposal.summary,
+      reason: input.reason ?? input.proposal.reason,
+      source: input.proposal.source,
+      reviewerName: input.reviewerName,
+      reviewerUserId: input.userId,
+      ...(input.applied ? { beforeMarkdown: input.applied.beforeMarkdown, createdMap: input.applied.createdMap, afterVersion: input.applied.afterVersion } : {}),
+    });
+  });
+  await recordAuditEvent({ actorUserId: input.userId, eventType: input.action === "approved" ? "agent.token.proposal_approved" : "agent.token.proposal_rejected", targetType: "agent_token_proposal", targetId: input.proposal.id, details: { workspaceId: workspace.id } });
+  await emitWorkspaceAgentEvent({ workspaceId: workspace.id, taskId: input.proposal.id, type: "token.proposal.reviewed" });
+  return changeId as string;
 }

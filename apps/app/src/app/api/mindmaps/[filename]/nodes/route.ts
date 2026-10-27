@@ -2,6 +2,8 @@ import { applyKnowledgeNodes, isKnowledgeInputError, parseKnowledgeNodeInputs } 
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { NextResponse } from "next/server";
 import { auditAgentWrite } from "../../../../../lib/agent-audit";
+import { agentProposalResponse, logAgentChange } from "../../../../../lib/agent-access";
+import { agentGate, agentReadOnlyResponse, readAgentMeta } from "../../../../../lib/agent-gate";
 import { getApiRequestIdentity } from "../../../../../lib/auth";
 import { getMindmapStorage } from "../../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../../../lib/request-security";
@@ -23,7 +25,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   try {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
-    const body = await readJsonBody<{ nodes?: unknown }>(request, 2 * 1024 * 1024);
+    const body = await readJsonBody<{ nodes?: unknown; agentMeta?: unknown }>(request, 2 * 1024 * 1024);
     const nodes = parseKnowledgeNodeInputs(body.nodes);
     const store = await getMindmapStorage(request, identity);
     const current = await store.read(filename);
@@ -31,6 +33,14 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (current.storage?.mode === "database") {
       if (!identity.userId) return NextResponse.json({ error: "Cloud document sync requires an authenticated user.", code: "SYNC_MUTATION_UNAVAILABLE" }, { status: 503 });
+      // Agent tokens change nodes only within their rights; the stored file name decides the area.
+      const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
+      const meta = readAgentMeta(body.agentMeta);
+      if (gate?.access === "read") return agentReadOnlyResponse(gate);
+      if (gate?.access === "propose") {
+        const change = applyKnowledgeNodes(serializeToMarkdown(current), nodes);
+        return agentProposalResponse(gate, { markdown: change.markdown, baseVersion: current.storage.version, defaultSummary: `${change.created.length} node(s) created, ${change.updated.length} updated`, meta, defaultTool: "api:nodes" });
+      }
       try {
         const result = await applyKnowledgeNodesThroughSyncServer(current.storage.documentId, {
           filename,
@@ -39,7 +49,11 @@ export async function POST(request: Request, { params }: RouteParams) {
           nodes,
         });
         await auditAgentWrite(identity, result.storage ?? current.storage);
-        return NextResponse.json({ ids: result.ids, created: result.created, updated: result.updated, version: result.version });
+        const changeId = gate ? await logAgentChange(gate, { event: "written", beforeMarkdown: serializeToMarkdown(current), afterVersion: result.version, meta, defaultTool: "api:nodes", defaultSummary: `${result.created.length} node(s) created, ${result.updated.length} updated` }).catch((error: unknown) => {
+          console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
+          return undefined;
+        }) : undefined;
+        return NextResponse.json({ ids: result.ids, created: result.created, updated: result.updated, version: result.version, ...(gate ? { mode: "written", changeId } : {}) });
       } catch (error) {
         if (error instanceof SyncMutationError) {
           const status = error.status === 400 || error.status === 409 ? error.status : 503;

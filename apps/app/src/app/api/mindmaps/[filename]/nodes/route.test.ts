@@ -6,15 +6,25 @@ let permission: "read" | "write" = "write";
 let written: MindMapDocument | null = null;
 let syncCalls: Array<{ documentId: string; input: Record<string, unknown> }> = [];
 let audits: unknown[] = [];
+let filename = "plan.md";
+let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
+let proposals: Array<Record<string, unknown>> = [];
+let changes: Array<Record<string, unknown>> = [];
+let asOwner = false;
 
 mock.module("../../../../../lib/auth", () => ({
-  getApiRequestIdentity: async () => ({
-    authKind: "access-token",
-    userId: "11111111-1111-4111-8111-111111111111",
-    tokenId: "tok-1",
-    agentName: "OpenClaw",
-    tokenScope: "write",
-  }),
+  getApiRequestIdentity: async () => asOwner
+    ? { authKind: "session", userId: "11111111-1111-4111-8111-111111111111" }
+    : { authKind: "access-token", userId: "11111111-1111-4111-8111-111111111111", tokenId: "tok-1", agentName: "OpenClaw", tokenScope: "write" },
+}));
+
+mock.module("../../../../../lib/db", () => ({
+  // Bun shares module mocks across test files; keep what request-security and the rights check need from lib/db.
+  consumeRateLimit: async () => null,
+  normalizeUuid: (value: string | undefined) => value ?? null,
+  getAgentTokenRights: async () => rights,
+  createAgentTokenProposal: async (input: Record<string, unknown>) => { proposals.push(input); return "p-1"; },
+  recordAgentTokenChange: async (input: Record<string, unknown>) => { changes.push(input); return "c-1"; },
 }));
 
 mock.module("../../../../../lib/agent-audit", () => ({
@@ -25,7 +35,7 @@ mock.module("../../../../../lib/mindmap-storage", () => ({
   getMindmapStorage: async () => ({
     mode,
     read: async () => ({
-      ...parseFile("plan.md", "# Plan <!-- bloommd:id=root01 -->\n\n## Aufgaben <!-- bloommd:id=aufg01 -->\n"),
+      ...parseFile(filename, "# Plan <!-- bloommd:id=root01 -->\n\n## Aufgaben <!-- bloommd:id=aufg01 -->\n"),
       storage: mode === "database"
         ? { mode: "database", documentId: "22222222-2222-4222-8222-222222222222", workspaceId: "33333333-3333-4333-8333-333333333333", version: 5, permission }
         : undefined,
@@ -53,9 +63,9 @@ mock.module("../../../../../lib/sync-room-status", () => ({
 }));
 
 const { POST } = await import("./route");
-const call = (nodes: unknown) => POST(
-  new Request("https://app.bloommd.test/api/mindmaps/plan.md/nodes", { method: "POST", headers: { Authorization: "Bearer bloom_pat_x", "Content-Type": "application/json" }, body: JSON.stringify({ nodes }) }),
-  { params: Promise.resolve({ filename: "plan.md" }) },
+const call = (nodes: unknown, agentMeta?: unknown) => POST(
+  new Request("https://app.bloommd.test/api/mindmaps/plan.md/nodes", { method: "POST", headers: { Authorization: "Bearer bloom_pat_x", "Content-Type": "application/json", Origin: "https://app.bloommd.test" }, body: JSON.stringify({ nodes, ...(agentMeta ? { agentMeta } : {}) }) }),
+  { params: Promise.resolve({ filename }) },
 );
 
 describe("POST /api/mindmaps/:filename/nodes", () => {
@@ -65,12 +75,18 @@ describe("POST /api/mindmaps/:filename/nodes", () => {
     written = null;
     syncCalls = [];
     audits = [];
+    filename = "plan.md";
+    rights = { access: "write", areas: {} };
+    proposals = [];
+    changes = [];
+    asOwner = false;
   });
 
   test("merges cloud node operations through the sync server and audits the agent", async () => {
     const response = await call([{ ref: "t", parent: "aufg01", title: "Folien", status: "open" }]);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ids: { t: "n1" }, created: ["n1"], updated: [], version: 6 });
+    expect(await response.json()).toEqual({ ids: { t: "n1" }, created: ["n1"], updated: [], version: 6, mode: "written", changeId: "c-1" });
+    expect(changes).toMatchObject([{ tokenId: "tok-1", agentName: "OpenClaw", event: "written", filename: "plan.md", area: "", afterVersion: 6, beforeMarkdown: expect.stringContaining("Aufgaben") }]);
     expect(syncCalls[0]?.input).toMatchObject({ filename: "plan.md", userId: "11111111-1111-4111-8111-111111111111", nodes: [{ ref: "t", title: "Folien" }] });
     expect(audits).toHaveLength(1);
   });
@@ -93,5 +109,51 @@ describe("POST /api/mindmaps/:filename/nodes", () => {
     expect((await call([{ title: 5 }])).status).toBe(400);
     expect((await call([{ title: "x", content: "## Kopf" }])).status).toBe(400);
     expect(written).toBeNull();
+  });
+
+  test("an agent that may only propose gets a stored proposal and nothing is written", async () => {
+    rights = { access: "write", areas: { Arbeit: "propose" } };
+    filename = "Arbeit – Plan.md";
+    const response = await call([{ ref: "t", parent: "aufg01", title: "Folien" }], { tool: "bloommd_update_map", reason: "Meeting", summary: "ignored by rights, only shown" });
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ mode: "proposed", proposalId: "p-1", filename: "Arbeit – Plan.md", area: "Arbeit" });
+    expect(syncCalls).toHaveLength(0);
+    expect(written).toBeNull();
+    expect(proposals).toMatchObject([{ tokenId: "tok-1", agentName: "OpenClaw", area: "Arbeit", baseVersion: 5, tool: "bloommd_update_map", reason: "Meeting", markdown: expect.stringContaining("Folien") }]);
+    expect(changes).toHaveLength(0);
+  });
+
+  test("a read-only area refuses the change and names the area", async () => {
+    rights = { access: "write", areas: { Learnings: "read" } };
+    filename = "Learnings – Idee.md";
+    const response = await call([{ title: "x" }]);
+    expect(response.status).toBe(403);
+    const body = await response.json() as { error: string; code: string; area: string };
+    expect(body).toMatchObject({ code: "AGENT_READ_ONLY", area: "Learnings" });
+    expect(body.error).toContain('may only read in "Learnings"');
+    expect(syncCalls).toHaveLength(0);
+    expect(proposals).toHaveLength(0);
+  });
+
+  test("the longest area decides: a sub-area may write below a read-only parent", async () => {
+    rights = { access: "propose", areas: { Learnings: "read", "Learnings/dev-team": "write" } };
+    filename = "Learnings › dev-team – Idee.md";
+    expect((await call([{ parent: "aufg01", title: "ok" }])).status).toBe(200);
+    expect(changes[0]).toMatchObject({ area: "Learnings/dev-team", filename: "Learnings › dev-team – Idee.md" });
+    filename = "Learnings › andere – Idee.md";
+    const refused = await call([{ parent: "aufg01", title: "nein" }]);
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { error: string }).error).toContain('"Learnings/andere"');
+    expect(syncCalls).toHaveLength(1);
+  });
+
+  test("without any stored right an agent only proposes; the owner (a session) is not limited", async () => {
+    rights = { access: "propose", areas: {} };
+    expect((await call([{ parent: "aufg01", title: "x" }])).status).toBe(202);
+    asOwner = true;
+    const response = await call([{ parent: "aufg01", title: "y" }]);
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty("changeId");
+    expect(proposals).toHaveLength(1);
   });
 });

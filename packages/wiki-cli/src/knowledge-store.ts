@@ -5,10 +5,11 @@
  */
 import { appendFile, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, normalize, relative, sep } from "node:path";
-import { accessFor, AgentLedger, foldName, type AgentAccessConfig, type AgentStateFiles } from "@bloommd/core/agent-ledger";
+import { accessFor, AgentLedger, areaSegments, CLOUD_AREA_SEPARATOR, cloudAreaOf, foldName, vaultAreaPath, type AgentAccessConfig, type AgentStateFiles } from "@bloommd/core/agent-ledger";
 import { knowledgeVersion, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { sanitizeMarkdownFilename } from "@bloommd/core/paths";
+import { CloudAgentApi, cloudRequest, type CloudOptions as CloudConnection } from "./cloud-agent";
 
 export interface KnowledgeMapEntry {
   path: string;
@@ -25,21 +26,39 @@ export interface KnowledgeDocument {
   version: string;
 }
 
+/** What the agent says about a change (shown in the change log); it never decides about rights. */
+export interface KnowledgeWriteMeta {
+  tool?: string;
+  reason?: string;
+  source?: string;
+  summary?: string;
+}
+
+/**
+ * The result of a save. In a cloud workspace the server decides by the agent's rights: with a
+ * `proposalId` nothing was written, a person has to review the change; otherwise `changeId` is the
+ * entry in the server's change log.
+ */
+export interface KnowledgeWriteResult extends KnowledgeDocument {
+  proposalId?: string;
+  changeId?: string;
+}
+
 export interface KnowledgeStore {
   readonly kind: "vault" | "cloud";
   list(): Promise<KnowledgeMapEntry[]>;
   read(path: string): Promise<KnowledgeDocument>;
   /** Writes when `expectedVersion` still matches (null = must not exist yet). */
-  write(path: string, markdown: string, expectedVersion: string | null): Promise<KnowledgeDocument>;
+  write(path: string, markdown: string, expectedVersion: string | null, meta?: KnowledgeWriteMeta): Promise<KnowledgeWriteResult>;
   /** A free path for a new map of `title` in `area`. */
   freePath(area: string, title: string): Promise<string>;
-  /** Where config, log, history and proposals live (always on this machine). */
+  /** Where requests (and, for a vault, config, log, history and proposals) live on this machine. */
   readonly stateDir: string;
   /**
    * Node operations applied by the store itself (cloud: merged into the live document, so they work
    * while people edit the map). Without it, the service rewrites the Markdown and calls `write`.
    */
-  applyNodes?(path: string, nodes: KnowledgeNodeInput[]): Promise<{ ids: Record<string, string>; created: string[]; updated: string[]; version: string }>;
+  applyNodes?(path: string, nodes: KnowledgeNodeInput[], meta?: KnowledgeWriteMeta): Promise<{ ids: Record<string, string>; created: string[]; updated: string[]; version: string; proposalId?: string; changeId?: string }>;
   /** A read-only link for people without an account (cloud only). */
   shareLink?(path: string, expiresInDays: number): Promise<{ url: string; expiresAt: string }>;
 }
@@ -120,7 +139,7 @@ export class VaultKnowledgeStore implements KnowledgeStore {
         if (entry.isDirectory()) await walk(full);
         else if (entry.isFile() && /\.md$/i.test(entry.name)) {
           const path = relative(this.root, full).split(sep).join("/");
-          const area = path.includes("/") ? path.split("/")[0]! : "";
+          const area = vaultAreaPath(path);
           // Like Obsidian, the file name is the title; listing never opens files. iCloud keeps
           // rarely used files only in the cloud (no local blocks); opening one can block or fail
           // (EDEADLK), so they are reported instead of read.
@@ -210,42 +229,30 @@ export class VaultKnowledgeStore implements KnowledgeStore {
   }
 }
 
-interface CloudOptions {
-  url: string;
-  token: string;
-  workspaceId?: string;
+interface CloudOptions extends CloudConnection {
+  /** Requests stay on this machine; rights, proposals and the change log live on the server. */
   stateDir: string;
-  fetch?: typeof fetch;
 }
 
 /**
  * A BloomMD cloud workspace through the REST API. The cloud has no folders, so the area becomes
- * part of the file name ("Arbeit – Teammeeting.md") and is kept in the frontmatter.
+ * part of the file name ("Arbeit – Teammeeting.md", "Learnings › dev-team – Idee.md") and is kept
+ * in the frontmatter. Rights are enforced by the server, per agent token.
  */
 export class CloudKnowledgeStore implements KnowledgeStore {
   readonly kind = "cloud" as const;
   readonly stateDir: string;
-  private readonly fetcher: typeof fetch;
+  /** Rights, proposals and change log of the token in this workspace (on the server). */
+  readonly agent: CloudAgentApi;
   private readonly versions = new Map<string, number>();
 
   constructor(private readonly options: CloudOptions) {
     this.stateDir = options.stateDir;
-    this.fetcher = options.fetch ?? fetch;
+    this.agent = new CloudAgentApi(options);
   }
 
-  private async request(path: string, init: RequestInit = {}): Promise<Response> {
-    if (!this.options.token) throw new Error("BloomMD cloud needs an access token in BLOOMMD_TOKEN.");
-    const url = new URL(path, this.options.url);
-    const response = await this.fetcher(url, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${this.options.token}`,
-        "Content-Type": "application/json",
-        ...(this.options.workspaceId ? { "X-BloomMD-Workspace-ID": this.options.workspaceId } : {}),
-        ...(init.headers ?? {}),
-      },
-    });
-    return response;
+  private request(path: string, init: RequestInit = {}): Promise<Response> {
+    return cloudRequest(this.options, path, init);
   }
 
   async list(): Promise<KnowledgeMapEntry[]> {
@@ -253,7 +260,7 @@ export class CloudKnowledgeStore implements KnowledgeStore {
     if (!response.ok) throw new Error(`BloomMD cloud list failed (${response.status}).`);
     const body = (await response.json()) as { files?: Array<{ filename: string; title?: string }> };
     return (body.files ?? []).map((file) => {
-      const area = /^(.+?) – /.exec(file.filename)?.[1] ?? "";
+      const area = cloudAreaOf(file.filename);
       return { path: file.filename, title: file.title ?? file.filename.replace(/\.md$/i, ""), area };
     });
   }
@@ -282,28 +289,34 @@ export class CloudKnowledgeStore implements KnowledgeStore {
     return { path, markdown, version: String(version) };
   }
 
-  async write(path: string, markdown: string, expectedVersion: string | null): Promise<KnowledgeDocument> {
+  async write(path: string, markdown: string, expectedVersion: string | null, meta: KnowledgeWriteMeta = {}): Promise<KnowledgeWriteResult> {
     // Fails before anything is sent when the agent produced a document BloomMD cannot parse.
     parseFile(path, markdown);
+    const agentMeta = Object.keys(meta).length > 0 ? { agentMeta: meta } : {};
     const response = expectedVersion === null
-      ? await this.request("/api/mindmaps", { method: "POST", body: JSON.stringify({ filename: path, markdown }) })
-      : await this.request(`/api/mindmaps/${encodeURIComponent(path)}`, { method: "PUT", body: JSON.stringify({ markdown, expectedVersion: Number(expectedVersion) }) });
+      ? await this.request("/api/mindmaps", { method: "POST", body: JSON.stringify({ filename: path, markdown, ...agentMeta }) })
+      : await this.request(`/api/mindmaps/${encodeURIComponent(path)}`, { method: "PUT", body: JSON.stringify({ markdown, expectedVersion: Number(expectedVersion), ...agentMeta }) });
     if (response.status === 409) throw new KnowledgeConflictError(path);
+    const body = (await response.json().catch(() => ({}))) as { error?: string; code?: string; mode?: string; proposalId?: string; changeId?: string; filePath?: string };
     if (!response.ok) {
-      const { code } = (await response.json().catch(() => ({}))) as { code?: string };
       // Whole-document saves are refused while the map is open somewhere (they would overwrite
       // live edits); node operations do not have this limit.
-      if (code === "SYNC_ROOM_ACTIVE" || code === "SYNC_ROOM_PENDING") throw new KnowledgeMapOpenError(path);
-      throw new Error(`BloomMD cloud could not save ${path} (${response.status}).`);
+      if (body.code === "SYNC_ROOM_ACTIVE" || body.code === "SYNC_ROOM_PENDING") throw new KnowledgeMapOpenError(path);
+      // The server names the agent's right and the area ("may only read in ...").
+      throw new Error(body.error ?? `BloomMD cloud could not save ${path} (${response.status}).`);
     }
-    return this.read(path);
+    // The server turned the change into a proposal: nothing was written.
+    if (body.mode === "proposed" && body.proposalId) return { path, markdown, version: expectedVersion ?? "", proposalId: body.proposalId };
+    // A new map may get another name when the name is taken.
+    const written = await this.read(body.filePath ?? path);
+    return { ...written, ...(body.changeId ? { changeId: body.changeId } : {}) };
   }
 
-  async applyNodes(path: string, nodes: KnowledgeNodeInput[]) {
-    const response = await this.request(`/api/mindmaps/${encodeURIComponent(path)}/nodes`, { method: "POST", body: JSON.stringify({ nodes }) });
-    const body = (await response.json().catch(() => ({}))) as { ids?: Record<string, string>; created?: string[]; updated?: string[]; version?: number | null; error?: string };
+  async applyNodes(path: string, nodes: KnowledgeNodeInput[], meta: KnowledgeWriteMeta = {}) {
+    const response = await this.request(`/api/mindmaps/${encodeURIComponent(path)}/nodes`, { method: "POST", body: JSON.stringify({ nodes, ...(Object.keys(meta).length > 0 ? { agentMeta: meta } : {}) }) });
+    const body = (await response.json().catch(() => ({}))) as { ids?: Record<string, string>; created?: string[]; updated?: string[]; version?: number | null; error?: string; mode?: string; proposalId?: string; changeId?: string };
     if (!response.ok) throw new Error(body.error ?? `BloomMD cloud could not update ${path} (${response.status}).`);
-    return { ids: body.ids ?? {}, created: body.created ?? [], updated: body.updated ?? [], version: String(body.version ?? "") };
+    return { ids: body.ids ?? {}, created: body.created ?? [], updated: body.updated ?? [], version: String(body.version ?? ""), ...(body.proposalId ? { proposalId: body.proposalId } : {}), ...(body.changeId ? { changeId: body.changeId } : {}) };
   }
 
   async shareLink(path: string, expiresInDays: number) {
@@ -315,7 +328,9 @@ export class CloudKnowledgeStore implements KnowledgeStore {
 
   async freePath(area: string, title: string): Promise<string> {
     const taken = new Set((await this.list()).map((entry) => entry.path));
-    const base = `${area ? `${safeSegment(area)} – ` : ""}${safeSegment(title) || "Notiz"}`;
+    // Sub-areas ("Learnings/dev-team") are joined by " › ": a file name cannot contain "/".
+    const prefix = areaSegments(area).map((segment) => safeSegment(segment).replace(/ [–›] /g, " - ")).filter(Boolean).join(CLOUD_AREA_SEPARATOR);
+    const base = `${prefix ? `${prefix} – ` : ""}${safeSegment(title) || "Notiz"}`;
     for (let index = 1; index < 100; index += 1) {
       const candidate = `${base}${index > 1 ? ` ${index}` : ""}.md`;
       if (!taken.has(candidate)) return candidate;

@@ -4,6 +4,8 @@ import type { MindMapNode } from "@bloommd/core/types";
 import { NextResponse } from "next/server";
 import { getApiRequestIdentity } from "../../../../lib/auth";
 import { auditAgentWrite } from "../../../../lib/agent-audit";
+import { agentProposalResponse, logAgentChange } from "../../../../lib/agent-access";
+import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta } from "../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../../lib/request-security";
 import {
@@ -64,12 +66,19 @@ export async function PUT(request: Request, { params }: RouteParams) {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
     const store = await getMindmapStorage(request, identity);
-    const { markdown, expectedVersion, overwrite } = await readJsonBody<{ markdown?: string; expectedVersion?: number; overwrite?: boolean }>(request, 11 * 1024 * 1024);
+    const { markdown, expectedVersion, overwrite, agentMeta } = await readJsonBody<{ markdown?: string; expectedVersion?: number; overwrite?: boolean; agentMeta?: unknown }>(request, 11 * 1024 * 1024);
     if (!markdown) return NextResponse.json({ error: "markdown field is required" }, { status: 400 });
     const current = await store.read(filename);
     if (current.storage?.mode === "database") {
       if (!identity.userId) {
         return NextResponse.json({ error: "Cloud document sync requires an authenticated user.", code: "SYNC_MUTATION_UNAVAILABLE" }, { status: 503 });
+      }
+      // Agent tokens save only within their rights; the stored file name decides the area.
+      const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
+      const meta = readAgentMeta(agentMeta);
+      if (gate?.access === "read") return agentReadOnlyResponse(gate);
+      if (gate?.access === "propose") {
+        return agentProposalResponse(gate, { markdown, baseVersion: overwrite ? current.storage.version : expectedVersion ?? current.storage.version, defaultSummary: "Map replaced", meta, defaultTool: "api:update" });
       }
       try {
         const saved = await writeThroughSyncServer(current.storage.documentId, {
@@ -80,10 +89,15 @@ export async function PUT(request: Request, { params }: RouteParams) {
           expectedVersion: overwrite ? undefined : expectedVersion ?? current.storage.version,
         });
         await auditAgentWrite(identity, saved.storage);
+        const changeId = gate ? await logAgentChange(gate, { event: "written", beforeMarkdown: serializeToMarkdown(current), afterVersion: saved.storage?.version, meta, defaultTool: "api:update", defaultSummary: "Map replaced" }).catch((error: unknown) => {
+          console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
+          return undefined;
+        }) : undefined;
         return NextResponse.json({
           filePath: saved.filePath,
           frontmatter: saved.frontmatter,
           storage: saved.storage,
+          ...(gate ? { mode: "written", changeId } : {}),
         });
       } catch (syncMutationError) {
         if (syncMutationError instanceof SyncMutationError && syncMutationError.code === "VERSION_CONFLICT") {
@@ -151,6 +165,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       if (!identity.userId) {
         return NextResponse.json({ error: "Cloud document sync requires an authenticated user.", code: "SYNC_MUTATION_UNAVAILABLE" }, { status: 503 });
       }
+      // A rename can move a map between areas: an agent needs the right to write in both.
+      const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
+      const targetGate = gate ? await agentGate(identity, current.storage.workspaceId, sanitizeMarkdownFilename(newFilename)) : null;
+      const blocked = [gate, targetGate].find((entry) => entry && entry.access !== "write");
+      if (blocked) return agentWriteRequiredResponse(blocked, "renaming a map");
       try {
         const renamed = await renameThroughSyncServer(current.storage.documentId, {
           filename,
@@ -160,6 +179,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           expectedVersion: current.storage.version,
         });
         await auditAgentWrite(identity, current.storage, "rename");
+        if (gate) {
+          await logAgentChange(gate, { event: "renamed", afterVersion: renamed.version, meta: {}, defaultTool: "api:rename", defaultSummary: `Renamed to "${renamed.newFilename}"` }).catch((error: unknown) => {
+            console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
+          });
+        }
         return NextResponse.json(renamed);
       } catch (error) {
         if (error instanceof SyncMutationError && error.code === "VERSION_CONFLICT") {
@@ -204,6 +228,8 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       if (!identity.userId) {
         return NextResponse.json({ error: "Cloud document sync requires an authenticated user.", code: "SYNC_MUTATION_UNAVAILABLE" }, { status: 503 });
       }
+      const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
+      if (gate && gate.access !== "write") return agentWriteRequiredResponse(gate, "deleting a map");
       try {
         await deleteThroughSyncServer(current.storage.documentId, {
           filename,
@@ -212,6 +238,11 @@ export async function DELETE(request: Request, { params }: RouteParams) {
           expectedVersion: current.storage.version,
         });
         await auditAgentWrite(identity, current.storage, "delete");
+        if (gate) {
+          await logAgentChange(gate, { event: "deleted", meta: {}, defaultTool: "api:delete", defaultSummary: `Deleted "${current.filePath}"` }).catch((error: unknown) => {
+            console.error("[BloomMD] Agent change could not be logged:", error instanceof Error ? error.name : "unknown");
+          });
+        }
         return NextResponse.json({ deleted: filename });
       } catch (error) {
         if (error instanceof SyncMutationError && error.code === "VERSION_CONFLICT") {

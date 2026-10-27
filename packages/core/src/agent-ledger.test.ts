@@ -3,10 +3,16 @@ import {
   AgentLedger,
   AgentProposalConflictError,
   accessFor,
+  areaCovers,
+  areaKey,
+  cloudAreaOf,
+  normalizeAreaPath,
+  vaultAreaPath,
   isVaultNotePath,
   knowledgeVersion,
   outlineDiff,
   parseAccessConfig,
+  strictAccessConfig,
   vaultArea,
   type AgentDocuments,
   type AgentStateFiles,
@@ -47,6 +53,53 @@ describe("rights", () => {
     expect(config.areas).toEqual({ Arbeit: "propose", arbeit: "read" });
     expect(accessFor(config, "ARBEIT")).toBe("read");
     expect(accessFor(config, "Schule")).toBe("write");
+  });
+
+  test("the longest matching area wins: sub-area before parent area before the default", () => {
+    const config = { access: "propose" as const, areas: { Learnings: "read" as const, "Learnings/dev-team": "write" as const, "learnings/dev-team/privat": "read" as const } };
+    expect(accessFor(config, "Learnings")).toBe("read");
+    expect(accessFor(config, "Learnings/dev-team")).toBe("write");
+    expect(accessFor(config, "LEARNINGS/Dev-Team/Coder")).toBe("write");
+    expect(accessFor(config, "Learnings/dev-team/Privat/x")).toBe("read");
+    expect(accessFor(config, "Learnings/andere")).toBe("read");
+    expect(accessFor(config, "Arbeit")).toBe("propose");
+    expect(accessFor(config, "")).toBe("propose");
+    // "Learnings-extra" is not below "Learnings": whole parts are compared, not text prefixes.
+    expect(accessFor(config, "Learnings-extra")).toBe("propose");
+    // Composed and decomposed umlauts are the same area; so are stray spaces around the parts.
+    expect(accessFor({ access: "read", areas: { "Küche/Rezepte": "write" } }, "Ku\u0308che / rezepte")).toBe("write");
+  });
+
+  test("two spellings of the same sub-area keep the strictest right; the top level only covers itself", () => {
+    expect(accessFor({ access: "write", areas: { "Arbeit/Plan": "write", "arbeit/PLAN": "propose" } }, "Arbeit/Plan")).toBe("propose");
+    expect(accessFor({ access: "write", areas: { "": "read" } }, "")).toBe("read");
+    expect(accessFor({ access: "write", areas: { "": "read" } }, "Arbeit")).toBe("write");
+  });
+
+  test("strict rights from a request are normalized; invalid ones are refused", () => {
+    expect(strictAccessConfig({ access: "propose", areas: { " Learnings / dev-team ": "write", Arbeit: "read", arbeit: "write" } })).toEqual({ access: "propose", areas: { "Learnings/dev-team": "write", Arbeit: "read" } });
+    expect(strictAccessConfig({ access: "read" })).toEqual({ access: "read", areas: {} });
+    expect(() => strictAccessConfig({ access: "admin" })).toThrow(/read, propose or write/);
+    expect(() => strictAccessConfig(null)).toThrow(/read, propose or write/);
+    expect(() => strictAccessConfig({ access: "read", areas: { Arbeit: "nope" } })).toThrow(/"Arbeit" must be/);
+    expect(() => strictAccessConfig({ access: "read", areas: { " / ": "read" } })).toThrow(/needs a name/);
+    expect(() => strictAccessConfig({ access: "read", areas: [] })).toThrow(/object/);
+    expect(() => strictAccessConfig({ access: "read", areas: Object.fromEntries(Array.from({ length: 101 }, (_, index) => [`a${index}`, "read"])) })).toThrow(/At most 100/);
+  });
+
+  test("area helpers fold names and read the area from a cloud file name", () => {
+    expect(areaCovers("Learnings", "learnings/dev-team")).toBe(true);
+    expect(areaCovers("Learnings/dev-team", "Learnings")).toBe(false);
+    expect(areaCovers("", "")).toBe(true);
+    expect(areaCovers("", "Arbeit")).toBe(false);
+    expect(areaKey(" Arbeit / Plan ")).toBe("arbeit/plan");
+    expect(normalizeAreaPath("/Arbeit//Plan/")).toBe("Arbeit/Plan");
+    expect(cloudAreaOf("Arbeit – Projekt X.md")).toBe("Arbeit");
+    expect(cloudAreaOf("Learnings › dev-team – Idee – Teil 2.md")).toBe("Learnings/dev-team");
+    expect(cloudAreaOf("Ohne Bereich.md")).toBe("");
+    expect(cloudAreaOf(" – Nur Titel.md")).toBe("");
+    expect(vaultAreaPath("Learnings/dev-team/Idee.md")).toBe("Learnings/dev-team");
+    expect(vaultAreaPath("Top.md")).toBe("");
   });
 
   test("note paths stay inside the vault", () => {

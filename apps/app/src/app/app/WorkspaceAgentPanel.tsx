@@ -18,6 +18,7 @@ import {
   UserMinus,
   X,
 } from "lucide-react";
+import { AgentTokenAccess } from "./AgentTokenAccess";
 
 interface WorkspaceInfo {
   id: string;
@@ -222,6 +223,8 @@ export function WorkspaceAgentPanel({
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [expandedProposal, setExpandedProposal] = useState<string | null>(null);
+  // Bumped when the workspace agent event stream reports a change, so the agent-token section reloads too.
+  const [refreshTick, setRefreshTick] = useState(0);
   const activeAgents = useMemo(
     () => agents.filter((agent) => agent.status === "active"),
     [agents],
@@ -289,14 +292,14 @@ export function WorkspaceAgentPanel({
     const events = new EventSource(
       `/api/workspaces/${encodeURIComponent(workspace.id)}/agent-events`,
     );
-    events.addEventListener(
-      "workspace-agent",
-      () => void load({ background: true }),
-    );
-    const timer = window.setInterval(
-      () => void load({ background: true }),
-      60_000,
-    );
+    events.addEventListener("workspace-agent", () => {
+      void load({ background: true });
+      setRefreshTick((tick) => tick + 1);
+    });
+    const timer = window.setInterval(() => {
+      void load({ background: true });
+      setRefreshTick((tick) => tick + 1);
+    }, 60_000);
     return () => {
       events.close();
       window.clearInterval(timer);
@@ -475,6 +478,14 @@ export function WorkspaceAgentPanel({
           revokeAgent={revokeAgent}
           pairingCode={pairingCode}
           locale={locale}
+        />
+      )}
+      {!isNodeComposer && workspace.role === "owner" && !loading && (
+        <AgentTokenAccess
+          workspaceId={workspace.id}
+          locale={locale}
+          refreshTick={refreshTick}
+          onApplied={onApplied}
         />
       )}
       <p className="mt-5 text-xs leading-5 text-[var(--color-ink-faint)]">

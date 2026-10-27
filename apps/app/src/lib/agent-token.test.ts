@@ -29,6 +29,27 @@ describe("agent access tokens", () => {
     expect(accessTokenAllows(request("POST", "/api/workspaces/x/invitations"), bound)).toBe(false);
   });
 
+  test("a token named for an agent is limited to documents even without a workspace binding", () => {
+    const agent = { scope: "write" as const, workspaceIds: null, agentName: "OpenClaw" };
+    expect(accessTokenAllows(request("PUT", "/api/mindmaps/a.md"), agent)).toBe(true);
+    expect(accessTokenAllows(request("GET", "/api/mindmaps/agent-access/rights"), agent)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/sync-ticket"), agent)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/account/access-tokens"), agent)).toBe(false);
+    expect(accessTokenAllows(request("PUT", "/api/workspaces/x/agent-rights"), agent)).toBe(false);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/agent-token-proposals/p1"), agent)).toBe(false);
+  });
+
+  test("a person's limited token may use the owner tools for agent rights, nothing else of the workspace", () => {
+    const bound = { scope: "write" as const, workspaceIds: ["0b5e8f3e-8a0c-4c55-9a43-6f4a3f9a0b11"], agentName: null };
+    expect(accessTokenAllows(request("PUT", "/api/workspaces/x/agent-rights"), bound)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/agent-token-proposals/p1"), bound)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/agent-log/c1"), bound)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/invitations"), bound)).toBe(false);
+    const read = { scope: "read" as const, workspaceIds: null, agentName: null };
+    expect(accessTokenAllows(request("GET", "/api/workspaces/x/agent-token-proposals"), read)).toBe(true);
+    expect(accessTokenAllows(request("POST", "/api/workspaces/x/agent-token-proposals/p1"), read)).toBe(false);
+  });
+
   test("document storage refuses a workspace the token is not bound to", async () => {
     const identity = {
       authKind: "access-token" as const,

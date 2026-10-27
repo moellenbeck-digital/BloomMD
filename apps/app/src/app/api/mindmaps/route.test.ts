@@ -3,13 +3,25 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 const originalError = console.error;
 let storageError: Error | null = null;
 let syncCreateCalls = 0;
+let agent = false;
+let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
+let proposals: Array<Record<string, unknown>> = [];
+let changes: Array<Record<string, unknown>> = [];
 
 mock.module("../../../lib/auth", () => ({
-  getApiRequestIdentity: async () => ({
-    authKind: "session",
-    userId: "11111111-1111-4111-8111-111111111111",
-    email: "tester@example.test",
-  }),
+  getApiRequestIdentity: async () => agent
+    ? { authKind: "access-token", userId: "11111111-1111-4111-8111-111111111111", tokenId: "tok-1", agentName: "OpenClaw", tokenScope: "write" }
+    : { authKind: "session", userId: "11111111-1111-4111-8111-111111111111", email: "tester@example.test" },
+}));
+
+mock.module("../../../lib/db", () => ({
+  // Bun shares module mocks across test files; keep what request-security and the rights check need from lib/db.
+  consumeRateLimit: async () => null,
+  normalizeUuid: (value: string | undefined) => value ?? null,
+  recordAgentDocumentWrite: async () => undefined,
+  getAgentTokenRights: async () => rights,
+  createAgentTokenProposal: async (input: Record<string, unknown>) => { proposals.push(input); return "p-1"; },
+  recordAgentTokenChange: async (input: Record<string, unknown>) => { changes.push(input); return "c-1"; },
 }));
 
 mock.module("../../../lib/mindmap-storage", () => ({
@@ -63,6 +75,10 @@ describe("mindmap listing route", () => {
   beforeEach(() => {
     storageError = null;
     syncCreateCalls = 0;
+    agent = false;
+    rights = { access: "write", areas: {} };
+    proposals = [];
+    changes = [];
     console.error = () => undefined;
   });
 
@@ -98,5 +114,44 @@ describe("mindmap listing route", () => {
 
     expect(response.status).toBe(201);
     expect(syncCreateCalls).toBe(1);
+  });
+
+  const create = (filename: string, agentMeta?: unknown) => POST(new Request("https://bloommd.app/api/mindmaps", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://bloommd.app" },
+    body: JSON.stringify({ filename, markdown: "# New", ...(agentMeta ? { agentMeta } : {}) }),
+  }));
+
+  test("an agent with the right to write creates the map and the change is logged for undo", async () => {
+    agent = true;
+    rights = { access: "propose", areas: { "Learnings/dev-team": "write" } };
+    const response = await create("Learnings › dev-team – Idee.md", { tool: "bloommd_create_map", reason: "Retro" });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ mode: "written", changeId: "c-1" });
+    expect(syncCreateCalls).toBe(1);
+    expect(changes).toMatchObject([{ tokenId: "tok-1", agentName: "OpenClaw", event: "written", area: "Learnings/dev-team", createdMap: true, tool: "bloommd_create_map", reason: "Retro", afterVersion: 1 }]);
+  });
+
+  test("an agent that may only propose stores a proposal instead of creating the map", async () => {
+    agent = true;
+    rights = { access: "write", areas: { Arbeit: "propose" } };
+    const response = await create("Arbeit – Plan.md");
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ mode: "proposed", proposalId: "p-1", filename: "Arbeit – Plan.md", area: "Arbeit" });
+    expect(syncCreateCalls).toBe(0);
+    expect(proposals).toMatchObject([{ tokenId: "tok-1", workspaceId: "22222222-2222-4222-8222-222222222222", area: "Arbeit", baseVersion: null, markdown: "# New" }]);
+  });
+
+  test("a read-only area refuses with the area in the message; a person is never limited", async () => {
+    agent = true;
+    rights = { access: "write", areas: { Learnings: "read" } };
+    const response = await create("Learnings – Idee.md");
+    expect(response.status).toBe(403);
+    expect(((await response.json()) as { error: string }).error).toContain('may only read in "Learnings"');
+    expect(syncCreateCalls).toBe(0);
+    agent = false;
+    expect((await create("Learnings – Idee.md")).status).toBe(201);
+    expect(proposals).toHaveLength(0);
+    expect(changes).toHaveLength(0);
   });
 });

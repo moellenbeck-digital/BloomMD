@@ -84,6 +84,10 @@ A cloud database is optional for local/self-hosted use and required for hosted a
 - `bloom_workspace_members` with `owner`, `editor`, and `viewer` roles
 - `bloom_workspace_agents`, `bloom_agent_tasks`, and `bloom_agent_proposals` for visible,
   review-only workspace agents
+- `bloom_agent_token_rights`, `bloom_agent_token_area_rights`, `bloom_agent_token_proposals`, and
+  `bloom_agent_token_changes` for agent access tokens: rights (default plus per area, sub-areas allowed,
+  the longest matching area wins; without a row an agent only proposes), proposals the workspace owner
+  reviews, and one change log entry per change. The map routes enforce them per calling token.
 - `bloom_documents` with `workspace_id`, Markdown, frontmatter, soft deletion, and optimistic `version`
 - `bloom_document_views` for future cloud view sharing; current UI presets are deliberately local
 

@@ -33,6 +33,14 @@ Abgelegt wird als normales Markdown:
    | `propose` | Änderungen landen als Vorschlag; erst du übernimmst sie |
    | `write` | der Agent schreibt direkt, mit Protokoll und Rückgängig |
 
+   Ein Bereich darf ein Unterbereich sein: `--area Learnings/dev-team=write` gilt für alles unter
+   `Learnings/dev-team`. Es gilt immer der längste passende Bereich – Unterbereich vor übergeordnetem
+   Bereich vor Standard. So kann `Learnings` auf `read` stehen und `Learnings/dev-team` auf `write`.
+
+   Im Cloud-Workspace gelten die Rechte **je Agent-Token auf dem Server** (siehe unten): Du setzt sie
+   im Browser unter **Agenten verwalten** oder mit `agent setup --cloud …`, und der Server erzwingt
+   sie – auch gegen einen veränderten Client.
+
 3. Den MCP-Server im Agenten eintragen, für OpenClaw:
 
    ```bash
@@ -90,7 +98,8 @@ ein Hinweis.
   des Agenten oder einem übernommenen Vorschlag wieder her – nach Rückfrage und nur, wenn die
   Notiz seitdem niemand bearbeitet hat.
 - **Rights** (Rechte): Standard und je Ordner der obersten Ebene `read`, `propose` oder `write`,
-  genau wie `bloommd-wiki agent setup`. Für deinen eigenen Agenten ist `write` üblich.
+  genau wie `bloommd-wiki agent setup`. Unterbereiche wie `Learnings/dev-team` setzt
+  `agent setup --area …`. Für deinen eigenen Agenten ist `write` üblich.
 
 Panel und `bloommd-wiki agent …` arbeiten mit denselben Dateien in `.bloommd/` und denselben
 Regeln. Übernehmen kann nur ein Mensch; der Agent hat dafür kein Werkzeug.
@@ -148,15 +157,57 @@ bloommd-wiki agent reject "/Pfad/zum/Vault" <id> --reviewer Max --reason "Gehör
 ```
 
 Für den Cloud-Workspace steht statt des Ordners `--cloud <url> --workspace <id>` – dieselben Angaben
-wie beim MCP-Server. Rechte, Protokoll und Vorschläge des Workspace liegen auf deinem Rechner unter
-`~/.bloommd/agent-cloud/`; `approve`, `undo`, `log` und `due` brauchen zusätzlich das Token in
-`BLOOMMD_TOKEN`:
+wie beim MCP-Server. Rechte, Vorschläge und Protokoll liegen dort **je Agent-Token auf dem Server**
+und werden dort erzwungen, nicht mehr auf dem Rechner des Agenten; mehrere Pods oder Rechner mit
+demselben Token haben also dieselben Rechte und dasselbe Protokoll. Alle Befehle mit `--cloud` brauchen
+dein Besitzer-Token in `BLOOMMD_TOKEN`; `--agent <name|id>` wählt den Agent-Token (bei nur einem
+entfällt es):
 
 ```bash
-bloommd-wiki agent setup --cloud https://… --workspace <id> --access write --area Arbeit=propose
+bloommd-wiki agent setup --cloud https://… --workspace <id> --agent OpenClaw --access propose \
+  --area Learnings=read --area Learnings/dev-team=write
+bloommd-wiki agent rights --cloud https://… --workspace <id>
 bloommd-wiki agent proposals --cloud https://… --workspace <id>
-bloommd-wiki agent approve --cloud https://… --workspace <id> <vorschlags-id> --reviewer Max
+bloommd-wiki agent approve --cloud https://… --workspace <id> <vorschlags-id>
+bloommd-wiki agent log --cloud https://… --workspace <id> --agent OpenClaw
 ```
+
+### Im Browser freigeben und Rechte setzen
+
+Als Workspace-Besitzer öffnest du im Cloud-Workspace **Agenten verwalten** (Workspace-Menü) und
+findest dort **Agent-Zugriff**:
+
+- **Offene Vorschläge** mit Agent, Bereich, Zeitpunkt, Grund und einer Gliederung der Änderung
+  (+ neu, ~ geändert, − entfernt). **Freigeben** übernimmt den Vorschlag, **Ablehnen** verwirft ihn
+  (mit optionalem Grund). Hat sich die Map seitdem geändert, siehst du das und entscheidest, ob du
+  trotzdem übernimmst. Im Protokoll steht, wer freigegeben oder abgelehnt hat – mit deinem
+  angemeldeten Namen. `agent approve|reject` mit deinem Token läuft über denselben Serverweg; `--reviewer`
+  ist dort nicht nötig.
+- **Rechte** je Agent-Token: Standardrecht und Rechte je Bereich (auch Unterbereiche).
+  Ohne Eintrag darf der Agent nur vorschlagen.
+- **Protokoll** der Änderungen mit **Rückgängig**.
+
+Die Rechte gelten sofort. Ein widerrufenes Token wird beim nächsten Aufruf abgelehnt. Was der Server
+im Einzelnen prüft: `read` lehnt jede Änderung mit einer Meldung ab, die den Bereich nennt; `propose`
+legt nur einen Vorschlag an; `write` schreibt direkt und protokolliert. Auch Umbenennen, Löschen,
+Lese-Links und die Live-Bearbeitung brauchen `write` im Bereich.
+
+### Alte lokale Rechte
+
+Früher lagen die Rechte eines Cloud-Workspace als `agent.json` unter
+`~/.bloommd/agent-cloud/<host>-<workspace>/`. Beim ersten Start mit Cloud-Ziel weist `bloommd-wiki`
+einmal darauf hin. **Lokale Rechte werden nie stillschweigend übernommen:** Bis du entscheidest, gilt
+das Recht des Servers (ohne Eintrag: `propose`).
+
+```bash
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw           # zeigt nur, was gilt
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw --apply   # genau die alten Rechte setzen
+bloommd-wiki agent migrate --cloud https://… --workspace <id> --agent OpenClaw --discard # verwerfen
+```
+
+`--apply` setzt höchstens die bisherigen lokalen Rechte und nur, wenn für den Token auf dem Server noch
+nichts gesetzt wurde. Alte lokale Protokolle und Vorschläge bleiben unverändert liegen; sie werden
+weder auf den Server übernommen noch gelöscht.
 
 - Der Agent schreibt nie ganze Dateien neu, sondern legt Knoten an oder ergänzt sie. Hat jemand die
   Map inzwischen geändert, bricht er ab und liest neu.
@@ -165,7 +216,9 @@ bloommd-wiki agent approve --cloud https://… --workspace <id> <vorschlags-id> 
   In einem `propose`-Bereich wird daraus ein Vorschlag. Freigegebene Vorschläge nimmst nur du zurück
   (`agent undo`).
 - Bereiche gelten unabhängig von der Schreibweise: Eine Regel für `Arbeit` gilt auch für `arbeit`.
+  Im Cloud-Workspace steht der Bereich im Dateinamen (`Learnings › dev-team – Idee.md`).
 - Ganze Maps lassen sich in der Cloud nur ersetzen (Rückgängig, übernommener Vorschlag), solange
   niemand sie geöffnet hat; sonst kommt eine Meldung, und du versuchst es nach dem Schließen erneut.
-- Protokoll, Verlauf und Vorschläge liegen im Vault unter `.bloommd/` und synchronisieren mit.
+- Im Vault liegen Protokoll, Verlauf und Vorschläge unter `.bloommd/` und synchronisieren mit; im
+  Cloud-Workspace liegen sie auf dem Server.
 - Dateien, die iCloud nur in der Cloud vorhält, werden übersprungen und in der Übersicht gemeldet.

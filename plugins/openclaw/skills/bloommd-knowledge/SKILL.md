@@ -36,7 +36,7 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
 - Private (school, own conversations, personal projects): `target: "vault"`.
 - Work and anything to share with colleagues: `target: "cloud"` when the cloud is configured,
   otherwise the vault area `Arbeit`.
-- Area = top-level folder; subfolders allowed, e.g. `Schule/Physik`, `Arbeit/Team`.
+- Area = folder path; subareas such as `Schule/Physik` or `Learnings/dev-team` can have their own right (the longest matching area wins). In a cloud workspace the server holds and enforces your rights.
 
 ## Acting on the maps
 
@@ -70,5 +70,5 @@ asks about BloomMD requests:
 
 Tell the user in their language which map you created or changed (path), what you added
 (counts of nodes, tasks, decisions) and any open questions. If a result says `"mode": "proposed"`,
-say that the owner has to approve it (agent panel in Obsidian or `bloommd-wiki agent proposals
-<vault>`); never try to approve it yourself.
+say that the owner has to approve it (agent panel in Obsidian, `bloommd-wiki agent proposals
+<vault>`, or in a cloud workspace “Manage agents → Agent access” in the browser); never try to approve it yourself.

@@ -90,7 +90,8 @@ function isInside(root: string, path: string): boolean {
   return rest === "" || (!rest.startsWith("..") && !isAbsolute(rest));
 }
 
-const SKIPPED_DIRS = new Set(["node_modules", ".git", ".obsidian", ".trash", ".bloommd"]);
+// `lost+found` is the root-only folder of an ext4 volume mounted directly as the vault.
+const SKIPPED_DIRS = new Set(["node_modules", ".git", ".obsidian", ".trash", ".bloommd", "lost+found"]);
 const MAX_FILES = 5_000;
 
 /** Vault-relative Markdown path, or an error for anything outside the vault or in hidden folders. */

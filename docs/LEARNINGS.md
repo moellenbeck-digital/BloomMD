@@ -2,7 +2,8 @@
 
 Learnings halten fest, was das Team (Agenten und Menschen) bei der Arbeit gelernt hat: ein Fehlerbild, seine
 Ursache und was künftig anders zu tun ist. Ohne feste Konvention werden sie nicht wiedergefunden und nicht
-gepflegt. Dieses Dokument legt Format, Bereiche und Lebenszyklus fest.
+gepflegt. Dieses Dokument legt Format, Bereiche und Lebenszyklus fest. Wo die Learnings im Cluster liegen
+(Vault, Rechte, MCP, Export), steht in [LEARNINGS-ABLAGE.md](LEARNINGS-ABLAGE.md).
 
 ## Grundsatz: Wissen, keine Regeln
 

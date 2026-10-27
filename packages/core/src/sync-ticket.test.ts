@@ -16,6 +16,13 @@ describe("sync tickets", () => {
     expect(verifySyncTicket(signSyncTicket(claims, secret), secret)).toEqual(claims);
   });
 
+  test("carries the access token a ticket was made for, and refuses an empty or non-string one", () => {
+    const withToken = { ...claims, tokenId: "11111111-1111-4111-8111-111111111111" };
+    expect(verifySyncTicket(signSyncTicket(withToken, secret), secret)).toEqual(withToken);
+    expect(verifySyncTicket(signSyncTicket({ ...claims, tokenId: "" }, secret), secret)).toBeNull();
+    expect(verifySyncTicket(signSyncTicket({ ...claims, tokenId: 7 as unknown as string }, secret), secret)).toBeNull();
+  });
+
   test("rejects tampered, expired, and weakly signed tickets", () => {
     const token = signSyncTicket(claims, secret);
     expect(verifySyncTicket(`${token}x`, secret)).toBeNull();

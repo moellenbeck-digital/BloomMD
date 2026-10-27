@@ -72,5 +72,7 @@ export interface RoomDescriptor {
   workspaceId?: string;
   documentId?: string;
   userId?: string;
+  /** The access token the ticket was made for; its state decides over the connection, not only the ticket's lifetime. */
+  tokenId?: string;
   permission?: "read" | "write";
 }

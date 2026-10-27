@@ -40,6 +40,8 @@ export async function POST(request: Request) {
       documentId: document.id,
       filename: document.filename,
       permission,
+      // The sync server checks this token against the database on connect and on every message.
+      ...(identity!.authKind === "access-token" && identity!.tokenId ? { tokenId: identity!.tokenId } : {}),
       exp,
     }, secret);
 

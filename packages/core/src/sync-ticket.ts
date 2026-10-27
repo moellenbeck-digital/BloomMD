@@ -6,6 +6,8 @@ export interface SyncTicketClaims {
   documentId: string;
   filename: string;
   permission: "read" | "write";
+  /** Set when the ticket was made for an access token: the sync server then follows that token's state. */
+  tokenId?: string;
   exp: number;
 }
 
@@ -40,6 +42,7 @@ export function verifySyncTicket(token: string | null | undefined, secret: strin
     const claims = JSON.parse(decode(payload)) as SyncTicketClaims;
     if (!claims.userId || !claims.workspaceId || !claims.documentId || !claims.filename) return null;
     if (claims.permission !== "read" && claims.permission !== "write") return null;
+    if (claims.tokenId !== undefined && (typeof claims.tokenId !== "string" || !claims.tokenId)) return null;
     if (!Number.isFinite(claims.exp) || claims.exp * 1000 <= now) return null;
     return claims;
   } catch {

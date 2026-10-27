@@ -5,7 +5,15 @@ import {
   serializeToMarkdown,
   type MindMapDocument,
 } from "@bloommd/core";
+import { AGENT_ACCESS, accessFor, cloudAreaOf, type AgentAccess, type AgentAccessConfig } from "@bloommd/core/agent-ledger";
 import type { PersistenceOperation, RoomDescriptor, SyncServerConfig } from "./types";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** An unknown stored right never grants more than a proposal (the same rule as the web app). */
+function agentAccessOrPropose(value: unknown): AgentAccess {
+  return AGENT_ACCESS.includes(value as AgentAccess) ? (value as AgentAccess) : "propose";
+}
 
 export class SyncDocumentVersionConflictError extends Error {
   constructor() {
@@ -112,19 +120,45 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
       if (!descriptor.documentId || !descriptor.workspaceId || !descriptor.userId) {
         throw new Error("Cloud sync requires document, workspace, and user ids.");
       }
+      // A ticket made for an access token names it: the connection is only as good as the token is
+      // now (not revoked, not expired, still bound to this workspace) and, for an agent token, the
+      // right of its owner for the map's area. The ticket lifetime does not matter for that.
+      const tokenId = descriptor.tokenId ?? null;
+      if (tokenId !== null && !UUID.test(tokenId)) throw new Error("Cloud document not found or access denied.");
       const rows = await sql`
-        select m.role
+        select m.role, d.filename, t.id as token_id, t.agent_name, t.scope
         from bloom_documents d
         join bloom_workspace_members m on m.workspace_id = d.workspace_id
+        left join bloom_access_tokens t
+          on t.id = ${tokenId}::uuid
+          and t.user_id = m.user_id
+          and t.revoked_at is null
+          and (t.expires_at is null or t.expires_at > now())
+          and (t.workspace_ids is null or cardinality(t.workspace_ids) = 0 or d.workspace_id = any(t.workspace_ids))
         where d.id = ${descriptor.documentId}
           and d.workspace_id = ${descriptor.workspaceId}
           and m.user_id = ${descriptor.userId}
           and d.deleted_at is null
         limit 1
       `;
-      const role = (rows[0] as { role?: string } | undefined)?.role;
-      if (!role) throw new Error("Cloud document not found or access denied.");
-      return role === "viewer" ? "read" : "write";
+      const row = rows[0] as { role?: string; filename?: string; token_id?: string | null; agent_name?: string | null; scope?: string | null } | undefined;
+      if (!row?.role) throw new Error("Cloud document not found or access denied.");
+      if (tokenId !== null && !row.token_id) throw new Error("Access token revoked, expired or not valid for this workspace.");
+      if (row.role === "viewer" || row.scope === "read") return "read";
+      if (tokenId !== null && row.agent_name) {
+        // The map's current file name decides the area (it can have been renamed since the ticket).
+        const [defaults, areas] = await Promise.all([
+          sql`select default_access from bloom_agent_token_rights where access_token_id = ${tokenId} and workspace_id = ${descriptor.workspaceId}`,
+          sql`select area, access from bloom_agent_token_area_rights where access_token_id = ${tokenId} and workspace_id = ${descriptor.workspaceId}`,
+        ]);
+        const rights: AgentAccessConfig = {
+          access: agentAccessOrPropose((defaults[0] as { default_access?: string } | undefined)?.default_access),
+          areas: Object.fromEntries((areas as unknown as Array<{ area: string; access: string }>).map((entry) => [entry.area, agentAccessOrPropose(entry.access)])),
+        };
+        // A live session would bypass proposals and the change log: an agent edits live only where it may write.
+        if (accessFor(rights, cloudAreaOf(row.filename ?? "")) !== "write") return "read";
+      }
+      return "write";
     },
     async load(descriptor) {
       if (!descriptor.documentId || !descriptor.workspaceId || !descriptor.userId) {

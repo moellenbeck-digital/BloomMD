@@ -559,6 +559,7 @@ export function createSyncServer(roomManager: RoomManager, config: Pick<SyncServ
             workspaceId: claims.workspaceId,
             documentId: claims.documentId,
             userId: claims.userId,
+            ...(claims.tokenId ? { tokenId: claims.tokenId } : {}),
             permission: claims.permission,
           }
         : config.syncSecret

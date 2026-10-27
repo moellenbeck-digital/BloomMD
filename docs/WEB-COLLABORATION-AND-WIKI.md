@@ -52,6 +52,25 @@ Example register:
 
 Without this register the UI explicitly reports that provenance is not verified. It must not claim that a page is fresh merely because the current source index is unavailable.
 
+### Reviewing proposals in the app
+
+The public `/api/wiki` stays read-only and never carries proposals. A signed-in person can review agent proposals on `/wiki` of `apps/app` (view "Vorschläge" / "Proposals") when the folder is configured:
+
+```env
+BLOOMMD_WIKI_PROPOSALS_DIR=/srv/bloommd/wiki-proposals
+BLOOMMD_WIKI_DIR=/srv/bloommd/wiki
+```
+
+Without `BLOOMMD_WIKI_PROPOSALS_DIR` (and `BLOOMMD_WIKI_DIR`) the whole feature is off: the view is hidden and the routes answer 404. Each proposal is one file `<id>.json` — the `WikiProposal` written by the CLI or MCP tools, extended by `status` (`open` when absent, `applied`, `discarded`). A discarded proposal carries `discardReason`, `discardedBy` and `discardedAt` and is never deleted.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/wiki/proposals` | Open proposals with before/after per page, cited sources (hash status `unchanged`, `changed`, `no-hash`, `unverified` against `BLOOMMD_WIKI_SOURCE_HASHES`) and whether the page changed since creation. 401 without session. |
+| `POST /api/wiki/proposals/<id>/approve` | `approveWikiProposal` for the session name (name, else email) directly followed by `applyWikiProposal`; the Wiki log names the reviewer. 409 `wiki-page-changed` when the page changed; the bundle stays untouched. |
+| `POST /api/wiki/proposals/<id>/discard` | Body `{ "reason": "…" }`, mandatory. The bundle is not changed. |
+
+Both POST routes need a signed-in session (401), a same-origin request (403) and never read the reviewer name from the request.
+
 ## Local verification
 
 ```bash

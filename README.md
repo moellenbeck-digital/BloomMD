@@ -345,7 +345,7 @@ The reproducible local macOS runner can be started with `bun run qa:m1:mac`.
 
 ### Optional LLM Wiki browser
 
-BloomMD can expose a read-only browser for an OKF-compatible Markdown bundle. Keep it disabled by default; on a trusted Hetzner deployment set `BLOOMMD_WIKI_DIR` to the mounted bundle and `BLOOMMD_WIKI_PUBLIC=1`. The browser is available at `/wiki` and `/api/wiki`. Wiki mutations remain an explicit, audited CLI/agent workflow and are never accepted by the public web route.
+BloomMD can expose a read-only browser for an OKF-compatible Markdown bundle. Keep it disabled by default; on a trusted Hetzner deployment set `BLOOMMD_WIKI_DIR` to the mounted bundle and `BLOOMMD_WIKI_PUBLIC=1`. The browser is available at `/wiki` and `/api/wiki`. Wiki mutations remain an explicit, audited CLI/agent workflow and are never accepted by the public web route. Signed-in reviewers can approve or discard agent proposals on `/wiki` of the app when `BLOOMMD_WIKI_PROPOSALS_DIR` is set (off by default; see `docs/WEB-COLLABORATION-AND-WIKI.md`).
 
 For a local agent client, use the provider-neutral MCP transport against an explicitly selected bundle:
 

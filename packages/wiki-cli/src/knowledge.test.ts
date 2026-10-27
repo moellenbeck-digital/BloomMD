@@ -123,6 +123,20 @@ describe("vault knowledge", () => {
     expect(await service.proposals()).toEqual([]);
   });
 
+  test("skips the unreadable lost+found of an ext4 volume used as the vault root", async () => {
+    const { root, service } = await vault();
+    await mkdir(join(root, "lost+found"));
+    await writeFile(join(root, "lost+found", "Stray.md"), "# Stray\n", "utf8");
+    await chmod(join(root, "lost+found"), 0o000);
+    try {
+      const overview = await service.overview();
+      expect(JSON.stringify(overview)).toContain("Physik");
+      expect(JSON.stringify(overview)).not.toContain("Stray");
+    } finally {
+      await chmod(join(root, "lost+found"), 0o700);
+    }
+  });
+
   test("read-only areas and paths outside the vault are refused", async () => {
     const { service } = await vault("read");
     await expect(service.createMap({ area: "Schule", title: "X" })).rejects.toThrow(/may only read/);

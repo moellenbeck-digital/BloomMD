@@ -271,7 +271,8 @@ async function walkMarkdown(rootDir: string, currentDir = rootDir): Promise<stri
   const entries = await readdir(currentDir, { withFileTypes: true });
   const paths: string[] = [];
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    // `lost+found` is the root-only folder of an ext4 volume mounted directly as the bundle.
+    if (entry.name.startsWith(".") || entry.name === "node_modules" || entry.name === "lost+found") continue;
     const absolute = join(currentDir, entry.name);
     if (entry.isDirectory()) paths.push(...await walkMarkdown(rootDir, absolute));
     else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) paths.push(normalizedPath(relative(rootDir, absolute)));

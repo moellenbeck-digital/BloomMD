@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readWorkspace } from "./workspace";
@@ -298,6 +298,9 @@ describe("wiki commands", () => {
     try {
       await mkdir(join(vault, "Learnings", "coder"), { recursive: true });
       await mkdir(join(vault, ".bloommd"), { recursive: true });
+      // An ext4 volume used as the vault root carries a root-only lost+found.
+      await mkdir(join(vault, "lost+found"));
+      await chmod(join(vault, "lost+found"), 0o000);
       await writeFile(join(vault, ".bloommd", "agent.json"), JSON.stringify({ access: "read", areas: {} }));
       await writeFile(join(vault, "Learnings", "coder", "pipefail.md"), "---\ntitle: Pipefail nutzen\nscope: coder\n---\n# Pipefail nutzen\n\n## Befund\n\nOhne pipefail ist tail immer grün.\n");
 
@@ -318,6 +321,7 @@ describe("wiki commands", () => {
       expect((await run(["export", vault, join(vault, "export")])).code).not.toBe(0);
       expect((await run(["export", vault])).code).toBe(2);
     } finally {
+      await chmod(join(vault, "lost+found"), 0o700).catch(() => undefined);
       await rm(vault, { recursive: true, force: true });
       await rm(out, { recursive: true, force: true });
     }

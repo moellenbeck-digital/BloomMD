@@ -7,7 +7,9 @@ import { parseFile } from "@bloommd/core/parser";
 import { normalizeMarkdownFilename, normalizeMarkdownPath, resolveMarkdownPath } from "@bloommd/core/paths";
 import type { MindMapDocument, MindMapListEntry } from "@bloommd/core/types";
 import { getApiRequestIdentity, type ApiRequestIdentity } from "./auth";
+import { isAgentTokenIdentity } from "./agent-gate";
 import { isE2EAuthBypassEnabled } from "./e2e-mode";
+import { RequestSecurityError } from "./request-security";
 import { workspaceForIdentity } from "./token-workspace";
 import {
   isDatabaseConfigured,
@@ -40,6 +42,8 @@ function workspaceIdFromRequest(request: Request) {
   const cookie = cookieHeader.split(";").map((part) => part.trim()).find((part) => part.startsWith("bloommd_workspace="));
   return cookie ? decodeURIComponent(cookie.slice("bloommd_workspace=".length)) : null;
 }
+
+const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 function filesystemScope(value: string) {
   return createHash("sha256").update(value).digest("hex").slice(0, 24);
@@ -134,6 +138,12 @@ export async function getMindmapStorage(request: Request, resolvedIdentity?: Api
 
   if (!cloudDisabled && isDatabaseConfigured() && normalizeUuid(userId)) {
     return createDatabaseStorage(userId!, workspaceId);
+  }
+
+  // Agent tokens have rights only in a cloud workspace. Outside the cloud database there is nothing
+  // to check them against, so every route that changes something refuses them here, once.
+  if (isAgentTokenIdentity(identity) && !READ_ONLY_METHODS.has(request.method.toUpperCase())) {
+    throw new RequestSecurityError(`The agent "${identity.agentName}" works only in a cloud workspace, where its rights are enforced.`, 403);
   }
 
   // E2E bypass intentionally uses the repository fixtures. Other local password

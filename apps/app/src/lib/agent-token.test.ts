@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { accessTokenAllows } from "./auth";
 import { getMindmapStorage } from "./mindmap-storage";
 
@@ -94,4 +97,39 @@ describe("agent access tokens", () => {
     const other = request("GET", "/api/mindmaps", { "X-BloomMD-Workspace-ID": "11111111-2222-4333-8444-555555555555" });
     await expect(getMindmapStorage(other, identity)).rejects.toThrow("Workspace not found or access denied.");
   });
+});
+
+describe("agent tokens outside the cloud database", () => {
+  const user = "11111111-1111-4111-8111-111111111111";
+  const agent = { authKind: "access-token" as const, userId: user, tokenId: "22222222-2222-4222-8222-222222222222", agentName: "OpenClaw" };
+  const personal = { authKind: "access-token" as const, userId: user, tokenId: "33333333-3333-4333-8333-333333333333" };
+  const session = { authKind: "session" as const, userId: user };
+
+  const withFilesystem = async (run: () => Promise<void>) => {
+    const dir = mkdtempSync(join(tmpdir(), "bloom-agent-storage-"));
+    const before = process.env.BLOOMMD_DIR;
+    process.env.BLOOMMD_DIR = dir;
+    try {
+      await run();
+    } finally {
+      if (before === undefined) delete process.env.BLOOMMD_DIR;
+      else process.env.BLOOMMD_DIR = before;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  test("every method that changes something is refused with 403 for an agent token, one place for all routes", () =>
+    withFilesystem(async () => {
+      for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
+        await expect(getMindmapStorage(request(method, "/api/mindmaps"), agent)).rejects.toMatchObject({ name: "RequestSecurityError", status: 403 });
+      }
+    }));
+
+  test("reading, personal tokens and sessions are unchanged", () =>
+    withFilesystem(async () => {
+      for (const method of ["GET", "HEAD"]) expect((await getMindmapStorage(request(method, "/api/mindmaps"), agent)).mode).toBe("filesystem");
+      for (const identity of [personal, session]) {
+        for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"]) expect((await getMindmapStorage(request(method, "/api/mindmaps"), identity)).mode).toBe("filesystem");
+      }
+    }));
 });

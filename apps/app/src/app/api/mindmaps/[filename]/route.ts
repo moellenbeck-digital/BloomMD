@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { getApiRequestIdentity } from "../../../../lib/auth";
 import { auditAgentWrite } from "../../../../lib/agent-audit";
 import { agentProposalResponse, logAgentChange } from "../../../../lib/agent-access";
-import { agentGate, agentOutsideCloudResponse, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta, type AgentChangeMeta } from "../../../../lib/agent-gate";
+import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta, type AgentChangeMeta } from "../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, readTextBody, RequestSecurityError } from "../../../../lib/request-security";
 import {
@@ -77,8 +77,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
     const store = await getMindmapStorage(request, identity);
-    const outside = agentOutsideCloudResponse(identity, store.mode);
-    if (outside) return outside;
     const { markdown, expectedVersion, overwrite, agentMeta } = await readJsonBody<{ markdown?: string; expectedVersion?: number; overwrite?: boolean; agentMeta?: unknown }>(request, 11 * 1024 * 1024);
     if (!markdown) return NextResponse.json({ error: "markdown field is required" }, { status: 400 });
     const current = await store.read(filename);
@@ -171,8 +169,6 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
     const store = await getMindmapStorage(request, identity);
-    const outside = agentOutsideCloudResponse(identity, store.mode);
-    if (outside) return outside;
     const { newFilename, agentMeta } = await readJsonBody<{ newFilename?: string; agentMeta?: unknown }>(request, 16 * 1024);
     if (!newFilename) return NextResponse.json({ error: "newFilename field is required" }, { status: 400 });
     const current = await store.read(filename);
@@ -238,8 +234,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     assertSameOriginForIdentity(request, identity);
     const { filename } = await params;
     const store = await getMindmapStorage(request, identity);
-    const outside = agentOutsideCloudResponse(identity, store.mode);
-    if (outside) return outside;
     const current = await store.read(filename);
     if (current.storage?.mode === "database") {
       if (!identity.userId) {

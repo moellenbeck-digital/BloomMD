@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { getApiRequestIdentity } from "../../../lib/auth";
 import { auditAgentWrite } from "../../../lib/agent-audit";
 import { agentProposalResponse, logAgentChange } from "../../../lib/agent-access";
-import { agentGate, agentOutsideCloudResponse, agentReadOnlyResponse, readAgentMeta } from "../../../lib/agent-gate";
+import { agentGate, agentReadOnlyResponse, readAgentMeta } from "../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
 import { createThroughSyncServer, SyncMutationError, type SyncRoomSaveResult } from "../../../lib/sync-room-status";
@@ -75,8 +75,6 @@ export async function POST(request: Request) {
   try {
     assertSameOriginForIdentity(request, identity);
     const store = await getMindmapStorage(request, identity);
-    const outside = agentOutsideCloudResponse(identity, store.mode);
-    if (outside) return outside;
     const { filename, markdown, agentMeta } = await readJsonBody<{ filename?: string; markdown?: string; agentMeta?: unknown }>(request, 11 * 1024 * 1024);
     if (!filename || !markdown) {
       return NextResponse.json({ error: "filename and markdown are required" }, { status: 400 });

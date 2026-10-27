@@ -59,15 +59,6 @@ function denied(gate: AgentGate, message: string, code: string) {
   return NextResponse.json({ error: message, code, area: gate.area, access: gate.access, agent: gate.agentName }, { status: 403 });
 }
 
-/**
- * Agent tokens have rights only in a cloud workspace. Where the storage is not the cloud database
- * (BLOOMMD_STORAGE_MODE=filesystem), no right exists to check, so the change is refused.
- */
-export function agentOutsideCloudResponse(identity: ApiRequestIdentity, storageMode: string) {
-  if (storageMode === "database" || !isAgentTokenIdentity(identity)) return null;
-  return NextResponse.json({ error: `The agent "${identity.agentName}" works only in a cloud workspace, where its rights are enforced.`, code: "AGENT_WORKSPACE_REQUIRED", agent: identity.agentName }, { status: 403 });
-}
-
 /** The agent may only read in this area: the change is refused. */
 export function agentReadOnlyResponse(gate: AgentGate) {
   return denied(gate, `The agent "${gate.agentName}" may only read in "${areaLabel(gate.area)}". Ask the workspace owner to allow proposals or writing there.`, "AGENT_READ_ONLY");

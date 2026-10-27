@@ -106,28 +106,16 @@ describe("POST /api/mindmaps/:filename/nodes", () => {
 
   test("applies node operations to filesystem documents", async () => {
     mode = "filesystem";
-    asOwner = true;
     const response = await call([{ ref: "t", parent: "aufg01", title: "Folien", due: "2026-10-09" }]);
     expect(response.status).toBe(200);
     const body = await response.json() as { ids: { t: string } };
     expect(written?.nodes.get(body.ids.t)?.metadata).toEqual({ kind: "task", due: "2026-10-09" });
   });
 
-  test("an agent token is refused outside the cloud database, whatever its rights say", async () => {
-    mode = "filesystem";
-    const response = await call([{ title: "x" }]);
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ code: "AGENT_WORKSPACE_REQUIRED" });
-    expect(written).toBeNull();
-    expect(changes).toHaveLength(0);
-    expect(proposals).toHaveLength(0);
-  });
-
   test("refuses read-only workspaces, invalid nodes and empty requests", async () => {
     permission = "read";
     expect((await call([{ title: "x" }])).status).toBe(403);
     mode = "filesystem";
-    asOwner = true;
     expect((await call([{ id: "missing", content: "x" }])).status).toBe(400);
     expect((await call([])).status).toBe(400);
     expect((await call([{ title: "x", kind: "evil" }])).status).toBe(400);

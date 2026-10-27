@@ -80,6 +80,14 @@ export class KnowledgeInputError extends Error {
   }
 }
 
+/** An input names a node id that is not in the map (404 on the node route, 400 on the batch route). */
+export class KnowledgeNodeNotFoundError extends KnowledgeInputError {
+  constructor(readonly nodeId: string) {
+    super(`Node "${nodeId}" does not exist in this map.`);
+    this.name = "KnowledgeNodeNotFoundError";
+  }
+}
+
 // Errors the Markdown helpers raise for bad input; they predate `KnowledgeInputError`.
 const INPUT_ERROR_MESSAGE = /does not exist|Unknown node|needs a title|YYYY-MM-DD|used twice|six heading levels|either an id|At most|one non-empty line/;
 
@@ -167,6 +175,31 @@ export function parseKnowledgeNodeInputs(value: unknown, options: { minItems?: n
     assertKnowledgeNodeInput(input);
     return input;
   });
+}
+
+/** Fields a partial node change may set; `id`, `ref` and `parent` belong to the batch operations. */
+export const KNOWLEDGE_NODE_PATCH_FIELDS: readonly string[] = [...NODE_STRING_FIELDS.filter((field) => field !== "id" && field !== "ref" && field !== "parent"), "relations", "children"];
+const NODE_PATCH_FIELDS = new Set<string>(KNOWLEDGE_NODE_PATCH_FIELDS);
+
+/**
+ * A partial change of one existing node as node operations: the node itself (`id` = `nodeId`, only
+ * the fields given) followed by new children. `applyKnowledgeNodes` appends them at the end of the
+ * node, unless a child names another `parent` (a `ref` of an earlier child). Everything goes through
+ * `parseKnowledgeNodeInputs`, so the rules are those of the batch route. Throws `KnowledgeInputError`.
+ */
+export function parseKnowledgeNodePatch(value: unknown, nodeId: string): KnowledgeNodeInput[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new KnowledgeInputError("The node change must be an object.");
+  const { children, ...fields } = value as Record<string, unknown>;
+  const unknown = Object.keys(fields).find((key) => !NODE_PATCH_FIELDS.has(key));
+  if (unknown) throw new KnowledgeInputError(`The node change has an unknown field "${unknown}".`);
+  if (children !== undefined && !Array.isArray(children)) throw new KnowledgeInputError("children must be an array of new nodes.");
+  const newChildren: unknown[] = children ?? [];
+  newChildren.forEach((child, index) => {
+    if (child && typeof child === "object" && !Array.isArray(child) && "id" in child) throw new KnowledgeInputError(`children[${index}] must be a new node without an id.`);
+  });
+  if (Object.keys(fields).length === 0 && newChildren.length === 0) throw new KnowledgeInputError("Give at least one field to change or children to add.");
+  const [self, ...created] = parseKnowledgeNodeInputs([{ ...fields, id: nodeId }, ...newChildren]);
+  return [self!, ...created.map((child) => ({ ...child, parent: child.parent ?? nodeId }))];
 }
 
 /** Stable short fingerprint of a document, used as an optimistic version (shared with the agent ledger). */
@@ -284,7 +317,7 @@ export function applyKnowledgeNodes(markdown: string, inputs: KnowledgeNodeInput
     let id: string;
     if (input.id) {
       id = ids[input.id] ?? input.id;
-      if (!findHeading(parseHeadingTree(next), id)) throw new Error(`Node "${input.id}" does not exist in this map.`);
+      if (!findHeading(parseHeadingTree(next), id)) throw new KnowledgeNodeNotFoundError(input.id);
       if (input.title?.trim()) next = renameHeading(next, id, input.title);
       updated.push(id);
     } else {

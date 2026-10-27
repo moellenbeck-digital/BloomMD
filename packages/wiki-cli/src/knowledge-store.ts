@@ -59,6 +59,11 @@ export interface KnowledgeStore {
    * while people edit the map). Without it, the service rewrites the Markdown and calls `write`.
    */
   applyNodes?(path: string, nodes: KnowledgeNodeInput[], meta?: KnowledgeWriteMeta): Promise<{ ids: Record<string, string>; created: string[]; updated: string[]; version: string; proposalId?: string; changeId?: string }>;
+  /**
+   * One partial node change applied by the store itself (cloud: `PATCH …/nodes/:nodeId`, merged into the
+   * live document). Without it, the service rewrites the Markdown and calls `write`.
+   */
+  patchNode?(path: string, nodeId: string, patch: Record<string, unknown>, meta?: KnowledgeWriteMeta): Promise<{ ids: Record<string, string>; created: string[]; updated: string[]; version: string; proposalId?: string; changeId?: string }>;
   /** A read-only link for people without an account (cloud only). */
   shareLink?(path: string, expiresInDays: number): Promise<{ url: string; expiresAt: string }>;
 }
@@ -316,6 +321,13 @@ export class CloudKnowledgeStore implements KnowledgeStore {
     const response = await this.request(`/api/mindmaps/${encodeURIComponent(path)}/nodes`, { method: "POST", body: JSON.stringify({ nodes, ...(Object.keys(meta).length > 0 ? { agentMeta: meta } : {}) }) });
     const body = (await response.json().catch(() => ({}))) as { ids?: Record<string, string>; created?: string[]; updated?: string[]; version?: number | null; error?: string; mode?: string; proposalId?: string; changeId?: string };
     if (!response.ok) throw new Error(body.error ?? `BloomMD cloud could not update ${path} (${response.status}).`);
+    return { ids: body.ids ?? {}, created: body.created ?? [], updated: body.updated ?? [], version: String(body.version ?? ""), ...(body.proposalId ? { proposalId: body.proposalId } : {}), ...(body.changeId ? { changeId: body.changeId } : {}) };
+  }
+
+  async patchNode(path: string, nodeId: string, patch: Record<string, unknown>, meta: KnowledgeWriteMeta = {}) {
+    const response = await this.request(`/api/mindmaps/${encodeURIComponent(path)}/nodes/${encodeURIComponent(nodeId)}`, { method: "PATCH", body: JSON.stringify({ ...patch, ...(Object.keys(meta).length > 0 ? { agentMeta: meta } : {}) }) });
+    const body = (await response.json().catch(() => ({}))) as { ids?: Record<string, string>; created?: string[]; updated?: string[]; version?: number | null; error?: string; mode?: string; proposalId?: string; changeId?: string };
+    if (!response.ok) throw new Error(body.error ?? `BloomMD cloud could not change node ${nodeId} of ${path} (${response.status}).`);
     return { ids: body.ids ?? {}, created: body.created ?? [], updated: body.updated ?? [], version: String(body.version ?? ""), ...(body.proposalId ? { proposalId: body.proposalId } : {}), ...(body.changeId ? { changeId: body.changeId } : {}) };
   }
 

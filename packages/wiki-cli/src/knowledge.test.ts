@@ -393,6 +393,13 @@ function fakeCloud(options: { tokens?: Array<{ tokenId: string; agentName: strin
     if (path === "/api/mindmaps/agent-access/rights") return Response.json({ agent: "OpenClaw", unrestricted: false, rights: { access: "propose", areas: { "Learnings/dev-team": "write", Learnings: "read" } } });
     if (path === "/api/mindmaps/agent-access/changes") return Response.json({ changes: [{ id: "c1", tokenId: "t1", agentName: "OpenClaw", event: "written", origin: "agent", tool: "bloommd_update_map", filename: "Arbeit – Plan.md", area: "Arbeit", proposalId: null, summary: "1 node(s) created", reason: null, source: null, reviewerName: null, undoable: true, undoneAt: null, createdAt: "2026-10-27T08:00:00Z" }] });
     if (path === "/api/mindmaps/agent-access/undo") return Response.json({ undone: body?.changeId, path: "Arbeit – Plan.md" });
+    const patched = method === "PATCH" ? path.match(/^\/api\/mindmaps\/Arbeit – Plan\.md\/nodes\/(.+)$/)?.[1] : undefined;
+    if (patched === "nope") return Response.json({ error: 'Node "nope" does not exist in this map.', code: "NODE_NOT_FOUND" }, { status: 404 });
+    if (patched) {
+      return state.mode === "proposed"
+        ? Response.json({ mode: "proposed", proposalId: "p2", filename: "Arbeit – Plan.md", area: "Arbeit" }, { status: 202 })
+        : Response.json({ ids: { [patched]: patched }, created: [], updated: [patched], version: 6, mode: "written", changeId: "c-node" });
+    }
     if (path === "/api/mindmaps/Arbeit – Plan.md/nodes") {
       return state.mode === "proposed"
         ? Response.json({ mode: "proposed", proposalId: "p1", filename: "Arbeit – Plan.md", area: "Arbeit" }, { status: 202 })
@@ -998,6 +1005,143 @@ describe("stale maps", () => {
     expect(lines[0]).toBe("NO_REPLY");
     expect(lines[1]).toContain("Läuft in den nächsten 7 Tagen ab");
     expect(lines[1]).toContain("Alt-Learning");
+  });
+});
+
+describe("changing one node (bloommd_update_node)", () => {
+  const patch = { status: "done", children: [{ ref: "k", title: "Folgeaufgabe", status: "open" }] };
+  async function thermo(service: KnowledgeService) {
+    const map = await service.getMap("Schule/Physik.md");
+    return { map, node: map.nodes.find((node) => node.title === "Thermodynamik")! };
+  }
+  async function cloudService(fake: ReturnType<typeof fakeCloud>) {
+    const stateDir = await mkdtemp(join(tmpdir(), "bloommd-cloud-"));
+    return new KnowledgeService(new CloudKnowledgeStore({ url: "https://app.example", token: "bloom_pat_x", workspaceId: "ws1", stateDir, fetch: fake.fetcher }), "OpenClaw");
+  }
+
+  test("a vault map changes only the named fields, appends children last, logs the change and can be undone", async () => {
+    const { root, service } = await vault();
+    const { map, node } = await thermo(service);
+    const result = await service.updateNode({ path: map.path, nodeId: node.id, version: map.version, patch: { ...patch, content: "Zweiter Satz.", contentMode: "append" }, reason: "Stunde", source: "Mitschrift" });
+    // A note without stored ids is outlined with heading-<line> ids; the change stores real ones.
+    const id = result.ids[node.id]!;
+    expect(result).toMatchObject({ mode: "written", updated: [id], created: [expect.any(String)] });
+    const after = parseFile("Physik.md", await readFile(join(root, "Schule/Physik.md"), "utf8"));
+    const changed = after.nodes.get(id)!;
+    expect(changed.title).toBe("Thermodynamik");
+    expect(changed.content.trim()).toBe("Wärme und Arbeit.\n\nZweiter Satz.");
+    expect(changed.metadata).toEqual({ kind: "task", status: "done" });
+    expect(changed.children.map((id) => after.nodes.get(id)!.title)).toEqual(["Folgeaufgabe"]);
+    expect((await service.changes()).changes[0]).toMatchObject({ event: "written", tool: "bloommd_update_node", path: "Schule/Physik.md", reason: "Stunde", source: "Mitschrift", changeId: result.changeId });
+    await service.undo(result.changeId!);
+    const undone = parseFile("Physik.md", await readFile(join(root, "Schule/Physik.md"), "utf8"));
+    expect([...undone.nodes.values()].map((entry) => entry.title)).toEqual(["Physik", "Thermodynamik"]);
+    expect([...undone.nodes.values()].every((entry) => entry.metadata === undefined)).toBe(true);
+  });
+
+  test("rights decide like for bloommd_update_map: propose keeps a proposal, read refuses, nothing is written", async () => {
+    const { root, service } = await vault("write", { Schule: "propose" });
+    const { map, node } = await thermo(service);
+    const before = await readFile(join(root, "Schule/Physik.md"), "utf8");
+    const proposed = await service.updateNode({ path: map.path, nodeId: node.id, patch });
+    expect(proposed).toMatchObject({ mode: "proposed", proposalId: expect.any(String) });
+    expect(await readFile(join(root, "Schule/Physik.md"), "utf8")).toBe(before);
+    const [proposal] = await service.proposals();
+    expect(proposal).toMatchObject({ tool: "bloommd_update_node", path: "Schule/Physik.md" });
+    expect(proposal!.markdown).toContain("Folgeaufgabe");
+    const readOnly = await vault("read");
+    const target = await thermo(readOnly.service);
+    await expect(readOnly.service.updateNode({ path: target.map.path, nodeId: target.node.id, patch })).rejects.toThrow(/may only read/);
+  });
+
+  test("an unknown node, a stale version and invalid fields change nothing", async () => {
+    const { root, service } = await vault();
+    const { map, node } = await thermo(service);
+    const before = await readFile(join(root, "Schule/Physik.md"), "utf8");
+    await expect(service.updateNode({ path: map.path, nodeId: "fehlt", patch })).rejects.toThrow(/does not exist/);
+    await expect(service.updateNode({ path: map.path, nodeId: node.id, version: "alt", patch })).rejects.toThrow(/changed since version/);
+    for (const bad of [{}, { id: "x" }, { parent: "y", status: "done" }, { status: "kaputt" }, { children: [{ id: node.id }] }, { content: "# Kopf" }]) {
+      await expect(service.updateNode({ path: map.path, nodeId: node.id, patch: bad })).rejects.toThrow();
+    }
+    expect(await readFile(join(root, "Schule/Physik.md"), "utf8")).toBe(before);
+    expect((await service.changes()).changes).toEqual([]);
+  });
+
+  test("a cloud workspace uses PATCH …/nodes/:nodeId with the agent's words, never a whole-document save", async () => {
+    const fake = fakeCloud();
+    const service = await cloudService(fake);
+    const proposed = await service.updateNode({ path: "Arbeit – Plan.md", nodeId: "ziel01", patch, reason: "Meeting", source: "Teams" });
+    expect(proposed).toMatchObject({ mode: "proposed", proposalId: "p2", path: "Arbeit – Plan.md" });
+    const sent = fake.calls.find((call) => call.method === "PATCH")!;
+    expect(sent).toMatchObject({ path: "/api/mindmaps/Arbeit – Plan.md/nodes/ziel01", workspace: "ws1", auth: "Bearer bloom_pat_x", body: { status: "done", children: [{ ref: "k", title: "Folgeaufgabe", status: "open" }], agentMeta: { tool: "bloommd_update_node", reason: "Meeting", source: "Teams" } } });
+    fake.state.mode = "written";
+    expect(await service.updateNode({ path: "Arbeit – Plan.md", nodeId: "ziel01", patch: { status: "done" } })).toMatchObject({ mode: "written", changeId: "c-node", version: "6", updated: ["ziel01"] });
+    expect(fake.calls.filter((call) => call.method === "PUT" || (call.method === "POST" && call.path.endsWith("/nodes")))).toEqual([]);
+  });
+
+  test("a cloud refusal reaches the agent as the server words it; an unknown node and bad input never leave the machine", async () => {
+    const fake = fakeCloud();
+    const service = await cloudService(fake);
+    await expect(service.updateNode({ path: "Arbeit – Plan.md", nodeId: "nope", patch })).rejects.toThrow(/does not exist/);
+    await expect(service.updateNode({ path: "Arbeit – Plan.md", nodeId: "ziel01", patch: { status: "kaputt" } })).rejects.toThrow(/status must be one of/);
+    expect(fake.calls.some((call) => call.method === "PATCH")).toBe(false);
+    fake.state.denyWith = { error: 'The agent "OpenClaw" may only read in "Arbeit". Ask the workspace owner to allow proposals or writing there.', code: "AGENT_READ_ONLY" };
+    await expect(service.updateNode({ path: "Arbeit – Plan.md", nodeId: "ziel01", patch })).rejects.toThrow(/may only read in "Arbeit"/);
+  });
+
+  test("the MCP tool takes the same fields, has no owner tools next to it and refuses invalid input", async () => {
+    const { root, service } = await vault();
+    const options = knowledgeServerOptions({ vault: service }, "test");
+    const tool = options.tools.find((entry) => entry.name === "bloommd_update_node")!;
+    const schema = tool.inputSchema as { required: string[]; properties: Record<string, unknown> };
+    const fields = Object.keys(schema.properties);
+    expect(schema.required).toEqual(["path", "nodeId"]);
+    expect(fields).toEqual(expect.arrayContaining(["path", "nodeId", "version", "title", "content", "contentMode", "kind", "status", "decision", "due", "assignee", "note", "citation", "url", "relations", "children", "reason", "source", "target"]));
+    for (const batchOnly of ["id", "ref", "parent"]) expect(fields).not.toContain(batchOnly);
+    expect(tool.annotations?.readOnlyHint).toBe(false);
+    // Rights, approval and the owner's undo stay with people.
+    expect(options.tools.map((entry) => entry.name).filter((name) => /approve|apply|reject|rights|setup|owner|migrate/.test(name))).toEqual([]);
+    const { node } = await thermo(service);
+    const result = await options.call("bloommd_update_node", { path: "Schule/Physik.md", nodeId: node.id, status: "in_progress", children: [{ title: "Neu" }], reason: "Test" }) as { mode: string; updated: string[] };
+    const id = (result as unknown as { ids: Record<string, string> }).ids[node.id]!;
+    expect(result).toMatchObject({ mode: "written", updated: [id] });
+    expect(parseFile("Physik.md", await readFile(join(root, "Schule/Physik.md"), "utf8")).nodes.get(id)?.metadata?.status).toBe("in_progress");
+    await expect(options.call("bloommd_update_node", { path: "Schule/Physik.md", nodeId: id })).rejects.toThrow(/at least one field/);
+    await expect(options.call("bloommd_update_node", { path: "Schule/Physik.md", nodeId: "fehlt", status: "done" })).rejects.toThrow(/does not exist/);
+    await expect(options.call("bloommd_update_node", { path: "Schule/Physik.md", nodeId: id, status: "kaputt" })).rejects.toThrow(/status must be one of/);
+  });
+
+  test("the CLI changes a node in a vault and, with --cloud, through the server route", async () => {
+    const { root, service } = await vault();
+    const { node } = await thermo(service);
+    const original = { log: console.log, token: process.env.BLOOMMD_TOKEN, fetch: globalThis.fetch, home: process.env.HOME };
+    const out: string[] = [];
+    console.log = (...values: unknown[]) => void out.push(values.join(" "));
+    try {
+      expect(await runAgentCli(["update-node", root, "Schule/Physik.md", node.id, "--patch", JSON.stringify({ assignee: "Lea", children: [{ title: "Aus der CLI" }] }), "--reason", "Test"], "test")).toBe(0);
+      const cli = JSON.parse(out.at(-1)!) as { mode: string; updated: string[]; ids: Record<string, string> };
+      expect(cli).toMatchObject({ mode: "written", updated: [cli.ids[node.id]] });
+      const doc = parseFile("Physik.md", await readFile(join(root, "Schule/Physik.md"), "utf8"));
+      expect(doc.nodes.get(cli.ids[node.id]!)?.metadata).toEqual({ kind: "task", assignee: "Lea" });
+      expect((await service.changes()).changes[0]).toMatchObject({ tool: "bloommd_update_node", reason: "Test" });
+      await expect(runAgentCli(["update-node", root, "Schule/Physik.md", node.id], "test")).rejects.toThrow(/--patch/);
+      await expect(runAgentCli(["update-node", root, "Schule/Physik.md", node.id, "--patch", "{kaputt"], "test")).rejects.toThrow(/kein gültiges JSON/);
+      await expect(runAgentCli(["update-node", root, "Schule/Physik.md"], "test")).rejects.toThrow(/knoten-id/);
+
+      const fake = fakeCloud();
+      fake.state.mode = "written";
+      globalThis.fetch = fake.fetcher;
+      process.env.BLOOMMD_TOKEN = "bloom_pat_agent";
+      process.env.HOME = await mkdtemp(join(tmpdir(), "bloommd-home-"));
+      expect(await runAgentCli(["update-node", "--cloud", "https://app.example", "--workspace", "ws1", "Arbeit – Plan.md", "ziel01", "--patch", JSON.stringify({ status: "done" }), "--source", "Teams"], "test")).toBe(0);
+      expect(JSON.parse(out.at(-1)!)).toMatchObject({ mode: "written", changeId: "c-node" });
+      expect(fake.calls.find((call) => call.method === "PATCH")).toMatchObject({ path: "/api/mindmaps/Arbeit – Plan.md/nodes/ziel01", auth: "Bearer bloom_pat_agent", workspace: "ws1", body: { status: "done", agentMeta: { tool: "bloommd_update_node", source: "Teams" } } });
+    } finally {
+      console.log = original.log;
+      globalThis.fetch = original.fetch;
+      if (original.token === undefined) delete process.env.BLOOMMD_TOKEN; else process.env.BLOOMMD_TOKEN = original.token;
+      if (original.home === undefined) delete process.env.HOME; else process.env.HOME = original.home;
+    }
   });
 });
 

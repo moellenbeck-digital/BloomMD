@@ -92,6 +92,10 @@
       "import": "./src/wiki-search.ts",
       "types": "./src/wiki-search.ts"
     },
+    "./wiki-proposals": {
+      "import": "./src/wiki-proposals.ts",
+      "types": "./src/wiki-proposals.ts"
+    },
     "./frontmatter": {
       "import": "./src/frontmatter.ts",
       "types": "./src/frontmatter.ts"

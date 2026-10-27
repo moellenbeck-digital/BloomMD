@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, normalizeWorkspaceName, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
+import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, migrateMarketSchema, normalizeWorkspaceName, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { SqlClient } from "./sql-client";
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
@@ -433,5 +435,22 @@ describe("agent token rights, proposals and log", () => {
     expect(await revokeAccessToken(userId, tokenId)).toBe(true);
     expect(await resolveAccessToken(token)).toBeNull();
     expect(lookups).toBe(2);
+  });
+
+  test("the migration file and the schema db:migrate applies create the same agent token tables", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/009_agent_token_rights.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(7);
+    // A semicolon inside an SQL comment once broke the inline copy; every statement must match exactly.
+    for (const statement of expected) expect(statements).toContain(statement);
   });
 });

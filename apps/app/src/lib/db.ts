@@ -747,7 +747,18 @@ async function createMarketSchema() {
       check (default_access in ('read', 'propose', 'write'))
     )
   `;
-  await sql`the longest matching area wins. create table if not exists bloom_agent_token_area_rights ( access_token_id uuid not null references bloom_access_tokens(id) on delete cascade, workspace_id uuid not null references bloom_workspaces(id) on delete cascade, area_key text not null, area text not null, access text not null, primary key (access_token_id, workspace_id, area_key), check (access in ('read', 'propose', 'write')), check (length(area) between 1 and 200) )`;
+  await sql`
+    create table if not exists bloom_agent_token_area_rights (
+      access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      area_key text not null,
+      area text not null,
+      access text not null,
+      primary key (access_token_id, workspace_id, area_key),
+      check (access in ('read', 'propose', 'write')),
+      check (length(area) between 1 and 200)
+    )
+  `;
   await sql`
     create table if not exists bloom_agent_token_proposals (
       id uuid primary key default gen_random_uuid(),
@@ -757,8 +768,20 @@ async function createMarketSchema() {
       tool text not null,
       filename text not null,
       area text not null default '',
+      base_version bigint,
+      proposed_markdown text not null,
+      summary text not null default '',
+      reason text,
+      source text,
+      status text not null default 'pending',
+      reviewed_by uuid references bloom_users(id) on delete set null,
+      reviewer_name text,
+      reviewed_at timestamptz,
+      review_reason text,
+      created_at timestamptz not null default now(),
+      check (status in ('pending', 'approved', 'rejected', 'stale'))
+    )
   `;
-  await sql`null: the map did not exist yet. base_version bigint, proposed_markdown text not null, summary text not null default '', reason text, source text, status text not null default 'pending', reviewed_by uuid references bloom_users(id) on delete set null, reviewer_name text, reviewed_at timestamptz, review_reason text, created_at timestamptz not null default now(), check (status in ('pending', 'approved', 'rejected', 'stale')) )`;
   await sql`create index if not exists bloom_agent_token_proposals_workspace_idx on bloom_agent_token_proposals(workspace_id, status, created_at desc)`;
   await sql`
     create table if not exists bloom_agent_token_changes (

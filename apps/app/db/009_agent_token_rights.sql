@@ -12,7 +12,7 @@ create table if not exists bloom_agent_token_rights (
   check (default_access in ('read', 'propose', 'write'))
 );
 
--- Rights per area ("Learnings" or "Learnings/dev-team"); the longest matching area wins.
+-- Rights per area ("Learnings" or "Learnings/dev-team"), the longest matching area wins.
 create table if not exists bloom_agent_token_area_rights (
   access_token_id uuid not null references bloom_access_tokens(id) on delete cascade,
   workspace_id uuid not null references bloom_workspaces(id) on delete cascade,

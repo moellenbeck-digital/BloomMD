@@ -34,6 +34,7 @@ import { readWorkspace } from "./workspace";
 import { formatFindings, formatGithub, formatJson, plural } from "./report";
 import { forwardToRunningDesktop } from "./desktop-handoff";
 import { AGENT_USAGE, AgentUsageError, runAgentCli } from "./agent-cli";
+import { isLearningCommand } from "./agent-learnings";
 import { runMcpServer } from "./mcp";
 export const WIKI_VERSION = "0.4.4";
 
@@ -435,7 +436,9 @@ export async function runWikiCommand(args: string[]): Promise<number> {
 }
 
 export async function runWikiCli(argv: string[]): Promise<number> {
-  if (argv.includes("-h") || argv.includes("--help") || argv.length === 0) {
+  // `agent search|read|create|append|stale --help` is the help of that command, not the general one.
+  const commandHelp = argv[0] === "agent" && isLearningCommand(argv[1]);
+  if (!commandHelp && (argv.includes("-h") || argv.includes("--help") || argv.length === 0)) {
     console.log(WIKI_USAGE);
     return 0;
   }

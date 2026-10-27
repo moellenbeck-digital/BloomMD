@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import type { KnowledgeAccess } from "@bloommd/core/knowledge";
 import { strictAccessConfig } from "@bloommd/core/agent-ledger";
 import { CloudAgentError, type CloudAgentToken } from "./cloud-agent";
+import { isLearningCommand, LEARNING_USAGE, LearningCliError, runLearningCommand, type LearningDeps } from "./agent-learnings";
 import { announceLegacyCloudState, describeRights, readLegacyCloudState, readMigrationMarker, takeOverRights, writeMigrationMarker } from "./cloud-migration";
 import { knowledgeServerOptions, type KnowledgeTargets } from "./knowledge-mcp";
 import { KnowledgeService } from "./knowledge-service";
@@ -50,7 +51,9 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   übernommen.
   update-node mit --cloud ruft PATCH /api/mindmaps/<map>/nodes/<id> auf: mit einem Agent-Token gelten
   dessen Rechte (Vorschlag oder direkt, im Protokoll mit Agent und Quelle), mit dem Besitzer-Token
-  schreibt es wie der Besitzer.`;
+  schreibt es wie der Besitzer.
+
+${LEARNING_USAGE}`;
 
 export class AgentUsageError extends Error {}
 
@@ -144,9 +147,26 @@ export function parseAccessConfig(args: string[]): AgentAccessConfig {
   return { access: access as KnowledgeAccess, areas };
 }
 
+/** Where the learning commands (`search`, `read`, `create`, `append`, `stale --json`) get their service and stdin. */
+export const learningDeps: LearningDeps = {
+  async open({ vault, cloud, workspace, name }) {
+    if (vault) return vaultService(vault, name);
+    const token = process.env.BLOOMMD_TOKEN?.trim();
+    if (!token) throw new LearningCliError(2, "--cloud braucht ein Zugriffstoken in BLOOMMD_TOKEN (nie als Argument).");
+    const service = cloudService(cloud!, workspace, token, name);
+    await announceLegacy(["--cloud", cloud!, ...(workspace ? ["--workspace", workspace] : [])], service);
+    return service;
+  },
+  stdin: () => readFileSync(0, "utf8"),
+};
+
 export async function runAgentCli(args: string[], version: string): Promise<number> {
   const [command, ...rest] = args;
   const params = positional(rest);
+  // `agent stale <ordner>` stays the plain-text routine; with --vault or --json (and for --help) it is the JSON command.
+  if (isLearningCommand(command) && (command !== "stale" || rest.some((arg) => arg === "--vault" || arg === "--json" || arg === "--help" || arg === "-h"))) {
+    return runLearningCommand(command!, rest, learningDeps);
+  }
   switch (command) {
     case "mcp": {
       const name = flag(rest, "--name") ?? "Agent";

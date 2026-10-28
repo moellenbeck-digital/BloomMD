@@ -104,7 +104,8 @@ export function safeVaultPath(input: string): string {
   return parts.join("/");
 }
 
-function safeSegment(value: string): string {
+/** A title as a file or folder name (the name a vault map gets for it). */
+export function safeSegment(value: string): string {
   return sanitizeMarkdownFilename(`${value}.md`).replace(/\.md$/i, "").replace(/[\\/]/g, "-").replace(/[.\s]+$/, "").trim();
 }
 

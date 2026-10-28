@@ -4,7 +4,7 @@
  */
 import { KNOWLEDGE_NODE_PATCH_FIELDS, KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { McpTextResult, type McpServerOptions, type McpTool } from "./mcp";
-import type { KnowledgeService } from "./knowledge-service";
+import { INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, parseIngestNodes, type KnowledgeService } from "./knowledge-service";
 
 export type KnowledgeTargets = Partial<Record<"vault" | "cloud", KnowledgeService>>;
 
@@ -150,6 +150,28 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     },
   },
   {
+    name: "bloommd_ingest",
+    title: "Text ablegen",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    description: `File raw text (transcript, chat, note) as a new map from a template. You hand over the original text AND the sections you already structured; the tool invents nothing and calls no model. The original is stored word for word (no shortening, no normalising) as a node of kind source titled "Originaltext" below "Quellen" (added when the template has none, e.g. weekly), with the source reference (citation, and url for http(s)) and date. nodes use the format of bloommd_create_map; parents are skeleton refs of the template (bloommd_templates). Limits: text at most ${INGEST_MAX_TEXT_CHARS} characters, nodes at most ${INGEST_MAX_NODES} (template skeleton and source node not counted); above that, with no text or no source, or with an unknown template, nothing is written and the error names the limit. A map with the same title (ignoring case and punctuation) in the same area is a duplicate: nothing is written, the error names the existing map. Rights like bloommd_create_map: read is refused, propose becomes a proposal for the owner (never approve it yourself), write is written; logged, undo with bloommd_undo. Use template learning's own flow (bloommd_create_map) for learnings, not this tool. Never file credentials (passwords, tokens, keys) or personal data: the tool does not filter them.`,
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        template: { type: "string", enum: [...INGEST_TEMPLATE_IDS], description: "Template id; its skeleton refs are the parents of your nodes." },
+        title: { type: "string" },
+        text: { type: "string", description: `The original text, unchanged (at most ${INGEST_MAX_TEXT_CHARS} characters).` },
+        source: { type: "string", description: "Where the original comes from: file path, URL or ticket. Required." },
+        sourceDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date of the source, YYYY-MM-DD." },
+        area: { type: "string", description: "Area/folder; default: the area of the template (e.g. Arbeit)." },
+        nodes: { type: "array", items: nodeSchema, description: `Your structured sections (at most ${INGEST_MAX_NODES}); the ref "originaltext" is reserved.` },
+        reason: changeMeta.reason,
+        ...targetProperty,
+      },
+      required: ["template", "title", "text", "source"],
+    },
+  },
+  {
     name: "bloommd_update_map",
     title: "Map ergänzen",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -256,6 +278,7 @@ export const KNOWLEDGE_INSTRUCTIONS = [
   "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent (several nodes at once) or bloommd_update_node to change one node (status, content, relations) and/or add children below it. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",
+  "5. Raw text (transcript, chat, note): structure it yourself, then bloommd_ingest files it as a map from a template with the original word for word as the source node; never put credentials or personal data in it.",
   "If a change comes back as 'proposed', the owner reviews it; tell them. Never try to approve proposals yourself.",
   "Reading: bloommd_get_node returns one node (parent, child ids, relations, map version); bloommd_backlinks lists the maps and nodes that link to a map or note; bloommd_changes with since lists your changes from a date or time on.",
   "Trust fields (status, stale_after, verified, scope, replaced_by) can be set with bloommd_create_map and bloommd_update_map; verified appends. bloommd_stale lists maps that are expired or about to expire, so they can be re-checked, renewed or retired.",
@@ -320,6 +343,16 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           tags: Array.isArray(args.tags) ? args.tags.filter((tag): tag is string => typeof tag === "string") : undefined,
           frontmatter: parseKnowledgeFrontmatterInput(args),
           ...meta,
+        });
+        case "bloommd_ingest": return service.ingest({
+          template: string(args, "template", true)!,
+          title: string(args, "title", true)!,
+          text: string(args, "text", true)!,
+          sourceRef: string(args, "source", true)!,
+          sourceDate: string(args, "sourceDate"),
+          area: string(args, "area"),
+          nodes: parseIngestNodes(args.nodes),
+          reason: meta.reason,
         });
         case "bloommd_update_map": {
           const trust = parseKnowledgeFrontmatterInput(args);

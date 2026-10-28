@@ -1,15 +1,17 @@
 /**
  * `bloommd-wiki agent search|read|create|append|stale`: the learnings of a vault or cloud workspace as
  * single commands with JSON on stdout, for scripts and for the adapter `wissen/bloommd` in `md-agents`.
+ * `agent ingest` files raw text (transcript, chat, note) as a map from a template the same way.
  *
  * Everything runs through `KnowledgeService`, so the rights of the agent (read, propose, write per area),
  * the change log, undo and the proposal review are exactly those of the MCP tools. There is no approve:
  * a proposal is applied by a person with `agent approve`.
  *
  * stdout carries one JSON document (`--help` aside); errors are `{"fehler": …}` on stdout and a message on
- * stderr. Exit codes: 0 ok, 1 error, 2 wrong call, 3 duplicate, 4 write limit of the ticket reached.
+ * stderr. Exit codes: 0 ok, 1 error, 2 wrong call or refused input, 3 duplicate, 4 write limit of the ticket
+ * reached (create and append only).
  */
-import { mkdir, open, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { areaCovers, cloudAreaOf, vaultAreaPath } from "@bloommd/core/agent-ledger";
 import { parseFrontmatter } from "@bloommd/core/frontmatter";
@@ -23,7 +25,7 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { addDays, LEARNING_STALE_AFTER_DAYS } from "@bloommd/core/knowledge-templates";
-import type { CommitResult, KnowledgeService } from "./knowledge-service";
+import { IngestDuplicateError, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, normalizeKnowledgeTitle, parseIngestNodes, type CommitResult, type KnowledgeService } from "./knowledge-service";
 import { safeVaultPath } from "./knowledge-store";
 
 export const EXIT = { ok: 0, error: 1, usage: 2, duplicate: 3, limit: 4 } as const;
@@ -140,6 +142,34 @@ Ausgabe: {"ok":true,"pfad","modus":"geschrieben"|"vorgeschlagen",…}`,
     values: ["--ticket", "--inhalt", "--abschnitt", "--titel", "--beleg", ...TARGET_FLAGS],
     positional: { min: 1, max: 1 },
   },
+  ingest: {
+    usage: "agent ingest --vorlage <id> --titel <t> --text <datei|-> --quelle <verweis> [--quelle-datum <YYYY-MM-DD>] [--abschnitte <datei|->] [--bereich <b>] --name <agent> (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    help: `Legt aus Rohtext (Transkript, Chat, Notiz) und den vom Agenten schon gegliederten Abschnitten eine Map nach
+Vorlage an. Das Werkzeug erfindet nichts und ruft kein Modell auf; die Gliederung liefert der Aufrufer.
+  --vorlage <id>     ${INGEST_TEMPLATE_IDS.join(", ")} (learning nicht: dafür agent create)
+  --titel <t>        Titel der Map
+  --text <datei|->   Originaltext aus Datei oder stdin ("-"). Er steht wörtlich (ohne Kürzung und Normalisierung)
+                     als Knoten "Originaltext" (kind: source) unter „Quellen“; hat die Vorlage keinen
+                     „Quellen“-Knoten (weekly), wird er angelegt
+  --quelle <verweis> Pflicht: woher der Text stammt (Pfad, URL oder Ticket); eine http(s)-URL wird auch url des Knotens
+  --quelle-datum <d> Datum der Quelle (YYYY-MM-DD); Verweis und Datum stehen in citation und in source der Map
+  --abschnitte <datei|->  JSON-Array von Knoten im Format von bloommd_create_map nodes ({ref,parent,title,content,kind,
+                     status,decision,due,assignee,note,citation,url,relations}); parent ist ein Skelett-Ref der
+                     Vorlage (z. B. themen, aufgaben) oder ein ref aus der Liste; "-" liest stdin
+  --bereich <b>      Bereich/Ordner (Standard: der Bereich der Vorlage, z. B. Arbeit)
+${TARGET_HELP}
+Nur ein Eingang (--text, --abschnitte) darf stdin ("-") sein.
+Grenzen: Originaltext höchstens ${INGEST_MAX_TEXT_CHARS} Zeichen, Abschnitte höchstens ${INGEST_MAX_NODES} Knoten (ohne Vorlagen-Skelett und
+Quellen-Knoten); darüber, bei fehlendem Text oder fehlender Quelle und bei unbekannter Vorlage: Exitcode 2, nichts wird geschrieben.
+Gibt es im Zielbereich schon eine Map mit gleichem Titel (Groß-/Kleinschreibung und Satzzeichen zählen nicht), wird nichts
+angelegt: Exitcode 3 und {"fehler","duplicate":true,"pfad"}. Es gibt kein --force. Gleicher Titel in anderem Bereich ist kein Duplikat.
+Rechte wie bei agent mcp: read lehnt ab, propose legt einen Vorschlag an (nur ein Mensch gibt ihn frei: agent approve), write schreibt;
+die Änderung steht im Protokoll (agent log) und lässt sich mit agent undo zurücknehmen.
+Keine Zugangsdaten und keine Personendaten in Text oder Abschnitte (Passwörter, Tokens, private Angaben): das Werkzeug filtert nichts.
+Ausgabe: {"ok":true,"pfad","bereich","vorlage","modus":"geschrieben"|"vorgeschlagen","quellknoten","zeichen","abschnitte",…}`,
+    values: ["--vorlage", "--titel", "--text", "--quelle", "--quelle-datum", "--abschnitte", "--bereich", ...TARGET_FLAGS],
+    positional: { min: 0, max: 0 },
+  },
   stale: {
     usage: "agent stale [--days <n>] [--json] (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Zeigt Learnings mit abgelaufenem stale_after (mit --days auch die der nächsten n Tage) als JSON.
@@ -159,7 +189,7 @@ export const LEARNING_USAGE = `Learnings als Einzelbefehle (JSON auf stdout; Gru
 ${Object.values(COMMANDS).map((spec) => `  ${spec.usage}`).join("\n")}
   Alle Befehle: --vault <ordner> oder --cloud <url> [--workspace <id>] (Token in BLOOMMD_TOKEN), dazu --name <agent>.
   create und append brauchen --ticket <id> (höchstens ${WRITE_LIMIT_PER_TICKET} Schreibvorgänge je Ticket). Exitcodes: 0 ok, 1 Fehler,
-  2 Aufruf, 3 Duplikat, 4 Limit. Hilfe je Befehl: agent <befehl> --help. Rechte wie bei agent mcp; freigeben
+  2 Aufruf bzw. abgelehnte Eingabe, 3 Duplikat, 4 Limit (nur create/append). ingest (Text als Map nach Vorlage): agent ingest --help. Hilfe je Befehl: agent <befehl> --help. Rechte wie bei agent mcp; freigeben
   können nur Menschen (agent approve).`;
 
 export function isLearningCommand(command: string | undefined): boolean {
@@ -348,10 +378,9 @@ async function withLock<T>(stateDir: string, name: string, task: () => Promise<T
 
 const STOPWORDS = new Set(["der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "und", "oder", "mit", "für", "von", "bei", "wenn", "the", "and", "for", "with"]);
 
-const normalizeTitle = (title: string): string => title.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 function tokens(text: string): Set<string> {
-  return new Set(normalizeTitle(text).split(" ").filter((word) => word.length >= 3 && !STOPWORDS.has(word)));
+  return new Set(normalizeKnowledgeTitle(text).split(" ").filter((word) => word.length >= 3 && !STOPWORDS.has(word)));
 }
 
 function jaccard(a: Set<string>, b: Set<string>): number {
@@ -369,7 +398,7 @@ const contentTags = (tags: string[]): Set<string> => new Set(tags.map((tag) => t
  * share no tag are never fuzzy duplicates.
  */
 export function learningSimilarity(a: { title: string; tags: string[] }, b: { title: string; tags: string[] }): number {
-  if (normalizeTitle(a.title) === normalizeTitle(b.title)) return 1;
+  if (normalizeKnowledgeTitle(a.title) === normalizeKnowledgeTitle(b.title)) return 1;
   const tagsA = contentTags(a.tags);
   const tagsB = contentTags(b.tags);
   if (![...tagsA].some((tag) => tagsB.has(tag))) return 0;
@@ -565,6 +594,53 @@ async function append(service: KnowledgeService, parsed: Parsed, target: Learnin
   }
 }
 
+/** Text of a file, or of stdin for `-`; word for word (unlike `contentOf`). `stdinUsed` guards that stdin is read once. */
+async function inputOf(flag: string, value: string, deps: LearningDeps, stdin: { used: boolean }): Promise<string> {
+  if (value === "-") {
+    if (stdin.used) throw usageError("Nur ein Eingang darf stdin (\"-\") sein: --text und --abschnitte nicht beide mit -.");
+    stdin.used = true;
+    return (deps.stdin ?? (() => { throw usageError("stdin ist nicht verfügbar."); }))();
+  }
+  try {
+    return await readFile(value, "utf8");
+  } catch (error) {
+    throw usageError(`${flag}: Datei "${value}" nicht lesbar (${(error as NodeJS.ErrnoException).code ?? "Fehler"}).`);
+  }
+}
+
+async function ingest(service: KnowledgeService, parsed: Parsed, deps: LearningDeps) {
+  const vorlage = required(parsed, "--vorlage");
+  const titel = required(parsed, "--titel");
+  const bereich = one(parsed, "--bereich")?.trim();
+  const quelleDatum = one(parsed, "--quelle-datum")?.trim();
+  const quelle = one(parsed, "--quelle")?.trim();
+  const textArg = one(parsed, "--text");
+  const abschnitteArg = one(parsed, "--abschnitte");
+  if (!textArg) throw usageError("Fehlende Quelle: --text <datei|-> (Originaltext) fehlt. Nichts geschrieben.");
+  if (!quelle) throw usageError("Fehlende Quelle: --quelle <pfad|url|ticket> fehlt. Nichts geschrieben.");
+  if (textArg === "-" && abschnitteArg === "-") throw usageError("Nur ein Eingang darf stdin (\"-\") sein: --text und --abschnitte nicht beide mit -.");
+  const stdin = { used: false };
+  const text = await inputOf("--text", textArg, deps, stdin);
+  let nodes: KnowledgeNodeInput[] = [];
+  if (abschnitteArg) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(await inputOf("--abschnitte", abschnitteArg, deps, stdin));
+    } catch (error) {
+      if (error instanceof LearningCliError) throw error;
+      throw usageError("--abschnitte ist kein gültiges JSON (erwartet: Array von Knoten).");
+    }
+    nodes = parseIngestNodes(raw);
+  }
+  try {
+    const result = await withLock(service.store.stateDir, "ingest.lock", () => service.ingest({ template: vorlage, title: titel, area: bereich, text, sourceRef: quelle, sourceDate: quelleDatum, nodes }));
+    return { ok: true, ...describeWrite(result), bereich: result.area, vorlage, quellknoten: result.sourceNode, zeichen: result.characters, abschnitte: result.sections, ids: result.ids };
+  } catch (error) {
+    if (error instanceof IngestDuplicateError) throw new LearningCliError(EXIT.duplicate, error.message, { duplicate: true, pfad: error.path, titel: error.title, bereich: error.area });
+    throw error;
+  }
+}
+
 /**
  * Runs one of the commands and prints its JSON; never throws. Returns the exit code.
  * `args` are the arguments after the command name.
@@ -578,7 +654,7 @@ export async function runLearningCommand(command: string, args: string[], deps: 
   }
   try {
     const parsed = parse(command, spec, args);
-    const writes = command === "create" || command === "append";
+    const writes = command === "create" || command === "append" || command === "ingest";
     const target = targetOf(parsed, writes);
     const service = await deps.open(target);
     let result: unknown;
@@ -587,6 +663,7 @@ export async function runLearningCommand(command: string, args: string[], deps: 
       case "read": result = await read(service, parsed, deps); break;
       case "stale": result = await stale(service, parsed, deps); break;
       case "create": result = await create(service, parsed, target, deps); break;
+      case "ingest": result = await ingest(service, parsed, deps); break;
       default: result = await append(service, parsed, target, deps);
     }
     console.log(JSON.stringify(result));

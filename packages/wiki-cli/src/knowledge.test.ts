@@ -1256,8 +1256,8 @@ describe("bloommd_get_node, bloommd_backlinks and changes since", () => {
     await Promise.allSettled([...pending]);
     await Bun.sleep(5);
     const names = (JSON.parse(out[0]!).result.tools as Array<{ name: string }>).map((tool) => tool.name);
-    expect(names).toEqual(expect.arrayContaining(["bloommd_get_node", "bloommd_backlinks"]));
-    expect(names).toHaveLength(17);
+    expect(names).toEqual(expect.arrayContaining(["bloommd_get_node", "bloommd_backlinks", "bloommd_ingest"]));
+    expect(names).toHaveLength(18);
   });
 
   test("get_node returns the node with parent, child ids, relations and the map version; an unknown id is refused", async () => {

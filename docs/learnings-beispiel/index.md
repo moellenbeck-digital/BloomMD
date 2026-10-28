@@ -7,7 +7,7 @@ okf_version: "0.2"
 
 # Learnings (Beispielbündel)
 
-> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Die Fakten stammen aus dem Auftrag zu #109 (Vorfälle vom 26.10.2026); die Belege liegen im Repo `bloommd-cluster` (Forgejo).
+> Vom Brand-Chief am 28.10.2026 gegen die Belege im Repo `bloommd-cluster` (Forgejo) geprüft und bestätigt. Die Fakten stammen aus den Vorfällen vom 26.10.2026.
 
 Drei Learnings aus den Vorfällen vom 26.10.2026. Format und Lebenszyklus: [LEARNINGS.md](../LEARNINGS.md).
 

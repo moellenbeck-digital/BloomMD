@@ -1,5 +1,7 @@
 # BloomMD Architecture
 
+Verified against: 2026-10-28 · BloomMD 0.5.1 · c4f794f
+
 ## Principles
 
 1. Markdown remains the portable source format.
@@ -128,8 +130,10 @@ roles, bilingual onboarding, security checks, and rollout.
 The web API issues a five-minute HMAC ticket containing:
 
 ```text
-userId, workspaceId, documentId, filename, permission, expiresAt
+userId, workspaceId, documentId, filename, permission, exp
 ```
+
+`permission` is `read` or `write`, `exp` is a Unix timestamp in seconds. A ticket made for an access token also carries its `tokenId`, so the sync server follows that token's state.
 
 The sync server verifies the signature, expiry, exact WebSocket document path, and permission. A cloud room is keyed by document ID rather than filename. Read-only clients may receive Yjs sync and awareness messages but cannot submit updates. Database persistence verifies document/workspace membership on load and rechecks owner/editor membership plus the expected document version on every save.
 
@@ -163,10 +167,17 @@ Mutating cookie-authenticated routes require an exact same-origin request. Reque
 | `packages/core` | Markdown AST, tree operations, Yjs bridge, sync tickets, local file store |
 | `packages/ui` | Shared React UI and React Flow interactions |
 | `apps/app` | Next.js app, auth, billing, APIs, Postgres tenant storage, browser workspaces |
+| `apps/marketing` | Public Next.js site: landing page, docs, legal, templates, demo |
 | `packages/sync` | WebSocket rooms, ticket enforcement, filesystem/Postgres persistence |
 | `packages/desktop` | Electrobun host, native filesystem and RPC |
 | `packages/mobile` | Capacitor renderer |
+| `packages/capacitor-folder` | Capacitor plugin: open a user-chosen folder and read/write its Markdown files in place |
+| `packages/capacitor-keychain` | Capacitor plugin: sign-in token in iOS Keychain / Android Keystore storage |
+| `packages/ink` | Handwriting: the `bloommd-ink` SVG format and editor, shared by the Obsidian plugin and the apps |
+| `packages/agent-runtime` | Runtime and native `bloommd-agent` binary for local workspace agents |
+| `packages/wiki-cli` | Optional native `bloommd-wiki` binary for local wiki workflows |
 | `plugins/obsidian` | Obsidian companion view and vault-safe Markdown editing |
+| `plugins/openclaw` | Local, review-first workspace-agent plugin for OpenClaw |
 
 ## Verification
 
@@ -182,3 +193,9 @@ bun run --cwd plugins/obsidian release:package
 ```
 
 The web E2E suite uses a non-production auth bypass and repository fixtures; it does not contact the database. Tenant isolation is validated separately with temporary database records through `bun run --cwd apps/app db:verify`. Production deployment must additionally pass `bun run --cwd apps/app release:check` using the real environment.
+
+## Keeping this document verified
+
+`bun run docs:verify` (`scripts/check-architecture-docs.ts`) compares this document with the repository without network or database: the package table against the workspaces, every `bun run …` command against the real scripts, named `packages/…`, `apps/…` and `plugins/…` paths, the Node major against `engines.node` and `.nvmrc`, and the storage, sync and ticket identifiers named above against the source.
+
+Run it during release preparation. When it reports a deviation, correct the statement, or keep it deliberately and record it with its reason in the script's exception list ("explicitly versioned"). Afterwards renew the `Verified against: <date> · BloomMD <version> · <git SHA>` line at the top. The script checks its format and that the commit exists, not its age.

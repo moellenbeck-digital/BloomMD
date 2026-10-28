@@ -64,6 +64,7 @@
     "build:release-artifacts": "bun run build:agent-runtime-release && bun run build:wiki-cli-release && bun run build:sync-binary",
     "test": "bun run --filter @bloommd/web-app test && bun run --filter @bloommd/marketing test && bun run --filter @bloommd/agent-runtime test && bun run --filter @bloommd/core test && bun run --filter @bloommd/desktop test && bun run --filter @bloommd/mobile test && bun run --filter @bloommd/sync test && bun run --filter @bloommd/ui test && bun run --filter @bloommd/ink test && bun run --filter @bloommd/wiki-cli test && bun run --cwd plugins/obsidian test && bun test tests/integration/*.test.ts",
     "test:qa": "bun test scripts/qa/*.test.ts",
+    "docs:verify": "bun scripts/check-architecture-docs.ts",
     "test:e2e": "bun run --cwd apps/app test:e2e",
     "test:e2e:marketing": "bun run --cwd apps/marketing test:e2e",
     "test:e2e:collaboration": "bun run --cwd apps/app test:e2e:collaboration",

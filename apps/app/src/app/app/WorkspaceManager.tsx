@@ -80,19 +80,19 @@ export function WorkspaceManager({ activeWorkspace, onWorkspaceChange, onRename,
   };
 
   const loadMembers = async (workspaceId: string) => {
-    const [memberResponse, invitationResponse, agentResponse] = await Promise.all([
-      fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/members`, { cache: "no-store" }),
-      activeWorkspace?.role === "owner"
-        ? fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/invitations`, { cache: "no-store" })
-        : Promise.resolve(null),
-      fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/agents`, { cache: "no-store" }),
-    ]);
+    // The requests run in parallel but are applied one by one: a slow or failing agent request must not delay or hide members and invitations.
+    const memberRequest = fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/members`, { cache: "no-store" });
+    const invitationRequest = activeWorkspace?.role === "owner"
+      ? fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/invitations`, { cache: "no-store" })
+      : Promise.resolve(null);
+    const agentRequest = fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/agents`, { cache: "no-store" });
+    void invitationRequest.catch(() => undefined);
+    void agentRequest.catch(() => undefined);
+    const memberResponse = await memberRequest;
     const memberPayload = await memberResponse.json() as { members?: WorkspaceMember[]; error?: string };
     if (!memberResponse.ok || !memberPayload.members) throw new Error(errorMessage(memberPayload, copy.membersLoad));
     setMembers(memberPayload.members);
-    const agentPayload = await agentResponse.json() as { agents?: WorkspaceAgent[]; error?: string };
-    if (!agentResponse.ok || !agentPayload.agents) throw new Error(errorMessage(agentPayload, copy.agentsLoad));
-    setAgents(agentPayload.agents.filter((agent) => agent.status === "active"));
+    const invitationResponse = await invitationRequest;
     if (invitationResponse) {
       const invitationPayload = await invitationResponse.json() as { invitations?: WorkspaceInvitation[]; error?: string };
       if (!invitationResponse.ok || !invitationPayload.invitations) throw new Error(errorMessage(invitationPayload, copy.invitationsLoad));
@@ -100,6 +100,10 @@ export function WorkspaceManager({ activeWorkspace, onWorkspaceChange, onRename,
     } else {
       setInvitations([]);
     }
+    const agentResponse = await agentRequest;
+    const agentPayload = await agentResponse.json() as { agents?: WorkspaceAgent[]; error?: string };
+    if (!agentResponse.ok || !agentPayload.agents) throw new Error(errorMessage(agentPayload, copy.agentsLoad));
+    setAgents(agentPayload.agents.filter((agent) => agent.status === "active"));
   };
 
   useEffect(() => {

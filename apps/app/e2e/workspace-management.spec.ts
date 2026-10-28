@@ -92,6 +92,7 @@ test("owner can inspect members, invite an editor, and remove the member", async
   await expect(page.getByRole("group", { name: "Einladung prüfen" })).toContainText(invited.email);
   await page.getByRole("button", { name: "Einladung senden" }).click();
   await expect(page.getByText("Einladung gesendet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Erneut senden" })).toBeVisible();
   await expect(page.getByText(invited.email)).toBeVisible();
   await page.getByRole("button", { name: "Erneut senden" }).click();
   await expect(page.getByText("Einladung erneut gesendet.")).toBeVisible();
@@ -99,10 +100,101 @@ test("owner can inspect members, invite an editor, and remove the member", async
   members = [...members, invited];
   await page.getByTestId("workspace-manager-toggle").click();
   await page.getByTestId("workspace-manager-toggle").click();
-  await expect(page.getByText(invited.email)).toBeVisible();
+  await expect(page.getByTitle(invited.email)).toBeVisible();
   page.on("dialog", (dialog) => void dialog.accept());
-  await page.getByRole("button", { name: `${invited.email} ausladen` }).click();
+  await page.getByRole("button", { name: `${invited.email} Mitglied konnte nicht ausgeladen werden.` }).click();
   await expect(page.getByText("Mitglied ausgeladen.")).toBeVisible();
+});
+
+async function setupInvitationWorkspace(page: Page, request: APIRequestContext, options: { emailSent: boolean; agentsStatus: number }) {
+  const email = uniqueEmail();
+  await createAccount(request, email);
+  await page.addInitScript(() => window.localStorage.setItem("bloommd_onboarding_seen", "1"));
+
+  const workspace = {
+    id: "11111111-1111-4111-8111-111111111111",
+    name: "Research Team",
+    slug: "team-research",
+    kind: "team" as const,
+    role: "owner" as const,
+  };
+  const members = [
+    { userId: "22222222-2222-4222-8222-222222222222", email, name: "Workspace Owner", role: "owner" as const, createdAt: "2026-08-20T10:00:00.000Z" },
+  ];
+  let invitations: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/mindmaps**", async (route) => {
+    if (route.request().method() === "GET" && route.request().url().endsWith("/api/mindmaps")) {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ files: [{ filename: "welcome.md", frontmatter: { title: "Welcome", id: "welcome" } }], storageMode: "database", workspace }) });
+      return;
+    }
+    if (route.request().method() === "GET") {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ filePath: "welcome.md", frontmatter: { title: "Welcome", id: "welcome" }, nodes: { root: { id: "root", title: "Welcome", level: 1, parentId: null, children: [], content: "" } }, rootId: "root", storage: { mode: "database", documentId: "44444444-4444-4444-8444-444444444444", workspaceId: workspace.id, version: 1, permission: "write" } }) });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route("**/api/workspaces", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ workspace, workspaces: [workspace] }) });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route(`**/api/workspaces/${workspace.id}/members`, async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ members }) });
+  });
+  await page.route(`**/api/workspaces/${workspace.id}/agents`, async (route) => {
+    await route.fulfill(options.agentsStatus === 200
+      ? { contentType: "application/json", body: JSON.stringify({ agents: [] }) }
+      : { status: options.agentsStatus, contentType: "application/json", body: JSON.stringify({ error: "Workspace agents could not be loaded." }) });
+  });
+  await page.route(`**/api/workspaces/${workspace.id}/invitations`, async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ invitations }) });
+      return;
+    }
+    const body = route.request().postDataJSON() as { email: string; role: "editor" | "viewer" };
+    invitations = [{ id: "55555555-5555-4555-8555-555555555555", workspaceId: workspace.id, email: body.email, role: body.role, status: "pending", expiresAt: "2099-08-20T10:00:00.000Z", acceptedAt: null, revokedAt: null, createdAt: "2026-08-20T10:00:00.000Z" }];
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ invitation: invitations[0], emailSent: options.emailSent }) });
+  });
+
+  await login(page, email);
+  await page.getByTestId("workspace-manager-toggle").click();
+  await expect(page.getByRole("dialog", { name: "Workspace-Verwaltung" })).toBeVisible();
+}
+
+async function sendInvitationAndExpectVisible(page: Page, message: string) {
+  const invitee = "viewer@example.test";
+  await page.getByLabel("E-Mail des einzuladenden Mitglieds").fill(invitee);
+  await page.getByLabel("Rolle der Einladung").selectOption("viewer");
+  await page.getByRole("button", { name: "Einladung prüfen" }).click();
+  await page.getByRole("button", { name: "Einladung senden" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Workspace-Verwaltung" });
+  await expect(dialog.getByRole("status")).toHaveText(message);
+  const pending = dialog.locator("h4", { hasText: "Offene Einladungen" }).locator("xpath=..");
+  await expect(pending).toContainText(invitee);
+  await expect(pending).toContainText("Viewer");
+  await expect(pending).toContainText("2099");
+  await expect(page.getByLabel("E-Mail des einzuladenden Mitglieds")).toHaveValue("");
+  await expect(page.getByRole("group", { name: "Einladung prüfen" })).toHaveCount(0);
+  await expect(dialog.getByRole("status")).toHaveText(message);
+}
+
+test("@t16 sent invitation is listed with its success message without reopening the dialog", async ({ page, request }) => {
+  await setupInvitationWorkspace(page, request, { emailSent: true, agentsStatus: 200 });
+  await sendInvitationAndExpectVisible(page, "Einladung gesendet.");
+});
+
+test("@t16 sent invitation stays visible when the agent list cannot be loaded", async ({ page, request }) => {
+  await setupInvitationWorkspace(page, request, { emailSent: true, agentsStatus: 401 });
+  await sendInvitationAndExpectVisible(page, "Einladung gesendet.");
+});
+
+test("@t16 invitation without configured mail delivery is listed with the matching message", async ({ page, request }) => {
+  await setupInvitationWorkspace(page, request, { emailSent: false, agentsStatus: 200 });
+  await sendInvitationAndExpectVisible(page, "Einladung angelegt; E-Mail-Versand ist derzeit nicht konfiguriert.");
 });
 
 test("recovers from a stale active workspace context", async ({ page, request }) => {

@@ -18,6 +18,9 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
 4. New map: `bloommd_templates` → pick `meeting`, `conversation`, `discussion`, `lesson`, `project`
    or `weekly`; read its guidance with `bloommd_templates {id}`; then `bloommd_create_map` with
    `template` and nodes whose `parent` is a skeleton ref (e.g. `aufgaben`, `begriffe`, `themen`).
+   For raw text (transcript, chat, note) use `bloommd_ingest` instead: you pass the text word for
+   word plus the sections you structured; it files the text as a `source` node. Never put credentials
+   or personal data in the text.
 5. Always pass `source` (what you filed from) and a one-sentence `reason`.
 
 ## Quality rules

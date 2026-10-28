@@ -91,7 +91,7 @@ Teams can put the same entry into the project's `.mcp.json` with `--scope projec
 
 ## Tools
 
-The server offers 17 tools `bloommd_*`. Reading (no changes):
+The server offers 18 tools `bloommd_*`. Reading (no changes):
 
 | Tool | Purpose |
 |---|---|
@@ -103,7 +103,7 @@ The server offers 17 tools `bloommd_*`. Reading (no changes):
 | `bloommd_changes` | the agent's change log, with `since` from a point in time |
 | `bloommd_tasks`, `bloommd_decisions`, `bloommd_stale`, `bloommd_templates`, `bloommd_requests` | tasks, decisions, expiring maps, templates, requests |
 
-Writing, according to the agent's rights: `bloommd_create_map`, `bloommd_update_map`,
+Writing, according to the agent's rights: `bloommd_create_map`, `bloommd_ingest`, `bloommd_update_map`,
 `bloommd_update_node`, `bloommd_answer_request`, `bloommd_undo` and `bloommd_share_link`.
 
 ### Single node, backlinks, changes since
@@ -130,6 +130,44 @@ All three work for `target` `vault` and `cloud` and never change anything.
 Templates: **meeting**, **conversation**, **discussion**, **lesson**, **project**, **weekly**. The
 maps can be presented in BloomMD, quizzed in study mode and exported as PNG/PDF – easy to explain
 and share.
+
+## File text as a map (ingest)
+
+When the agent has raw text (transcript, chat, note) and has already structured the sections,
+`bloommd_ingest` creates the map from a template and keeps the original as the source. The tool
+invents nothing and calls no model: the structure comes from the agent, it is only a create-and-check
+layer over `bloommd_create_map` with the same rights (read: refused, propose: a proposal that only a
+person approves, write: written), log and undo.
+
+```bash
+bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
+  --titel "Weekly product team" --text transcript.txt \
+  --quelle "Teams recording 20 Oct" --quelle-datum 2026-10-20 \
+  --abschnitte sections.json          # file, or - for stdin
+```
+
+- **Input:** original text (`--text <file|->`, MCP: `text`), template (`meeting`, `conversation`,
+  `discussion`, `lesson`, `project`, `weekly`; not `learning`, which has `agent create|append`), title,
+  optionally an area (default: the template's area), a source reference (`--quelle`, MCP: `source`; path,
+  URL or ticket) and the date of the source (`--quelle-datum`, MCP: `sourceDate`, `YYYY-MM-DD`), plus the
+  sections as a JSON array of nodes in the format of `bloommd_create_map` (`--abschnitte`, MCP: `nodes`);
+  `parent` is a skeleton ref of the template (`themen`, `aufgaben`, …). Only one input may be stdin (`-`).
+- **Source:** the original text stands word for word as the node "Originaltext" (`kind: source`) below
+  "Quellen", with reference and date in `citation` (an http(s) URL also as `url`) and in the map's
+  `source`. It sits in a code block so headings, lists and `---` inside the text stay text; nothing is
+  shortened or reworded (the only change: line breaks are stored as `\n`). A template without a "Quellen"
+  node (`weekly`) gets one. Without original text or source reference nothing is written ("Missing source").
+- **Limits:** original text at most **200,000 characters**, sections at most **150 nodes** (template
+  skeleton and source node not counted). Above that you get an error with the actual value and the limit,
+  and nothing is written.
+- **Duplicates:** if the target area already has a map with the same title (case and punctuation do not
+  count), nothing is created; the error names the path. The same title in another area is not a
+  duplicate. There is no `--force`.
+- **Exit codes** (`agent ingest`): 0 ok, 1 error (e.g. unknown template, no permission), 2 wrong call or
+  refused input (limits, missing source), 3 duplicate (`{"duplicate":true,"pfad":…}`).
+- **No credentials and no personal data** (passwords, tokens, keys, private details) in the original text
+  or the sections: the tool filters nothing. Remove what does not belong in the map first (as with
+  learnings).
 
 ## Change a single node
 

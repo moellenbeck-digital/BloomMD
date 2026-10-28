@@ -91,7 +91,7 @@ nur `${BLOOMMD_TOKEN}`, nie der Wert.
 
 ## Werkzeuge
 
-Der Server bietet 17 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
+Der Server bietet 18 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
 
 | Werkzeug | Zweck |
 |---|---|
@@ -103,7 +103,7 @@ Der Server bietet 17 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
 | `bloommd_changes` | Änderungsprotokoll des Agenten, mit `since` ab einem Zeitpunkt |
 | `bloommd_tasks`, `bloommd_decisions`, `bloommd_stale`, `bloommd_templates`, `bloommd_requests` | Aufgaben, Entscheidungen, ablaufende Maps, Vorlagen, Anfragen |
 
-Schreibend, nach den Rechten des Agenten: `bloommd_create_map`, `bloommd_update_map`,
+Schreibend, nach den Rechten des Agenten: `bloommd_create_map`, `bloommd_ingest`, `bloommd_update_map`,
 `bloommd_update_node`, `bloommd_answer_request`, `bloommd_undo` und `bloommd_share_link`.
 
 ### Einzelner Knoten, Rückverweise, Änderungen seit
@@ -130,6 +130,45 @@ Alle drei gelten für `target` `vault` und `cloud` und ändern nie etwas.
 Vorlagen: **Besprechung**, **Gespräch**, **Diskussion**, **Lerneinheit**, **Projekt**,
 **Wochenrückblick**. Die Maps lassen sich in BloomMD präsentieren, im Lernmodus abfragen und als
 PNG/PDF exportieren – so lassen sie sich gut erklären und teilen.
+
+## Text als Map ablegen (Ingest)
+
+Hat der Agent Rohtext (Transkript, Chat, Notiz) und daraus schon die Abschnitte gegliedert, legt
+`bloommd_ingest` die Map nach Vorlage an und hält das Original als Quelle fest. Das Werkzeug erfindet
+nichts und ruft kein Modell auf: die Gliederung kommt vom Agenten, es ist nur eine Anlege- und
+Prüfschicht über `bloommd_create_map` mit denselben Rechten (lesen: abgelehnt, vorschlagen:
+Vorschlag, den nur ein Mensch freigibt, schreiben: geschrieben), Protokoll und Undo.
+
+```bash
+bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
+  --titel "Wochenbesprechung Produktteam" --text transkript.txt \
+  --quelle "Teams-Aufzeichnung 20.10." --quelle-datum 2026-10-20 \
+  --abschnitte abschnitte.json          # Datei oder - für stdin
+```
+
+- **Eingabe:** Originaltext (`--text <datei|->`, MCP: `text`), Vorlage (`meeting`, `conversation`,
+  `discussion`, `lesson`, `project`, `weekly`; `learning` nicht, dafür gibt es `agent create|append`),
+  Titel, optional Bereich (Standard: der Bereich der Vorlage), Quellenverweis (`--quelle`, MCP: `source`;
+  Pfad, URL oder Ticket) und Datum der Quelle (`--quelle-datum`, MCP: `sourceDate`, `YYYY-MM-DD`), dazu die
+  Abschnitte als JSON-Array von Knoten im Format von `bloommd_create_map` (`--abschnitte`, MCP: `nodes`);
+  `parent` ist ein Skelett-Ref der Vorlage (`themen`, `aufgaben`, …). Nur ein Eingang darf stdin (`-`) sein.
+- **Quelle:** Der Originaltext steht wörtlich als Knoten „Originaltext“ (`kind: source`) unter „Quellen“,
+  mit Verweis und Datum in `citation` (eine http(s)-URL auch als `url`) und in `source` der Map. Er steht in
+  einem Codeblock, damit Überschriften, Listen und `---` im Text Text bleiben; nichts wird gekürzt oder
+  umformuliert (einzige Änderung: Zeilenumbrüche werden als `\n` gespeichert). Hat die Vorlage keinen
+  „Quellen“-Knoten (`weekly`), legt das Werkzeug ihn an. Ohne Originaltext oder Quellenverweis wird nichts
+  geschrieben („Fehlende Quelle“).
+- **Grenzen:** Originaltext höchstens **200 000 Zeichen**, Abschnitte höchstens **150 Knoten** (ohne
+  Vorlagen-Skelett und Quellen-Knoten). Darüber kommt eine Fehlermeldung mit Ist- und Grenzwert, nichts
+  wird geschrieben.
+- **Duplikate:** Gibt es im Zielbereich schon eine Map mit gleichem Titel (Groß-/Kleinschreibung und
+  Satzzeichen zählen nicht), wird nichts angelegt; die Fehlermeldung nennt den Pfad. Gleicher Titel in
+  einem anderen Bereich ist kein Duplikat. Ein `--force` gibt es nicht.
+- **Exitcodes** (`agent ingest`): 0 ok, 1 Fehler (z. B. unbekannte Vorlage, keine Berechtigung), 2 Aufruf oder
+  abgelehnte Eingabe (Grenzen, fehlende Quelle), 3 Duplikat (`{"duplicate":true,"pfad":…}`).
+- **Keine Zugangsdaten und keine Personendaten** (Passwörter, Tokens, Schlüssel, private Angaben) in
+  Originaltext oder Abschnitte: das Werkzeug filtert nichts. Was nicht in die Map gehört, vorher
+  entfernen (wie bei den Learnings).
 
 ## Einen Knoten gezielt ändern
 

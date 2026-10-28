@@ -18,6 +18,7 @@ import {
   matchesKnowledgeFilter,
   newKnowledgeMap,
   outlineMarkdown,
+  parseKnowledgeNodeInputs,
   parseKnowledgeNodePatch,
   readKnowledgeFrontmatter,
   searchKnowledge,
@@ -29,7 +30,7 @@ import {
 } from "@bloommd/core/knowledge";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
 import { backlinksFor } from "@bloommd/core/workspace-search";
-import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
+import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
 
 export interface ChangeMeta {
@@ -82,6 +83,89 @@ export interface SearchHit {
   stale_after?: string;
   expired?: boolean;
   ageDays?: number;
+}
+
+/** `ingest` takes the original text up to this many characters (Unicode code points). */
+export const INGEST_MAX_TEXT_CHARS = 200_000;
+/** `ingest` takes at most this many section nodes (without the template skeleton and the source node). */
+export const INGEST_MAX_NODES = 150;
+/** The templates `ingest` files into; `learning` has its own commands (`agent create|append`). */
+export const INGEST_TEMPLATE_IDS: readonly string[] = KNOWLEDGE_TEMPLATES.filter((template) => template.id !== "learning").map((template) => template.id);
+/** Ref of the source node `ingest` adds; section nodes must not use it. */
+const INGEST_SOURCE_REF = "originaltext";
+const INGEST_PARENT_REF = "quellen";
+const SOURCE_REF_MAX = 300;
+const BLOOM_COMMENT_RE = /<!--\s*bloommd:/i;
+
+/** A title as compared for duplicates: case, punctuation and spacing do not matter. */
+export const normalizeKnowledgeTitle = (title: string): string => title.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/** A map with the same title already exists in the target area; `path` is that map. */
+export class IngestDuplicateError extends Error {
+  constructor(readonly path: string, readonly title: string, readonly area: string) {
+    super(`A map titled "${title}" already exists in "${area}": ${path}. Nothing was written.`);
+    this.name = "IngestDuplicateError";
+  }
+}
+
+export interface IngestInput extends ChangeMeta {
+  /** One of `INGEST_TEMPLATE_IDS`. */
+  template: string;
+  title: string;
+  /** Default: the template's area. */
+  area?: string;
+  /** The original text, filed word for word. */
+  text: string;
+  /** Where the original comes from: path, URL or ticket (also the `source` of the change). */
+  sourceRef: string;
+  /** Date of the source, `YYYY-MM-DD`; left out when unknown. */
+  sourceDate?: string;
+  /** Sections the agent already structured (node format of `bloommd_create_map`, parents are skeleton refs). */
+  nodes?: KnowledgeNodeInput[];
+}
+
+export interface IngestResult extends CommitResult {
+  area: string;
+  /** Id of the `kind: source` node that holds the original text. */
+  sourceNode: string;
+  /** Characters of the original text (code points). */
+  characters: number;
+  /** Section nodes given by the agent (skeleton and source node not counted). */
+  sections: number;
+}
+
+/**
+ * The section nodes of an ingest from outside (JSON of the CLI, `nodes` of the MCP tool): at most
+ * `INGEST_MAX_NODES`, checked before the generic node parser so the message names both numbers.
+ */
+export function parseIngestNodes(value: unknown): KnowledgeNodeInput[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new KnowledgeInputError("The sections must be an array of nodes (same format as the nodes of bloommd_create_map).");
+  assertIngestNodeCount(value.length);
+  return parseKnowledgeNodeInputs(value, { minItems: 0 });
+}
+
+function assertIngestNodeCount(count: number): void {
+  if (count > INGEST_MAX_NODES) throw new KnowledgeInputError(`Too many sections: ${count} nodes, at most ${INGEST_MAX_NODES} are allowed (template skeleton and source node not counted). Nothing was written.`);
+}
+
+/** Calendar check for `YYYY-MM-DD` (2026-02-30 is no date). */
+function isIsoDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/**
+ * The original text as node content: in a code fence, so headings, lists and `---` lines inside a
+ * transcript stay text and nothing is trimmed or rewritten. The fence is longer than any backtick
+ * run of the text, so the text cannot close it.
+ */
+function sourceContent(text: string): string {
+  const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+  const fence = "`".repeat(Math.max(3, longest + 1));
+  return `${fence}\n${text}\n${fence}`;
 }
 
 export type Proposal = AgentProposal;
@@ -381,6 +465,15 @@ export class KnowledgeService {
    * and overrides the template's values; without it a template's defaults apply as before.
    */
   async createMap(input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta): Promise<CommitResult> {
+    return this.createMapAs("bloommd_create_map", input);
+  }
+
+  /** `createMap` under the name of `tool` in the log; `guard` runs under the area lock, before a path is taken. */
+  private createMapAs(
+    tool: string,
+    input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta,
+    guard?: (area: string) => Promise<void>,
+  ): Promise<CommitResult> {
     const template = input.template ? knowledgeTemplate(input.template) : null;
     if (input.template && !template) throw new Error(`Unknown template "${input.template}".`);
     const area = input.area.trim() || template?.area || "";
@@ -390,9 +483,64 @@ export class KnowledgeService {
     const change = { ...applyKnowledgeNodes(withFrontmatter.markdown, [...(template?.skeleton ?? []), ...(input.nodes ?? [])]), ...(withFrontmatter.fields.length > 0 ? { frontmatter: withFrontmatter.fields } : {}) };
     // One lock per area: two maps with the same title must not both get the same free path.
     return this.withLock(`create:${area}`, async () => {
+      await guard?.(area);
       const path = await this.store.freePath(area, input.title);
-      return this.withLock(path, () => this.commit("bloommd_create_map", path, null, null, change.markdown, change, input));
+      return this.withLock(path, () => this.commit(tool, path, null, null, change.markdown, change, input));
     });
+  }
+
+  /**
+   * Files raw material (transcript, chat, note) as a map from a template: the agent hands over the
+   * original text and the sections it already structured; nothing is invented and no model is called.
+   * The original stands word for word as a `kind: source` node (below "Quellen"; templates without
+   * that node get one) with the reference and date of the source. Refused, with nothing written:
+   * a template other than meeting, conversation, discussion, lesson, project or weekly, a missing
+   * original or source reference, more than `INGEST_MAX_TEXT_CHARS` characters or `INGEST_MAX_NODES`
+   * section nodes, and a map with the same title in the target area (`IngestDuplicateError`).
+   * Rights, proposals, log and undo are those of `createMap`.
+   */
+  async ingest(input: IngestInput): Promise<IngestResult> {
+    const templateId = input.template?.trim();
+    if (!templateId) throw new KnowledgeInputError(`Give a template: ${INGEST_TEMPLATE_IDS.join(", ")}.`);
+    if (templateId === "learning") throw new KnowledgeInputError("The template learning cannot be ingested; use agent create / agent append for learnings.");
+    const template = knowledgeTemplate(templateId);
+    if (!template || !INGEST_TEMPLATE_IDS.includes(template.id)) throw new Error(`Unknown template "${templateId}". Known: ${INGEST_TEMPLATE_IDS.join(", ")}.`);
+    const title = input.title?.trim();
+    if (!title) throw new KnowledgeInputError("A map needs a title.");
+
+    const sourceRef = input.sourceRef?.trim() ?? "";
+    if (typeof input.text !== "string" || !input.text.trim()) throw new KnowledgeInputError("Missing source: the original text is missing or empty. Nothing was written.");
+    if (!sourceRef) throw new KnowledgeInputError("Missing source: give where the original comes from (path, URL or ticket). Nothing was written.");
+    if (sourceRef.length > SOURCE_REF_MAX || /[\r\n]/.test(sourceRef) || BLOOM_COMMENT_RE.test(sourceRef)) throw new KnowledgeInputError(`The source reference must be one line of at most ${SOURCE_REF_MAX} characters, without BloomMD comments.`);
+    const sourceDate = input.sourceDate?.trim();
+    if (sourceDate !== undefined && sourceDate !== "" && !isIsoDay(sourceDate)) throw new KnowledgeInputError(`The date of the source must be YYYY-MM-DD, got "${sourceDate}".`);
+
+    const characters = [...input.text].length;
+    if (characters > INGEST_MAX_TEXT_CHARS) throw new KnowledgeInputError(`Original text too long: ${characters} characters, at most ${INGEST_MAX_TEXT_CHARS} are allowed. Nothing was written.`);
+    if (BLOOM_COMMENT_RE.test(input.text)) throw new KnowledgeInputError("The original text contains a BloomMD comment (<!-- bloommd: … -->), which is reserved for BloomMD's own metadata. Nothing was written.");
+    const sections = input.nodes ?? [];
+    assertIngestNodeCount(sections.length);
+    if (sections.some((node) => node.ref === INGEST_SOURCE_REF)) throw new KnowledgeInputError(`The ref "${INGEST_SOURCE_REF}" is reserved for the source node.`);
+
+    const hasSources = template.skeleton.some((node) => node.ref === INGEST_PARENT_REF);
+    const citation = [sourceRef, ...(sourceDate ? [sourceDate] : [])].join(", ");
+    const nodes: KnowledgeNodeInput[] = [
+      ...(hasSources ? [] : [{ ref: INGEST_PARENT_REF, title: "Quellen", kind: "source" as const }]),
+      ...sections,
+      { ref: INGEST_SOURCE_REF, parent: INGEST_PARENT_REF, title: "Originaltext", kind: "source", citation, ...(/^https?:\/\/\S+$/i.test(sourceRef) ? { url: sourceRef } : {}), content: sourceContent(input.text) },
+    ];
+    const area = input.area?.trim() || template.area;
+    const result = await this.createMapAs(
+      "bloommd_ingest",
+      { area, title, template: template.id, nodes, source: citation, reason: input.reason ?? `Ingest nach Vorlage ${template.name}` },
+      async (target) => {
+        // A vault names its maps by file name, which is the title as safeSegment writes it.
+        const wanted = new Set([normalizeKnowledgeTitle(title), normalizeKnowledgeTitle(safeSegment(title))]);
+        const same = (await this.store.list()).find((entry) => entry.available !== false && foldName(entry.area) === foldName(target) && wanted.has(normalizeKnowledgeTitle(entry.title)));
+        if (same) throw new IngestDuplicateError(same.path, same.title, target);
+      },
+    );
+    return { ...result, area, sourceNode: result.ids[INGEST_SOURCE_REF] ?? "", characters, sections: sections.length };
   }
 
   /**

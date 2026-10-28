@@ -1,0 +1,17 @@
+Transkript: Wochenbesprechung Produktteam, 20.10.2026 (Beispieltext, frei erfunden)
+
+[00:00] Moderation: Guten Morgen zusammen. Heute geht es um drei Punkte: den Release-Termin, die Rückmeldungen aus dem Test und die Planung der nächsten Woche.
+[00:42] Entwicklung: Beim Release-Termin sind wir im Plan. Die Migration ist fertig, offen ist nur noch der Feinschliff an der Suche. Ich würde den 5. November vorschlagen.
+[01:15] Vertrieb: Der 5. November passt, die Kundentermine liegen danach. Wichtig ist, dass die Änderungen vorher in einer kurzen Mail angekündigt werden.
+[01:50] Moderation: Gut, dann halten wir fest: Release am 5. November, Entwicklung bereitet die Ankündigung vor, Vertrieb prüft den Text.
+[02:20] Test: Zu den Rückmeldungen. Es gab zwei Fehler in der Import-Funktion:
+    1. Umlaute in Dateinamen werden beim Hochladen abgeschnitten.
+    2. Leere Zeilen am Ende der Datei erzeugen einen leeren Eintrag.
+---
+## Anmerkung des Tests
+Beide Fehler sind reproduzierbar. Ein Beispiel: `Übersicht_Größe.md` wird zu `bersicht_Gr`.
+```
+Dieser Block ist Teil des Gesprächs und schließt nichts ab.
+[03:05] Entwicklung: Den ersten Fehler beheben wir bis Freitag, der zweite hat keine Eile.
+[03:40] Moderation: Offene Frage: Brauchen wir für die Ankündigung eine englische Fassung? Das klären wir nächste Woche.
+[04:10] Moderation: Dann bis nächste Woche, danke euch.

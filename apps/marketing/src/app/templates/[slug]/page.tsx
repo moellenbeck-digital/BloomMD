@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight, Download } from "lucide-react";
-import { getTemplate, listTemplates, templateSlugs } from "../../../lib/templates";
+import { getTemplate, listTemplates } from "../../../lib/templates";
 import { getMarketingLocale, withMarketingLocale } from "../../../lib/locale";
 import { marketingMetadata } from "../../../lib/metadata";
 
@@ -13,7 +13,7 @@ interface TemplatePageProps {
 }
 
 export async function generateStaticParams() {
-  return templateSlugs().map((slug) => ({ slug }));
+  return (await listTemplates()).map((template) => ({ slug: template.slug }));
 }
 
 export async function generateMetadata({ params, searchParams }: TemplatePageProps): Promise<Metadata> {

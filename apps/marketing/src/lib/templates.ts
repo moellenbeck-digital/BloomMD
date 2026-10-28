@@ -1,21 +1,10 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import type { MarketingLocale } from "./locale";
+import { validateTemplateMetadata, type TemplateMetadata } from "./template-metadata";
 
-export interface TemplateMetadata {
-  title: string;
-  description: string;
-  audience: string[];
-  category: string;
-  previewImage: string;
-  sections: string[];
-  tags: string[];
-  recommendedUse: string;
-  version: string;
-  slug: string;
-  filePath: string;
-}
+export type { TemplateMetadata } from "./template-metadata";
 
 export interface TemplateRecord extends TemplateMetadata {
   markdown: string;
@@ -32,7 +21,6 @@ const TEMPLATE_SLUGS = [
 
 const cwd = process.cwd();
 const repoRoot = existsSync(join(cwd, "templates")) ? cwd : resolve(cwd, "../..");
-const templatesRoot = join(repoRoot, "templates");
 
 const germanTemplateCopy: Record<string, Pick<TemplateMetadata, "title" | "description" | "audience" | "category" | "sections" | "tags" | "recommendedUse">> = {
   "software-architecture": {
@@ -96,24 +84,62 @@ function localizeTemplate(template: TemplateMetadata, locale: MarketingLocale): 
   return { ...template, ...germanTemplateCopy[template.slug] };
 }
 
-async function readTemplateMetadata(slug: string): Promise<TemplateMetadata> {
-  const raw = await readFile(join(templatesRoot, slug, "metadata.json"), "utf-8");
-  return JSON.parse(raw) as TemplateMetadata;
+function logInvalidTemplate(slug: string, file: string, problem: string) {
+  console.error(`[templates] Template "${slug}" skipped (${file}): ${problem}`);
 }
 
-export async function listTemplates(locale: MarketingLocale = "en"): Promise<TemplateMetadata[]> {
-  const templates = await Promise.all(TEMPLATE_SLUGS.map(readTemplateMetadata));
+/**
+ * Reads and validates `templates/<slug>/metadata.json` below `root`.
+ * Unreadable file, broken JSON and schema violations all yield `null` after a
+ * server-side diagnostic; nothing from the file content is logged or returned.
+ */
+async function readTemplateMetadata(slug: string, root: string): Promise<TemplateMetadata | null> {
+  const file = join("templates", slug, "metadata.json");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(join(root, file), "utf-8"));
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    logInvalidTemplate(slug, file, error instanceof SyntaxError ? "invalid JSON" : `unreadable (${typeof code === "string" ? code : "error"})`);
+    return null;
+  }
+
+  const result = validateTemplateMetadata(parsed, slug);
+  if (!result.ok) {
+    logInvalidTemplate(slug, file, result.violations.map((violation) => `${violation.path} ${violation.reason}`).join("; "));
+    return null;
+  }
+  return result.metadata;
+}
+
+export async function listTemplates(locale: MarketingLocale = "en", root: string = repoRoot): Promise<TemplateMetadata[]> {
+  const read = await Promise.all(TEMPLATE_SLUGS.map((slug) => readTemplateMetadata(slug, root)));
+  const templates = read.filter((metadata): metadata is TemplateMetadata => metadata !== null);
   return templates.map((template) => localizeTemplate(template, locale)).sort((a, b) => a.title.localeCompare(b.title));
 }
 
-export async function getTemplate(slug: string, locale: MarketingLocale = "en"): Promise<TemplateRecord | null> {
+export async function getTemplate(slug: string, locale: MarketingLocale = "en", root: string = repoRoot): Promise<TemplateRecord | null> {
   if (!TEMPLATE_SLUGS.includes(slug as (typeof TEMPLATE_SLUGS)[number])) {
     return null;
   }
 
-  const metadata = localizeTemplate(await readTemplateMetadata(slug), locale);
-  const markdown = await readFile(join(repoRoot, metadata.filePath), "utf-8");
-  return { ...metadata, markdown };
+  const base = await readTemplateMetadata(slug, root);
+  if (!base) return null;
+  const metadata = localizeTemplate(base, locale);
+
+  // The schema already confines filePath to templates/<slug>/; keep a resolved-path check as defence in depth.
+  const markdownPath = resolve(root, metadata.filePath);
+  if (!markdownPath.startsWith(resolve(root, "templates", slug) + sep)) {
+    logInvalidTemplate(slug, join("templates", slug, "metadata.json"), "filePath resolves outside the template directory");
+    return null;
+  }
+  try {
+    return { ...metadata, markdown: await readFile(markdownPath, "utf-8") };
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    logInvalidTemplate(slug, metadata.filePath, `markdown unreadable (${typeof code === "string" ? code : "error"})`);
+    return null;
+  }
 }
 
 export function templateSlugs() {

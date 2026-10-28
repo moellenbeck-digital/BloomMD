@@ -27,7 +27,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
   const templates = await listTemplates(locale);
   const slug = params.template && templates.some((template) => template.slug === params.template)
     ? params.template
-    : "software-architecture";
+    : templates.find((template) => template.slug === "software-architecture")?.slug ?? templates[0]?.slug ?? "software-architecture";
   const template = await getTemplate(slug, locale);
 
   return (

@@ -5,9 +5,9 @@ import type { AppLocale } from "../../lib/locale";
 
 function wikiCopy(locale: AppLocale) {
   return locale === "en" ? {
-    rejected: "blocked", missing: "missing", externalAddress: "an external address", preview: "Load preview — sends a request to", bundle: "KB in bundle", mapTitle: "Knowledge Map", mapIntro: "Nodes are concept pages; edges come from wiki links, tags and cited sources — not from the folder structure. Broken references remain visible.", withoutSource: "without source", pointsTo: "Points to: ", nothing: "nothing", linkedBy: "Linked from: ", nobody: "nobody", sources: "Sources: ", view: "View", proposals: "Proposals", pages: "Pages", map: "Knowledge Map", log: "Log", brokenLinks: "broken links", search: "Search the wiki", placeholder: "Title, path, tag, status, content", onlyProblems: "Only pages with problems", count: "of", changed: " · source changed", noSource: " · without source", logTitle: "Wiki log", noLog: "No log available.", wikiPages: "Wiki pages", citations: "Citations", noCitations: "This page names no source. Its claims cannot be verified.", changedBadge: "Source has changed", unknown: "unknown source", noHash: "without hash — drift cannot be detected", references: "References and media", external: "External previews load only after a click. No request leaves this page beforehand.", noPage: "No page found."
+    rejected: "blocked", missing: "missing", externalAddress: "an external address", preview: "Load preview — sends a request to", bundle: "KB in bundle", mapTitle: "Knowledge Map", mapIntro: "Nodes are concept pages; edges come from wiki links, tags and cited sources — not from the folder structure. Broken references remain visible.", withoutSource: "without source", pointsTo: "Points to: ", nothing: "nothing", linkedBy: "Linked from: ", nobody: "nobody", sources: "Sources: ", view: "View", proposals: "Proposals", pages: "Pages", map: "Knowledge Map", log: "Log", brokenLinks: "broken links", search: "Search the wiki", placeholder: "Title, path, tag, status, content", onlyProblems: "Only pages with problems", count: "of", changed: " · source changed", missingSource: " · source missing", missingBadge: "Source is missing", unmonitored: "not watched", noSource: " · without source", logTitle: "Wiki log", noLog: "No log available.", wikiPages: "Wiki pages", citations: "Citations", noCitations: "This page names no source. Its claims cannot be verified.", changedBadge: "Source has changed", unknown: "unknown source", noHash: "without hash — drift cannot be detected", references: "References and media", external: "External previews load only after a click. No request leaves this page beforehand.", noPage: "No page found."
   } : {
-    rejected: "abgelehnt", missing: "fehlt", externalAddress: "eine externe Adresse", preview: "Vorschau laden — sendet eine Anfrage an", bundle: "KB im Bundle", mapTitle: "Knowledge Map", mapIntro: "Knoten sind Konzeptseiten, Kanten stammen aus Wiki-Links, Tags und zitierten Quellen — nicht aus der Ordnerstruktur. Defekte Verweise bleiben sichtbar.", withoutSource: "ohne Quelle", pointsTo: "Verweist auf: ", nothing: "nichts", linkedBy: "Wird verlinkt von: ", nobody: "niemandem", sources: "Quellen: ", view: "Ansicht", proposals: "Vorschläge", pages: "Seiten", map: "Knowledge Map", log: "Log", brokenLinks: "defekte Links", search: "Wiki durchsuchen", placeholder: "Titel, Pfad, Tag, Status, Inhalt", onlyProblems: "Nur Seiten mit Problemen", count: "von", changed: " · Quelle verändert", noSource: " · ohne Quelle", logTitle: "Wiki-Log", noLog: "Kein Log verfügbar.", wikiPages: "Wiki-Seiten", citations: "Zitate", noCitations: "Diese Seite nennt keine Quelle. Aussagen darauf lassen sich nicht überprüfen.", changedBadge: "Quelle hat sich geändert", unknown: "unbekannte Quelle", noHash: "ohne Hash — Drift nicht feststellbar", references: "Verweise und Medien", external: "Externe Vorschauen werden erst auf Klick geladen. Vorher verlässt keine Anfrage diese Seite.", noPage: "Keine Seite gefunden."
+    rejected: "abgelehnt", missing: "fehlt", externalAddress: "eine externe Adresse", preview: "Vorschau laden — sendet eine Anfrage an", bundle: "KB im Bundle", mapTitle: "Knowledge Map", mapIntro: "Knoten sind Konzeptseiten, Kanten stammen aus Wiki-Links, Tags und zitierten Quellen — nicht aus der Ordnerstruktur. Defekte Verweise bleiben sichtbar.", withoutSource: "ohne Quelle", pointsTo: "Verweist auf: ", nothing: "nichts", linkedBy: "Wird verlinkt von: ", nobody: "niemandem", sources: "Quellen: ", view: "Ansicht", proposals: "Vorschläge", pages: "Seiten", map: "Knowledge Map", log: "Log", brokenLinks: "defekte Links", search: "Wiki durchsuchen", placeholder: "Titel, Pfad, Tag, Status, Inhalt", onlyProblems: "Nur Seiten mit Problemen", count: "von", changed: " · Quelle verändert", missingSource: " · Quelle fehlt", missingBadge: "Quelle fehlt", unmonitored: "nicht überwacht", noSource: " · ohne Quelle", logTitle: "Wiki-Log", noLog: "Kein Log verfügbar.", wikiPages: "Wiki-Seiten", citations: "Zitate", noCitations: "Diese Seite nennt keine Quelle. Aussagen darauf lassen sich nicht überprüfen.", changedBadge: "Quelle hat sich geändert", unknown: "unbekannte Quelle", noHash: "ohne Hash — Drift nicht feststellbar", references: "Verweise und Medien", external: "Externe Vorschauen werden erst auf Klick geladen. Vorher verlässt keine Anfrage diese Seite.", noPage: "Keine Seite gefunden."
   };
 }
 
@@ -20,6 +20,8 @@ export interface WikiCitation {
   contentHash: string | null;
   drifted: boolean;
   unknown: boolean;
+  /** Only when the server checks sources live (`BLOOMMD_WIKI_SOURCES_DIR`). */
+  sourceState?: "ok" | "changed" | "missing" | "unmonitored" | "unverified" | "no-hash";
 }
 
 export interface WikiPreview {
@@ -38,7 +40,7 @@ export interface WikiExplorerPage {
   content: string;
   tags?: string[];
   citations?: WikiCitation[];
-  citationSummary?: { total: number; drifted: number; unknown: number; withoutHash: number };
+  citationSummary?: { total: number; drifted: number; unknown: number; withoutHash: number; changed?: number; missing?: number };
   previews?: WikiPreview[];
   issues?: string[];
   lifecycle?: "draft" | "stable" | "deprecated";
@@ -244,6 +246,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
         const problem =
           (page.citationSummary?.total ?? 0) === 0
           || (page.citationSummary?.drifted ?? 0) > 0
+          || (page.citationSummary?.missing ?? 0) > 0
           || (page.issues?.length ?? 0) > 0
           || (page.previews ?? []).some((preview) => preview.availability === "missing" || preview.availability === "unsafe");
         if (!problem) return false;
@@ -353,6 +356,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
                   <span className="mt-1 block text-xs text-neutral-500">
                     {page.type}
                     {(page.citationSummary?.drifted ?? 0) > 0 ? copy.changed : ""}
+                    {(page.citationSummary?.missing ?? 0) > 0 ? copy.missingSource : ""}
                     {(page.citationSummary?.total ?? 0) === 0 ? copy.noSource : ""}
                   </span>
                 </button>
@@ -390,11 +394,17 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
                       {(selected.citations ?? []).map((citation) => (
                         <li
                           key={citation.id}
-                          className={`border px-3 py-2 ${citation.drifted ? "border-amber-300 bg-amber-50" : "border-neutral-200 bg-white"}`}
+                          className={`border px-3 py-2 ${citation.sourceState === "missing" ? "border-red-300 bg-red-50" : citation.drifted ? "border-amber-300 bg-amber-50" : "border-neutral-200 bg-white"}`}
                         >
                           <span className="font-medium">{citation.title ?? citation.resource}</span>
                           {citation.drifted && (
                             <Badge className="ml-2 border-amber-400 bg-amber-100 text-amber-900">{copy.changedBadge}</Badge>
+                          )}
+                          {citation.sourceState === "missing" && (
+                            <Badge className="ml-2 border-red-400 bg-red-100 text-red-900">{copy.missingBadge}</Badge>
+                          )}
+                          {citation.sourceState === "unmonitored" && (
+                            <Badge className="ml-2 border-neutral-300 bg-neutral-100 text-neutral-600">{copy.unmonitored}</Badge>
                           )}
                           {citation.unknown && (
                             <Badge className="ml-2 border-neutral-300 bg-neutral-100 text-neutral-600">{copy.unknown}</Badge>

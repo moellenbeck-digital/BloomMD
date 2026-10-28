@@ -12,7 +12,7 @@
  */
 
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { backlinksFor, lintWorkspace, searchWorkspace, type LintResult } from "@bloommd/core";
 import {
   appendWikiLog,
@@ -22,6 +22,7 @@ import {
   getWikiStatus,
   initWikiBundle,
   lintWikiBundle,
+  readWikiBundle,
   regenerateWikiIndex,
   renderWikiDiff,
   type WikiChange,
@@ -29,6 +30,7 @@ import {
   type WikiSourceHashes,
 } from "@bloommd/core/wiki";
 import { WIKI_AGENT_TOOLS, callWikiAgentTool } from "@bloommd/core/wiki-agent";
+import { createWikiSourceCache, readLiveWikiSources, wikiSourceCheckOf, type WikiLiveSources } from "@bloommd/core/wiki-sources";
 import { exportWikiBundle } from "@bloommd/core/wiki-export";
 import { readWorkspace } from "./workspace";
 import { formatFindings, formatGithub, formatJson, plural } from "./report";
@@ -36,6 +38,7 @@ import { forwardToRunningDesktop } from "./desktop-handoff";
 import { AGENT_USAGE, AgentUsageError, runAgentCli } from "./agent-cli";
 import { isLearningCommand } from "./agent-learnings";
 import { runMcpServer } from "./mcp";
+import { runWikiWatch } from "./watch";
 export const WIKI_VERSION = "0.4.4";
 
 export const WIKI_USAGE = `bloommd-wiki ${WIKI_VERSION} — lokaler Markdown- und Wiki-Workflow
@@ -45,13 +48,22 @@ Befehle:
   index <pfad>                                Wiki-Index aktualisieren
   export <pfad> <zielordner> [--overwrite]    Statischer Export (index.html + wiki.json, offline lesbar);
                                               --overwrite ersetzt einen früheren Export im Zielordner
-  status <pfad> [source-hashes.json]          Wiki-Status und Vertrauensstufen prüfen
-  lint <pfad> [source-hashes.json]            Wiki-Bundle prüfen
+  status <pfad> [source-hashes.json] [--sources <ordner>]
+                                              Wiki-Status und Vertrauensstufen prüfen; mit --sources werden
+                                              die Quell-Hashes live aus dem Ordner berechnet
+  lint <pfad> [source-hashes.json] [--sources <ordner>]
+                                              Wiki-Bundle prüfen (ebenso live mit --sources)
+  watch <pfad> --sources <ordner> [--state <datei>] [--once]
+                                              Quellordner beobachten und je Änderung melden, welche
+                                              Seiten betroffen sind; --state merkt den Stand über Neustarts,
+                                              --once macht einen Durchlauf und endet
   log <pfad> <nachricht> [autor]              Wiki-Log ergänzen
   propose <pfad> <changes.json> <proposal.json>
   approve <proposal.json> <reviewer>
   apply <pfad> <proposal.json>
-  mcp <pfad> [--allow-agent-approval]         MCP-Transport für lokale Agent-Clients
+  mcp <pfad> [--sources <ordner>] [--allow-agent-approval]
+                                              MCP-Transport für lokale Agent-Clients; mit --sources rechnet
+                                              knowledge_wiki_status live (der Ordner kommt nur von hier)
   workspace open <pfad>                       Datei oder Ordner in BloomMD Desktop öffnen
   workspace lint <pfad>                       Markdown-Verweise prüfen
   workspace check <pfad>                      Roundtrip prüfen
@@ -61,7 +73,7 @@ Befehle:
 ${AGENT_USAGE}
 
 Optionen:
-  --format <text|json|github>   Ausgabeform (Standard: text)
+  --format <text|json|github>   Ausgabeform (Standard: text; watch: text oder json, eine Zeile je Änderung)
   --orphans                     Seiten ohne jede Verbindung mitmelden (nur lint)
   --strict                      Auch Warnungen führen zu Exit-Code 1
   --quiet                       Nur die Zusammenfassung
@@ -86,6 +98,10 @@ interface Options {
   quiet: boolean;
   overwrite?: boolean;
   folder?: string;
+  sources?: string;
+  state?: string;
+  once?: boolean;
+  allowAgentApproval?: boolean;
 }
 
 interface Parsed {
@@ -286,6 +302,29 @@ async function sourceHashes(path?: string): Promise<WikiSourceHashes> {
   return path ? readJson<WikiSourceHashes>(path) : {};
 }
 
+function isInside(dir: string, path: string): boolean {
+  const rel = relative(dir, path);
+  return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+async function requireDirectory(path: string, label: string): Promise<string> {
+  const info = await stat(path).catch(() => null);
+  if (!info?.isDirectory()) throw new WikiUsageError(`${label} existiert nicht oder ist kein Ordner: ${path}`);
+  return resolve(path);
+}
+
+/**
+ * Hashes for `status` and `lint`: the JSON file as before, and with `--sources` the live ones from
+ * the folder on top. Without either, nothing is computed and nothing changes from today.
+ */
+async function sourceInputs(root: string, jsonPath: string | undefined, sourcesDir: string | undefined): Promise<{ hashes: WikiSourceHashes; live: WikiLiveSources | null }> {
+  const fromFile = await sourceHashes(jsonPath);
+  if (!sourcesDir) return { hashes: fromFile, live: null };
+  const dir = await requireDirectory(sourcesDir, "Quellordner");
+  const live = await readLiveWikiSources(dir, (await readWikiBundle(root)).pages);
+  return { hashes: { ...fromFile, ...live.sourceHashes }, live };
+}
+
 function requiredArgument(args: string[], index: number, label: string): string {
   const value = args[index];
   if (!value) throw new WikiUsageError(`Fehlt: ${label}.`);
@@ -308,6 +347,14 @@ function wikiOptions(args: string[]): { positional: string[]; options: Options }
     if (argument === "--strict") { options.strict = true; continue; }
     if (argument === "--quiet") { options.quiet = true; continue; }
     if (argument === "--overwrite") { options.overwrite = true; continue; }
+    if (argument === "--once") { options.once = true; continue; }
+    if (argument === "--allow-agent-approval") { options.allowAgentApproval = true; continue; }
+    if (argument === "--sources" || argument === "--state") {
+      const value = args[++index];
+      if (!value || value.startsWith("--")) throw new WikiUsageError(`${argument} braucht ${argument === "--sources" ? "einen Ordner" : "eine Datei"}.`);
+      options[argument === "--sources" ? "sources" : "state"] = value;
+      continue;
+    }
     if (argument.startsWith("-")) throw new WikiUsageError(`Unbekannte Option: ${argument}`);
     positional.push(argument);
   }
@@ -319,6 +366,8 @@ export async function runWikiCommand(args: string[]): Promise<number> {
   const command = positional[0];
 
   if (!command) throw new WikiUsageError("Fehlender Unterbefehl. Gemeint war vermutlich: bloommd-wiki status <pfad>");
+  if (options.sources && !["status", "lint", "watch", "mcp"].includes(command)) throw new WikiUsageError(`--sources gilt nur für status, lint, watch und mcp, nicht für ${command}.`);
+  if ((options.state || options.once) && command !== "watch") throw new WikiUsageError(`--state und --once gelten nur für watch, nicht für ${command}.`);
 
   if (command === "init") {
     const root = requiredArgument(positional, 1, "Bundle-Ordner");
@@ -344,8 +393,9 @@ export async function runWikiCommand(args: string[]): Promise<number> {
 
   if (command === "status") {
     const root = requiredArgument(positional, 1, "Bundle-Ordner");
-    const hashes = await sourceHashes(positional[2]);
-    const [status, issues] = await Promise.all([getWikiStatus(root, hashes), lintWikiBundle(root, hashes)]);
+    const { hashes, live } = await sourceInputs(root, positional[2], options.sources);
+    const check = live ? wikiSourceCheckOf(live) : {};
+    const [status, issues] = await Promise.all([getWikiStatus(root, hashes, check), lintWikiBundle(root, hashes, check)]);
     if (options.format === "json") {
       console.log(JSON.stringify({ status, issues }, null, 2));
     } else {
@@ -354,6 +404,7 @@ export async function runWikiCommand(args: string[]): Promise<number> {
         `Vertrauen: ${status.trustCounts.verified} geprüft · ${status.trustCounts.generated} ungeprüft · ${status.trustCounts.unattributed} ohne Quelle`,
       );
       console.log(`Veraltete Quellen: ${status.staleSourceCount} · Abgelaufene Seiten: ${status.expiredPageCount}`);
+      if (live) console.log(`Fehlende Quellen: ${status.missingSourceFileCount} · Nicht überwacht (http/https): ${status.unmonitoredSourceCount}`);
       if (issues.length > 0 && !options.quiet) {
         console.log("");
         for (const issue of issues) console.log(`  ${issue.code.padEnd(24)} ${issue.path} — ${issue.message}`);
@@ -369,7 +420,8 @@ export async function runWikiCommand(args: string[]): Promise<number> {
 
   if (command === "lint") {
     const root = requiredArgument(positional, 1, "Bundle-Ordner");
-    const issues = await lintWikiBundle(root, await sourceHashes(positional[2]));
+    const { hashes, live } = await sourceInputs(root, positional[2], options.sources);
+    const issues = await lintWikiBundle(root, hashes, live ? wikiSourceCheckOf(live) : {});
     if (options.format === "json") {
       console.log(JSON.stringify({ ok: issues.length === 0, issues }, null, 2));
     } else {
@@ -378,6 +430,20 @@ export async function runWikiCommand(args: string[]): Promise<number> {
       console.log(plural(issues.length, "Befund", "Befunde"));
     }
     return issues.length > 0 ? 1 : 0;
+  }
+
+  if (command === "watch") {
+    const root = await requireDirectory(requiredArgument(positional, 1, "Bundle-Ordner"), "Bundle-Ordner");
+    if (!options.sources) throw new WikiUsageError("watch braucht --sources <ordner>.");
+    if (options.format === "github") throw new WikiUsageError("watch kennt nur --format text oder json.");
+    const sourcesDir = await requireDirectory(options.sources, "Quellordner");
+    const statePath = options.state ? resolve(options.state) : undefined;
+    // The state file inside the source folder would be seen by the watcher and trigger itself; inside
+    // the bundle it would put a foreign file into something that only proposals may change.
+    for (const [label, dir] of [["Quellordner", sourcesDir], ["Bundle", root]] as const) {
+      if (statePath && isInside(dir, statePath)) throw new WikiUsageError(`--state darf nicht im ${label} liegen: ${options.state}`);
+    }
+    return runWikiWatch({ bundleDir: root, sourcesDir, ...(statePath ? { statePath } : {}), once: options.once === true, format: options.format });
   }
 
   if (command === "log") {
@@ -417,14 +483,17 @@ export async function runWikiCommand(args: string[]): Promise<number> {
   if (command === "mcp") {
     const rootDir = requiredArgument(positional, 1, "Bundle-Ordner");
     // An agent must not approve and apply its own proposals; a person does that with the CLI.
-    const allowApproval = args.includes("--allow-agent-approval");
+    const allowApproval = options.allowAgentApproval === true;
+    // Chosen by the person starting the server. It is not a tool argument, so an agent cannot point it elsewhere.
+    const sourcesDir = options.sources ? await requireDirectory(options.sources, "Quellordner") : undefined;
+    const sourceCache = createWikiSourceCache();
     const tools = WIKI_AGENT_TOOLS.filter((tool) => allowApproval || (tool.name !== "knowledge_wiki_approve" && tool.name !== "knowledge_wiki_apply"));
     await runMcpServer({
       name: "bloommd-wiki",
       version: WIKI_VERSION,
       tools: tools as never,
       call: async (name, toolArgs) => {
-        const result = await callWikiAgentTool(rootDir, name, toolArgs);
+        const result = await callWikiAgentTool(rootDir, name, toolArgs, sourcesDir ? { sourcesDir, sourceCache } : {});
         if (result.isError) throw new Error(typeof result.value === "string" ? result.value : JSON.stringify(result.value));
         return result.value;
       },
@@ -461,7 +530,7 @@ export async function runWikiCli(argv: string[]): Promise<number> {
       throw error;
     }
   }
-  const wikiCommands = new Set(["init", "index", "export", "status", "lint", "log", "propose", "approve", "apply", "mcp"]);
+  const wikiCommands = new Set(["init", "index", "export", "status", "lint", "log", "propose", "approve", "apply", "mcp", "watch"]);
   if (wikiCommands.has(commandArgs[0] ?? "")) return runWikiCommand(commandArgs);
   if (commandArgs[0] !== "workspace") {
     throw new WikiUsageError(`Unbekannter Befehl: ${commandArgs[0] ?? "(keiner)"}. Nutze Wiki-Befehle direkt oder \`bloommd-wiki workspace <befehl> <pfad>\`.`);

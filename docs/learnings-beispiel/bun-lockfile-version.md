@@ -2,7 +2,10 @@
 type: learning
 title: "Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer"
 area: "Learnings"
-status: neu
+status: bestätigt
+verified:
+  - by: Brand-Chief bloommd
+    at: 2026-10-28
 scope: "bloommd-cluster, md-agents, coder"
 source: "bloommd-cluster, Commit 1da7950, 2026-10-26"
 stale_after: 2027-01-24
@@ -11,7 +14,7 @@ tags: ["bereich/learnings", "coder"]
 
 # Bun-Version je Repo festhalten, das dev-team-Image braucht Bun 1.4 oder neuer
 
-> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Die Fakten stammen aus dem Auftrag zu #109 (Vorfälle vom 26.10.2026); die Belege liegen im Repo `bloommd-cluster` (Forgejo).
+> Vom Brand-Chief am 28.10.2026 gegen die Belege im Repo `bloommd-cluster` (Forgejo) geprüft und bestätigt. Die Fakten stammen aus den Vorfällen vom 26.10.2026.
 
 ## Symptom
 

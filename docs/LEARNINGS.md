@@ -156,8 +156,8 @@ und Undo.
 
 ## Beispielbündel
 
-> **Ungeprüftes Beispiel, noch nicht vom Brand-Chief bestätigt.** Der Hinweis entfällt erst mit dieser
-> Bestätigung.
+> Die drei Beispiele hat der Brand-Chief am 28.10.2026 gegen die Belege im Repo `bloommd-cluster` (Forgejo)
+> geprüft und bestätigt (`status: bestätigt`, `verified`).
 
 [learnings-beispiel/index.md](learnings-beispiel/index.md) enthält drei Learnings aus den Vorfällen vom
 26.10.2026 (kubectl/NetworkPolicy, GHCR-Platzhalter, Bun-Lockfile) als lint-fähiges Wiki-Bundle

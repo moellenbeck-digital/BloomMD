@@ -90,6 +90,7 @@ next-env.d.ts
 **/playwright-report/
 **/playwright-report-*/
 **/test-results/
+**/test-results-testsystem/
 # Graphify analysis output is local working data, not a release or source artifact.
 graphify-out/
 plugins/obsidian/release/

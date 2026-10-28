@@ -16,6 +16,13 @@ bloommd-wiki approve ./proposal.json "reviewer"
 bloommd-wiki apply ./wiki ./proposal.json
 bloommd-wiki mcp ./wiki
 
+# Live source checks: hashes come from the source folder, not from a hand-kept JSON file
+bloommd-wiki status ./wiki --sources ./sources
+bloommd-wiki lint ./wiki --sources ./sources
+bloommd-wiki watch ./wiki --sources ./sources --state ./wiki-sources.state.json
+bloommd-wiki watch ./wiki --sources ./sources --state ./wiki-sources.state.json --once --format json
+bloommd-wiki mcp ./wiki --sources ./sources
+
 # Markdown workspace checks
 bloommd-wiki workspace lint ./docs --format github --strict
 bloommd-wiki workspace check ./vault
@@ -25,6 +32,38 @@ bloommd-wiki workspace backlinks "Note.md" ./docs
 
 The binary writes only where the command explicitly requests it: `init`, `index`, `log`,
 `approve`, `apply`, and `export` (only into the target folder; a non-empty one needs `--overwrite` and must be an earlier export). `apply` needs a named approval and verifies source hashes before writing.
+
+## Live source checks (`--sources`, `watch`)
+
+A page cites a source with `sources[].resource` (a path relative to the source folder) and,
+optionally, `contentHash`. With `--sources <folder>` the current hash of each cited local source is
+read from that folder and compared with `contentHash`; no hash file is needed. The hash is
+`sha256` over the raw bytes, which is what `contentHash` records for UTF-8 text and the only
+meaningful value for binary files. A hash file given in addition is overridden by the live hashes.
+
+| Finding | Meaning |
+| --- | --- |
+| `stale-source` | the source exists and its hash differs from `contentHash` |
+| `missing-source` | the source file no longer exists (new; `status` counts it as `missingSourceFileCount`) |
+| `missing-source-hash` | no current hash is available (unchanged meaning; `missingSourceCount`) |
+
+`http(s)` sources are never fetched or watched; they are counted as `unmonitoredSourceCount` and
+raise no finding. A path that is absolute, contains `..`, uses another scheme or leads out of the
+folder through a symlink is never read.
+
+`watch` prints one line per changed source and the pages that cite it (`--format json`: one JSON
+object per line, `{"event":"changed|added|removed","source":…,"pages":[…]}`). Quick successive
+writes are merged by a 300 ms debounce. `--state <file>` keeps hash, size and modification time per
+source between runs, so a restart reports exactly what changed in between; without it every run
+starts from scratch and reports all present sources as `added`. A file whose size and modification
+time are unchanged is not read again. `--once` makes one pass and exits. The state file must not lie
+inside the source folder or the bundle. `watch` uses `fs.watch` (recursive) instead of chokidar: it
+needs no dependency in the compiled binary, and its events are only a trigger — the report always
+comes from comparing the current sources with the previous state.
+
+With `mcp --sources <folder>` the tool `knowledge_wiki_status` computes live. The folder is chosen
+when a person starts the server; it is never a tool argument, and hashes an agent passes in are
+ignored in that mode.
 
 ## Learning commands (`agent search|read|create|append|stale`)
 

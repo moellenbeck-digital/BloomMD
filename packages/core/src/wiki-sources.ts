@@ -66,6 +66,8 @@ export interface WikiLiveSources {
 /** Keeps the previous snapshot between calls of a long-running process, so unchanged files are not rehashed. */
 export interface WikiSourceCache {
   snapshot: WikiSourceSnapshot | null;
+  /** Folder the snapshot was read from; a snapshot of another folder is never reused. */
+  dir?: string;
 }
 
 export const createWikiSourceCache = (): WikiSourceCache => ({ snapshot: null });
@@ -240,9 +242,14 @@ export async function readLiveWikiSources(
   pages: ReadonlyArray<Pick<WikiPage, "sources">>,
   previous: WikiSourceSnapshot | WikiSourceCache | null = null,
 ): Promise<WikiLiveSources> {
-  const base = previous && "snapshot" in previous ? previous.snapshot : previous;
+  const dir = resolve(sourcesDir);
+  const cache = previous && "snapshot" in previous ? previous : null;
+  const base = cache ? (cache.dir === dir ? cache.snapshot : null) : (previous as WikiSourceSnapshot | null);
   const snapshot = await scanWikiSources(sourcesDir, collectWikiSourceResources(pages), base);
-  if (previous && "snapshot" in previous) previous.snapshot = snapshot;
+  if (cache) {
+    cache.snapshot = snapshot;
+    cache.dir = dir;
+  }
   return liveWikiSourcesFrom(snapshot);
 }
 

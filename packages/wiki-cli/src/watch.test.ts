@@ -234,9 +234,10 @@ describe("mcp --sources", () => {
 
     const reader = proc.stdout.getReader();
     let buffer = "";
-    let answer: { result: { structuredContent: { staleSourceCount: number; sourceVerification: string } } } | null = null;
+    type Answer = { result: { structuredContent: { staleSourceCount: number; sourceVerification: string } } };
+    const found: { answer?: Answer } = {};
     const deadline = Date.now() + 15000;
-    while (!answer && Date.now() < deadline) {
+    while (!found.answer && Date.now() < deadline) {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += new TextDecoder().decode(value);
@@ -244,15 +245,15 @@ describe("mcp --sources", () => {
         if (!line.trim()) continue;
         try {
           const message = JSON.parse(line) as { id?: number };
-          if (message.id === 2) answer = message as never;
+          if (message.id === 2) found.answer = message as unknown as Answer;
         } catch {
           /* partial line */
         }
       }
     }
     proc.kill();
-    expect(answer?.result.structuredContent.staleSourceCount).toBe(1);
-    expect(answer?.result.structuredContent.sourceVerification).toBe("live");
+    expect(found.answer?.result.structuredContent.staleSourceCount).toBe(1);
+    expect(found.answer?.result.structuredContent.sourceVerification).toBe("live");
   });
 
   test("--allow-agent-approval is still accepted next to --sources", async () => {

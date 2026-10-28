@@ -50,6 +50,14 @@ Example register:
 }
 ```
 
+Alternatively, let BloomMD read the current hashes from the source folder itself. Each cited local source (`sources[].resource`, a path relative to this folder) is hashed from its raw bytes; a source whose size and modification time did not change is not read again between requests. The folder wins when both variables are set:
+
+```env
+BLOOMMD_WIKI_SOURCES_DIR=/srv/bloommd/wiki-sources
+```
+
+`/api/wiki` and `/wiki` then show "Quelle geändert" / "Source has changed" and "Quelle fehlt" / "Source is missing" per page and citation; `status` adds `missingSourceFileCount` and `unmonitoredSourceCount`, and `sourceMode` is `live`. `http(s)` sources are not watched. A path that is not a folder is logged and treated as if the variable were unset. The same check is available as `bloommd-wiki status|lint|watch|mcp --sources <folder>`.
+
 Without this register the UI explicitly reports that provenance is not verified. It must not claim that a page is fresh merely because the current source index is unavailable.
 
 ### Reviewing proposals in the app

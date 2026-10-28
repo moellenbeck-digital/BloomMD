@@ -266,3 +266,20 @@ describe("live consumers", () => {
     expect(live).toMatchObject({ sourceHashes: { "a.md": "sha256:a" }, missing: ["b.md"], unmonitored: ["https://x"], unsafe: ["../y"] });
   });
 });
+
+describe("source cache", () => {
+  test("never reuses a snapshot that was read from another folder", async () => {
+    const first = await tempDir("bloommd-src-");
+    const second = await tempDir("bloommd-src-");
+    const when = new Date("2026-01-01T00:00:00Z");
+    for (const [dir, text] of [[first, "one"], [second, "two"]] as const) {
+      await writeFile(join(dir, "a.md"), text);
+      await utimes(join(dir, "a.md"), when, when);
+    }
+    const cache = createWikiSourceCache();
+    const cited = [page("p.md", ["a.md"])];
+    expect((await readLiveWikiSources(first, cited, cache)).sourceHashes["a.md"]).toBe(hashWikiContent("one"));
+    // Same name, size and modification time in another folder: reusing the cache would report "one".
+    expect((await readLiveWikiSources(second, cited, cache)).sourceHashes["a.md"]).toBe(hashWikiContent("two"));
+  });
+});

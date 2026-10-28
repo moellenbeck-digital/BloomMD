@@ -14,6 +14,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { resolve, sep } from "node:path";
 import { extractWikiResources, isSafeWikiResourceTarget, type WikiPage, type WikiResourceKind, type WikiResourceReference } from "./wiki";
+import { citationSourceState, type WikiCitationSourceState, type WikiLiveSources } from "./wiki-sources";
 
 export type PreviewAvailability =
   /** Can be previewed now: a local file inside the bundle that exists. */
@@ -46,6 +47,8 @@ export interface PageCitation {
   drifted: boolean;
   /** True when the page cites a source id that the bundle does not know. */
   unknown: boolean;
+  /** Only with a live source check: how the cited source stands right now. */
+  sourceState?: WikiCitationSourceState;
 }
 
 const REMOTE_SCHEME = /^https?:\/\//i;
@@ -204,9 +207,10 @@ export async function requestResourcePreview(
  * changed after the page was written, which is exactly the moment a generated claim stops being
  * supported by what it cites — so it is surfaced rather than smoothed over.
  */
-export function pageCitations(page: WikiPage, knownHashes: Record<string, string> = {}): PageCitation[] {
+export function pageCitations(page: WikiPage, knownHashes: Record<string, string> = {}, live?: WikiLiveSources): PageCitation[] {
   return page.sources.map((source) => {
-    const expected = knownHashes[source.id];
+    // A live check is keyed by resource (the path in the source folder), a hash file by id.
+    const expected = live ? live.sourceHashes[source.resource] : knownHashes[source.id];
     return {
       id: source.id,
       resource: source.resource,
@@ -215,7 +219,8 @@ export function pageCitations(page: WikiPage, knownHashes: Record<string, string
       retrievedAt: source.retrievedAt ?? null,
       contentHash: source.contentHash ?? null,
       drifted: Boolean(expected && source.contentHash && expected !== source.contentHash),
-      unknown: Object.keys(knownHashes).length > 0 && expected === undefined,
+      unknown: live ? false : Object.keys(knownHashes).length > 0 && expected === undefined,
+      ...(live ? { sourceState: citationSourceState(source, live) } : {}),
     };
   });
 }
@@ -225,6 +230,9 @@ export interface CitationSummary {
   drifted: number;
   unknown: number;
   withoutHash: number;
+  /** Only with a live source check. */
+  changed?: number;
+  missing?: number;
 }
 
 /** Counts for a page badge, so a reader sees the state before opening the list. */
@@ -234,5 +242,11 @@ export function citationSummary(citations: PageCitation[]): CitationSummary {
     drifted: citations.filter((citation) => citation.drifted).length,
     unknown: citations.filter((citation) => citation.unknown).length,
     withoutHash: citations.filter((citation) => !citation.contentHash).length,
+    ...(citations.some((citation) => citation.sourceState)
+      ? {
+          changed: citations.filter((citation) => citation.sourceState === "changed").length,
+          missing: citations.filter((citation) => citation.sourceState === "missing").length,
+        }
+      : {}),
   };
 }

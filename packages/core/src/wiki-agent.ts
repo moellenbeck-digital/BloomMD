@@ -1,3 +1,4 @@
+import { readLiveWikiSources, wikiSourceCheckOf, type WikiSourceCache } from "./wiki-sources";
 import {
   applyWikiProposal,
   approveWikiProposal,
@@ -13,7 +14,7 @@ import {
 export const WIKI_AGENT_TOOLS = [
   {
     name: "knowledge_wiki_status",
-    description: "Return deterministic page, source, drift, and lint status for the configured Wiki bundle.",
+    description: "Return deterministic page, source, drift, and lint status for the configured Wiki bundle. When the server was started with a source folder, source hashes are computed live from it.",
     inputSchema: { type: "object", properties: { sourceHashes: { type: "object", additionalProperties: { type: "string" } } } },
   },
   {
@@ -49,8 +50,24 @@ function objectArgument(args: Record<string, unknown> | undefined, key: string):
   return value as Record<string, unknown>;
 }
 
-export async function callWikiAgentTool(rootDir: string, name: string, args: Record<string, unknown> = {}): Promise<WikiAgentCallResult> {
+/**
+ * Set by the person starting the server, never by a tool argument: the folder an agent may cause
+ * to be read must not be something the agent can choose.
+ */
+export interface WikiAgentOptions {
+  /** Source folder for live hashes in `knowledge_wiki_status`. */
+  sourcesDir?: string;
+  /** Previous scan of that folder, kept between calls so unchanged files are not hashed again. */
+  sourceCache?: WikiSourceCache;
+}
+
+export async function callWikiAgentTool(rootDir: string, name: string, args: Record<string, unknown> = {}, options: WikiAgentOptions = {}): Promise<WikiAgentCallResult> {
   if (name === "knowledge_wiki_status") {
+    if (options.sourcesDir) {
+      // Live mode: hashes an agent passes in would only be able to hide drift, so they are ignored.
+      const live = await readLiveWikiSources(options.sourcesDir, (await readWikiBundle(rootDir)).pages, options.sourceCache ?? null);
+      return { value: { ...(await getWikiStatus(rootDir, live.sourceHashes, wikiSourceCheckOf(live))), sourceVerification: "live" } };
+    }
     return { value: await getWikiStatus(rootDir, (args.sourceHashes ?? {}) as WikiSourceHashes) };
   }
 

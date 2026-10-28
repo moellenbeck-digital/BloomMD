@@ -16,6 +16,7 @@ export type WikiIssueCode =
   | "unsafe-resource"
   | "broken-link"
   | "missing-source-hash"
+  | "missing-source"
   | "stale-source"
   | "unindexed-page"
   | "expired-page"
@@ -122,7 +123,12 @@ export interface WikiStatus {
   pageCount: number;
   sourceCount: number;
   staleSourceCount: number;
+  /** Sources that are cited with a `contentHash` but have no current hash (`missing-source-hash`). */
   missingSourceCount: number;
+  /** Cited local sources whose file no longer exists (`missing-source`); needs a live source check. */
+  missingSourceFileCount: number;
+  /** Cited sources that are deliberately not watched (http/https); needs a live source check. */
+  unmonitoredSourceCount: number;
   unindexedPageCount: number;
   pendingPageCount: number;
   /** OKF v0.2 lifecycle and trust rollup, so an agent can ask "what may I rely on?" */
@@ -196,6 +202,14 @@ function absoluteWikiPath(rootDir: string, path: string): string {
 
 export function hashWikiContent(content: string): string {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
+}
+
+/**
+ * The same hash over raw bytes. For valid UTF-8 text this equals `hashWikiContent` of the decoded
+ * string; for binary sources it is the only correct form, because decoding would alter the bytes.
+ */
+export function hashWikiBytes(bytes: Uint8Array): string {
+  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 function titleFromPath(path: string, frontmatter: Record<string, unknown>): string {
@@ -444,7 +458,17 @@ export function extractWikiResources(markdown: string): WikiResourceReference[] 
   return resources;
 }
 
-export async function lintWikiBundle(rootDir: string, sourceHashes: WikiSourceHashes = {}): Promise<WikiLintIssue[]> {
+/** Result of a live source check (see `wiki-sources.ts`), handed to lint and status. */
+export interface WikiSourceCheck {
+  /** Resources of cited local sources whose file no longer exists. */
+  missingSources?: Iterable<string>;
+  /** Resources that are deliberately not watched (http/https). They are not an error. */
+  unmonitoredSources?: Iterable<string>;
+}
+
+export async function lintWikiBundle(rootDir: string, sourceHashes: WikiSourceHashes = {}, sourceCheck: WikiSourceCheck = {}): Promise<WikiLintIssue[]> {
+  const missingSources = new Set(sourceCheck.missingSources ?? []);
+  const unmonitoredSources = new Set(sourceCheck.unmonitoredSources ?? []);
   const bundle = await readWikiBundle(rootDir);
   const issues: WikiLintIssue[] = [];
   if (!bundle.index) issues.push({ code: "missing-reserved-file", path: "index.md", message: "Wiki bundle is missing index.md." });
@@ -496,10 +520,18 @@ export async function lintWikiBundle(rootDir: string, sourceHashes: WikiSourceHa
       }
     }
     for (const source of page.sources) {
+      // A vanished file is its own state, distinct from "no hash available", and applies to every
+      // cited local source, with or without a contentHash.
+      if (missingSources.has(source.resource) || missingSources.has(source.id)) {
+        issues.push({ code: "missing-source", path: page.path, message: `Source file no longer exists: ${source.id}` });
+        continue;
+      }
       // Drift detection needs BloomMD's contentHash extension. A plain OKF source without it is
       // conformant, so its absence is not an issue on its own.
       if (!source.contentHash) continue;
       const current = sourceHashes[source.id] ?? sourceHashes[source.resource];
+      // A deliberately unwatched source (http/https) has no live hash and that is not a finding.
+      if (!current && (unmonitoredSources.has(source.resource) || unmonitoredSources.has(source.id))) continue;
       if (!current) issues.push({ code: "missing-source-hash", path: page.path, message: `No current hash is available for source: ${source.id}` });
       else if (current !== source.contentHash) issues.push({ code: "stale-source", path: page.path, message: `Source changed since distillation: ${source.id}` });
     }
@@ -507,9 +539,10 @@ export async function lintWikiBundle(rootDir: string, sourceHashes: WikiSourceHa
   return issues;
 }
 
-export async function getWikiStatus(rootDir: string, sourceHashes: WikiSourceHashes = {}): Promise<WikiStatus> {
+export async function getWikiStatus(rootDir: string, sourceHashes: WikiSourceHashes = {}, sourceCheck: WikiSourceCheck = {}): Promise<WikiStatus> {
   const bundle = await readWikiBundle(rootDir);
-  const issues = await lintWikiBundle(rootDir, sourceHashes);
+  const issues = await lintWikiBundle(rootDir, sourceHashes, sourceCheck);
+  const unmonitored = new Set(sourceCheck.unmonitoredSources ?? []);
   const sources = bundle.pages.flatMap((page) => page.sources);
   const statusCounts: Record<WikiPageStatus, number> = { draft: 0, stable: 0, deprecated: 0 };
   const trustCounts: Record<WikiTrustTier, number> = { verified: 0, generated: 0, unattributed: 0 };
@@ -523,6 +556,8 @@ export async function getWikiStatus(rootDir: string, sourceHashes: WikiSourceHas
     sourceCount: new Set(sources.map((source) => source.resource)).size,
     staleSourceCount: issues.filter((issue) => issue.code === "stale-source").length,
     missingSourceCount: issues.filter((issue) => issue.code === "missing-source-hash").length,
+    missingSourceFileCount: issues.filter((issue) => issue.code === "missing-source").length,
+    unmonitoredSourceCount: new Set(sources.filter((source) => unmonitored.has(source.resource) || unmonitored.has(source.id)).map((source) => source.resource)).size,
     unindexedPageCount: issues.filter((issue) => issue.code === "unindexed-page").length,
     pendingPageCount: statusCounts.draft,
     statusCounts,

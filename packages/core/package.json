@@ -72,6 +72,10 @@
       "import": "./src/wiki.ts",
       "types": "./src/wiki.ts"
     },
+    "./wiki-sources": {
+      "import": "./src/wiki-sources.ts",
+      "types": "./src/wiki-sources.ts"
+    },
     "./wiki-agent": {
       "import": "./src/wiki-agent.ts",
       "types": "./src/wiki-agent.ts"

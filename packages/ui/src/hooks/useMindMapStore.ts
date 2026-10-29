@@ -272,7 +272,8 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   setDocument: (doc) => {
     cancelPendingNodeFocus();
     cancelLayout();
-    set({ layoutPending: false, layoutFailed: false });
+    // A status message belongs to the document it was raised for; never carry it across navigation.
+    set({ layoutPending: false, layoutFailed: false, statusMessage: null });
     // Cleanup previous sync provider FIRST (before destroying Y.Doc)
     const prevProvider = get().syncProvider;
     if (prevProvider) prevProvider.destroy();

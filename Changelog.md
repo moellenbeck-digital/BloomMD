@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Registrierung: Die Quelladresse für die Limits je Adresse lässt sich nicht mehr per Header fälschen. Geglaubt wird nur noch ein Header: der in `BLOOMMD_TRUSTED_PROXY_HEADER` benannte (z. B. `cf-connecting-ip`), sonst der letzte Eintrag von `x-forwarded-for` (genau ein Proxy davor). `x-vercel-forwarded-for`, `cf-connecting-ip` und `x-real-ip` zählen nur noch, wenn sie dort benannt sind. Fehlt der Header im Produktionsbuild, zählen alle solchen Anfragen gemeinsam. `release:check` lehnt einen ungültigen Header-Namen ab und warnt, wenn er fehlt (ebenso `warnings` in `/api/health/ready`).
+- Registration: the source address used for the per-address limits can no longer be forged with a header. Only one header is believed: the one named in `BLOOMMD_TRUSTED_PROXY_HEADER` (e.g. `cf-connecting-ip`), otherwise the last `x-forwarded-for` entry (exactly one proxy in front). `x-vercel-forwarded-for`, `cf-connecting-ip` and `x-real-ip` only count when named there. If the header is missing in a production build, all such requests are counted together. `release:check` rejects an invalid header name and warns when it is unset (also `warnings` in `/api/health/ready`).
+
 - Desktop: Der Startbildschirm (Splash) zeigt die Version, die wirklich gebaut wurde, statt immer `v0.3.0`. Er zeigt dieselbe Zeichenkette wie der About-Dialog: `BloomMD <Version> (<Kurz-SHA>)`, ohne Klammer, wenn der Build keine SHA kennt. Stable-, Development- und Insiders-Builds zeigen jeweils ihre eigene Version.
 - Desktop: The start screen (splash) shows the version that was actually built instead of always `v0.3.0`. It shows the same string as the About dialog: `BloomMD <version> (<short SHA>)`, without the parenthesis when the build has no SHA. Stable, development and insiders builds each show their own version.
 

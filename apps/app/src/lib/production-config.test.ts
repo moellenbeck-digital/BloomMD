@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { productionConfigErrors } from "./production-config";
+import { productionConfigErrors, productionConfigWarnings } from "./production-config";
 
 function appEnv(): NodeJS.ProcessEnv {
   return {
@@ -114,6 +114,21 @@ describe("product app production config", () => {
 
         expect(productionConfigErrors(env)).toContain(`${key} must not be set in production.`);
       }
+    }
+  });
+
+  test("checks the trusted proxy header name, and only warns when it is missing (#169)", () => {
+    const env = appEnv();
+    expect(productionConfigErrors(env)).toEqual([]);
+    expect(productionConfigWarnings(env).join(" ")).toContain("BLOOMMD_TRUSTED_PROXY_HEADER is not set");
+
+    env.BLOOMMD_TRUSTED_PROXY_HEADER = "cf-connecting-ip";
+    expect(productionConfigErrors(env)).toEqual([]);
+    expect(productionConfigWarnings(env)).toEqual([]);
+
+    for (const invalid of ["x forwarded for", "x-real-ip: 1.2.3.4", "höhe"]) {
+      env.BLOOMMD_TRUSTED_PROXY_HEADER = invalid;
+      expect(productionConfigErrors(env)).toContain("BLOOMMD_TRUSTED_PROXY_HEADER must be a valid HTTP header name (letters, digits and hyphens).");
     }
   });
 

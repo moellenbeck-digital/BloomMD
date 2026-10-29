@@ -372,6 +372,9 @@ Required for the hosted closed beta:
   self-registration, then no invitation list is required)
 - `BLOOMMD_INTERNAL_INVITE_SECRET` for DB-backed beta invites (no longer used by the marketing app since the waitlist admin was removed)
 - optional fallback: `BLOOMMD_BETA_ALLOWED_EMAILS` or `BLOOMMD_BETA_INVITE_CODES`
+- optional: `BLOOMMD_TRUSTED_PROXY_HEADER` (name of the one header believed for the client address in
+  rate limits, e.g. `cf-connecting-ip`; unset: last `x-forwarded-for` entry, right behind one proxy;
+  `release:check` warns when unset and rejects an invalid name)
 - `BLOOMMD_BILLING_ENABLED=0`
 - `BLOOMMD_AUTO_MIGRATE=0`
 - `NEXT_PUBLIC_SITE_URL`

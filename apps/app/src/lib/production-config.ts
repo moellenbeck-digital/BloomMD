@@ -1,3 +1,5 @@
+import { trustedProxyHeaderName } from "./trusted-proxy";
+
 const requiredProductionValues = [
   "DATABASE_URL",
   "BLOOMMD_AUTH_SECRET",
@@ -95,6 +97,11 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     if (env[key]?.trim()) errors.push(`${key} must not be set in production.`);
   }
   if (env.BLOOMMD_E2E_MAIL_OUTBOX?.trim()) errors.push("BLOOMMD_E2E_MAIL_OUTBOX must not be set in production.");
+  // Rate limits per client address believe exactly one header (#169); a malformed name would make
+  // every request share one key.
+  if (trustedProxyHeaderName(env) === undefined) {
+    errors.push("BLOOMMD_TRUSTED_PROXY_HEADER must be a valid HTTP header name (letters, digits and hyphens).");
+  }
   const siteOrigin = secureOrigin(env.NEXT_PUBLIC_SITE_URL, ["https:"]);
   if (!siteOrigin) errors.push("NEXT_PUBLIC_SITE_URL must be a valid HTTPS URL.");
   if (!hasSecretEntropy(env.BLOOMMD_AUTH_SECRET)) errors.push("BLOOMMD_AUTH_SECRET must be a non-placeholder secret with at least 32 characters and sufficient variety.");
@@ -166,6 +173,20 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     errors.push("NEXT_PUBLIC_POSTHOG_HOST must be HTTPS.");
   }
   return errors;
+}
+
+/**
+ * Findings that do not block a release but should be seen: reported by `release:check` and in
+ * `/api/health/ready`.
+ */
+export function productionConfigWarnings(env: NodeJS.ProcessEnv = process.env) {
+  const warnings: string[] = [];
+  if (!env.BLOOMMD_TRUSTED_PROXY_HEADER?.trim()) {
+    warnings.push(
+      "BLOOMMD_TRUSTED_PROXY_HEADER is not set: rate limits per client address use the last x-forwarded-for entry, which is only right behind exactly one proxy.",
+    );
+  }
+  return warnings;
 }
 
 function feedbackConfigErrors(env: NodeJS.ProcessEnv): string[] {

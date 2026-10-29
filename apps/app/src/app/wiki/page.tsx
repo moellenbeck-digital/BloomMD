@@ -71,7 +71,8 @@ export default function WikiPageRoute() {
   const loadProposals = useCallback(async () => {
     try {
       const response = await fetch("/api/wiki/proposals", { cache: "no-store" });
-      const body = response.ok ? ((await response.json()) as WikiProposalsData) : null;
+      // Drain a non-OK body too: an unread response keeps the request open (Chromium never reaches network idle).
+      const body = response.ok ? ((await response.json()) as WikiProposalsData) : (await response.body?.cancel(), null);
       setProposals(body && Array.isArray(body.proposals) ? body : null);
     } catch (error) {
       console.error("[BloomMD] Wiki proposals could not be loaded:", error instanceof Error ? error.message : "unknown");

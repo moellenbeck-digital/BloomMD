@@ -153,13 +153,14 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_ingest",
     title: "Text ablegen",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: `File raw text (transcript, chat, note) as a new map from a template. You hand over the original text AND the sections you already structured; the tool invents nothing and calls no model. The original is stored word for word (no shortening, no normalising) as a node of kind source titled "Originaltext" below "Quellen" (added when the template has none, e.g. weekly), with the source reference (citation, and url for http(s)) and date. nodes use the format of bloommd_create_map; parents are skeleton refs of the template (bloommd_templates). Limits: text at most ${INGEST_MAX_TEXT_CHARS} characters, nodes at most ${INGEST_MAX_NODES} (template skeleton and source node not counted); above that, with no text or no source, or with an unknown template, nothing is written and the error names the limit. A map with the same title (ignoring case and punctuation) in the same area is a duplicate: nothing is written, the error names the existing map. Rights like bloommd_create_map: read is refused, propose becomes a proposal for the owner (never approve it yourself), write is written; logged, undo with bloommd_undo. Use template learning's own flow (bloommd_create_map) for learnings, not this tool. Never file credentials (passwords, tokens, keys) or personal data: the tool does not filter them.`,
+    description: `File raw text (transcript, chat, note) as a new map from a template. You hand over the original text AND the sections you already structured; the tool invents nothing and calls no model. The original is stored word for word (no shortening, no normalising) as a node of kind source titled "Originaltext" below "Quellen" (added when the template has none, e.g. weekly), with the source reference (citation, and url for http(s)) and date. nodes use the format of bloommd_create_map; parents are skeleton refs of the template (bloommd_templates). Limits: text at most ${INGEST_MAX_TEXT_CHARS} characters, nodes at most ${INGEST_MAX_NODES} (template skeleton and source node not counted); above that, with no text or no source, or with an unknown template, nothing is written and the error names the limit. A map with the same title (ignoring case and punctuation) in the same area is a duplicate: nothing is written, the error names the existing map. Rights like bloommd_create_map: read is refused, propose becomes a proposal for the owner (never approve it yourself), write is written; logged, undo with bloommd_undo. With inMap (path of an existing map) the same input adds to that map instead: a section node whose parent already has exactly one child with the same normalized title is not created again (its new children hang below it, its content stays); otherwise it is created (several matches: created, with a hint "mehrdeutig" in hinweise). parent is a ref of your list, a node id of that map, or a skeleton ref of a template whose node the map has; otherwise nothing is written. The original becomes one more source node "Originaltext <date or source>" below "Quellen" (existing sources stay unchanged); a source node with the same citation is a duplicate and nothing is written. relations targets (ref, node id or title) and [[Note]] links in the content of new nodes are connected only when the target is unambiguous, otherwise hinweise says so. template, title and area are not allowed with inMap; a missing map refuses with nothing written. Use template learning's own flow (bloommd_create_map) for learnings, not this tool. Never file credentials (passwords, tokens, keys) or personal data: the tool does not filter them.`,
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        template: { type: "string", enum: [...INGEST_TEMPLATE_IDS], description: "Template id; its skeleton refs are the parents of your nodes." },
-        title: { type: "string" },
+        template: { type: "string", enum: [...INGEST_TEMPLATE_IDS], description: "Template id; its skeleton refs are the parents of your nodes. Required for a new map, not allowed with inMap." },
+        title: { type: "string", description: "Title of the new map. Required for a new map, not allowed with inMap." },
+        inMap: { type: "string", description: "Path of an existing map to add to (as bloommd_get_map takes it) instead of creating a new one; then template, title and area are not allowed." },
         text: { type: "string", description: `The original text, unchanged (at most ${INGEST_MAX_TEXT_CHARS} characters).` },
         source: { type: "string", description: "Where the original comes from: file path, URL or ticket. Required." },
         sourceDate: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date of the source, YYYY-MM-DD." },
@@ -168,7 +169,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
         reason: changeMeta.reason,
         ...targetProperty,
       },
-      required: ["template", "title", "text", "source"],
+      required: ["text", "source"],
     },
   },
   {
@@ -344,16 +345,21 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           frontmatter: parseKnowledgeFrontmatterInput(args),
           ...meta,
         });
-        case "bloommd_ingest": return service.ingest({
-          template: string(args, "template", true)!,
-          title: string(args, "title", true)!,
-          text: string(args, "text", true)!,
-          sourceRef: string(args, "source", true)!,
-          sourceDate: string(args, "sourceDate"),
-          area: string(args, "area"),
-          nodes: parseIngestNodes(args.nodes),
-          reason: meta.reason,
-        });
+        case "bloommd_ingest": {
+          // template and title are checked at run time: a new map needs them, inMap must not get them.
+          const inMap = string(args, "inMap");
+          return service.ingest({
+            template: string(args, "template", !inMap),
+            title: string(args, "title", !inMap),
+            inMap,
+            text: string(args, "text", true)!,
+            sourceRef: string(args, "source", true)!,
+            sourceDate: string(args, "sourceDate"),
+            area: string(args, "area"),
+            nodes: parseIngestNodes(args.nodes),
+            reason: meta.reason,
+          });
+        }
         case "bloommd_update_map": {
           const trust = parseKnowledgeFrontmatterInput(args);
           return service.updateMap({ path: string(args, "path", true)!, version: string(args, "version"), nodes: nodes(args, trust ? 0 : 1), frontmatter: trust, ...meta });

@@ -2,6 +2,7 @@ import { access, copyFile, mkdir, readdir, readFile, writeFile, unlink  } from "
 import { basename, join  } from "node:path";
 import { assertPathInDirectory, normalizeMarkdownFilename, resolveMarkdownPath, normalizeMarkdownPath, normalizeFolderPath, resolveFolderPath } from "./paths";
 import { parseFile, serializeToMarkdown } from "./parser";
+import { DEFAULT_TEMPLATE_FOLDER, selectTemplatePaths, type CustomNoteTemplate } from "./note-templates";
 import { buildWorkspaceMindMap, WorkspaceDocumentCache } from "./workspace-document";
 import type {
   FileStoreConfig,
@@ -78,6 +79,31 @@ export class FileStore {
     return (await walk("")).sort((a, b) => a.localeCompare(b));
   }
 
+
+  /**
+   * The user's own note templates: the `.md` files directly inside `folder` at the workspace root
+   * (sub-folders are not searched). A workspace without that folder has no templates, which is not
+   * an error; any other read failure is.
+   */
+  async readTemplates(folder: string = DEFAULT_TEMPLATE_FOLDER): Promise<CustomNoteTemplate[]> {
+    const folderName = normalizeFolderPath(folder);
+    let entries;
+    try {
+      entries = await readdir(resolveFolderPath(this.baseDir, folderName), { withFileTypes: true });
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") return [];
+      throw error;
+    }
+    const paths = selectTemplatePaths(
+      entries.filter((entry) => entry.isFile()).map((entry) => `${folderName}/${entry.name}`),
+      folderName,
+    );
+    return Promise.all(paths.map(async (path) => ({
+      path,
+      content: await readFile(join(this.baseDir, path), "utf-8"),
+    })));
+  }
 
   /** Markdown files as workspace-relative paths, so files inside folders are listed too. */
   private async collectMarkdownFiles(prefix: string, onIssue?: FileReadIssueHandler): Promise<Array<{ name: string }>> {

@@ -5,7 +5,7 @@ import type { CustomNoteTemplate } from "@bloommd/core/browser";
 import type { Locale } from "../i18n/translations";
 import type { CreateEntryKind } from "./CreateEntryDialog";
 
-(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // React DOM decides at import time whether the browser supports `input` events, so the DOM has to
 // exist before react-dom is loaded; hence the dynamic imports below.
@@ -30,6 +30,7 @@ describe("CreateEntryDialog templates", () => {
   const created: Array<{ path: string; content: string | undefined }> = [];
 
   beforeEach(() => {
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
     created.length = 0;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -40,6 +41,7 @@ describe("CreateEntryDialog templates", () => {
     act(() => root?.unmount());
     root = null;
     document.body.innerHTML = "";
+    actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
   });
 
   async function open(options: {

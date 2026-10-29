@@ -251,3 +251,43 @@ describe("creating folders and files", () => {
     expect(workspace.folders()).toEqual(["Buch", "Buch/Teil-1"]);
   });
 });
+
+describe("readTemplates", () => {
+  const vorlagen = () =>
+    directoryHandle("Vorlagen", [
+      ["Wochenplan.md", fileHandle("Wochenplan.md", "# {{title}}\n{{date}}\n")],
+      ["Brief.md", fileHandle("Brief.md", "# {{title}}\n{{name}}\n")],
+      ["notizen.txt", fileHandle("notizen.txt", "ignored")],
+    ]);
+
+  test("reads the .md files directly inside Vorlagen at the workspace root, sorted", async () => {
+    const archive = directoryHandle("Archiv", [["Alt.md", fileHandle("Alt.md", "# old")]]);
+    const root = directoryHandle("vault", [
+      ["Normal.md", fileHandle("Normal.md", "# Normal")],
+      ["Vorlagen", vorlagen()],
+      ["Uni", directoryHandle("Uni", [["Vorlagen", archive]] as never)],
+    ] as never);
+    const workspace = new BrowserWorkspace(root as never);
+    await workspace.refresh();
+    expect(await workspace.readTemplates()).toEqual([
+      { path: "Vorlagen/Brief.md", content: "# {{title}}\n{{name}}\n" },
+      { path: "Vorlagen/Wochenplan.md", content: "# {{title}}\n{{date}}\n" },
+    ]);
+  });
+
+  test("does not search sub-folders of Vorlagen", async () => {
+    const nested = directoryHandle("Vorlagen", [
+      ["Top.md", fileHandle("Top.md", "# Top")],
+      ["Archiv", directoryHandle("Archiv", [["Alt.md", fileHandle("Alt.md", "# old")]])],
+    ] as never);
+    const workspace = new BrowserWorkspace(directoryHandle("vault", [["Vorlagen", nested]] as never) as never);
+    await workspace.refresh();
+    expect((await workspace.readTemplates()).map((template) => template.path)).toEqual(["Vorlagen/Top.md"]);
+  });
+
+  test("a workspace without the folder has no templates and raises no error", async () => {
+    const workspace = new BrowserWorkspace(directoryHandle("vault", [["Normal.md", fileHandle("Normal.md", "# N")]]) as never);
+    await workspace.refresh();
+    expect(await workspace.readTemplates()).toEqual([]);
+  });
+});

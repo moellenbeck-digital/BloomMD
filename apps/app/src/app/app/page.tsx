@@ -712,7 +712,7 @@ export default function Home() {
    * directory that other programs can touch, so the filesystem stays the source of truth.
    */
   const createEntry = useCallback(
-    async (kind: CreateEntryKind, path: string) => {
+    async (kind: CreateEntryKind, path: string, templateContent?: string) => {
       const workspace = browserWorkspaceRef.current;
       if (!workspace) throw new Error(copy.noFolder);
 
@@ -729,12 +729,18 @@ export default function Home() {
 
       const created = await workspace.createFile(
         path,
-        `# ${path.split("/").pop()?.replace(/\.md$/i, "") ?? "Neu"}\n\n`,
+        templateContent ?? `# ${path.split("/").pop()?.replace(/\.md$/i, "") ?? "Neu"}\n\n`,
       );
       setBrowserWorkspaceFiles(await workspace.refresh());
       await openLocalFile(created);
     },
     [locale, openLocalFile],
+  );
+
+  /** Own templates are the .md files in the workspace folder `Vorlagen`; without it there are none. */
+  const loadCustomTemplates = useCallback(
+    async () => (await browserWorkspaceRef.current?.readTemplates()) ?? [],
+    [],
   );
 
   /**
@@ -2784,9 +2790,10 @@ export default function Home() {
         <CreateEntryDialog
           kind={createKind}
           folders={browserWorkspaceRef.current?.folders() ?? []}
+          loadCustomTemplates={loadCustomTemplates}
           onClose={() => setCreateKind(null)}
-          onCreate={async (path) => {
-            await createEntry(createKind, path);
+          onCreate={async (path, content) => {
+            await createEntry(createKind, path, content);
             return path;
           }}
         />

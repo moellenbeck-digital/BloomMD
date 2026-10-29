@@ -1,6 +1,6 @@
 "use client";
 
-import { normalizeFolderPath, normalizeMarkdownPath } from "@bloommd/core/browser";
+import { DEFAULT_TEMPLATE_FOLDER, normalizeFolderPath, normalizeMarkdownPath, selectTemplatePaths, type CustomNoteTemplate } from "@bloommd/core/browser";
 
 interface DirectoryPickerOptions {
   id?: string;
@@ -187,6 +187,15 @@ export class BrowserWorkspace {
     this.files.set(normalized, handle);
     this.resources.set(normalized, handle);
     return normalized;
+  }
+
+  /**
+   * The user's own note templates: the `.md` files directly inside the template folder at the root
+   * of the workspace, as found by the last refresh. Without such a folder there are none.
+   */
+  async readTemplates(folder: string = DEFAULT_TEMPLATE_FOLDER): Promise<CustomNoteTemplate[]> {
+    const paths = selectTemplatePaths([...this.files.keys()], folder);
+    return Promise.all(paths.map(async (path) => ({ path, content: await this.read(path) })));
   }
 
   /** Folder paths in the workspace, derived from the files found during the last refresh. */

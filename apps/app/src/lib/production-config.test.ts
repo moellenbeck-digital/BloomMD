@@ -117,6 +117,17 @@ describe("product app production config", () => {
     }
   });
 
+  test("rejects the local-deployment marker in production (#169)", () => {
+    const env = appEnv();
+    expect(productionConfigErrors(env)).toEqual([]);
+
+    env.BLOOMMD_LOCAL_DEPLOYMENT = "1";
+    expect(productionConfigErrors(env)).toContain("BLOOMMD_LOCAL_DEPLOYMENT must not be set in production.");
+
+    env.BLOOMMD_LOCAL_DEPLOYMENT = "0";
+    expect(productionConfigErrors(env)).toEqual([]);
+  });
+
   test("checks the trusted proxy header name, and only warns when it is missing (#169)", () => {
     const env = appEnv();
     expect(productionConfigErrors(env)).toEqual([]);

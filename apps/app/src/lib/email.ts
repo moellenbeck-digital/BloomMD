@@ -1,5 +1,6 @@
 import { appendFile } from "node:fs/promises";
 import { getSiteUrl } from "./billing";
+import { isE2ETestModeEnabled } from "./e2e-mode";
 import { publicAppUrl } from "./deployment";
 import { formatAuthDate, roleLabel, type AuthLocale } from "./auth-copy";
 import { serializeAuthParams } from "./invite-intent";
@@ -36,10 +37,11 @@ export function isEmailConfigured() {
 /**
  * E2E only: with the test marker set, mails are appended to this file instead of being sent, so
  * the browser suite can follow confirmation and reset links without a mail provider. Ignored
- * without `BLOOMMD_E2E_TEST_MODE=1`, and `release:check` rejects both variables in production.
+ * without `BLOOMMD_E2E_TEST_MODE=1` (in a production build also without `BLOOMMD_LOCAL_DEPLOYMENT=1`), and
+ * `release:check` rejects these variables in production.
  */
 function e2eMailOutboxPath() {
-  if (process.env.BLOOMMD_E2E_TEST_MODE !== "1") return null;
+  if (!isE2ETestModeEnabled()) return null;
   return process.env.BLOOMMD_E2E_MAIL_OUTBOX?.trim() || null;
 }
 

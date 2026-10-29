@@ -130,6 +130,11 @@ export interface Translations {
   createEntryFilePlaceholder: string;
   createEntryFolderDescription: string;
   createEntryFileDescription: string;
+  createEntryTemplate: string;
+  createEntryTemplateBlank: string;
+  createEntryTemplateBuiltIn: string;
+  createEntryTemplateCustom: string;
+  createEntryTemplateLoadFailed: string;
   createEntryBusy: string;
   create: string;
   conflictAriaLabel: string;
@@ -576,6 +581,11 @@ export const translations: Record<Locale, Translations> = {
     createEntryFilePlaceholder: "Notiz",
     createEntryFolderDescription: "Ein echtes Verzeichnis — es bleibt sichtbar, wenn du den Ordner in Obsidian öffnest oder nach git committest.",
     createEntryFileDescription: "Eine gewöhnliche Markdown-Datei. Ein Schrägstrich im Namen legt Unterordner an.",
+    createEntryTemplate: "Vorlage",
+    createEntryTemplateBlank: "Leer",
+    createEntryTemplateBuiltIn: "Eingebaut",
+    createEntryTemplateCustom: "Eigene (Ordner Vorlagen)",
+    createEntryTemplateLoadFailed: "Eigene Vorlagen konnten nicht geladen werden:",
     createEntryBusy: "Wird angelegt…",
     create: "Anlegen",
     conflictAriaLabel: "Speicherkonflikt",
@@ -1016,6 +1026,11 @@ export const translations: Record<Locale, Translations> = {
     createEntryFilePlaceholder: "Note",
     createEntryFolderDescription: "A real directory — it remains visible when you open the folder in Obsidian or commit it to git.",
     createEntryFileDescription: "A regular Markdown file. A slash in the name creates nested folders.",
+    createEntryTemplate: "Template",
+    createEntryTemplateBlank: "Blank",
+    createEntryTemplateBuiltIn: "Built-in",
+    createEntryTemplateCustom: "Your own (Vorlagen folder)",
+    createEntryTemplateLoadFailed: "Your own templates could not be loaded:",
     createEntryBusy: "Creating…",
     create: "Create",
     conflictAriaLabel: "Save conflict",

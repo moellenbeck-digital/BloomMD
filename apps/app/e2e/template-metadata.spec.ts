@@ -93,8 +93,7 @@ test.describe("Template-Metadaten @t78", () => {
     await expect(select).toBeVisible();
     await expect(select).toHaveValue("software-architecture");
     await expect(select.locator("option")).toHaveCount(6);
-    await page.getByRole("button", { name: "Markdown", exact: true }).click();
-    await expect(page.getByLabel("Markdown preview")).toContainText("title: Software Architecture Map");
+    await expect(page.getByLabel("Markdown to visualize")).toHaveValue(/title: Software Architecture Map/);
 
     // ohne lang-Parameter (Standardsprache Deutsch) gilt dieselbe Voreinstellung
     await page.goto(url("/demo"));
@@ -108,8 +107,7 @@ test.describe("Template-Metadaten @t78", () => {
     const select = page.getByLabel("Select template");
     await expect(select).toHaveValue("research-project");
     await expect(select.locator("option:checked")).toHaveText("Research Project Map");
-    await page.getByRole("button", { name: "Markdown", exact: true }).click();
-    await expect(page.getByLabel("Markdown preview")).toContainText("title: Research Project Map");
+    await expect(page.getByLabel("Markdown to visualize")).toHaveValue(/title: Research Project Map/);
   });
 
   for (const template of TEMPLATES) {

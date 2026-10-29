@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Desktop: Der Startbildschirm (Splash) zeigt die Version, die wirklich gebaut wurde, statt immer `v0.3.0`. Er zeigt dieselbe Zeichenkette wie der About-Dialog: `BloomMD <Version> (<Kurz-SHA>)`, ohne Klammer, wenn der Build keine SHA kennt. Stable-, Development- und Insiders-Builds zeigen jeweils ihre eigene Version.
+- Desktop: The start screen (splash) shows the version that was actually built instead of always `v0.3.0`. It shows the same string as the About dialog: `BloomMD <version> (<short SHA>)`, without the parenthesis when the build has no SHA. Stable, development and insiders builds each show their own version.
+
 - Desktop: Ein Ordner-, Datei- oder PDF-Dialog darf beliebig lange offen bleiben. Wer den Dialog „Ordner wechseln“, „Datei importieren“ oder die Auswahl einer Ressource/PDF länger als 60 Sekunden offen ließ, bekam nach der Auswahl „Dateien konnten nicht geladen werden“ bzw. einen Fehler, obwohl die App die Auswahl übernommen hatte (Ordner gewechselt, Einstellung gespeichert). Die Auswahl erreicht jetzt auch nach langer Wartezeit die Oberfläche; ein Abbrechen bleibt ohne Meldung, ein echter Fehler (z. B. gewählter Pfad ist kein Ordner) wird weiter angezeigt. Alle übrigen Anfragen zwischen Oberfläche und App behalten ihre Zeitgrenze von 60 Sekunden.
 - Desktop: A folder, file or PDF dialog may stay open as long as needed. Leaving the "Change folder", "Import file" or resource/PDF picker open for more than 60 seconds used to end in "Files could not be loaded" or an error after the choice, although the app had accepted it (folder switched, setting saved). The choice now reaches the interface after any wait; cancelling stays silent and a real error (e.g. the chosen path is not a folder) is still shown. All other requests between interface and app keep their 60-second limit.
 

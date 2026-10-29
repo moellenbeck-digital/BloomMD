@@ -20,6 +20,7 @@ const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalBypass = process.env.BLOOMMD_E2E_AUTH_BYPASS;
 const originalE2ETestMode = process.env.BLOOMMD_E2E_TEST_MODE;
 const originalNodeEnv = process.env.NODE_ENV;
+const originalLocalDeployment = process.env.BLOOMMD_LOCAL_DEPLOYMENT;
 const mutableEnv = process.env as Record<string, string | undefined>;
 
 afterEach(() => {
@@ -28,18 +29,54 @@ afterEach(() => {
   process.env.BLOOMMD_E2E_TEST_MODE = originalE2ETestMode;
   mutableEnv.NODE_ENV = originalNodeEnv;
   delete mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER;
+  if (originalLocalDeployment == null) delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+  else mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = originalLocalDeployment;
   resetMemoryRateLimitsForTests();
 });
 
 describe("request security", () => {
-  test("requires an explicit test marker before enabling the bypass in a production server", () => {
+  test("requires the test and local-deployment markers before enabling the bypass in a production server (#169)", () => {
     mutableEnv.NODE_ENV = "production";
     process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
     delete process.env.BLOOMMD_E2E_TEST_MODE;
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
     expect(isE2EAuthBypassEnabled()).toBe(false);
 
     process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+
+    mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = "1";
     expect(isE2EAuthBypassEnabled()).toBe(true);
+
+    delete process.env.BLOOMMD_E2E_TEST_MODE;
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+
+    // The local-deployment marker alone never turns the bypass on.
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "";
+    process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+  });
+
+  test("outside production the bypass flag alone is enough", () => {
+    mutableEnv.NODE_ENV = "development";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    delete process.env.BLOOMMD_E2E_TEST_MODE;
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+    expect(isE2EAuthBypassEnabled()).toBe(true);
+  });
+
+  test("a production server without all markers still enforces the rate limit and the honeypot", async () => {
+    mutableEnv.NODE_ENV = "production";
+    process.env.DATABASE_URL = "";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+    const request = new Request("https://bloommd.app", { headers: { "x-forwarded-for": "203.0.113.77" } });
+    const options = { action: "test-fail-closed", limit: 1, windowMs: 60_000 };
+
+    await assertRateLimit(request, options);
+    await expect(assertRateLimit(request, options)).rejects.toBeInstanceOf(RateLimitError);
+    expect(() => assertHumanFormSignal(new URLSearchParams({ website: "bot", formStartedAt: String(Date.now() - 5_000) }))).toThrow(FormSpamError);
   });
 
   test("requires an exact same origin for cookie-backed mutations", () => {

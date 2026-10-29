@@ -5,7 +5,8 @@
 `playwright.testsystem.config.ts` testet ein bereits laufendes System (z. B. `bloommd-test`). Sie startet
 keinen Server (`webServer`) und kein `globalSetup`; nur das Projekt `chromium` (Desktop Chrome) läuft.
 Das Testsystem muss im Testmodus laufen: `BLOOMMD_REQUIRE_AUTH=1`, `BLOOMMD_E2E_AUTH_BYPASS=1`,
-`BLOOMMD_E2E_TEST_MODE=1`.
+`BLOOMMD_E2E_TEST_MODE=1`, `BLOOMMD_LOCAL_DEPLOYMENT=1` (seit #169; ohne die dritte Variable ist der Bypass im
+Produktionsbuild aus).
 
 ```bash
 cd apps/app

@@ -6,7 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
  * this config starts nothing: no `webServer`, no `globalSetup` (the dev-route warm-up is for `next dev`).
  *
  * Prerequisite: the test system runs in test mode (`BLOOMMD_REQUIRE_AUTH=1`, `BLOOMMD_E2E_AUTH_BYPASS=1`,
- * `BLOOMMD_E2E_TEST_MODE=1`).
+ * `BLOOMMD_E2E_TEST_MODE=1`, `BLOOMMD_LOCAL_DEPLOYMENT=1`; in a production build the bypass needs all three).
  *
  * Env: `PLAYWRIGHT_BASE_URL` (required), `PLAYWRIGHT_ARTIFACTS_DIR` (optional, default
  * `./test-results-testsystem`; results go to `results/`, the HTML report to `report/`).

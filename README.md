@@ -355,7 +355,7 @@ bloommd-wiki mcp /path/to/wiki
 
 It exposes deterministic status/page reads and the `propose`, `approve`, and `apply` tools. The server has no model credentials and does not upload Wiki content.
 
-Playwright runs with `BLOOMMD_E2E_AUTH_BYPASS=1` from `apps/app/playwright.config.ts`, so local E2E coverage does not depend on external auth or a reachable database. The suite still checks route protection and rejects anonymous mindmap API access.
+Playwright runs with `BLOOMMD_E2E_AUTH_BYPASS=1` (in a production build together with `BLOOMMD_E2E_TEST_MODE=1` and `BLOOMMD_LOCAL_DEPLOYMENT=1`, otherwise the bypass stays off) from `apps/app/playwright.config.ts`, so local E2E coverage does not depend on external auth or a reachable database. The suite still checks route protection and rejects anonymous mindmap API access.
 
 ### Environment
 

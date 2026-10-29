@@ -98,6 +98,7 @@ const envKeys = [
   "BLOOMMD_AUTH_SECRET",
   "BLOOMMD_E2E_AUTH_BYPASS",
   "BLOOMMD_E2E_TEST_MODE",
+  "BLOOMMD_LOCAL_DEPLOYMENT",
   "BLOOMMD_MAIL_DAILY_LIMIT",
   "BLOOMMD_MAIL_HOURLY_LIMIT",
   "DATABASE_URL",
@@ -157,6 +158,7 @@ beforeEach(() => {
   delete mutableEnv.BLOOMMD_BETA_INVITE_CODES;
   delete mutableEnv.BLOOMMD_E2E_AUTH_BYPASS;
   delete mutableEnv.BLOOMMD_E2E_TEST_MODE;
+  delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
   delete mutableEnv.DATABASE_URL;
   delete mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT;
   delete mutableEnv.BLOOMMD_MAIL_HOURLY_LIMIT;
@@ -368,6 +370,30 @@ describe("email confirmation stays mandatory", () => {
 
     const attempt = await login(formRequest("/api/auth/login", { email: "bypass@example.test", password: PASSWORD, next: "/app" }));
     expect(attempt.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("the E2E bypass is fail-closed in a production server (#169)", () => {
+  test("bypass flag plus test marker without the local-deployment marker still needs the confirmation mail", async () => {
+    mutableEnv.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    mutableEnv.BLOOMMD_E2E_TEST_MODE = "1";
+    const response = await signup(formRequest("/api/auth/signup", signupForm("closed@example.test")));
+
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(decodedLocation(response)).toContain("verification=sent");
+    expect(users.get("closed@example.test")?.emailVerifiedAt).toBeNull();
+    const attempt = await login(formRequest("/api/auth/login", { email: "closed@example.test", password: PASSWORD, next: "/app" }));
+    expect(attempt.headers.get("set-cookie")).toBeNull();
+  });
+
+  test("all three markers (local test server) sign in without mail", async () => {
+    mutableEnv.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    mutableEnv.BLOOMMD_E2E_TEST_MODE = "1";
+    mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = "1";
+    const response = await signup(formRequest("/api/auth/signup", signupForm("local@example.test")));
+
+    expect(response.headers.get("set-cookie")).toContain("bloommd_session=");
+    expect(mails).toHaveLength(0);
   });
 });
 

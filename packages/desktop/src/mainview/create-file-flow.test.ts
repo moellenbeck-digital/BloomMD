@@ -81,6 +81,7 @@ mock.module("./rpc", () => ({
   getConnectionMode: async () => ({ type: "local" }),
   listConnectionProfiles: async () => ({ profiles: [], active: { type: "local" } }),
   listFolders: async () => ({ folders: [] }),
+  listTemplates: async () => ({ templates: [] }),
   getSharedDocument: async () => ({ sharedDocument: null }),
   getBuildInfo: async () => null,
   getUpdateState: async () => ({ local: { channel: "dev" }, update: {} }),

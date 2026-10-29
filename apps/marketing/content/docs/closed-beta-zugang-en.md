@@ -1,20 +1,22 @@
 ---
 title: Closed beta access
-description: Open registration or invitation only — account creation, email confirmation, sign-in, and password recovery.
+description: Open registration without an invitation — account creation, email confirmation, sign-in, and password recovery.
 order: 2
 ---
 
 # Closed beta access
 
-Web access to BloomMD (bloommd.app) has two states. The signup page shows which one applies: if you
-see the form right away, registration is open. If you see a notice that your cloud access is not
-enabled yet, an invitation is required.
+Registration for web access to BloomMD (bloommd.app) is open: you create your own account, without
+an invitation and without a waitlist. Only if the operator has turned on the access switch does an
+invitation apply for the time being (see below). The signup page shows which one applies: if you see
+the form right away, you can register. If you see a notice that your cloud access is not enabled
+yet, the access switch is on.
 
-**Only Web, cloud workspaces, sync and collaboration are ever restricted.** The
-[browser demo](/demo?lang=en), [desktop builds](/download?lang=en) and
-[Obsidian plugin](/obsidian?lang=en) are always available without an invitation.
+**Even with the access switch on, only Web, cloud workspaces, sync and collaboration are
+restricted.** The [browser demo](/demo?lang=en), [desktop builds](/download?lang=en) and
+[Obsidian plugin](/obsidian?lang=en) are always available without an account and without an invitation.
 
-## Registration is open
+## Registration (normal case)
 
 You need neither an invitation nor a code.
 
@@ -40,10 +42,12 @@ again later.
 Use "Forgot password?" on the sign-in page. You receive a link that is valid for 60 minutes. After a
 reset, existing sign-ins are ended.
 
-## Beta closed (invitation only)
+## Only with the access switch on: invitation
 
-The beta waitlist at bloommd.io has ended; nobody can join it any more. A beta invitation does not
-create a password. The steps are intentionally separate so that every stage is clear.
+The beta waitlist at bloommd.io has ended; nobody can join it any more. The access switch stays
+available for operations. While it is on, an account is only enabled for invited email addresses or
+with an invitation code. A beta invitation does not create a password. The steps are intentionally
+separate so that every stage is clear.
 
 1. An admin or staff member invites you.
 2. You receive a personal beta invitation with an account-creation link.
@@ -54,8 +58,8 @@ create a password. The steps are intentionally separate so that every stage is c
 
 ### No invitation yet
 
-Contact the BloomMD team. In this state an account is not enabled without an invitation or
-invitation code.
+Contact the BloomMD team. With the access switch on, an account is not enabled without an
+invitation or invitation code.
 
 ### You received an invitation
 
@@ -70,7 +74,7 @@ first.
 ## You already created an account
 
 If the account exists and the email is confirmed, use the sign-in page at bloommd.app. Password
-recovery is useful after an account with a password has been created. This applies in both states;
+recovery is useful after an account with a password has been created. This applies with and without the access switch;
 existing accounts stay unchanged.
 
 ## Desktop app

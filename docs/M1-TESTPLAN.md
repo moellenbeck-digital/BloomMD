@@ -6,13 +6,13 @@ Verbindliches Board: [BloomMD Roadmap](https://github.com/orgs/moellenbeck-digit
 
 ## Ziel
 
-M1 ist abnahmefähig, wenn ein eingeladener Tester BloomMD als private Closed Beta nutzen kann:
+M1 ist abnahmefähig, wenn ein Tester BloomMD als Closed Beta nutzen kann (Registrierung offen; mit Zugangsschalter `BLOOMMD_BETA_ACCESS=1` nur auf Einladung):
 
 - Desktop lokal ohne Account und ohne Cloud auf macOS
 - Web-App mit einfacher Auth und Closed-Beta-Gate
 - OKF/llm-wiki lokal und im Web
 - Collaboration als Beta-Funktion mit klaren Grenzen
-- Marketing/Waitlist getrennt von der privaten App
+- Marketing getrennt von der privaten App (die Warteliste ist beendet, alte Links leiten auf die Registrierung)
 - Linux und Windows Desktop bleiben außerhalb des M1-Beta-Supports und werden als eigene Beta-Releases nachgezogen
 - Mobile bleibt außerhalb des M1-Beta-Supports
 
@@ -22,7 +22,7 @@ externer Gap in [Archiv #79](https://github.com/moellenbeck-digital/BloomMD-arch
 Die detaillierte UI-Abdeckung lebt in der [M1 UI-QA-Testmatrix](M1-UI-QA-MATRIX.md). Sie ist fuer
 M1 verbindlich, wenn UI-Funktionen bewertet werden: Canvas, Editor, Toolbar, Sidebar, Command
 Palette, File-/Folder-Flows, Empty States, Desktop-Handoff, Collaboration/Remote-UI, Web-App,
-Beta-Gate, Waitlist und Wiki.
+Beta-Gate (Schalter), Registrierung und Wiki.
 
 Der reproduzierbare macOS-Lauf wird mit dem QA-Skript ausgefuehrt:
 
@@ -35,7 +35,7 @@ bun run qa:m1:mac
 | Ebene | Zweck | Gate |
 |---|---|---|
 | Unit | Parser, FileStore, Desktop-RPC-Helfer, Security-Grenzen | Muss lokal und in CI grün sein |
-| Integration | Sync-Server, CLI, Storage, Auth-/Waitlist-API | Muss lokal grün sein |
+| Integration | Sync-Server, CLI, Storage, Auth-API | Muss lokal grün sein |
 | Browser-E2E | Web, Auth, Beta-Gate, Wiki, UX-Smoke, Accessibility | Muss in CI grün sein |
 | Native Smoke | macOS Desktop-Artefakt, OS-Handoff, lokale Ordner | Muss lokal auf macOS dokumentiert sein |
 | External E2E | echte Zielumgebung, DNS/TLS, Postgres/Restore, Mail, Collaboration über Netz | In [Archiv #79](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/79) kommentieren |
@@ -237,7 +237,7 @@ Testumgebung:
 | ID | Test | Automatisierung | Erwartung |
 |---|---|---|---|
 | WEB-01 | Public Landing | `test:e2e` | Beta-Positionierung, Demo und Registrierungs-CTA sichtbar |
-| WEB-02 | Signup ohne Gate | `test:e2e` | Lokale Dev-Registrierung funktioniert |
+| WEB-02 | Signup ohne Gate (Normalfall) | `test:e2e` | Offene Registrierung funktioniert, kein Beta-Block |
 | WEB-03 | Signup mit Gate ohne Invite | `test:e2e:beta` | Registrierung blockiert, keine Account-Enumeration |
 | WEB-04 | Signup mit Allowlist | `test:e2e:beta` | Session wird gesetzt, Redirect nach `/app` |
 | WEB-05 | Signup mit Invite-Code | `test:e2e:beta` | Session wird gesetzt |
@@ -245,6 +245,8 @@ Testumgebung:
 | WEB-07 | Billing disabled | `test:e2e` | Stripe-Routen 404, keine Preise |
 | WEB-08 | Security headers | `test:e2e` | Pages und APIs liefern erwartete Header |
 | WEB-09 | In-App-Feedback | `apps/app` Unit/Route + `test:e2e` | Eingeloggter Nutzer oeffnet Formular; Screenshot ist Pflicht; API speichert Metadaten, legt Anhaenge im Feedback-Bucket ab und erstellt ein GitHub-Issue mit `user-feedback`/`beta-feedback` |
+| WEB-10 | Prod-Smoke, Gate aus | `bun run qa:production-smoke` | `/signup` zeigt das Registrierungsformular ohne Beta-Block; `/api/waitlist` antwortet 410, alte Wartelisten-Links leiten per 308 auf die Registrierung |
+| WEB-11 | Prod-Smoke, Gate an | `bun run qa:production-smoke --beta-gate` | `/signup` zeigt den Beta-Zugangsblock (ohne Wartelisten-Link), freigeschaltete E-Mail das Formular |
 
 ## OKF / llm-wiki
 

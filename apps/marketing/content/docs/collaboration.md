@@ -109,7 +109,7 @@ die Obsidian-Verbindung; die letzte lokale Notiz bleibt erhalten und kann nicht 
 - Nach Reload bleibt der letzte gespeicherte Stand erhalten.
 
 > **Wenn Person B den Workspace nicht sieht:** Prüfe zuerst, ob die Einladung angenommen wurde und
-> ob Person B mit genau der eingeladenen E-Mail-Adresse angemeldet ist. Eine Beta-Einladung allein
+> ob Person B mit genau der eingeladenen E-Mail-Adresse angemeldet ist. Ein Konto allein
 > gibt keinen Zugriff auf den Workspace.
 
 ## Rollen und Mitgliedschaft
@@ -170,7 +170,7 @@ Für reine Cloud-Dateien in WebApp + Desktop-App muss die Desktop-App im Server-
 
 Nutze für Probleme den Feedback-Button in der App. Ein Screenshot ist Pflicht, weil wir Sync-,
 Ordner- und Panel-Probleme schneller zuordnen können. Wenn die App gar nicht erreichbar ist,
-antworte auf deine Beta-Einladungs-Mail oder schreibe an `feedback@bloommd.io`.
+schreibe an `feedback@bloommd.io`.
 
 Bitte lade keine echten Zugangsdaten, Tokens oder personenbezogenen Daten Dritter hoch. Ein kleines
 Markdown-Beispiel reicht meistens.

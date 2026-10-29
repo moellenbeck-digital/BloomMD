@@ -2,7 +2,7 @@ export interface SmokeOptions {
   marketingUrl: string;
   appUrl: string;
   timeoutMs: number;
-  waitlistEmail?: string;
+  betaGate: boolean;
   expectedSha?: string;
   expectedOpenClawPluginVersion?: string;
   json: boolean;
@@ -53,7 +53,8 @@ Usage:
 Options:
   --marketing-url <url>     Marketing origin (default: https://bloommd.io)
   --app-url <url>           Private app origin (default: https://bloommd.app)
-  --waitlist-email <email>  Also submit the marketing waitlist form with this explicit test address
+  --beta-gate               The target runs with BLOOMMD_BETA_ACCESS=1: expect the beta access gate
+                            at /signup instead of the open registration form (default: gate off)
   --expected-sha <sha>      Require app and marketing /api/version to report this Git SHA
   --expected-openclaw-plugin-version <version>
                             Require latest and immutable plugin downloads to report this version
@@ -68,6 +69,7 @@ export function parseArgs(argv: string[]): SmokeOptions {
     marketingUrl: "https://bloommd.io",
     appUrl: "https://bloommd.app",
     timeoutMs: 8000,
+    betaGate: false,
     json: false,
   };
 
@@ -89,8 +91,8 @@ export function parseArgs(argv: string[]): SmokeOptions {
       options.appUrl = requireValue(argv, ++index, arg);
       continue;
     }
-    if (arg === "--waitlist-email") {
-      options.waitlistEmail = requireValue(argv, ++index, arg);
+    if (arg === "--beta-gate") {
+      options.betaGate = true;
       continue;
     }
     if (arg === "--expected-sha") {
@@ -202,28 +204,58 @@ async function expectOpenClawPluginDownload(
   }
 }
 
-async function expectClosedBetaSignupEntry(name: string, url: string, timeoutMs: number, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+/** Strings that must not show up in the open registration (gate off); "Zur Beta-Warteliste" is the retired waitlist link. */
+const BETA_GATE_MARKERS = ['data-testid="beta-access-gate"', "Zur Beta-Warteliste", "Beta-Code (optional)"];
+
+function signupActual(response: Response, failureMatch: string, ok: boolean, okLabel: string, missingLabel: string) {
+  const location = response.headers.get("location");
+  if (location) return `${response.status} -> ${location}`;
+  if (response.status !== 200) return String(response.status);
+  return failureMatch || (ok ? okLabel : missingLabel);
+}
+
+/** Gate off (default): registration is open, so /signup shows the normal form and no beta block. */
+async function expectOpenSignupForm(name: string, url: string, timeoutMs: number, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+  const expected = "200 open signup form without beta gate, redirect or config error";
+  try {
+    const response = await fetcher(url, { method: "GET", redirect: "manual" }, timeoutMs);
+    const body = await response.text();
+    const hasForm = body.includes('data-testid="signup-form"')
+      && body.includes("Account erstellen")
+      && body.includes("Mindestens 10 Zeichen");
+    const gateMarker = BETA_GATE_MARKERS.find((marker) => body.includes(marker));
+    const failureMatch = body.match(SIGNUP_FAILURE_PATTERN)?.[0] ?? "";
+    const ok = response.status === 200 && !response.headers.get("location") && hasForm && !gateMarker && !failureMatch;
+    const actual = gateMarker && response.status === 200 && !response.headers.get("location")
+      ? `beta gate still shown (${gateMarker})`
+      : signupActual(response, failureMatch, hasForm, "open signup form", "missing open signup form");
+    return statusCheck(name, url, expected, ok ? "pass" : "fail", actual);
+  } catch (error) {
+    return statusCheck(name, url, expected, "fail", "network-error", error instanceof Error ? error.message : String(error));
+  }
+}
+
+/** --beta-gate: the entry shows the access gate (code field, no waitlist link — the waitlist has ended). */
+async function expectBetaGateSignupEntry(name: string, url: string, timeoutMs: number, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+  const expected = "200 beta access gate without redirect/config error";
   try {
     const response = await fetcher(url, { method: "GET", redirect: "manual" }, timeoutMs);
     const body = await response.text();
     const hasEntry = body.includes('data-testid="beta-access-gate"')
       && body.includes("Dein Cloud-Zugang ist noch nicht freigeschaltet.")
-      && body.includes("Zur Beta-Warteliste")
-      && body.includes("Beta-Code (optional)");
+      && body.includes("Beta-Code (optional)")
+      && !body.includes("Zur Beta-Warteliste");
     const failureMatch = body.match(SIGNUP_FAILURE_PATTERN)?.[0] ?? "";
     const ok = response.status === 200 && !response.headers.get("location") && hasEntry && !failureMatch;
-    const actual = response.headers.get("location")
-      ? `${response.status} -> ${response.headers.get("location")}`
-      : response.status === 200
-        ? failureMatch || (hasEntry ? "closed beta signup entry" : "missing closed beta signup entry")
-        : String(response.status);
-    return statusCheck(name, url, "200 waitlist-first closed beta entrypoint without redirect/config error", ok ? "pass" : "fail", actual);
+    return statusCheck(name, url, expected, ok ? "pass" : "fail", signupActual(response, failureMatch, hasEntry, "beta access gate", "missing beta access gate"));
   } catch (error) {
-    return statusCheck(name, url, "200 waitlist-first closed beta entrypoint without redirect/config error", "fail", "network-error", error instanceof Error ? error.message : String(error));
+    return statusCheck(name, url, expected, "fail", "network-error", error instanceof Error ? error.message : String(error));
   }
 }
 
-async function expectInvitedSignupForm(name: string, url: string, expectedEmail: string, timeoutMs: number, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+/** --beta-gate: a granted email gets the usable signup form and no gate. */
+async function expectBetaGateGrantedSignupForm(name: string, url: string, expectedEmail: string, timeoutMs: number, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+  const expected = "200 signup form for granted email without beta gate, redirect or config error";
   try {
     const response = await fetcher(url, { method: "GET", redirect: "manual" }, timeoutMs);
     const body = await response.text();
@@ -234,14 +266,9 @@ async function expectInvitedSignupForm(name: string, url: string, expectedEmail:
       && !body.includes('data-testid="beta-access-gate"');
     const failureMatch = body.match(SIGNUP_FAILURE_PATTERN)?.[0] ?? "";
     const ok = response.status === 200 && !response.headers.get("location") && hasForm && !failureMatch;
-    const actual = response.headers.get("location")
-      ? `${response.status} -> ${response.headers.get("location")}`
-      : response.status === 200
-        ? failureMatch || (hasForm ? "invited signup form" : "missing invited signup form")
-        : String(response.status);
-    return statusCheck(name, url, "200 invited signup form without redirect/config error", ok ? "pass" : "fail", actual);
+    return statusCheck(name, url, expected, ok ? "pass" : "fail", signupActual(response, failureMatch, hasForm, "granted signup form", "missing granted signup form"));
   } catch (error) {
-    return statusCheck(name, url, "200 invited signup form without redirect/config error", "fail", "network-error", error instanceof Error ? error.message : String(error));
+    return statusCheck(name, url, expected, "fail", "network-error", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -288,25 +315,25 @@ async function expectNoLegalPlaceholder(name: string, url: string, timeoutMs: nu
   }
 }
 
-async function expectWaitlistSubmit(options: SmokeOptions, fetcher: SmokeFetcher): Promise<SmokeCheck> {
+/**
+ * The waitlist ended with the open registration. /api/waitlist stays only as a clear answer for old
+ * forms: 410 with a pointer to the signup, and it never writes (so no test address is needed).
+ */
+async function expectWaitlistClosed(options: SmokeOptions, fetcher: SmokeFetcher): Promise<SmokeCheck> {
   const url = joinUrl(options.marketingUrl, "/api/waitlist");
+  const expected = "410 waitlist closed with signup pointer";
   try {
     const response = await fetcher(url, {
       method: "POST",
       redirect: "manual",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        origin: options.marketingUrl,
-      },
-      body: new URLSearchParams({ email: options.waitlistEmail ?? "", source: "production-smoke" }),
+      headers: { "content-type": "application/x-www-form-urlencoded", origin: options.marketingUrl },
+      body: new URLSearchParams({ email: "", source: "production-smoke" }),
     }, options.timeoutMs);
     const body = await response.text();
-    const normalizedBody = body.toLowerCase();
-    const generic = normalizedBody.includes("\"status\":\"pending\"") || normalizedBody.includes("bestätig") || normalizedBody.includes("bestaetig");
-    const ok = (response.status === 200 || response.status === 202) && generic;
-    return statusCheck("marketing waitlist submit", url, "200/202 generic confirmation response", ok ? "pass" : "fail", `${response.status}`, ok ? undefined : body.slice(0, 300));
+    const ok = response.status === 410 && body.includes(joinUrl(options.appUrl, "/signup"));
+    return statusCheck("marketing waitlist is closed", url, expected, ok ? "pass" : "fail", String(response.status), ok ? undefined : body.slice(0, 300));
   } catch (error) {
-    return statusCheck("marketing waitlist submit", url, "200/202 generic confirmation response", "fail", "network-error", error instanceof Error ? error.message : String(error));
+    return statusCheck("marketing waitlist is closed", url, expected, "fail", "network-error", error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -380,21 +407,31 @@ export async function runSmoke(options: SmokeOptions, fetcher: SmokeFetcher = re
   checks.push(await expectHeaderPresent("marketing csp", options.marketingUrl, "content-security-policy", options.timeoutMs, fetcher));
   checks.push(await expectVersionApi("marketing version metadata", joinUrl(options.marketingUrl, "/api/version"), "marketing", options.expectedSha, options.timeoutMs, fetcher));
 
-  if (options.waitlistEmail) {
-    checks.push(await expectWaitlistSubmit(options, fetcher));
-  }
+  checks.push(await expectWaitlistClosed(options, fetcher));
+  checks.push(await expectRedirect(
+    "marketing old waitlist link leads to signup",
+    joinUrl(options.marketingUrl, "/waitlist/bestaetigt"),
+    308,
+    joinUrl(options.appUrl, "/signup"),
+    options.timeoutMs,
+    fetcher,
+  ));
 
   for (const path of APP_PUBLIC_PATHS) {
     checks.push(await expectStatus(`app public ${path}`, joinUrl(options.appUrl, path), 200, options.timeoutMs, fetcher));
   }
-  checks.push(await expectClosedBetaSignupEntry("app closed beta signup entrypoint", joinUrl(options.appUrl, "/signup?next=%2Fapp"), options.timeoutMs, fetcher));
-  checks.push(await expectInvitedSignupForm(
-    "app invited signup form is usable",
-    joinUrl(options.appUrl, "/signup?next=%2Fapp&email=smoke%40bloommd.io&access=granted"),
-    "smoke@bloommd.io",
-    options.timeoutMs,
-    fetcher,
-  ));
+  if (options.betaGate) {
+    checks.push(await expectBetaGateSignupEntry("app beta gate signup entrypoint", joinUrl(options.appUrl, "/signup?next=%2Fapp"), options.timeoutMs, fetcher));
+    checks.push(await expectBetaGateGrantedSignupForm(
+      "app beta gate granted signup form is usable",
+      joinUrl(options.appUrl, "/signup?next=%2Fapp&email=smoke%40bloommd.io&access=granted"),
+      "smoke@bloommd.io",
+      options.timeoutMs,
+      fetcher,
+    ));
+  } else {
+    checks.push(await expectOpenSignupForm("app open signup form", joinUrl(options.appUrl, "/signup?next=%2Fapp"), options.timeoutMs, fetcher));
+  }
   for (const path of APP_MARKETING_PAGE_PATHS) {
     checks.push(await expectRedirect(`app redirects marketing page ${path}`, joinUrl(options.appUrl, path), 308, joinUrl(options.marketingUrl, path), options.timeoutMs, fetcher));
   }

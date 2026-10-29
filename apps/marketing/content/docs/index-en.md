@@ -28,13 +28,13 @@ need an internet connection.
 The Web app at `/app` is the second path. It can open local folders in the browser without uploading
 them.
 
-The Web app, cloud workspaces, sync, and collaboration require an account. Depending on the current
-state you register yourself or need an invitation. Both processes, email confirmation, and sign-in
-are described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
+The Web app, cloud workspaces, sync, and collaboration require an account. You
+register yourself, without an invitation and without a waitlist. Registration, email confirmation,
+and sign-in are described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
 
 **Available without an invitation:** the [browser demo](/demo?lang=en), desktop
 builds on the [download page](/download?lang=en), and the [Obsidian plugin](/obsidian?lang=en)
-through BRAT or GitHub releases. An invitation can only ever apply to Web and cloud access.
+through BRAT or GitHub releases. Only while the access switch is on does an invitation apply, and then only to Web and cloud access.
 
 ## Not included in the beta
 

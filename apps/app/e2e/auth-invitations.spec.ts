@@ -16,7 +16,7 @@ test.describe("auth and workspace invitation handoff", () => {
   test("keeps beta messaging out of direct login and signup", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByText("Closed Beta")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Auf die Beta-Warteliste" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Warteliste/ })).toHaveCount(0);
 
     await page.goto("/signup");
     await expect(page.getByTestId("beta-access-gate")).toHaveCount(0);

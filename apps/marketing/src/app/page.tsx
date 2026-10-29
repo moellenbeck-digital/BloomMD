@@ -348,7 +348,7 @@ const faqItems = [
   },
   {
     question: "Wie kann ich Beta-Feedback geben?",
-    answer: "Eingeladene Tester melden Feedback nach dem Login direkt in der App mit Screenshot. Wenn Login oder App nicht erreichbar sind, antworte auf deine Beta-Einladung oder schreibe an feedback@bloommd.io. GitHub ist nur unser internes Triage-Ziel.",
+    answer: "Angemeldete Tester melden Feedback direkt in der App mit Screenshot. Wenn Login oder App nicht erreichbar sind, schreibe an feedback@bloommd.io. GitHub ist nur unser internes Triage-Ziel.",
   },
   {
     question: "Wo werden Backups gespeichert?",
@@ -1114,7 +1114,7 @@ function BetaProgramSection() {
         <p className="mt-8 max-w-3xl text-sm leading-6 text-[#666666]">
           Nach der Beta wird es eine kostenlose Stufe für lokales Arbeiten geben und eine bezahlte für Cloud- und
           Team-Funktionen. Beta-Teilnehmer informieren wir vorher und rechnen nichts rückwirkend ab. Wenn du
-          zur geschlossenen Beta dazu willst, melde dich — wir laden in kleinen Gruppen ein.
+          die Cloud-Beta nutzen willst, registriere dich einfach — eine Einladung brauchst du nicht.
         </p>
       </div>
     </section>

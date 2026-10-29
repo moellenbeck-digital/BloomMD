@@ -23,7 +23,7 @@ The API is available in Chrome and Edge. Firefox and Safari do not support it.
 ## Cloud workspace
 
 Cloud workspaces require an account. Documents are stored in the database and collaboration uses the
-sync server. Registration (open or invitation only) is described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
+sync server. Registration (open, no invitation needed) is described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
 
 To import a Markdown file, sign in, select the cloud workspace, choose **Import Markdown** from the
 toolbar or command palette, select a `.md` or `.markdown` file, and open it from the file list.

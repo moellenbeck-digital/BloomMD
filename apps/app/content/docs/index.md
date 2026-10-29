@@ -28,8 +28,8 @@ und keine Internetverbindung.
 Die Web-App unter `/app` ist der zweite Weg. Sie kann lokale Ordner über den Browser öffnen, ohne
 etwas hochzuladen.
 
-Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account. Je nach Stand
-registrierst du dich direkt selbst oder brauchst eine Einladung. Beide Abläufe, E-Mail-Bestätigung
+Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account. Du
+registrierst dich direkt selbst, ohne Einladung und ohne Warteliste. Registrierung, E-Mail-Bestätigung
 und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
 
 ## Was in der Beta nicht enthalten ist

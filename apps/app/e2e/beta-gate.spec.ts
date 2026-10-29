@@ -3,9 +3,6 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 const PASSWORD = "Testpass12345";
 const API_ORIGIN = process.env.PLAYWRIGHT_BETA_BASE_URL ?? `http://localhost:${process.env.PLAYWRIGHT_BETA_PORT ?? "3411"}`;
 const SAME_ORIGIN_HEADERS = { Origin: API_ORIGIN };
-const BETA_WAITLIST_URL = process.env.PLAYWRIGHT_SERVER_MODE === "production"
-  ? "https://bloommd.io/#beta"
-  : "http://127.0.0.1:3212/#beta";
 
 function uniqueEmail(label: string) {
   return `e2e-beta-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@bloommd.local`;
@@ -35,7 +32,7 @@ test.describe("closed beta gate enabled", () => {
 
     await expect(page.getByRole("heading", { name: "Account erstellen" })).toBeVisible();
     await expect(page.getByText("Dein Cloud-Zugang ist noch nicht freigeschaltet.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Zur Beta-Warteliste" })).toHaveAttribute("href", BETA_WAITLIST_URL);
+    await expect(page.getByRole("link", { name: /Warteliste/ })).toHaveCount(0);
     await expect(page.getByLabel("Beta-Code (optional)")).toBeHidden();
     await page.locator("summary").filter({ hasText: "Beta-Code (optional)" }).click();
     await expect(page.getByLabel("Beta-Code (optional)")).toBeVisible();
@@ -107,7 +104,7 @@ test.describe("closed beta gate enabled", () => {
     await page.goto("/login?next=/app");
 
     await expect(page.getByText("Closed Beta")).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Auf die Beta-Warteliste" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Warteliste/ })).toHaveCount(0);
     const loginForm = page.locator('form[action="/api/auth/login"]');
     await loginForm.getByLabel("E-Mail", { exact: true }).fill(uniqueEmail("login"));
     await loginForm.getByLabel("Passwort").fill(PASSWORD);

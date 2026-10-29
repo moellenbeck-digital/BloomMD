@@ -16,6 +16,7 @@
     "db:restore-drill-marker": "bun run scripts/restore-drill-marker.ts",
     "feedback:verify-storage": "bun run scripts/verify-feedback-storage.ts",
     "db:maintenance": "bun run scripts/maintenance.ts",
+    "db:purge-unconfirmed": "bun run scripts/purge-unconfirmed-accounts.ts",
     "start": "next start",
     "test": "bun scripts/test-isolated.ts",
     "test:e2e": "playwright test",

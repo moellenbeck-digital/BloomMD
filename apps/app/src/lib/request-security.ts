@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 import { consumeRateLimit } from "./db";
 import { type ApiRequestIdentity } from "./auth";
 import { isE2EAuthBypassEnabled } from "./e2e-mode";
+import { trustedProxyHeaderName } from "./trusted-proxy";
+
+export { trustedProxyHeaderName };
 
 interface RateLimitOptions {
   action: string;
@@ -159,13 +162,52 @@ export function assertHumanFormSignal(form: URLSearchParams, options: HumanFormS
   if (ageMs < minAgeMs || ageMs > maxAgeMs) throw new FormSpamError();
 }
 
+/** Key for requests whose trusted source header is missing: all of them are counted together. */
+export const UNATTRIBUTED_SOURCE = "unattributed";
+
+/** The entry the nearest proxy appended: an attacker can prepend entries, but not add one after it. */
+function lastEntry(value: string | null) {
+  const entries = value?.split(",").map((entry) => entry.trim()).filter(Boolean);
+  return entries?.[entries.length - 1] || null;
+}
+
+let warnedUnattributed = false;
+
+/**
+ * The address a request is counted under for rate limits (#169).
+ *
+ * Client-controlled headers must not choose the key, or the per-address limit is bypassable. So
+ * only one header is believed: `BLOOMMD_TRUSTED_PROXY_HEADER` if configured (for example
+ * `cf-connecting-ip` or `x-vercel-forwarded-for` when that proxy overwrites it), otherwise the last
+ * entry of `x-forwarded-for`, which is what a single proxy in front of the app appended. If that
+ * header is absent in a production build, every such request shares {@link UNATTRIBUTED_SOURCE}:
+ * counting too strictly beats believing a header nobody vouches for.
+ *
+ * Outside production the other common headers are accepted so local development and tests can
+ * tell clients apart without a proxy.
+ */
 export function clientAddress(request: Request) {
-  const forwarded =
-    request.headers.get("x-vercel-forwarded-for") ??
-    request.headers.get("cf-connecting-ip") ??
-    request.headers.get("x-forwarded-for") ??
-    request.headers.get("x-real-ip");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
+  const configured = trustedProxyHeaderName();
+  const header = configured === undefined ? null : configured ?? "x-forwarded-for";
+  const trusted = header ? lastEntry(request.headers.get(header)) : null;
+  if (trusted) return trusted;
+
+  if (process.env.NODE_ENV !== "production") {
+    return (
+      lastEntry(request.headers.get("x-forwarded-for")) ??
+      lastEntry(request.headers.get("x-real-ip")) ??
+      lastEntry(request.headers.get("x-vercel-forwarded-for")) ??
+      lastEntry(request.headers.get("cf-connecting-ip")) ??
+      "unknown"
+    );
+  }
+  if (!warnedUnattributed) {
+    warnedUnattributed = true;
+    console.warn(
+      `[request-security] No usable source address in ${header ?? "BLOOMMD_TRUSTED_PROXY_HEADER (invalid)"}; counting such requests under one shared rate-limit key. Check the proxy configuration.`,
+    );
+  }
+  return UNATTRIBUTED_SOURCE;
 }
 
 function hashKey(value: string) {

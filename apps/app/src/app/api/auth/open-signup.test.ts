@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createHash, randomUUID } from "node:crypto";
-import { localizeAuthError, SIGNUP_CONSENT_REQUIRED_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../lib/auth-copy";
+import { localizeAuthError, MAIL_UNAVAILABLE_ERROR, SIGNUP_CONSENT_REQUIRED_ERROR, SIGNUP_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../lib/auth-copy";
+import { resetMailBudgetForTests } from "../../../lib/mail-budget";
 import { RateLimitError, SIGNUP_RATE_LIMIT, resetMemoryRateLimitsForTests } from "../../../lib/request-security";
 
 /**
@@ -83,6 +84,7 @@ mock.module("../../../lib/email", () => ({
 }));
 
 const { POST: signup } = await import("./signup/route");
+const { POST: resendVerification } = await import("./resend-verification/route");
 const { POST: login } = await import("./login/route");
 const { POST: requestPasswordReset } = await import("./request-password-reset/route");
 const { POST: resetPassword } = await import("./reset-password/route");
@@ -96,6 +98,9 @@ const envKeys = [
   "BLOOMMD_AUTH_SECRET",
   "BLOOMMD_E2E_AUTH_BYPASS",
   "BLOOMMD_E2E_TEST_MODE",
+  "BLOOMMD_LOCAL_DEPLOYMENT",
+  "BLOOMMD_MAIL_DAILY_LIMIT",
+  "BLOOMMD_MAIL_HOURLY_LIMIT",
   "DATABASE_URL",
   "NEXT_PUBLIC_APP_URL",
   "NEXT_PUBLIC_SITE_URL",
@@ -153,8 +158,12 @@ beforeEach(() => {
   delete mutableEnv.BLOOMMD_BETA_INVITE_CODES;
   delete mutableEnv.BLOOMMD_E2E_AUTH_BYPASS;
   delete mutableEnv.BLOOMMD_E2E_TEST_MODE;
+  delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
   delete mutableEnv.DATABASE_URL;
+  delete mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT;
+  delete mutableEnv.BLOOMMD_MAIL_HOURLY_LIMIT;
   resetMemoryRateLimitsForTests();
+  resetMailBudgetForTests();
 });
 
 afterEach(() => {
@@ -364,6 +373,30 @@ describe("email confirmation stays mandatory", () => {
   });
 });
 
+describe("the E2E bypass is fail-closed in a production server (#169)", () => {
+  test("bypass flag plus test marker without the local-deployment marker still needs the confirmation mail", async () => {
+    mutableEnv.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    mutableEnv.BLOOMMD_E2E_TEST_MODE = "1";
+    const response = await signup(formRequest("/api/auth/signup", signupForm("closed@example.test")));
+
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(decodedLocation(response)).toContain("verification=sent");
+    expect(users.get("closed@example.test")?.emailVerifiedAt).toBeNull();
+    const attempt = await login(formRequest("/api/auth/login", { email: "closed@example.test", password: PASSWORD, next: "/app" }));
+    expect(attempt.headers.get("set-cookie")).toBeNull();
+  });
+
+  test("all three markers (local test server) sign in without mail", async () => {
+    mutableEnv.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    mutableEnv.BLOOMMD_E2E_TEST_MODE = "1";
+    mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = "1";
+    const response = await signup(formRequest("/api/auth/signup", signupForm("local@example.test")));
+
+    expect(response.headers.get("set-cookie")).toContain("bloommd_session=");
+    expect(mails).toHaveLength(0);
+  });
+});
+
 describe("registering an address someone else already registered", () => {
   test("the real owner's signup replaces a password set by an earlier, unconfirmed signup", async () => {
     const email = "victim@example.test";
@@ -397,5 +430,75 @@ describe("registering an address someone else already registered", () => {
     expect(users.get(email)!.passwordHash).toBe(hashBefore);
     const attacker = await login(formRequest("/api/auth/login", { email, password: "AttackerPass1234", next: "/app" }));
     expect(attacker.headers.get("set-cookie")).toBeNull();
+  });
+});
+
+describe("global cap for outgoing account mails (#169)", () => {
+  beforeEach(() => {
+    mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT = "2";
+  });
+
+  test("answers 'temporarily unavailable' at the cap, sends no mail and leaves no account", async () => {
+    for (const email of ["a@example.test", "b@example.test"]) {
+      const ok = await signup(formRequest("/api/auth/signup", signupForm(email)));
+      expect(decodedLocation(ok)).toContain("verification=sent");
+    }
+    expect(mails).toHaveLength(2);
+
+    const refused = await signup(formRequest("/api/auth/signup", signupForm("c@example.test")));
+
+    expect(refused.status).toBe(303);
+    expect(decodedLocation(refused)).toContain(`${ORIGIN}/signup?`);
+    expect(decodedLocation(refused)).toContain(SIGNUP_UNAVAILABLE_ERROR);
+    expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(refused.headers.get("set-cookie")).toBeNull();
+    expect(mails).toHaveLength(2);
+    expect(users.has("c@example.test")).toBe(false);
+  });
+
+  test("covers resend-verification and password reset with the same budget", async () => {
+    mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT = "3";
+    await signup(formRequest("/api/auth/signup", signupForm("d@example.test")));
+    await signup(formRequest("/api/auth/signup", signupForm("e@example.test")));
+    await confirmEmail(lastMail("verification", "e@example.test")!.token);
+    expect(mails).toHaveLength(2);
+
+    const reset = await requestPasswordReset(formRequest("/api/auth/request-password-reset", { email: "e@example.test", next: "/login" }));
+    expect(decodedLocation(reset)).toContain("reset=requested");
+    expect(mails).toHaveLength(3);
+
+    const resend = await resendVerification(formRequest("/api/auth/resend-verification", { email: "d@example.test" }));
+    expect(decodedLocation(resend)).toContain(MAIL_UNAVAILABLE_ERROR);
+    const resetRefused = await requestPasswordReset(formRequest("/api/auth/request-password-reset", { email: "e@example.test", next: "/login" }));
+    expect(decodedLocation(resetRefused)).toContain(`${ORIGIN}/forgot-password?`);
+    expect(decodedLocation(resetRefused)).toContain(MAIL_UNAVAILABLE_ERROR);
+    expect(resetRefused.headers.get("retry-after")).not.toBeNull();
+    expect(mails).toHaveLength(3);
+  });
+
+  test("an hourly limit applies on top of the daily one", async () => {
+    mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT = "100";
+    mutableEnv.BLOOMMD_MAIL_HOURLY_LIMIT = "1";
+    await signup(formRequest("/api/auth/signup", signupForm("f@example.test")));
+    const refused = await signup(formRequest("/api/auth/signup", signupForm("g@example.test")));
+
+    expect(decodedLocation(refused)).toContain(SIGNUP_UNAVAILABLE_ERROR);
+    expect(mails).toHaveLength(1);
+  });
+
+  test("a confirmed account that registers again uses no mail budget", async () => {
+    await signup(formRequest("/api/auth/signup", signupForm("h@example.test")));
+    await confirmEmail(lastMail("verification", "h@example.test")!.token);
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const again = await signup(formRequest("/api/auth/signup", signupForm("h@example.test")));
+      expect(decodedLocation(again)).toContain("verification=sent");
+    }
+    const other = await signup(formRequest("/api/auth/signup", signupForm("i@example.test")));
+    expect(decodedLocation(other)).toContain("verification=sent");
+  });
+
+  test("has English wording", () => {
+    expect(localizeAuthError(SIGNUP_UNAVAILABLE_ERROR, "en")).toBe("Sign-up is temporarily unavailable. Please try again later.");
+    expect(localizeAuthError(MAIL_UNAVAILABLE_ERROR, "en")).toBe("Sending email is temporarily unavailable. Please try again later.");
   });
 });

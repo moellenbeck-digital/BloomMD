@@ -5,6 +5,8 @@ import {
   assertSameOrigin,
   assertSameOriginForIdentity,
   clientAddress,
+  trustedProxyHeaderName,
+  UNATTRIBUTED_SOURCE,
   FormSpamError,
   RateLimitError,
   readJsonBody,
@@ -18,6 +20,7 @@ const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalBypass = process.env.BLOOMMD_E2E_AUTH_BYPASS;
 const originalE2ETestMode = process.env.BLOOMMD_E2E_TEST_MODE;
 const originalNodeEnv = process.env.NODE_ENV;
+const originalLocalDeployment = process.env.BLOOMMD_LOCAL_DEPLOYMENT;
 const mutableEnv = process.env as Record<string, string | undefined>;
 
 afterEach(() => {
@@ -25,18 +28,55 @@ afterEach(() => {
   process.env.BLOOMMD_E2E_AUTH_BYPASS = originalBypass;
   process.env.BLOOMMD_E2E_TEST_MODE = originalE2ETestMode;
   mutableEnv.NODE_ENV = originalNodeEnv;
+  delete mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER;
+  if (originalLocalDeployment == null) delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+  else mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = originalLocalDeployment;
   resetMemoryRateLimitsForTests();
 });
 
 describe("request security", () => {
-  test("requires an explicit test marker before enabling the bypass in a production server", () => {
+  test("requires the test and local-deployment markers before enabling the bypass in a production server (#169)", () => {
     mutableEnv.NODE_ENV = "production";
     process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
     delete process.env.BLOOMMD_E2E_TEST_MODE;
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
     expect(isE2EAuthBypassEnabled()).toBe(false);
 
     process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+
+    mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT = "1";
     expect(isE2EAuthBypassEnabled()).toBe(true);
+
+    delete process.env.BLOOMMD_E2E_TEST_MODE;
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+
+    // The local-deployment marker alone never turns the bypass on.
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "";
+    process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    expect(isE2EAuthBypassEnabled()).toBe(false);
+  });
+
+  test("outside production the bypass flag alone is enough", () => {
+    mutableEnv.NODE_ENV = "development";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    delete process.env.BLOOMMD_E2E_TEST_MODE;
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+    expect(isE2EAuthBypassEnabled()).toBe(true);
+  });
+
+  test("a production server without all markers still enforces the rate limit and the honeypot", async () => {
+    mutableEnv.NODE_ENV = "production";
+    process.env.DATABASE_URL = "";
+    process.env.BLOOMMD_E2E_AUTH_BYPASS = "1";
+    process.env.BLOOMMD_E2E_TEST_MODE = "1";
+    delete mutableEnv.BLOOMMD_LOCAL_DEPLOYMENT;
+    const request = new Request("https://bloommd.app", { headers: { "x-forwarded-for": "203.0.113.77" } });
+    const options = { action: "test-fail-closed", limit: 1, windowMs: 60_000 };
+
+    await assertRateLimit(request, options);
+    await expect(assertRateLimit(request, options)).rejects.toBeInstanceOf(RateLimitError);
+    expect(() => assertHumanFormSignal(new URLSearchParams({ website: "bot", formStartedAt: String(Date.now() - 5_000) }))).toThrow(FormSpamError);
   });
 
   test("requires an exact same origin for cookie-backed mutations", () => {
@@ -74,11 +114,75 @@ describe("request security", () => {
     await expect(readUrlEncodedForm(multipart)).rejects.toMatchObject({ status: 415 });
   });
 
-  test("uses the first trusted proxy address", () => {
-    const request = new Request("https://bloommd.app", {
-      headers: { "x-vercel-forwarded-for": "203.0.113.4, 10.0.0.1" },
+  describe("client address (#169)", () => {
+    const req = (headers: Record<string, string>) => new Request("https://bloommd.app", { headers });
+
+    test("believes the last x-forwarded-for entry by default, not the first", () => {
+      mutableEnv.NODE_ENV = "production";
+      expect(clientAddress(req({ "x-forwarded-for": "198.51.100.99, 203.0.113.4" }))).toBe("203.0.113.4");
+      expect(clientAddress(req({ "x-forwarded-for": "203.0.113.4" }))).toBe("203.0.113.4");
     });
-    expect(clientAddress(request)).toBe("203.0.113.4");
+
+    test("ignores vendor headers in production unless they are configured", () => {
+      mutableEnv.NODE_ENV = "production";
+      const headers = {
+        "x-vercel-forwarded-for": "198.51.100.1",
+        "cf-connecting-ip": "198.51.100.2",
+        "x-real-ip": "198.51.100.3",
+      };
+      expect(clientAddress(req(headers))).toBe(UNATTRIBUTED_SOURCE);
+      expect(clientAddress(req({ ...headers, "x-forwarded-for": "203.0.113.4" }))).toBe("203.0.113.4");
+
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "CF-Connecting-IP";
+      expect(clientAddress(req({ ...headers, "x-forwarded-for": "203.0.113.4" }))).toBe("198.51.100.2");
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "x-vercel-forwarded-for";
+      expect(clientAddress(req(headers))).toBe("198.51.100.1");
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "x-real-ip";
+      expect(clientAddress(req(headers))).toBe("198.51.100.3");
+    });
+
+    test("counts requests without the trusted header under one shared key in production", () => {
+      mutableEnv.NODE_ENV = "production";
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "cf-connecting-ip";
+      // x-forwarded-for is not the configured header, so it is not believed either.
+      expect(clientAddress(req({ "x-forwarded-for": "203.0.113.4" }))).toBe(UNATTRIBUTED_SOURCE);
+      expect(clientAddress(req({}))).toBe(UNATTRIBUTED_SOURCE);
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "not a header!";
+      expect(clientAddress(req({ "x-forwarded-for": "203.0.113.4" }))).toBe(UNATTRIBUTED_SOURCE);
+    });
+
+    test("stays practical outside production", () => {
+      mutableEnv.NODE_ENV = "development";
+      expect(clientAddress(req({ "x-real-ip": "203.0.113.5" }))).toBe("203.0.113.5");
+      expect(clientAddress(req({ "cf-connecting-ip": "203.0.113.6" }))).toBe("203.0.113.6");
+      expect(clientAddress(req({}))).toBe("unknown");
+    });
+
+    test("validates the configured header name", () => {
+      expect(trustedProxyHeaderName({})).toBeNull();
+      expect(trustedProxyHeaderName({ BLOOMMD_TRUSTED_PROXY_HEADER: " CF-Connecting-IP " })).toBe("cf-connecting-ip");
+      expect(trustedProxyHeaderName({ BLOOMMD_TRUSTED_PROXY_HEADER: "x forwarded" })).toBeUndefined();
+      expect(trustedProxyHeaderName({ BLOOMMD_TRUSTED_PROXY_HEADER: "a:b" })).toBeUndefined();
+    });
+
+    test("forged headers cannot bypass the per-address limit", async () => {
+      mutableEnv.NODE_ENV = "production";
+      process.env.DATABASE_URL = "";
+      process.env.BLOOMMD_E2E_AUTH_BYPASS = "";
+      const options = { action: "test-forged", limit: 2, sourceLimit: 2, windowMs: 60_000 };
+      const attempt = (headers: Record<string, string>, n: number) =>
+        assertRateLimit(req(headers), { ...options, identifier: `user${n}@example.com` });
+
+      // The attacker prepends random entries; the proxy appends the real address last.
+      await attempt({ "x-forwarded-for": "198.51.100.1, 203.0.113.50" }, 1);
+      await attempt({ "x-forwarded-for": "198.51.100.2, 203.0.113.50" }, 2);
+      await expect(attempt({ "x-forwarded-for": "198.51.100.3, 203.0.113.50" }, 3)).rejects.toBeInstanceOf(RateLimitError);
+
+      // Headers nobody vouches for do not buy a fresh bucket; they land in the shared one.
+      await attempt({ "cf-connecting-ip": "198.51.100.10" }, 4);
+      await attempt({ "x-real-ip": "198.51.100.11" }, 5);
+      await expect(attempt({ "x-vercel-forwarded-for": "198.51.100.12" }, 6)).rejects.toBeInstanceOf(RateLimitError);
+    });
   });
 
   test("limits both IP and account identifiers", async () => {

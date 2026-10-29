@@ -355,7 +355,7 @@ bloommd-wiki mcp /path/to/wiki
 
 It exposes deterministic status/page reads and the `propose`, `approve`, and `apply` tools. The server has no model credentials and does not upload Wiki content.
 
-Playwright runs with `BLOOMMD_E2E_AUTH_BYPASS=1` from `apps/app/playwright.config.ts`, so local E2E coverage does not depend on external auth or a reachable database. The suite still checks route protection and rejects anonymous mindmap API access.
+Playwright runs with `BLOOMMD_E2E_AUTH_BYPASS=1` (in a production build together with `BLOOMMD_E2E_TEST_MODE=1` and `BLOOMMD_LOCAL_DEPLOYMENT=1`, otherwise the bypass stays off) from `apps/app/playwright.config.ts`, so local E2E coverage does not depend on external auth or a reachable database. The suite still checks route protection and rejects anonymous mindmap API access.
 
 ### Environment
 
@@ -372,6 +372,13 @@ Required for the hosted closed beta:
   self-registration, then no invitation list is required)
 - `BLOOMMD_INTERNAL_INVITE_SECRET` for DB-backed beta invites (no longer used by the marketing app since the waitlist admin was removed)
 - optional fallback: `BLOOMMD_BETA_ALLOWED_EMAILS` or `BLOOMMD_BETA_INVITE_CODES`
+- optional: `BLOOMMD_TRUSTED_PROXY_HEADER` (name of the one header believed for the client address in
+  rate limits, e.g. `cf-connecting-ip`; unset: last `x-forwarded-for` entry, right behind one proxy;
+  `release:check` warns when unset and rejects an invalid name)
+- optional: `BLOOMMD_MAIL_DAILY_LIMIT` (default 300) and `BLOOMMD_MAIL_HOURLY_LIMIT` (default 60):
+  global cap for confirmation and password-reset mails, counted in the database (migration
+  `010_account_mail_budget.sql`; run `db:migrate` before the rollout). When reached, signup answers
+  "temporarily unavailable", no mail goes out and an `[ALERT]` line is logged
 - `BLOOMMD_BILLING_ENABLED=0`
 - `BLOOMMD_AUTO_MIGRATE=0`
 - `NEXT_PUBLIC_SITE_URL`

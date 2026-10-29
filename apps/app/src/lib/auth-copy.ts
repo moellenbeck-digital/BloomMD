@@ -26,6 +26,9 @@ export function formatAuthDate(value: string, locale: AuthLocale) {
 export const SIGNUP_CONSENT_FIELD = "acceptTerms";
 export const SIGNUP_CONSENT_REQUIRED_ERROR = "Bitte stimme der Datenschutzerklärung und den AGB zu.";
 export const VERIFICATION_NOT_SENT_ERROR = "Bestätigungs-E-Mail konnte nicht gesendet werden.";
+/** Global mail cap reached (#169): nothing is wrong with the input, so say it is temporary and nobody's fault. */
+export const SIGNUP_UNAVAILABLE_ERROR = "Die Registrierung ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
+export const MAIL_UNAVAILABLE_ERROR = "Der E-Mail-Versand ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
 
 export function localizeAuthError(value: string, locale: AuthLocale) {
   if (locale === "de") return value;
@@ -48,6 +51,8 @@ export function localizeAuthError(value: string, locale: AuthLocale) {
     "Registrierung fehlgeschlagen.": "Sign-up failed.",
     "Login fehlgeschlagen.": "Sign-in failed.",
     [VERIFICATION_NOT_SENT_ERROR]: "The confirmation email could not be sent.",
+    [SIGNUP_UNAVAILABLE_ERROR]: "Sign-up is temporarily unavailable. Please try again later.",
+    [MAIL_UNAVAILABLE_ERROR]: "Sending email is temporarily unavailable. Please try again later.",
     [SIGNUP_CONSENT_REQUIRED_ERROR]: "Please accept the privacy policy and the terms.",
     "Zu viele Versuche. Bitte warte kurz und versuche es erneut.": "Too many attempts. Please wait a moment and try again.",
     "Bitte lade die Seite neu und versuche es erneut.": "Reload the page and try again.",

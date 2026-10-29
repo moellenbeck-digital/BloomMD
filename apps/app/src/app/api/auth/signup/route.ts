@@ -3,8 +3,9 @@ import { createSessionToken, isE2EAuthBypassEnabled, safeNextPath, sessionCookie
 import { assertBetaSignupAllowedForRequest } from "../../../../lib/betaAccess";
 import { acceptBetaInvite, createAuthToken, createPasswordUser, findPasswordUserByEmail, getWorkspaceInvitationPreviewById, updatePasswordForEmail } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
-import { SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
+import { SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR, SIGNUP_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
 import { sendVerificationEmail } from "../../../../lib/email";
+import { assertAccountMailBudget, MailBudgetError } from "../../../../lib/mail-budget";
 import { hashPassword } from "../../../../lib/passwordAuth";
 import { appendAuthParams, parseWorkspaceInviteHandoff, serializeAuthParams } from "../../../../lib/invite-intent";
 import { assertHumanFormSignal, assertRateLimit, assertSameOrigin, FormSpamError, RateLimitError, readUrlEncodedForm, RequestSecurityError, SIGNUP_RATE_LIMIT } from "../../../../lib/request-security";
@@ -67,6 +68,9 @@ export async function POST(request: Request) {
     }
     const passwordHash = hashPassword(password);
     const existing = await findPasswordUserByEmail(email);
+    // Global mail cap (#169), checked before the account is created: when it is reached no mail
+    // goes out, and no unconfirmed account is left behind that could never be confirmed.
+    if (!existing?.emailVerifiedAt) await assertAccountMailBudget("verification");
     const user = existing ?? await createPasswordUser({ email, name, passwordHash });
     // With open registration anyone can register an address they do not own. If the account is
     // still unconfirmed, the latest signup wins, so a password set by someone else beforehand does
@@ -99,9 +103,9 @@ export async function POST(request: Request) {
     const params = new URLSearchParams({ next, lang });
     if (emailForRedirect) params.set("email", emailForRedirect);
     if (invite) params.set("invite", invite);
-    params.set("error", err instanceof FormSpamError ? "Bitte lade die Seite neu und versuche es erneut." : err instanceof Error ? err.message : "Registrierung fehlgeschlagen.");
+    params.set("error", err instanceof FormSpamError ? "Bitte lade die Seite neu und versuche es erneut." : err instanceof MailBudgetError ? SIGNUP_UNAVAILABLE_ERROR : err instanceof Error ? err.message : "Registrierung fehlgeschlagen.");
     const response = NextResponse.redirect(appRedirectUrl(`/signup?${serializeAuthParams(params)}`, request.url), 303);
-    if (err instanceof RateLimitError) response.headers.set("Retry-After", String(err.retryAfterSeconds));
+    if (err instanceof RateLimitError || err instanceof MailBudgetError) response.headers.set("Retry-After", String(err.retryAfterSeconds));
     return response;
   }
 }

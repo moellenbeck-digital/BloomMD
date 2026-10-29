@@ -453,4 +453,20 @@ describe("agent token rights, proposals and log", () => {
     // A semicolon inside an SQL comment once broke the inline copy; every statement must match exactly.
     for (const statement of expected) expect(statements).toContain(statement);
   });
+
+  test("the migration file and the schema db:migrate applies create the same mail budget table (#169)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/010_account_mail_budget.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(2);
+    for (const statement of expected) expect(statements).toContain(statement);
+  });
 });

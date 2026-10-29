@@ -102,6 +102,13 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
   if (trustedProxyHeaderName(env) === undefined) {
     errors.push("BLOOMMD_TRUSTED_PROXY_HEADER must be a valid HTTP header name (letters, digits and hyphens).");
   }
+  // Global cap for account mails (#169): an invalid value would silently fall back to the default.
+  for (const key of ["BLOOMMD_MAIL_DAILY_LIMIT", "BLOOMMD_MAIL_HOURLY_LIMIT"] as const) {
+    const value = env[key]?.trim();
+    if (value && !(/^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) >= 1)) {
+      errors.push(`${key} must be a positive integer when set.`);
+    }
+  }
   const siteOrigin = secureOrigin(env.NEXT_PUBLIC_SITE_URL, ["https:"]);
   if (!siteOrigin) errors.push("NEXT_PUBLIC_SITE_URL must be a valid HTTPS URL.");
   if (!hasSecretEntropy(env.BLOOMMD_AUTH_SECRET)) errors.push("BLOOMMD_AUTH_SECRET must be a non-placeholder secret with at least 32 characters and sufficient variety.");

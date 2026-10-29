@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { safeNextPath, validateLoginEmail } from "../../../../lib/auth";
+import { MAIL_UNAVAILABLE_ERROR } from "../../../../lib/auth-copy";
 import { createAuthToken, findPasswordUserByEmail } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { sendPasswordResetEmail } from "../../../../lib/email";
+import { assertAccountMailBudget, MailBudgetError } from "../../../../lib/mail-budget";
 import { appendAuthParams, parseWorkspaceInviteHandoff, serializeAuthParams } from "../../../../lib/invite-intent";
 import { ACCOUNT_MAIL_RATE_LIMIT, assertRateLimit, assertSameOrigin, RateLimitError, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
 
@@ -29,6 +31,7 @@ export async function POST(request: Request) {
     const user = await findPasswordUserByEmail(email);
 
     if (user) {
+      await assertAccountMailBudget("password-reset");
       const reset = await createAuthToken({
         userId: user.id,
         email: user.email,
@@ -43,10 +46,10 @@ export async function POST(request: Request) {
     return NextResponse.redirect(appRedirectUrl(appendAuthParams(next, { reset: "requested", invite: invite || undefined, lang }), request.url), 303);
   } catch (err) {
     if (err instanceof RequestSecurityError) return NextResponse.json({ error: err.message }, { status: err.status });
-    const params = new URLSearchParams({ error: err instanceof Error ? err.message : "Passwort-Reset fehlgeschlagen.", lang });
+    const params = new URLSearchParams({ error: err instanceof MailBudgetError ? MAIL_UNAVAILABLE_ERROR : err instanceof Error ? err.message : "Passwort-Reset fehlgeschlagen.", lang });
     if (invite) params.set("invite", invite);
     const response = NextResponse.redirect(appRedirectUrl(`/forgot-password?${serializeAuthParams(params)}`, request.url), 303);
-    if (err instanceof RateLimitError) response.headers.set("Retry-After", String(err.retryAfterSeconds));
+    if (err instanceof RateLimitError || err instanceof MailBudgetError) response.headers.set("Retry-After", String(err.retryAfterSeconds));
     return response;
   }
 }

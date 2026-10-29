@@ -132,6 +132,20 @@ describe("product app production config", () => {
     }
   });
 
+  test("checks the account mail limits (#169)", () => {
+    const env = appEnv();
+    env.BLOOMMD_MAIL_DAILY_LIMIT = "500";
+    env.BLOOMMD_MAIL_HOURLY_LIMIT = "100";
+    expect(productionConfigErrors(env)).toEqual([]);
+
+    for (const invalid of ["0", "-5", "many", "1.5"]) {
+      env.BLOOMMD_MAIL_DAILY_LIMIT = invalid;
+      env.BLOOMMD_MAIL_HOURLY_LIMIT = invalid;
+      expect(productionConfigErrors(env)).toContain("BLOOMMD_MAIL_DAILY_LIMIT must be a positive integer when set.");
+      expect(productionConfigErrors(env)).toContain("BLOOMMD_MAIL_HOURLY_LIMIT must be a positive integer when set.");
+    }
+  });
+
   test("rejects a weak internal invite secret", () => {
     const env = appEnv();
     env.BLOOMMD_INTERNAL_INVITE_SECRET = "TODO";

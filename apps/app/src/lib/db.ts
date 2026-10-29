@@ -188,7 +188,8 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_agent_token_proposals') as agent_token_proposals,
       to_regclass('public.bloom_agent_token_changes') as agent_token_changes,
       to_regclass('public.bloom_documents') as documents,
-      to_regclass('public.bloom_document_views') as document_views
+      to_regclass('public.bloom_document_views') as document_views,
+      to_regclass('public.bloom_mail_budget') as mail_budget
   `;
   const row = rows[0] as Record<string, string | null> | undefined;
   const missing = Object.entries(row ?? {})
@@ -853,6 +854,19 @@ async function createMarketSchema() {
     )
   `;
   await sql`create index if not exists bloom_document_views_user_idx on bloom_document_views(user_id, updated_at desc)`;
+
+  // Global cap for outgoing account mails; see db/010_account_mail_budget.sql.
+  await sql`
+    create table if not exists bloom_mail_budget (
+      scope text not null,
+      window_started_at timestamptz not null,
+      sent integer not null default 0,
+      updated_at timestamptz not null default now(),
+      primary key (scope, window_started_at),
+      check (scope in ('hour', 'day'))
+    )
+  `;
+  await sql`create index if not exists bloom_mail_budget_updated_idx on bloom_mail_budget(updated_at)`;
 
   const tenantConstraints = await sql`
     select conname
@@ -3881,6 +3895,56 @@ export async function consumeRateLimit(input: {
     (rows[0] as { attempts: number } | undefined)?.attempts ?? input.limit + 1,
   );
   return { allowed: attempts <= input.limit, attempts };
+}
+
+export type MailBudgetResult =
+  | { allowed: true }
+  | { allowed: false; scope: "hour" | "day" };
+
+class MailBudgetExhausted extends Error {
+  constructor(readonly scope: "hour" | "day") {
+    super("Mail budget exhausted.");
+  }
+}
+
+/**
+ * Takes one mail from the global hourly and daily budget of outgoing account mails (#169).
+ * Both counters are bumped in one transaction and only while below their limit, so refused
+ * attempts do not use up budget. Returns null when no database is configured.
+ */
+export async function consumeMailBudget(input: {
+  hourStartedAt: string;
+  dayStartedAt: string;
+  hourlyLimit: number;
+  dailyLimit: number;
+}): Promise<MailBudgetResult | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureMarketSchema();
+
+  try {
+    await getSql().begin(async (transaction) => {
+      await transaction`delete from bloom_mail_budget where updated_at < now() - interval '7 days'`;
+      for (const [scope, windowStartedAt, limit] of [
+        ["hour", input.hourStartedAt, input.hourlyLimit],
+        ["day", input.dayStartedAt, input.dailyLimit],
+      ] as const) {
+        const rows = await transaction`
+          insert into bloom_mail_budget (scope, window_started_at, sent)
+          values (${scope}, ${windowStartedAt}, 1)
+          on conflict (scope, window_started_at)
+          do update set sent = bloom_mail_budget.sent + 1, updated_at = now()
+          where bloom_mail_budget.sent < ${limit}
+          returning sent
+        `;
+        // No row: the window is full. Throwing rolls back the counter bumped before it.
+        if (rows.length === 0) throw new MailBudgetExhausted(scope);
+      }
+    });
+    return { allowed: true };
+  } catch (error) {
+    if (error instanceof MailBudgetExhausted) return { allowed: false, scope: error.scope };
+    throw error;
+  }
 }
 
 export async function findPasswordUserByEmail(

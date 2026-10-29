@@ -375,6 +375,10 @@ Required for the hosted closed beta:
 - optional: `BLOOMMD_TRUSTED_PROXY_HEADER` (name of the one header believed for the client address in
   rate limits, e.g. `cf-connecting-ip`; unset: last `x-forwarded-for` entry, right behind one proxy;
   `release:check` warns when unset and rejects an invalid name)
+- optional: `BLOOMMD_MAIL_DAILY_LIMIT` (default 300) and `BLOOMMD_MAIL_HOURLY_LIMIT` (default 60):
+  global cap for confirmation and password-reset mails, counted in the database (migration
+  `010_account_mail_budget.sql`; run `db:migrate` before the rollout). When reached, signup answers
+  "temporarily unavailable", no mail goes out and an `[ALERT]` line is logged
 - `BLOOMMD_BILLING_ENABLED=0`
 - `BLOOMMD_AUTO_MIGRATE=0`
 - `NEXT_PUBLIC_SITE_URL`

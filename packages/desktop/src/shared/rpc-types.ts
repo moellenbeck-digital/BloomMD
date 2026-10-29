@@ -172,6 +172,26 @@ export interface LinkPreviewResult {
   image?: string;
 }
 
+export interface NativeDialogResults {
+  chooseDirectory: { path: string | null; error?: string };
+  chooseResourceFile: { path: string | null; error?: string };
+  importFile: SerializedDocument | { filePath: null };
+}
+
+export type NativeDialogMethod = keyof NativeDialogResults;
+
+/**
+ * Answer of a native dialog request: the dialog was started. The outcome follows as the
+ * `nativeDialogResult` message, so a dialog that waits for a person is not bound by the RPC timeout.
+ */
+export interface NativeDialogStarted {
+  started: true;
+}
+
+export type NativeDialogResultMessage =
+  | { dialogId: string; method: NativeDialogMethod; result: NativeDialogResults[NativeDialogMethod]; error?: undefined }
+  | { dialogId: string; method: NativeDialogMethod; error: string; result?: undefined };
+
 export type BloomMDRPC = {
   bun: RPCSchema<{
     requests: {
@@ -196,16 +216,16 @@ export type BloomMDRPC = {
         response: { success: boolean };
       };
       chooseDirectory: {
-        params: Record<string, never>;
-        response: { path: string | null; error?: string };
+        params: { dialogId: string };
+        response: NativeDialogStarted;
       };
       chooseResourceFile: {
-        params: { kind: "file" | "pdf" };
-        response: { path: string | null; error?: string };
+        params: { dialogId: string; kind: "file" | "pdf" };
+        response: NativeDialogStarted;
       };
       importFile: {
-        params: Record<string, never>;
-        response: SerializedDocument | { filePath: null };
+        params: { dialogId: string };
+        response: NativeDialogStarted;
       };
       createMindmap: {
         params: { filename: string; markdown: string };
@@ -380,6 +400,8 @@ export type BloomMDRPC = {
        */
       externalFileOpened: { kind: "file" | "folder"; filename: string | null; nodeId?: string | null };
       aboutRequested: Record<string, never>;
+      /** Outcome of a `chooseDirectory`, `chooseResourceFile` or `importFile` request started earlier. */
+      nativeDialogResult: NativeDialogResultMessage;
     };
   }>;
 };

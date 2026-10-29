@@ -49,6 +49,8 @@ import { createSecureStorage, SecureStorageUnavailableError, type SecureStorage 
 import { validateAndActivateConnection } from "./connection-profile-flow";
 import { isMarkdownPath, parseCliPath, parseExternalNodeId, parseExternalTarget } from "./external-file";
 import { firstSelectedPath } from "./dialog-selection";
+import { startNativeDialog } from "./native-dialog";
+import { RPC_MAX_REQUEST_TIME_MS } from "../shared/native-dialog";
 import { appendDesktopE2EEvent, parseDesktopArgs, writeDesktopE2EState } from "./e2e-mode";
 import { createDesktopInstanceHandoff, type DesktopInstanceHandoff } from "./instance-handoff";
 import { desktopHandoffPath, handoffPrivateDir, type HandoffPathInput } from "./handoff-path";
@@ -665,9 +667,146 @@ const splashWindow = new BrowserWindow({
   },
 });
 
+// --- Native dialogs ---
+// They wait for a person, so they run outside the RPC request (see ../shared/native-dialog.ts).
+async function runChooseDirectory() {
+  if (isRemote()) {
+    return { path: null };
+  }
+
+  try {
+    const paths = await Utils.openFileDialog({
+      startingFolder: bloommdDir,
+      canChooseFiles: false,
+      canChooseDirectory: true,
+      allowsMultipleSelection: false,
+    });
+
+    const selected = firstSelectedPath(paths);
+    if (!selected) {
+      return { path: null };
+    }
+
+    const info = await stat(selected);
+    if (!info.isDirectory()) {
+      return { path: null, error: "Selected path is not a directory." };
+    }
+
+    bloommdDir = selected;
+    mode = { type: "local", dir: bloommdDir };
+    localStore = new FileStore({ baseDir: bloommdDir });
+
+    await updateSettings({ localDir: bloommdDir });
+    await appendDesktopE2EEvent(desktopArgs.e2e, "chooseDirectory", { localDir: bloommdDir });
+    await writeDesktopE2EState(desktopArgs.e2e, {
+      source: "chooseDirectory",
+      localDir: bloommdDir,
+      activeFile: null,
+      emptyWorkspace: false,
+      mode: "local",
+    });
+
+    if (mainWindow) {
+      startWatching(mainWindow);
+      mainRPC.send.connectionModeChanged({ type: "local" });
+    }
+
+    console.log(`[BloomMD] Switched local directory to: ${selected}`);
+    return { path: selected };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[BloomMD] chooseDirectory error:", message);
+    return { path: null, error: message };
+  }
+}
+
+async function runChooseResourceFile(kind: "file" | "pdf") {
+  if (isRemote()) {
+    return { path: null, error: "Resource files can currently only be selected for local workspaces." };
+  }
+
+  try {
+    const paths = await Utils.openFileDialog({
+      startingFolder: bloommdDir,
+      canChooseFiles: true,
+      canChooseDirectory: false,
+      allowsMultipleSelection: false,
+      allowedFileTypes: kind === "pdf" ? "pdf" : "*",
+    });
+
+    const selected = firstSelectedPath(paths);
+    if (!selected) {
+      return { path: null };
+    }
+
+    const info = await stat(selected);
+    if (!info.isFile()) {
+      return { path: null, error: "Selected path is not a file." };
+    }
+
+    if (kind === "pdf" && resourceMimeType(selected) !== "application/pdf") {
+      return { path: null, error: "Selected file is not a PDF." };
+    }
+
+    return { path: await importResourceIntoWorkspace(selected) };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[BloomMD] chooseResourceFile error:", message);
+    return { path: null, error: message };
+  }
+}
+
+async function runImportFile() {
+  try {
+    const paths = await Utils.openFileDialog({
+      startingFolder: bloommdDir,
+      canChooseFiles: true,
+      canChooseDirectory: false,
+      allowsMultipleSelection: false,
+      allowedFileTypes: "*",
+    });
+
+    const srcPath = paths[0];
+    if (!srcPath || srcPath === "") {
+      return { filePath: null };
+    }
+
+    const content = await readFile(srcPath, "utf-8");
+    const filename = sanitizeMarkdownFilename(srcPath.split("/").pop() || "imported.md");
+
+    if (isRemote()) {
+      // Upload to remote server
+      const doc = await remoteStore!.create(filename, content);
+      return {
+        filePath: doc.filePath,
+        frontmatter: doc.frontmatter,
+        nodes: serializeNodes(doc.nodes),
+        rootId: doc.rootId,
+        preamble: doc.preamble,
+        storage: doc.storage,
+      };
+    }
+
+    const destPath = resolveMarkdownPath(bloommdDir, filename);
+    const doc = parseFile(destPath, content);
+    await localStore.write(doc);
+    return {
+      filePath: doc.filePath,
+      frontmatter: doc.frontmatter,
+      nodes: serializeNodes(doc.nodes),
+      rootId: doc.rootId,
+      preamble: doc.preamble,
+      storage: doc.storage,
+    };
+  } catch (err) {
+    console.error("[BloomMD] importFile error:", err);
+    return { filePath: null };
+  }
+}
+
 // --- Main Window Setup ---
 const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
-  maxRequestTime: 60000,
+  maxRequestTime: RPC_MAX_REQUEST_TIME_MS,
   handlers: {
     requests: {
       listMindmaps: async () => {
@@ -751,140 +890,14 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
         return { success: true };
       },
 
-      chooseDirectory: async () => {
-        if (isRemote()) {
-          return { path: null };
-        }
+      chooseDirectory: ({ dialogId }) =>
+        startNativeDialog(dialogId, "chooseDirectory", runChooseDirectory, (message) => mainRPC.send.nativeDialogResult(message)),
 
-        try {
-          const paths = await Utils.openFileDialog({
-            startingFolder: bloommdDir,
-            canChooseFiles: false,
-            canChooseDirectory: true,
-            allowsMultipleSelection: false,
-          });
+      chooseResourceFile: ({ dialogId, kind }) =>
+        startNativeDialog(dialogId, "chooseResourceFile", () => runChooseResourceFile(kind), (message) => mainRPC.send.nativeDialogResult(message)),
 
-          const selected = firstSelectedPath(paths);
-          if (!selected) {
-            return { path: null };
-          }
-
-          const info = await stat(selected);
-          if (!info.isDirectory()) {
-            return { path: null, error: "Selected path is not a directory." };
-          }
-
-          bloommdDir = selected;
-          mode = { type: "local", dir: bloommdDir };
-          localStore = new FileStore({ baseDir: bloommdDir });
-
-          await updateSettings({ localDir: bloommdDir });
-          await appendDesktopE2EEvent(desktopArgs.e2e, "chooseDirectory", { localDir: bloommdDir });
-          await writeDesktopE2EState(desktopArgs.e2e, {
-            source: "chooseDirectory",
-            localDir: bloommdDir,
-            activeFile: null,
-            emptyWorkspace: false,
-            mode: "local",
-          });
-
-          if (mainWindow) {
-            startWatching(mainWindow);
-            mainRPC.send.connectionModeChanged({ type: "local" });
-          }
-
-          console.log(`[BloomMD] Switched local directory to: ${selected}`);
-          return { path: selected };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error("[BloomMD] chooseDirectory error:", message);
-          return { path: null, error: message };
-        }
-      },
-
-      chooseResourceFile: async ({ kind }) => {
-        if (isRemote()) {
-          return { path: null, error: "Resource files can currently only be selected for local workspaces." };
-        }
-
-        try {
-          const paths = await Utils.openFileDialog({
-            startingFolder: bloommdDir,
-            canChooseFiles: true,
-            canChooseDirectory: false,
-            allowsMultipleSelection: false,
-            allowedFileTypes: kind === "pdf" ? "pdf" : "*",
-          });
-
-          const selected = firstSelectedPath(paths);
-          if (!selected) {
-            return { path: null };
-          }
-
-          const info = await stat(selected);
-          if (!info.isFile()) {
-            return { path: null, error: "Selected path is not a file." };
-          }
-
-          if (kind === "pdf" && resourceMimeType(selected) !== "application/pdf") {
-            return { path: null, error: "Selected file is not a PDF." };
-          }
-
-          return { path: await importResourceIntoWorkspace(selected) };
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error("[BloomMD] chooseResourceFile error:", message);
-          return { path: null, error: message };
-        }
-      },
-
-      importFile: async () => {
-        try {
-          const paths = await Utils.openFileDialog({
-            startingFolder: bloommdDir,
-            canChooseFiles: true,
-            canChooseDirectory: false,
-            allowsMultipleSelection: false,
-            allowedFileTypes: "*",
-          });
-
-          const srcPath = paths[0];
-          if (!srcPath || srcPath === "") {
-            return { filePath: null };
-          }
-
-          const content = await readFile(srcPath, "utf-8");
-          const filename = sanitizeMarkdownFilename(srcPath.split("/").pop() || "imported.md");
-
-          if (isRemote()) {
-            // Upload to remote server
-            const doc = await remoteStore!.create(filename, content);
-            return {
-              filePath: doc.filePath,
-              frontmatter: doc.frontmatter,
-              nodes: serializeNodes(doc.nodes),
-              rootId: doc.rootId,
-              preamble: doc.preamble,
-              storage: doc.storage,
-            };
-          }
-
-          const destPath = resolveMarkdownPath(bloommdDir, filename);
-          const doc = parseFile(destPath, content);
-          await localStore.write(doc);
-          return {
-            filePath: doc.filePath,
-            frontmatter: doc.frontmatter,
-            nodes: serializeNodes(doc.nodes),
-            rootId: doc.rootId,
-            preamble: doc.preamble,
-            storage: doc.storage,
-          };
-        } catch (err) {
-          console.error("[BloomMD] importFile error:", err);
-          return { filePath: null };
-        }
-      },
+      importFile: ({ dialogId }) =>
+        startNativeDialog(dialogId, "importFile", runImportFile, (message) => mainRPC.send.nativeDialogResult(message)),
 
       /**
        * Creates a folder in the local workspace.

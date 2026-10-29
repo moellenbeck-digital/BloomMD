@@ -1,5 +1,7 @@
 import Electrobun, { Electroview } from "electrobun/view";
-import type { BloomMDRPC, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus } from "../shared/rpc-types";
+import type { BloomMDRPC, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus, NativeDialogMethod, NativeDialogStarted } from "../shared/rpc-types";
+import { RPC_MAX_REQUEST_TIME_MS } from "../shared/native-dialog";
+import { createNativeDialogClient } from "./native-dialog-client";
 
 type FileChangedCallback = (filename: string) => void;
 type ExternalOpen = { kind: "file" | "folder" | null; filename: string | null; nodeId?: string | null };
@@ -13,8 +15,9 @@ let onExternalFileOpenedCallback: ExternalOpenCallback | null = null;
 let onAboutRequestedCallback: AboutRequestedCallback | null = null;
 let onUpdateStatusCallback: UpdateStatusCallback | null = null;
 
+// Native dialogs wait for a person and must not run into this timeout: see `nativeDialogs` below.
 const rpc = Electroview.defineRPC<BloomMDRPC>({
-  maxRequestTime: 60000,
+  maxRequestTime: RPC_MAX_REQUEST_TIME_MS,
   handlers: {
     requests: {},
     messages: {
@@ -39,11 +42,19 @@ const rpc = Electroview.defineRPC<BloomMDRPC>({
       aboutRequested: () => {
         onAboutRequestedCallback?.();
       },
+      nativeDialogResult: (message) => {
+        nativeDialogs.handleResult(message);
+      },
     },
   },
 });
 
 const electrobun = new Electrobun.Electroview({ rpc });
+
+/** Native dialogs: the request only starts the dialog, the choice arrives as `nativeDialogResult`. */
+const nativeDialogs = createNativeDialogClient(
+  (method, params) => (electrobun.rpc!.request as unknown as Record<NativeDialogMethod, (params: unknown) => Promise<NativeDialogStarted>>)[method](params),
+);
 
 export function onFileChanged(callback: FileChangedCallback) {
   onFileChangedCallback = callback;
@@ -82,15 +93,15 @@ export async function saveMindmap(filePath: string, markdown: string, storage?: 
 }
 
 export async function chooseDirectory() {
-  return electrobun.rpc!.request.chooseDirectory({});
+  return nativeDialogs.open("chooseDirectory");
 }
 
 export async function chooseResourceFile(kind: "file" | "pdf") {
-  return electrobun.rpc!.request.chooseResourceFile({ kind });
+  return nativeDialogs.open("chooseResourceFile", { kind });
 }
 
 export async function importFile() {
-  return electrobun.rpc!.request.importFile({});
+  return nativeDialogs.open("importFile");
 }
 
 export async function createFolder(folderPath: string) {

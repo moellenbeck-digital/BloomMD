@@ -32,6 +32,7 @@ import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bl
 import { backlinksFor } from "@bloommd/core/workspace-search";
 import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
+import { INGEST_SOURCE_REF, IngestSourceDuplicateError, normalizeKnowledgeTitle, planIngestInMap } from "./ingest-in-map";
 
 export interface ChangeMeta {
   reason?: string;
@@ -91,14 +92,11 @@ export const INGEST_MAX_TEXT_CHARS = 200_000;
 export const INGEST_MAX_NODES = 150;
 /** The templates `ingest` files into; `learning` has its own commands (`agent create|append`). */
 export const INGEST_TEMPLATE_IDS: readonly string[] = KNOWLEDGE_TEMPLATES.filter((template) => template.id !== "learning").map((template) => template.id);
-/** Ref of the source node `ingest` adds; section nodes must not use it. */
-const INGEST_SOURCE_REF = "originaltext";
 const INGEST_PARENT_REF = "quellen";
 const SOURCE_REF_MAX = 300;
 const BLOOM_COMMENT_RE = /<!--\s*bloommd:/i;
 
-/** A title as compared for duplicates: case, punctuation and spacing do not matter. */
-export const normalizeKnowledgeTitle = (title: string): string => title.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+export { IngestSourceDuplicateError, normalizeKnowledgeTitle };
 
 /** A map with the same title already exists in the target area; `path` is that map. */
 export class IngestDuplicateError extends Error {
@@ -109,10 +107,13 @@ export class IngestDuplicateError extends Error {
 }
 
 export interface IngestInput extends ChangeMeta {
-  /** One of `INGEST_TEMPLATE_IDS`. */
-  template: string;
-  title: string;
-  /** Default: the template's area. */
+  /** One of `INGEST_TEMPLATE_IDS`; required for a new map, not allowed with `inMap`. */
+  template?: string;
+  /** Title of the new map; required for a new map, not allowed with `inMap`. */
+  title?: string;
+  /** Path of an existing map to add to (as `bloommd_get_map` takes it) instead of creating a new one. */
+  inMap?: string;
+  /** Default: the template's area; not allowed with `inMap`. */
   area?: string;
   /** The original text, filed word for word. */
   text: string;
@@ -126,6 +127,12 @@ export interface IngestInput extends ChangeMeta {
 
 export interface IngestResult extends CommitResult {
   area: string;
+  /** With `inMap`: the section nodes that already existed (matched by title, left as they are). */
+  matched?: Array<{ titel: string; id: string }>;
+  /** With `inMap`: what was left out on purpose (ambiguous titles or relation targets, ignored content). */
+  hinweise?: string[];
+  /** With `inMap`: title of the source node that was added. */
+  sourceTitle?: string;
   /** Id of the `kind: source` node that holds the original text. */
   sourceNode: string;
   /** Characters of the original text (code points). */
@@ -166,6 +173,32 @@ function sourceContent(text: string): string {
   const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
   const fence = "`".repeat(Math.max(3, longest + 1));
   return `${fence}\n${text}\n${fence}`;
+}
+
+/** `url` of the source node: only for an http(s) reference. */
+function sourceUrl(sourceRef: string): { url?: string } {
+  return /^https?:\/\/\S+$/i.test(sourceRef) ? { url: sourceRef } : {};
+}
+
+/**
+ * The checks every ingest shares (new map or `inMap`): original text, source reference and date,
+ * the limits, no BloomMD comment, the reserved ref. Throws before anything is written.
+ */
+function checkIngestMaterial(input: IngestInput) {
+  const sourceRef = input.sourceRef?.trim() ?? "";
+  if (typeof input.text !== "string" || !input.text.trim()) throw new KnowledgeInputError("Missing source: the original text is missing or empty. Nothing was written.");
+  if (!sourceRef) throw new KnowledgeInputError("Missing source: give where the original comes from (path, URL or ticket). Nothing was written.");
+  if (sourceRef.length > SOURCE_REF_MAX || /[\r\n]/.test(sourceRef) || BLOOM_COMMENT_RE.test(sourceRef)) throw new KnowledgeInputError(`The source reference must be one line of at most ${SOURCE_REF_MAX} characters, without BloomMD comments.`);
+  const sourceDate = input.sourceDate?.trim();
+  if (sourceDate !== undefined && sourceDate !== "" && !isIsoDay(sourceDate)) throw new KnowledgeInputError(`The date of the source must be YYYY-MM-DD, got "${sourceDate}".`);
+
+  const characters = [...input.text].length;
+  if (characters > INGEST_MAX_TEXT_CHARS) throw new KnowledgeInputError(`Original text too long: ${characters} characters, at most ${INGEST_MAX_TEXT_CHARS} are allowed. Nothing was written.`);
+  if (BLOOM_COMMENT_RE.test(input.text)) throw new KnowledgeInputError("The original text contains a BloomMD comment (<!-- bloommd: … -->), which is reserved for BloomMD's own metadata. Nothing was written.");
+  const sections = input.nodes ?? [];
+  assertIngestNodeCount(sections.length);
+  if (sections.some((node) => node.ref === INGEST_SOURCE_REF)) throw new KnowledgeInputError(`The ref "${INGEST_SOURCE_REF}" is reserved for the source node.`);
+  return { sections, sourceRef, sourceDate: sourceDate || undefined, characters, citation: [sourceRef, ...(sourceDate ? [sourceDate] : [])].join(", ") };
 }
 
 export type Proposal = AgentProposal;
@@ -500,6 +533,13 @@ export class KnowledgeService {
    * Rights, proposals, log and undo are those of `createMap`.
    */
   async ingest(input: IngestInput): Promise<IngestResult> {
+    const inMap = input.inMap?.trim();
+    if (input.inMap !== undefined && !inMap) throw new KnowledgeInputError("inMap is empty: give the path of the map to add to.");
+    if (inMap) {
+      const given = [input.template?.trim() && "template", input.title?.trim() && "title", input.area?.trim() && "area"].filter(Boolean);
+      if (given.length > 0) throw new KnowledgeInputError(`With inMap, ${given.join(", ")} must not be given: the map, its title and its area already exist. Nothing was written.`);
+      return this.ingestInMap(inMap, input);
+    }
     const templateId = input.template?.trim();
     if (!templateId) throw new KnowledgeInputError(`Give a template: ${INGEST_TEMPLATE_IDS.join(", ")}.`);
     if (templateId === "learning") throw new KnowledgeInputError("The template learning cannot be ingested; use agent create / agent append for learnings.");
@@ -508,26 +548,12 @@ export class KnowledgeService {
     const title = input.title?.trim();
     if (!title) throw new KnowledgeInputError("A map needs a title.");
 
-    const sourceRef = input.sourceRef?.trim() ?? "";
-    if (typeof input.text !== "string" || !input.text.trim()) throw new KnowledgeInputError("Missing source: the original text is missing or empty. Nothing was written.");
-    if (!sourceRef) throw new KnowledgeInputError("Missing source: give where the original comes from (path, URL or ticket). Nothing was written.");
-    if (sourceRef.length > SOURCE_REF_MAX || /[\r\n]/.test(sourceRef) || BLOOM_COMMENT_RE.test(sourceRef)) throw new KnowledgeInputError(`The source reference must be one line of at most ${SOURCE_REF_MAX} characters, without BloomMD comments.`);
-    const sourceDate = input.sourceDate?.trim();
-    if (sourceDate !== undefined && sourceDate !== "" && !isIsoDay(sourceDate)) throw new KnowledgeInputError(`The date of the source must be YYYY-MM-DD, got "${sourceDate}".`);
-
-    const characters = [...input.text].length;
-    if (characters > INGEST_MAX_TEXT_CHARS) throw new KnowledgeInputError(`Original text too long: ${characters} characters, at most ${INGEST_MAX_TEXT_CHARS} are allowed. Nothing was written.`);
-    if (BLOOM_COMMENT_RE.test(input.text)) throw new KnowledgeInputError("The original text contains a BloomMD comment (<!-- bloommd: … -->), which is reserved for BloomMD's own metadata. Nothing was written.");
-    const sections = input.nodes ?? [];
-    assertIngestNodeCount(sections.length);
-    if (sections.some((node) => node.ref === INGEST_SOURCE_REF)) throw new KnowledgeInputError(`The ref "${INGEST_SOURCE_REF}" is reserved for the source node.`);
-
+    const { sections, sourceRef, characters, citation } = checkIngestMaterial(input);
     const hasSources = template.skeleton.some((node) => node.ref === INGEST_PARENT_REF);
-    const citation = [sourceRef, ...(sourceDate ? [sourceDate] : [])].join(", ");
     const nodes: KnowledgeNodeInput[] = [
       ...(hasSources ? [] : [{ ref: INGEST_PARENT_REF, title: "Quellen", kind: "source" as const }]),
       ...sections,
-      { ref: INGEST_SOURCE_REF, parent: INGEST_PARENT_REF, title: "Originaltext", kind: "source", citation, ...(/^https?:\/\/\S+$/i.test(sourceRef) ? { url: sourceRef } : {}), content: sourceContent(input.text) },
+      { ref: INGEST_SOURCE_REF, parent: INGEST_PARENT_REF, title: "Originaltext", kind: "source", citation, ...sourceUrl(sourceRef), content: sourceContent(input.text) },
     ];
     const area = input.area?.trim() || template.area;
     const result = await this.createMapAs(
@@ -544,6 +570,44 @@ export class KnowledgeService {
   }
 
   /**
+   * `ingest` into an existing map (`inMap`): a section node whose parent already has exactly one
+   * child with the same normalized title is not created again, its new children hang below it and
+   * its content stays as it is; otherwise it is created (several matches: created, with a hint).
+   * Parents are a ref of the list, a node id of the map or a skeleton ref of a template whose node
+   * the map has (by title). The original becomes one more `kind: source` node below "Quellen"
+   * ("Originaltext <Datum>"); a source node with the same citation is a duplicate
+   * (`IngestSourceDuplicateError`). Relations and `[[Note]]` links are set when their target is
+   * unambiguous, otherwise a hint says so. A missing map, an unresolvable parent or a node with an
+   * id are refused with nothing written. Rights, proposals, log and undo are those of `updateMap`.
+   */
+  private async ingestInMap(inMap: string, input: IngestInput): Promise<IngestResult> {
+    const { sections, sourceRef, sourceDate, characters, citation } = checkIngestMaterial(input);
+    return this.withLock(inMap, async () => {
+      const document = await this.store.read(inMap).catch((error: unknown) => {
+        throw new KnowledgeInputError(`Die Ziel-Map "${inMap}" gibt es nicht oder sie ist nicht lesbar (${error instanceof Error ? error.message : String(error)}). Nichts wurde geschrieben.`);
+      });
+      const plan = planIngestInMap({ path: document.path, markdown: document.markdown, sections, citation, sourceRef, sourceDate });
+      const nodes: KnowledgeNodeInput[] = [
+        ...plan.nodes,
+        { ref: INGEST_SOURCE_REF, parent: plan.sourceParent, title: plan.sourceTitle, kind: "source", citation, ...sourceUrl(sourceRef), content: sourceContent(input.text) },
+      ];
+      const result = await this.updateMapNow({ path: document.path, version: document.version, nodes, tool: "bloommd_ingest", source: citation, reason: input.reason ?? `Ingest in bestehende Map ${document.path}` });
+      return {
+        ...result,
+        // Refs the plan made up (nodes without a ref, a missing "Quellen") are not the caller's business.
+        ids: Object.fromEntries(Object.entries(result.ids).filter(([ref]) => !ref.startsWith("_ingest_"))),
+        area: this.areaOf(result.path),
+        sourceNode: result.ids[INGEST_SOURCE_REF] ?? "",
+        sourceTitle: plan.sourceTitle,
+        characters,
+        sections: sections.length,
+        matched: plan.matched,
+        hinweise: plan.hinweise,
+      };
+    });
+  }
+
+  /**
    * Adds or updates nodes and/or sets frontmatter fields (`frontmatter`); at least one of the two.
    * Only the fields given are touched, the rest of the map stays as it is. In a cloud workspace
    * a change with frontmatter is a whole-document save (refused while the map is open).
@@ -553,7 +617,9 @@ export class KnowledgeService {
     return this.withLock(input.path, () => this.updateMapNow(input));
   }
 
-  private async updateMapNow(input: { path: string; version?: string; nodes?: KnowledgeNodeInput[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta): Promise<CommitResult> {
+  /** `tool` is the name in the log and the change record (default: `bloommd_update_map`; `ingest` into a map uses its own). */
+  private async updateMapNow(input: { path: string; version?: string; nodes?: KnowledgeNodeInput[]; frontmatter?: KnowledgeFrontmatterInput; tool?: string } & ChangeMeta): Promise<CommitResult> {
+    const tool = input.tool ?? "bloommd_update_map";
     const document = await this.store.read(input.path);
     if (input.version && input.version !== document.version) {
       throw new Error(`${input.path} changed since version ${input.version} (now ${document.version}). Read it again with bloommd_get_map.`);
@@ -567,16 +633,16 @@ export class KnowledgeService {
     if (this.store.applyNodes && nodes.length > 0 && !input.frontmatter && (this.cloud || (await this.access(area)) === "write")) {
       // Cloud: node operations merge into the live document instead of replacing it. The server
       // decides by the token's rights: it writes, or keeps the change as a proposal.
-      const applied = await this.store.applyNodes(document.path, nodes, { tool: "bloommd_update_map", reason: input.reason, source: input.source });
+      const applied = await this.store.applyNodes(document.path, nodes, { tool, reason: input.reason, source: input.source });
       if (this.cloud) {
         if (applied.proposalId) return { path: document.path, mode: "proposed", proposalId: applied.proposalId, ids: nodeChange.ids, created: nodeChange.created, updated: nodeChange.updated };
         return { path: document.path, mode: "written", changeId: applied.changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
       }
-      const changeId = await this.remember({ origin: "agent", tool: "bloommd_update_map", path: document.path, before: document.markdown, afterVersion: applied.version, reason: input.reason, source: input.source });
-      await this.log({ event: "written", tool: "bloommd_update_map", path: document.path, changeId, summary: `${applied.created.length} node(s) created, ${applied.updated.length} updated`, created: applied.created, updated: applied.updated, reason: input.reason, source: input.source });
+      const changeId = await this.remember({ origin: "agent", tool, path: document.path, before: document.markdown, afterVersion: applied.version, reason: input.reason, source: input.source });
+      await this.log({ event: "written", tool, path: document.path, changeId, summary: `${applied.created.length} node(s) created, ${applied.updated.length} updated`, created: applied.created, updated: applied.updated, reason: input.reason, source: input.source });
       return { path: document.path, mode: "written", changeId, version: applied.version, ids: applied.ids, created: applied.created, updated: applied.updated };
     }
-    return this.commit("bloommd_update_map", document.path, document.markdown, document.version, change.markdown, change, input);
+    return this.commit(tool, document.path, document.markdown, document.version, change.markdown, change, input);
   }
 
   /**

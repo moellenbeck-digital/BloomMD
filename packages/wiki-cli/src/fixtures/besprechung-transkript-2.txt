@@ -1,0 +1,10 @@
+Transkript: Wochenbesprechung Produktteam, 27.10.2026 (Beispieltext, frei erfunden)
+
+[00:00] Moderation: Guten Morgen. Wir haben diese Woche drei Punkte: Stand Release-Termin, die Fehler aus dem Import und die Frage nach der englischen Fassung.
+[00:35] Entwicklung: Beim Release-Termin hat sich nichts geändert, der 5. November hält. Der Feinschliff an der Suche ist inzwischen erledigt, die Migration läuft stabil.
+[01:10] Test: Zum Import: Der Fehler mit den Umlauten in Dateinamen ist behoben und verifiziert. Der zweite Fehler mit den leeren Zeilen am Ende der Datei bleibt offen, ich habe ihn wieder aufgenommen.
+[01:48] Vertrieb: Die Ankündigung für den Release ist noch nicht raus. Der Entwurf liegt bei uns, wir prüfen den Text bis Mittwoch.
+[02:20] Moderation: Gut. Dann halten wir fest: Entwicklung bereitet die Ankündigung weiter vor, Vertrieb prüft sie. Siehe auch [[Release-Termin]].
+[02:55] Moderation: Zur englischen Fassung: Das ist weiter offen. Wir brauchen dafür eine Rückmeldung vom Marketing, die kommt nächste Woche.
+[03:30] Moderation: Neu ist die Frage, ob wir den Import-Fehler im Release-Hinweis nennen. Das klären wir mit dem Test.
+[04:00] Moderation: Danke euch, bis nächste Woche.

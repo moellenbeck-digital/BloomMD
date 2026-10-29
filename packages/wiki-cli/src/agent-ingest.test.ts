@@ -369,7 +369,8 @@ describe("bloommd_ingest (MCP)", () => {
     expect(tool.description).toContain(String(INGEST_MAX_NODES));
     expect(tool.description).toMatch(/personal data/);
     const schema = tool.inputSchema as { required: string[]; properties: { template: { enum: string[] } } };
-    expect(schema.required).toEqual(["template", "title", "text", "source"]);
+    // template and title are required at run time (a new map), not in the schema: inMap does without them
+    expect(schema.required).toEqual(["text", "source"]);
     expect(schema.properties.template.enum).toEqual(["meeting", "conversation", "discussion", "lesson", "project", "weekly"]);
   });
 

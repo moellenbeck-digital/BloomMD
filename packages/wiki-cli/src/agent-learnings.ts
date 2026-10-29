@@ -25,7 +25,7 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { addDays, LEARNING_STALE_AFTER_DAYS } from "@bloommd/core/knowledge-templates";
-import { IngestDuplicateError, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, normalizeKnowledgeTitle, parseIngestNodes, type CommitResult, type KnowledgeService } from "./knowledge-service";
+import { IngestDuplicateError, IngestSourceDuplicateError, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, normalizeKnowledgeTitle, parseIngestNodes, type CommitResult, type KnowledgeService } from "./knowledge-service";
 import { safeVaultPath } from "./knowledge-store";
 
 export const EXIT = { ok: 0, error: 1, usage: 2, duplicate: 3, limit: 4 } as const;
@@ -143,9 +143,22 @@ Ausgabe: {"ok":true,"pfad","modus":"geschrieben"|"vorgeschlagen",…}`,
     positional: { min: 1, max: 1 },
   },
   ingest: {
-    usage: "agent ingest --vorlage <id> --titel <t> --text <datei|-> --quelle <verweis> [--quelle-datum <YYYY-MM-DD>] [--abschnitte <datei|->] [--bereich <b>] --name <agent> (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    usage: "agent ingest --vorlage <id> --titel <t> --text <datei|-> --quelle <verweis> [--quelle-datum <YYYY-MM-DD>] [--abschnitte <datei|->] [--bereich <b>] --name <agent> (--vault <ordner> | --cloud <url> [--workspace <id>])\n  agent ingest --in-map <pfad> --text <datei|-> --quelle <verweis> [--quelle-datum <YYYY-MM-DD>] [--abschnitte <datei|->] --name <agent> (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Legt aus Rohtext (Transkript, Chat, Notiz) und den vom Agenten schon gegliederten Abschnitten eine Map nach
-Vorlage an. Das Werkzeug erfindet nichts und ruft kein Modell auf; die Gliederung liefert der Aufrufer.
+Vorlage an — oder ergänzt mit --in-map eine bestehende Map. Das Werkzeug erfindet nichts und ruft kein Modell auf;
+die Gliederung liefert der Aufrufer.
+  --in-map <pfad>    bestehende Map ergänzen (Pfad wie bei agent read bzw. bloommd_get_map) statt eine neue anzulegen;
+                     dann sind --vorlage, --titel und --bereich nicht erlaubt (Exitcode 2). Fehlt die Map: Exitcode 2.
+                     Zuordnung: Hat der Elternknoten eines Abschnittsknotens genau ein Kind mit gleichem Titel (Groß-/Klein-
+                     schreibung und Satzzeichen zählen nicht), wird es nicht neu angelegt; die neuen Kinder hängen darunter,
+                     sein Inhalt, Typ und seine Relationen bleiben unverändert (aus der Aufnahme wird dafür nichts übernommen). Sonst wird der Knoten neu angelegt (mehrere Treffer: neu, Hinweis
+                     „mehrdeutig“). parent: ein ref aus der Liste (vorher), eine Knoten-ID der Map oder ein Skelett-Ref einer
+                     Vorlage (themen, aufgaben …), dessen Knoten die Map hat; sonst Exitcode 2, nichts geschrieben.
+                     Das Original wird ein weiterer Knoten „Originaltext <Datum|Quelle>“ (kind: source) unter „Quellen“
+                     (fehlt er, wird er angelegt); bestehende Quellen bleiben unverändert. Gibt es schon einen Quellknoten
+                     mit gleicher citation (Quelle, Datum): Exitcode 3, {"fehler","duplicate":true,"pfad"}, nichts geschrieben.
+                     relations-Ziele (ref, Knoten-ID oder Titel) und [[Notiz]] im Inhalt neuer Knoten werden verknüpft, wenn
+                     das Ziel eindeutig ist; sonst steht ein Eintrag in "hinweise" und es gibt keine Verknüpfung.
   --vorlage <id>     ${INGEST_TEMPLATE_IDS.join(", ")} (learning nicht: dafür agent create)
   --titel <t>        Titel der Map
   --text <datei|->   Originaltext aus Datei oder stdin ("-"). Er steht wörtlich (ohne Kürzung und Normalisierung)
@@ -166,8 +179,9 @@ angelegt: Exitcode 3 und {"fehler","duplicate":true,"pfad"}. Es gibt kein --forc
 Rechte wie bei agent mcp: read lehnt ab, propose legt einen Vorschlag an (nur ein Mensch gibt ihn frei: agent approve), write schreibt;
 die Änderung steht im Protokoll (agent log) und lässt sich mit agent undo zurücknehmen.
 Keine Zugangsdaten und keine Personendaten in Text oder Abschnitte (Passwörter, Tokens, private Angaben): das Werkzeug filtert nichts.
-Ausgabe: {"ok":true,"pfad","bereich","vorlage","modus":"geschrieben"|"vorgeschlagen","quellknoten","zeichen","abschnitte",…}`,
-    values: ["--vorlage", "--titel", "--text", "--quelle", "--quelle-datum", "--abschnitte", "--bereich", ...TARGET_FLAGS],
+Ausgabe: {"ok":true,"pfad","bereich","vorlage","modus":"geschrieben"|"vorgeschlagen","quellknoten","zeichen","abschnitte",…};
+mit --in-map ohne "vorlage", dafür "quellentitel","zugeordnet":[{"titel","id"}],"neu" (Anzahl neuer Knoten),"hinweise":[…].`,
+    values: ["--vorlage", "--titel", "--text", "--quelle", "--quelle-datum", "--abschnitte", "--bereich", "--in-map", ...TARGET_FLAGS],
     positional: { min: 0, max: 0 },
   },
   stale: {
@@ -609,8 +623,14 @@ async function inputOf(flag: string, value: string, deps: LearningDeps, stdin: {
 }
 
 async function ingest(service: KnowledgeService, parsed: Parsed, deps: LearningDeps) {
-  const vorlage = required(parsed, "--vorlage");
-  const titel = required(parsed, "--titel");
+  const inMap = one(parsed, "--in-map")?.trim();
+  if (parsed.values.has("--in-map") && !inMap) throw usageError("--in-map fehlt: Pfad der Map, die ergänzt werden soll.");
+  if (inMap) {
+    const verboten = ["--vorlage", "--titel", "--bereich"].filter((flag) => parsed.values.has(flag));
+    if (verboten.length > 0) throw usageError(`Mit --in-map sind ${verboten.join(", ")} nicht erlaubt: Map, Titel und Bereich gibt es schon. Nichts geschrieben.`);
+  }
+  const vorlage = inMap ? undefined : required(parsed, "--vorlage");
+  const titel = inMap ? undefined : required(parsed, "--titel");
   const bereich = one(parsed, "--bereich")?.trim();
   const quelleDatum = one(parsed, "--quelle-datum")?.trim();
   const quelle = one(parsed, "--quelle")?.trim();
@@ -633,10 +653,21 @@ async function ingest(service: KnowledgeService, parsed: Parsed, deps: LearningD
     nodes = parseIngestNodes(raw);
   }
   try {
-    const result = await withLock(service.store.stateDir, "ingest.lock", () => service.ingest({ template: vorlage, title: titel, area: bereich, text, sourceRef: quelle, sourceDate: quelleDatum, nodes }));
-    return { ok: true, ...describeWrite(result), bereich: result.area, vorlage, quellknoten: result.sourceNode, zeichen: result.characters, abschnitte: result.sections, ids: result.ids };
+    const result = await withLock(service.store.stateDir, "ingest.lock", () => service.ingest({ template: vorlage, title: titel, inMap, area: bereich, text, sourceRef: quelle, sourceDate: quelleDatum, nodes }));
+    return {
+      ok: true,
+      ...describeWrite(result),
+      bereich: result.area,
+      ...(inMap ? {} : { vorlage }),
+      quellknoten: result.sourceNode,
+      zeichen: result.characters,
+      abschnitte: result.sections,
+      ...(inMap ? { quellentitel: result.sourceTitle, zugeordnet: result.matched, neu: result.created.length, hinweise: result.hinweise } : {}),
+      ids: result.ids,
+    };
   } catch (error) {
     if (error instanceof IngestDuplicateError) throw new LearningCliError(EXIT.duplicate, error.message, { duplicate: true, pfad: error.path, titel: error.title, bereich: error.area });
+    if (error instanceof IngestSourceDuplicateError) throw new LearningCliError(EXIT.duplicate, error.message, { duplicate: true, pfad: error.path, quelle: error.citation, knoten: error.nodeTitle });
     throw error;
   }
 }

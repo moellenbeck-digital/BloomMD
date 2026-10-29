@@ -5,6 +5,7 @@ const options = {
   marketingUrl: "https://bloommd.io",
   appUrl: "https://bloommd.app",
   timeoutMs: 1000,
+  betaGate: false,
   json: false,
 };
 
@@ -18,10 +19,32 @@ function headers(host: string) {
   return values;
 }
 
-const passingFetcher: SmokeFetcher = async (url, init) => {
+const OPEN_SIGNUP_BODY = 'data-testid="signup-form" BloomMD Account erstellen Mindestens 10 Zeichen';
+const GATE_SIGNUP_BODY = 'data-testid="beta-access-gate" Account erstellen Dein Cloud-Zugang ist noch nicht freigeschaltet. Beta-Code (optional)';
+
+/** Fetcher for a deployment; `betaGate` mirrors BLOOMMD_BETA_ACCESS=1 on the app. */
+function fetcherFor(betaGate: boolean): SmokeFetcher {
+  return async (url, init, timeoutMs) => {
+    const parsed = new URL(url);
+    if (parsed.host === "bloommd.app" && parsed.pathname === "/signup") {
+      const email = parsed.searchParams.get("email");
+      if (!betaGate) return new Response(OPEN_SIGNUP_BODY, { status: 200, headers: headers(parsed.host) });
+      if (parsed.searchParams.get("access") === "granted") {
+        return new Response(`${OPEN_SIGNUP_BODY} ${email}`, { status: 200, headers: headers(parsed.host) });
+      }
+      return new Response(GATE_SIGNUP_BODY, { status: 200, headers: headers(parsed.host) });
+    }
+    return baseFetcher(url, init, timeoutMs);
+  };
+}
+
+const baseFetcher: SmokeFetcher = async (url, init) => {
   const parsed = new URL(url);
-  if (init.method === "POST" && parsed.pathname === "/api/waitlist") {
-    return new Response("Bitte prüfe deine E-Mail. Die Bestätigung wurde gesendet.", { status: 202, headers: headers(parsed.host) });
+  if (init.method === "POST" && parsed.host === "bloommd.io" && parsed.pathname === "/api/waitlist") {
+    return new Response(JSON.stringify({ error: "The waitlist has ended.", signup: "https://bloommd.app/signup" }), { status: 410, headers: headers(parsed.host) });
+  }
+  if (parsed.host === "bloommd.io" && parsed.pathname === "/waitlist/bestaetigt") {
+    return new Response("", { status: 308, headers: { ...headers(parsed.host), location: "https://bloommd.app/signup" } });
   }
   if (parsed.pathname === "/api/version") {
     return new Response(JSON.stringify({
@@ -77,17 +100,15 @@ const passingFetcher: SmokeFetcher = async (url, init) => {
     "/api/billing/webhook",
     "/_next/static/chunks/bloommd-production-smoke.js.map",
   ];
-  if (parsed.pathname === "/signup") {
-    if (parsed.searchParams.get("access") === "granted") {
-      return new Response('data-testid="signup-form" BloomMD Account erstellen smoke@bloommd.io Mindestens 10 Zeichen', { status: 200, headers: headers(parsed.host) });
-    }
-    return new Response('data-testid="beta-access-gate" Account erstellen Dein Cloud-Zugang ist noch nicht freigeschaltet. Zur Beta-Warteliste Beta-Code (optional)', { status: 200, headers: headers(parsed.host) });
-  }
   return new Response("", { status: appRejects.includes(parsed.pathname) ? 404 : 200, headers: headers(parsed.host) });
 };
 
+/** Default deployment: gate off, open registration. */
+const passingFetcher = fetcherFor(false);
+const betaGateFetcher = fetcherFor(true);
+
 describe("production smoke runner", () => {
-  test("parses explicit origins and optional waitlist email", () => {
+  test("parses explicit origins and the beta gate switch", () => {
     expect(parseArgs([
       "--marketing-url",
       "https://preview.bloommd.io/path",
@@ -95,8 +116,7 @@ describe("production smoke runner", () => {
       "https://preview.bloommd.app/app",
       "--timeout-ms",
       "2000",
-      "--waitlist-email",
-      "smoke@example.test",
+      "--beta-gate",
       "--expected-sha",
       "de8aff39cb9c93c36d62036899735eaf4c72dfa8",
       "--expected-openclaw-plugin-version",
@@ -106,21 +126,75 @@ describe("production smoke runner", () => {
       marketingUrl: "https://preview.bloommd.io",
       appUrl: "https://preview.bloommd.app",
       timeoutMs: 2000,
-      waitlistEmail: "smoke@example.test",
+      betaGate: true,
       expectedSha: "de8aff39cb9c93c36d62036899735eaf4c72dfa8",
       expectedOpenClawPluginVersion: "0.4.1",
       json: true,
     });
   });
 
+  test("defaults to the open registration (gate off)", () => {
+    expect(parseArgs([]).betaGate).toBe(false);
+  });
+
+  test("no longer accepts the waitlist submit option", () => {
+    expect(() => parseArgs(["--waitlist-email", "smoke@example.test"])).toThrow("Unknown option");
+  });
+
   test("rejects non-https origins", () => {
     expect(() => parseArgs(["--marketing-url", "http://bloommd.io"])).toThrow("must use https://");
   });
 
-  test("passes when public routes, split boundaries and headers match", async () => {
-    const checks = await runSmoke({ ...options, waitlistEmail: "smoke@example.test" }, passingFetcher);
+  test("passes with the gate off: open signup form, closed waitlist, split boundaries and headers", async () => {
+    const checks = await runSmoke(options, passingFetcher);
     expect(checks).toHaveLength(51);
     expect(checks.every((check) => check.status === "pass")).toBe(true);
+    expect(checks.some((check) => check.name === "app open signup form")).toBe(true);
+    expect(checks.some((check) => check.name.startsWith("app beta gate"))).toBe(false);
+  });
+
+  test("passes with --beta-gate: access gate and granted signup form", async () => {
+    const checks = await runSmoke({ ...options, betaGate: true }, betaGateFetcher);
+    expect(checks).toHaveLength(52);
+    expect(checks.every((check) => check.status === "pass")).toBe(true);
+    expect(checks.some((check) => check.name === "app open signup form")).toBe(false);
+  });
+
+  test("gate off fails while the app still shows the beta gate", async () => {
+    const checks = await runSmoke(options, betaGateFetcher);
+    const signupCheck = checks.find((check) => check.name === "app open signup form");
+    expect(signupCheck?.status).toBe("fail");
+    expect(signupCheck?.actual).toContain("beta gate still shown");
+    expect(checks.filter((check) => check.status === "fail")).toHaveLength(1);
+  });
+
+  test("gate off fails when the retired waitlist link is back in the signup", async () => {
+    const checks = await runSmoke(options, async (url, init) => {
+      const parsed = new URL(url);
+      if (parsed.host === "bloommd.app" && parsed.pathname === "/signup") {
+        return new Response(`${OPEN_SIGNUP_BODY} Zur Beta-Warteliste`, { status: 200, headers: headers(parsed.host) });
+      }
+      return passingFetcher(url, init, options.timeoutMs);
+    });
+    expect(checks.find((check) => check.name === "app open signup form")?.status).toBe("fail");
+  });
+
+  test("--beta-gate fails when registration is open", async () => {
+    const checks = await runSmoke({ ...options, betaGate: true }, passingFetcher);
+    expect(checks.find((check) => check.name === "app beta gate signup entrypoint")?.status).toBe("fail");
+  });
+
+  test("fails when the waitlist endpoint still accepts submissions", async () => {
+    const checks = await runSmoke(options, async (url, init) => {
+      const parsed = new URL(url);
+      if (init.method === "POST" && parsed.pathname === "/api/waitlist") {
+        return new Response("Bitte bestätige deine E-Mail.", { status: 202, headers: headers(parsed.host) });
+      }
+      return passingFetcher(url, init, options.timeoutMs);
+    });
+    const waitlist = checks.find((check) => check.name === "marketing waitlist is closed");
+    expect(waitlist?.status).toBe("fail");
+    expect(waitlist?.actual).toBe("202");
   });
 
   test("verifies that latest and immutable plugin URLs resolve the same release", async () => {
@@ -168,7 +242,7 @@ describe("production smoke runner", () => {
       return passingFetcher(url, init, options.timeoutMs);
     });
 
-    const signupCheck = checks.find((check) => check.name === "app closed beta signup entrypoint");
+    const signupCheck = checks.find((check) => check.name === "app open signup form");
     expect(signupCheck?.status).toBe("fail");
     expect(signupCheck?.actual).toContain("DATABASE_URL");
   });
@@ -200,7 +274,7 @@ describe("production smoke runner", () => {
       throw new Error("connection refused");
     });
 
-    expect(checks).toHaveLength(50);
+    expect(checks).toHaveLength(51);
     expect(checks.every((check) => check.status === "fail")).toBe(true);
     expect(checks[0]?.detail).toBe("connection refused");
   });

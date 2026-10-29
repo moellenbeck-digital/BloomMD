@@ -6,7 +6,6 @@ import { getWorkspaceInvitationPreviewById } from "../../lib/db";
 import { authCopy, formatAuthDate, SIGNUP_CONSENT_FIELD, getAuthLocale, languageLabel, localizeAuthError, otherAuthLocale, roleLabel } from "../../lib/auth-copy";
 import { appendAuthParams, parseWorkspaceInviteHandoff } from "../../lib/invite-intent";
 import { isDatabaseConfigured } from "../../lib/db";
-import { publicMarketingUrl } from "../../lib/deployment";
 import { withAppLocale } from "../../lib/locale";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +44,6 @@ export default async function SignupPage({
   // mutation deterministic for E2E; the beta suite must still exercise the real access UI.
   const betaEligible = !betaGate || accessGranted || (email ? await canBetaSignup({ email }) : false);
   const showBetaGate = betaGate && !betaEligible;
-  const waitlistUrl = `${publicMarketingUrl()}/#beta`;
   const errorMessage = localizeAuthError(decodeMessage(params.error), locale);
   const languageHref = appendAuthParams("/signup", {
     next,
@@ -152,7 +150,6 @@ export default async function SignupPage({
                 </details>
                 <button type="submit" className="min-h-11 rounded-md bg-[#B64A1F] px-4 py-2 text-sm font-semibold text-white hover:bg-[#8A3518]">{copy.checkBetaAccess}</button>
               </form>
-              <a href={waitlistUrl} className="mt-4 inline-flex min-h-11 items-center font-semibold text-[#8A3518] hover:underline">{copy.betaWaitlist}</a>
             </div>
           )}
           {signupForm}

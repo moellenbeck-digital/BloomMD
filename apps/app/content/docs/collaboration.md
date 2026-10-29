@@ -42,8 +42,8 @@ und öffnen dieselbe Datei.
 - Nach Reload bleibt der letzte gespeicherte Stand erhalten.
 
 > **Wenn Person B den Workspace nicht sieht:** Der Account ist noch nicht für denselben Workspace
-> freigeschaltet. Melde das über den Feedback-Button in der App oder antworte auf deine
-> Beta-Einladung mit der E-Mail-Adresse der zweiten Person.
+> freigeschaltet. Melde das über den Feedback-Button in der App und nenne die E-Mail-Adresse der
+> zweiten Person.
 
 ## Cloud-Workspace benennen
 
@@ -78,7 +78,7 @@ Server-Modus verbunden sein.
 
 Nutze für Probleme den Feedback-Button in der App. Ein Screenshot ist Pflicht, weil wir Sync-,
 Ordner- und Panel-Probleme schneller zuordnen können. Wenn die App gar nicht erreichbar ist,
-antworte auf deine Beta-Einladungs-Mail oder schreibe an `feedback@bloommd.io`.
+schreibe an `feedback@bloommd.io`.
 
 Bitte lade keine echten Zugangsdaten, Tokens oder personenbezogenen Daten Dritter hoch. Ein kleines
 Markdown-Beispiel reicht meistens.

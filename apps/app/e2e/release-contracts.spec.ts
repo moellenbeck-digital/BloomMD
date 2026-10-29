@@ -80,6 +80,7 @@ test.describe("product app release contracts", () => {
     expect(body).toContain("Mobile Obsidian");
     expect(body).toContain("Wiederherstellungszusage");
     expect(body).toContain("GitHub ist unser internes Triage-Ziel");
+    expect(body).not.toMatch(/auf Einladung|Einladungs-Mail|Warteliste|gegatet/);
     await expect(page.getByRole("link", { name: /github-fallback/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "macOS-App laden" })).toHaveAttribute("href", "https://bloommd.io/download");
     await expect(page.getByRole("link", { name: "Installation lesen" })).toHaveAttribute("href", "https://bloommd.io/docs/desktop");

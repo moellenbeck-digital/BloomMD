@@ -15,7 +15,7 @@ freigegebene macOS-arm64-Build für M1 mit Version, Plattformstatus und Installa
 
 In der geschlossenen Beta ist der Build nicht öffentlich gelistet. Wenn dein Account freigeschaltet
 ist, bekommst du den konkreten Download-Link über die Beta-Freigabe. Falls der Link fehlt oder
-abgelaufen ist, antworte auf deine Beta-Einladung oder schreibe an `feedback@bloommd.io`.
+abgelaufen ist, schreibe an `feedback@bloommd.io`.
 
 ## Installation in der Closed Beta
 

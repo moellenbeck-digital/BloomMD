@@ -23,7 +23,7 @@ Verfügbar in Chrome und Edge. Firefox und Safari unterstützen die API nicht.
 ## Cloud-Workspace
 
 Mit Konto. Dokumente liegen in der Datenbank, Zusammenarbeit läuft über den Sync-Server.
-Registrierung (offen oder nur mit Einladung) ist unter
+Die Registrierung (offen, ohne Einladung) ist unter
 [Closed-Beta Zugang](/docs/closed-beta-zugang) beschrieben.
 
 ### Markdown-Datei in den Cloud-Workspace laden
@@ -50,8 +50,8 @@ oder als Kopie sichern.
 
 Eingeloggte Beta-Tester nutzen den Feedback-Button in der App. Ein Screenshot ist Pflicht, ein
 kurzes Video ist optional. Bitte keine privaten Markdown-Inhalte, Zugangsdaten oder personenbezogene
-Daten Dritter hochladen. Wenn Login oder App nicht erreichbar sind, antworte auf deine
-Beta-Einladungs-Mail oder schreibe an `feedback@bloommd.io`. GitHub ist nur unser internes
+Daten Dritter hochladen. Wenn Login oder App nicht erreichbar sind, schreibe an
+`feedback@bloommd.io`. GitHub ist nur unser internes
 Triage-Ziel.
 
 ## Zwei Kartenansichten

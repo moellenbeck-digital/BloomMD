@@ -55,7 +55,6 @@ test.describe("M1 visual regression", () => {
 
   test("private beta page stays visually stable", async ({ page }) => {
     await page.goto("/beta");
-    await expect(page.getByText("Geschlossene Beta")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Danke, dass du BloomMD testest." })).toBeVisible();
     await stabilizeVisuals(page);
     await expect(page).toHaveScreenshot("beta-page.png");

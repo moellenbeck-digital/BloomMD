@@ -1,20 +1,22 @@
 ---
 title: Closed-Beta Zugang
-description: Registrierung offen oder nur mit Einladung — Account-Erstellung, E-Mail-Bestätigung, Login und Passwort.
+description: Offene Registrierung ohne Einladung — Account-Erstellung, E-Mail-Bestätigung, Login und Passwort.
 order: 2
 ---
 
 # Closed-Beta Zugang
 
-Der Web-Zugang zu BloomMD (bloommd.app) kennt zwei Zustände. Welcher gilt, siehst du auf der
-Registrierungsseite: Ist dort direkt ein Formular zu sehen, ist die Registrierung offen. Siehst du
-stattdessen den Hinweis, dass dein Cloud-Zugang noch nicht freigeschaltet ist, gilt die Einladung.
+Die Registrierung für den Web-Zugang zu BloomMD (bloommd.app) ist offen: Du legst dir selbst ein
+Konto an, ohne Einladung und ohne Warteliste. Nur wenn der Betrieb den Zugangsschalter aktiviert hat,
+gilt vorübergehend die Einladung (siehe unten). Auf der Registrierungsseite siehst du, was gilt: Ist
+dort direkt ein Formular zu sehen, kannst du dich registrieren. Siehst du stattdessen den Hinweis,
+dass dein Cloud-Zugang noch nicht freigeschaltet ist, ist der Zugangsschalter aktiv.
 
-**Gesperrt ist in jedem Zustand nur der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und
-Zusammenarbeit.** Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
-[Obsidian-Plugin](/obsidian) kannst du immer ohne Einladung nutzen.
+**Auch bei aktivem Zugangsschalter ist nur der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und
+Zusammenarbeit eingeschränkt.** Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
+[Obsidian-Plugin](/obsidian) kannst du immer ohne Konto und ohne Einladung nutzen.
 
-## Registrierung offen
+## Registrierung (Normalfall)
 
 Du brauchst keine Einladung und keinen Code.
 
@@ -40,11 +42,12 @@ Hinweises „E-Mail gesendet“; dann kannst du es später noch einmal versuchen
 Nutze auf der Anmeldeseite „Passwort vergessen?“. Du bekommst einen Link, der 60 Minuten gültig ist.
 Nach dem Zurücksetzen werden bestehende Anmeldungen beendet.
 
-## Beta geschlossen (nur mit Einladung)
+## Nur bei aktivem Zugangsschalter: Einladung
 
-Die Beta-Warteliste auf bloommd.io ist beendet; neue Einträge sind nicht mehr möglich. Eine
-Beta-Einladung erstellt noch kein Passwort. Der Ablauf ist bewusst getrennt, damit klar ist, was in
-welchem Schritt passiert.
+Die Beta-Warteliste auf bloommd.io ist beendet; neue Einträge sind nicht mehr möglich. Der
+Zugangsschalter bleibt für den Betrieb erhalten. Ist er aktiv, wird ein Account nur für eingeladene
+E-Mail-Adressen oder mit Einladungscode freigeschaltet. Eine Beta-Einladung erstellt noch kein
+Passwort. Der Ablauf ist bewusst getrennt, damit klar ist, was in welchem Schritt passiert.
 
 1. Ein Admin oder Staff-Mitglied lädt dich ein.
 2. Du bekommst eine persönliche Beta-Einladung per E-Mail mit einem Account-erstellen-Link.
@@ -57,7 +60,7 @@ welchem Schritt passiert.
 ### Noch keine Einladung
 
 Wenn du noch keine Einladung bekommen hast, wende dich an das BloomMD-Team. Ohne Einladung oder
-Einladungscode wird in diesem Zustand kein Account freigeschaltet.
+Einladungscode wird bei aktivem Zugangsschalter kein Account freigeschaltet.
 
 ### Einladung erhalten
 
@@ -74,7 +77,7 @@ Spam- und Promotions-Ordner.
 
 Wenn dein Account existiert und die E-Mail bestätigt ist, nutzt du die Anmeldung auf bloommd.app.
 Der Passwort-vergessen-Link ist erst sinnvoll, nachdem ein Account mit Passwort erstellt wurde.
-Das gilt in beiden Zuständen; bestehende Accounts bleiben unverändert.
+Das gilt mit und ohne Zugangsschalter; bestehende Accounts bleiben unverändert.
 
 ## Desktop-App
 

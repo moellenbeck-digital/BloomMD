@@ -8,7 +8,7 @@ import type { CreateEntryKind } from "./CreateEntryDialog";
 const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // React DOM decides at import time whether the browser supports `input` events, so the DOM has to
-// exist before react-dom is loaded; hence the dynamic imports below.
+// exist before react-dom is loaded when this file runs alone; hence the dynamic imports below.
 const win = new Window({ url: "https://bloommd.test/app" });
 globalThis.window = win as unknown as Window & typeof globalThis.window;
 globalThis.document = win.document as unknown as Document;
@@ -69,11 +69,15 @@ describe("CreateEntryDialog templates", () => {
 
   const query = <T extends HTMLElement>(testId: string) => container.querySelector<T>(`[data-testid='${testId}']`);
 
+  // React DOM decides at import time whether `input` events exist. When another test file loaded it
+  // before any DOM did, it ignores them but still notices a changed value on `keyup`, so both are sent.
   async function setValue(element: HTMLInputElement | HTMLSelectElement, value: string, event: "input" | "change") {
     await act(async () => {
       const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(element, value);
-      element.dispatchEvent(new window.Event(event, { bubbles: true }) as unknown as Event);
+      for (const type of event === "input" ? ["input", "keyup"] : ["change"]) {
+        element.dispatchEvent(new window.Event(type, { bubbles: true }) as unknown as Event);
+      }
     });
   }
 

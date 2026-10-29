@@ -468,7 +468,11 @@ Stripe credentials are intentionally not required for the closed beta. They are 
 Run `bun run --cwd apps/app release:check` and `bun run --cwd apps/marketing release:check` with the
 respective production environments before deploying Docker targets to Hetzner. They fail closed when
 provider credentials, legal identity, TLS URLs, secret entropy, beta access, waitlist separation, or
-the supported sync topology are incomplete.
+the supported sync topology are incomplete. `release:check` stays mandatory in every rollout: it also
+rejects the E2E bypass variables and `BLOOMMD_LOCAL_DEPLOYMENT=1`, warns when
+`BLOOMMD_TRUSTED_PROXY_HEADER` is unset and rejects invalid mail limits. Run `db:migrate` first
+(migration `010_account_mail_budget.sql`); the open-registration protections and what Ops has to set
+are in `docs/ACCOUNT-ABUSE-PROTECTION.md`.
 
 
 ## Demo Assets

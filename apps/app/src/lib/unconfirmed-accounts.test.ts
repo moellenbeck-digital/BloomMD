@@ -43,7 +43,7 @@ describe("purging unconfirmed accounts (#169)", () => {
     expect(statement).toContain("u.auth_provider = 'password'");
     expect(statement).toContain("u.password_hash is not null");
     expect(statement).toContain("u.stripe_customer_id is null");
-    for (const table of ["bloom_workspace_members", "bloom_workspaces", "bloom_access_tokens"]) {
+    for (const table of ["bloom_workspace_members", "bloom_workspaces", "bloom_access_tokens", "bloom_workspace_invitations"]) {
       expect(statement).toContain(`not exists (select 1 from ${table}`);
     }
   });

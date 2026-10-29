@@ -12,6 +12,7 @@ const originalEnv = {
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
   BLOOMMD_E2E_TEST_MODE: process.env.BLOOMMD_E2E_TEST_MODE,
+  BLOOMMD_LOCAL_DEPLOYMENT: process.env.BLOOMMD_LOCAL_DEPLOYMENT,
   BLOOMMD_E2E_MAIL_OUTBOX: process.env.BLOOMMD_E2E_MAIL_OUTBOX,
 };
 
@@ -137,10 +138,16 @@ describe("E2E mail outbox", () => {
       await sendVerificationEmail("max@example.test", "ignored-token");
       expect(providerCalls).toBe(1);
 
+      // The marker alone is not enough in a production build (#169): it needs the local-deployment marker too.
       setEnvValue("BLOOMMD_E2E_TEST_MODE", "1");
+      delete (process.env as Record<string, string | undefined>).BLOOMMD_LOCAL_DEPLOYMENT;
+      await sendVerificationEmail("max@example.test", "still-ignored-token");
+      expect(providerCalls).toBe(2);
+
+      setEnvValue("BLOOMMD_LOCAL_DEPLOYMENT", "1");
       const result = await sendVerificationEmail("max@example.test", "outbox-token");
       expect(result).toEqual({ sent: true });
-      expect(providerCalls).toBe(1);
+      expect(providerCalls).toBe(2);
 
       const [line] = readFileSync(outbox, "utf8").trim().split("\n");
       const mail = JSON.parse(line ?? "{}") as { to: string; text: string };

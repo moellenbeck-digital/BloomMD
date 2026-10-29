@@ -17,8 +17,10 @@ export interface UnconfirmedAccountCleanup {
  * Deletes password accounts whose address was never confirmed within `days`, with their auth tokens.
  *
  * Only accounts nobody could have used are touched: registered with a password, never confirmed
- * (so no login), no billing customer, no workspace, membership or access token. Every other table
- * references the account with on delete cascade/set null. With `dryRun` nothing is deleted. No
+ * (so no login), no billing customer, no workspace, membership, access token or invitation sent.
+ * Invitations *to* the address (workspace or beta) are keyed by email, not by account, so they stay
+ * valid and the person can register again and accept. Every other table references the account
+ * with on delete cascade/set null. With `dryRun` nothing is deleted. No
  * address is returned or logged.
  */
 export async function purgeUnconfirmedAccounts(
@@ -41,6 +43,7 @@ export async function purgeUnconfirmedAccounts(
           and not exists (select 1 from bloom_workspace_members m where m.user_id = u.id)
           and not exists (select 1 from bloom_workspaces w where w.owner_user_id = u.id)
           and not exists (select 1 from bloom_access_tokens a where a.user_id = u.id)
+          and not exists (select 1 from bloom_workspace_invitations i where i.invited_by = u.id)
       )
       select
         (select count(*) from candidates)::int as accounts,
@@ -62,6 +65,7 @@ export async function purgeUnconfirmedAccounts(
         and not exists (select 1 from bloom_workspace_members m where m.user_id = u.id)
         and not exists (select 1 from bloom_workspaces w where w.owner_user_id = u.id)
         and not exists (select 1 from bloom_access_tokens a where a.user_id = u.id)
+        and not exists (select 1 from bloom_workspace_invitations i where i.invited_by = u.id)
     ),
     -- Tokens with a user are removed by the cascade of the account; only orphans need their own delete.
     orphan_tokens as (

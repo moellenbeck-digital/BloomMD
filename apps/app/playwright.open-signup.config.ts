@@ -54,6 +54,9 @@ export default defineConfig({
       BLOOMMD_E2E_TEST_MODE: "1",
       BLOOMMD_E2E_MAIL_OUTBOX: MAIL_OUTBOX_PATH,
       BLOOMMD_E2E_AUTH_BYPASS: "",
+      // Global mail cap (#169): low enough that the cap test at the end of the suite reaches it,
+      // high enough for the ~30 mails of the tests before it. Keep in step with MAIL_HOURLY_LIMIT in the spec.
+      BLOOMMD_MAIL_HOURLY_LIMIT: "50",
       DATABASE_URL: databaseUrl,
     },
   },

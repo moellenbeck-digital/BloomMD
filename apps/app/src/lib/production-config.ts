@@ -97,6 +97,9 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     if (env[key]?.trim()) errors.push(`${key} must not be set in production.`);
   }
   if (env.BLOOMMD_E2E_MAIL_OUTBOX?.trim()) errors.push("BLOOMMD_E2E_MAIL_OUTBOX must not be set in production.");
+  // The marker that lets a production build honour the bypass and the outbox (#169). It belongs to
+  // loopback rehearsals and test systems only; the public app never sets it.
+  if (env.BLOOMMD_LOCAL_DEPLOYMENT?.trim() === "1") errors.push("BLOOMMD_LOCAL_DEPLOYMENT must not be set in production.");
   // Rate limits per client address believe exactly one header (#169); a malformed name would make
   // every request share one key.
   if (trustedProxyHeaderName(env) === undefined) {

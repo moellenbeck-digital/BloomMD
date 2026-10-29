@@ -1,4 +1,6 @@
 import { expect, test, type APIRequestContext, type APIResponse } from "@playwright/test";
+import { createSqlClient } from "../src/lib/sql-client";
+import { purgeUnconfirmedAccounts } from "../src/lib/unconfirmed-accounts";
 import { latestLink, readMails } from "./fixtures/mail-outbox";
 
 /**
@@ -14,6 +16,11 @@ const ORIGIN = process.env.PLAYWRIGHT_OPEN_SIGNUP_BASE_URL ?? `http://localhost:
 // silent change of the production values shows up here.
 const SIGNUP_LIMIT_PER_ACCOUNT = 5;
 const SIGNUP_LIMIT_PER_SOURCE = 20;
+
+// MAIL_HOURLY_LIMIT of the server in playwright.open-signup.config.ts (#169). The earlier tests of
+// this file send about 30 mails, so the budget is spent only by the cap test at the end.
+const MAIL_HOURLY_LIMIT = 50;
+const DATABASE_URL = process.env.PLAYWRIGHT_OPEN_SIGNUP_DATABASE_URL ?? process.env.DATABASE_URL;
 
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 let counter = 0;
@@ -53,6 +60,22 @@ function loginRequest(request: APIRequestContext, input: { email: string; passwo
     maxRedirects: 0,
   });
 }
+
+/** Runs `work` with a connection to the suite's own test database. */
+async function withDatabase<T>(work: (sql: ReturnType<typeof createSqlClient>) => Promise<T>): Promise<T> {
+  if (!DATABASE_URL) throw new Error("PLAYWRIGHT_OPEN_SIGNUP_DATABASE_URL (or DATABASE_URL) is required.");
+  const sql = createSqlClient(DATABASE_URL);
+  try {
+    return await work(sql);
+  } finally {
+    await sql.end();
+  }
+}
+
+// The global mail budget lives in the database and outlasts a run: start every run, and leave the
+// database, with a fresh one so reruns within the hour neither fail nor block other suites.
+const resetMailBudget = () => withDatabase(async (sql) => { await sql`delete from bloom_mail_budget`; });
+test.beforeAll(resetMailBudget);
 
 const location = (response: APIResponse) => decodeURIComponent(response.headers().location ?? "");
 
@@ -204,5 +227,95 @@ test.describe("signup rate limits against mass registration", () => {
 
     const otherSource = await signupRequest(request, { email: uniqueEmail("bulk-other"), address: uniqueAddress() });
     expect(location(otherSource)).toContain("verification=sent");
+  });
+});
+
+test.describe("cleanup of unconfirmed accounts (#169)", () => {
+  test("deletes old unconfirmed accounts with their tokens and leaves confirmed and young ones alone", async ({ request }) => {
+    const oldUnconfirmed = uniqueEmail("purge-old");
+    const youngUnconfirmed = uniqueEmail("purge-young");
+    const oldConfirmed = uniqueEmail("purge-confirmed");
+    for (const email of [oldUnconfirmed, youngUnconfirmed, oldConfirmed]) {
+      const response = await signupRequest(request, { email, address: uniqueAddress() });
+      expect(location(response), email).toContain("verification=sent");
+    }
+    const confirmation = await request.get(latestLink(oldConfirmed, "/api/auth/verify-email")!, { maxRedirects: 0 });
+    expect(location(confirmation)).toContain("verified=1");
+
+    const count = (sql: ReturnType<typeof createSqlClient>, table: "bloom_users" | "bloom_auth_tokens", email: string) =>
+      table === "bloom_users"
+        ? sql`select count(*)::int as n from bloom_users where lower(email) = ${email}`.then((rows) => Number(rows[0]?.n))
+        : sql`select count(*)::int as n from bloom_auth_tokens where lower(email) = ${email}`.then((rows) => Number(rows[0]?.n));
+
+    await withDatabase(async (sql) => {
+      // Age two of the three accounts past the 7 days; the third stays young.
+      await sql`update bloom_users set created_at = now() - interval '8 days' where lower(email) = ${oldUnconfirmed} or lower(email) = ${oldConfirmed}`;
+      expect(await count(sql, "bloom_auth_tokens", oldUnconfirmed)).toBeGreaterThan(0);
+
+      const dryRun = await purgeUnconfirmedAccounts(sql, { dryRun: true });
+      expect(dryRun).toMatchObject({ dryRun: true, days: 7 });
+      expect(dryRun.accounts).toBeGreaterThanOrEqual(1);
+      expect(await count(sql, "bloom_users", oldUnconfirmed)).toBe(1);
+
+      const applied = await purgeUnconfirmedAccounts(sql, { dryRun: false });
+      expect(applied.dryRun).toBe(false);
+      expect(applied.accounts).toBeGreaterThanOrEqual(1);
+
+      expect(await count(sql, "bloom_users", oldUnconfirmed)).toBe(0);
+      expect(await count(sql, "bloom_auth_tokens", oldUnconfirmed)).toBe(0);
+      expect(await count(sql, "bloom_users", youngUnconfirmed)).toBe(1);
+      expect(await count(sql, "bloom_auth_tokens", youngUnconfirmed)).toBeGreaterThan(0);
+      expect(await count(sql, "bloom_users", oldConfirmed)).toBe(1);
+    });
+
+    // The confirmed account still signs in, the deleted address can register again.
+    const login = await loginRequest(request, { email: oldConfirmed, password: PASSWORD, address: uniqueAddress() });
+    expect(login.headers()["set-cookie"]).toContain("bloommd_session=");
+    const again = await signupRequest(request, { email: oldUnconfirmed, address: uniqueAddress() });
+    expect(location(again)).toContain("verification=sent");
+  });
+});
+
+test.describe("global cap for account mails (#169)", () => {
+  test.afterAll(resetMailBudget);
+
+  test("refuses the registration at the hourly cap, sends no mail and counts in the database", async ({ request }) => {
+    test.setTimeout(240_000);
+    let accepted = 0;
+    let refused: { email: string; response: APIResponse } | null = null;
+
+    for (let attempt = 0; attempt <= MAIL_HOURLY_LIMIT && !refused; attempt += 1) {
+      const email = uniqueEmail(`cap${attempt}`);
+      const response = await signupRequest(request, { email, address: uniqueAddress() });
+      if (location(response).includes("vorübergehend nicht verfügbar")) refused = { email, response };
+      else {
+        expect(location(response), `signup ${attempt + 1}`).toContain("verification=sent");
+        expect(readMails(email), `mail ${attempt + 1}`).toHaveLength(1);
+        accepted += 1;
+      }
+    }
+
+    expect(refused, "the cap was never reached").not.toBeNull();
+    const { email, response } = refused!;
+    expect(accepted).toBeGreaterThan(0);
+    expect(response.status()).toBe(303);
+    expect(location(response)).toContain("/signup");
+    expect(location(response)).toContain("Die Registrierung ist vorübergehend nicht verfügbar.");
+    expect(Number(response.headers()["retry-after"])).toBeGreaterThan(0);
+    expect(response.headers()["set-cookie"]).toBeUndefined();
+
+    // No mail and no account for the refused address: the outbox is empty and it cannot sign in.
+    expect(readMails(email)).toHaveLength(0);
+    const login = await loginRequest(request, { email, password: PASSWORD, address: uniqueAddress() });
+    expect(login.headers()["set-cookie"]).toBeUndefined();
+    expect(location(login)).toContain("E-Mail oder Passwort ist falsch.");
+
+    // The counter in the database is the evidence: both windows stand exactly at their limit.
+    await withDatabase(async (sql) => {
+      const rows = await sql`select scope, max(sent)::int as sent from bloom_mail_budget group by scope`;
+      const sent = Object.fromEntries(rows.map((row) => [String(row.scope), Number(row.sent)]));
+      expect(sent.hour).toBe(MAIL_HOURLY_LIMIT);
+      expect(sent.day).toBe(MAIL_HOURLY_LIMIT);
+    });
   });
 });

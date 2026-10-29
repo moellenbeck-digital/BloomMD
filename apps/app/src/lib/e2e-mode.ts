@@ -14,3 +14,14 @@ export function isE2EAuthBypassEnabled(): boolean {
 
   return process.env.BLOOMMD_E2E_TEST_MODE === "1" && process.env.BLOOMMD_LOCAL_DEPLOYMENT === "1";
 }
+
+/**
+ * The E2E test marker (`BLOOMMD_E2E_TEST_MODE=1`) decides whether mails go to a file outbox instead
+ * of the provider. A production build honours it only on a local or test deployment
+ * (`BLOOMMD_LOCAL_DEPLOYMENT=1`), the same condition as the auth bypass above, so a stray marker
+ * on the public app cannot swallow account mails (#169).
+ */
+export function isE2ETestModeEnabled(): boolean {
+  if (process.env.BLOOMMD_E2E_TEST_MODE !== "1") return false;
+  return process.env.NODE_ENV !== "production" || process.env.BLOOMMD_LOCAL_DEPLOYMENT === "1";
+}

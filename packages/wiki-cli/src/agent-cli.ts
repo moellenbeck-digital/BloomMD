@@ -27,6 +27,12 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   agent reject <ziel> <id> [--reviewer <name>] [--reason <text>]
   agent due <ziel> [--days <n>]             Fällige und überfällige Aufgaben (für Routinen;
                                             ohne Treffer: NO_REPLY)
+  agent tasks [<ordner>] [--owner <name>] [--faellig-bis <YYYY-MM-DD>] [--vault <ordner>]
+                                            Offene Aufgaben über alle Maps als JSON ({ "tasks": [...] }),
+                                            nach Fälligkeit sortiert (ohne Datum zuletzt), mit overdue.
+                                            --owner filtert ohne Beachtung der Groß-/Kleinschreibung,
+                                            --faellig-bis nimmt auch Überfällige mit, nicht die ohne
+                                            Datum. Ohne Treffer: { "tasks": [] }, Exitcode 0
   agent stale <ziel> [--days <n>]           Maps mit abgelaufenem stale_after, mit --days auch
                                             die der nächsten n Tage (ohne Treffer: NO_REPLY)
   agent log <ziel> [--limit <n>] [--agent <name|id>]
@@ -34,7 +40,7 @@ export const AGENT_USAGE = `Agent-Befehle (Wissen in BloomMD-Maps ablegen):
   agent undo <ziel> <change-id>             Änderung zurücknehmen (auch freigegebene)
   agent update-node <ziel> <map-pfad> <knoten-id> --patch <json|-> [--version <v>] [--reason <text>] [--source <text>]
         Einen Knoten teilweise ändern: --patch ist ein JSON-Objekt mit title, content (+ contentMode),
-        kind, status, decision, due, assignee, note, citation, url, relations und/oder children (neue
+        kind, status, decision, due, assignee (oder owner als Alias), note, citation, url, relations und/oder children (neue
         Knoten, ans Ende des Knotens); nicht genannte Felder bleiben. "-" liest das JSON von stdin.
         Gleiche Rechte und gleiches Protokoll wie bloommd_update_node: Vorschlag oder direkt.
   agent migrate <ziel> --agent <name|id> [--apply | --discard]
@@ -66,12 +72,28 @@ function flag(args: string[], name: string): string | undefined {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+/** The value of a flag that must carry one: a missing value (end of line or the next flag) is a usage error. */
+function flagValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index < 0) return undefined;
+  const value = args[index + 1];
+  if (value === undefined || value.startsWith("--") || !value.trim()) throw new AgentUsageError(`${name} braucht einen Wert.`);
+  return value;
+}
+
+/** A real calendar day written as YYYY-MM-DD. */
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function flags(args: string[], name: string): string[] {
   return args.flatMap((value, index) => (args[index - 1] === name ? [value] : []));
 }
 
 function positional(args: string[]): string[] {
-  const valued = new Set(["--vault", "--cloud", "--workspace", "--name", "--access", "--area", "--reviewer", "--limit", "--days", "--reason", "--agent", "--patch", "--source", "--version"]);
+  const valued = new Set(["--vault", "--cloud", "--workspace", "--name", "--access", "--area", "--reviewer", "--limit", "--days", "--reason", "--agent", "--patch", "--source", "--version", "--owner", "--faellig-bis"]);
   return args.filter((value, index) => !value.startsWith("--") && !valued.has(args[index - 1] ?? ""));
 }
 
@@ -229,6 +251,16 @@ export async function runAgentCli(args: string[], version: string): Promise<numb
       console.log(await dueSummary((await ownerTarget(rest, params)).service, Number.isFinite(days) && days >= 0 ? days : 0));
       return 0;
     }
+    case "tasks": {
+      const owner = flagValue(rest, "--owner");
+      const until = flagValue(rest, "--faellig-bis");
+      if (until !== undefined && !isIsoDate(until)) throw new AgentUsageError(`--faellig-bis erwartet ein Datum im Format YYYY-MM-DD, nicht "${until}".`);
+      const vault = flagValue(rest, "--vault");
+      if (vault !== undefined && flag(rest, "--cloud")) throw new AgentUsageError("--vault und --cloud schließen sich bei agent tasks aus.");
+      const service = vault !== undefined ? vaultService(vault) : (await ownerTarget(rest, params)).service;
+      console.log(JSON.stringify(await service.tasks({ owner, dueBefore: until }), null, 2));
+      return 0;
+    }
     case "stale": {
       const days = Number(flag(rest, "--days") ?? 0);
       console.log(await staleSummary((await ownerTarget(rest, params)).service, Number.isInteger(days) && days >= 0 ? days : 0));
@@ -331,7 +363,7 @@ function isoDay(offsetDays: number, from = new Date()): string {
  */
 export async function dueSummary(service: KnowledgeService, days: number, now = new Date()): Promise<string> {
   const today = isoDay(0, now);
-  const { tasks } = await service.tasks({ dueBefore: isoDay(days, now) });
+  const { tasks } = await service.tasks({ dueBefore: isoDay(days, now), now });
   if (tasks.length === 0) return "NO_REPLY";
   const line = (task: (typeof tasks)[number]) => `• ${task.title}${task.assignee ? ` (${task.assignee})` : ""} – ${task.mapTitle}${task.due && task.due < today ? `, seit ${task.due}` : ""}`;
   const overdue = tasks.filter((task) => task.due! < today);

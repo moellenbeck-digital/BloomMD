@@ -6,6 +6,7 @@ import { AgentLedger, areaCovers, cloudAreaOf, vaultAreaPath, type AgentDocument
 import {
   applyKnowledgeFrontmatter,
   applyKnowledgeNodes,
+  compareTaskDue,
   isKnowledgeRetired,
   KnowledgeInputError,
   knowledgeDaysBetween,
@@ -460,18 +461,33 @@ export class KnowledgeService {
     return { stale: stale.sort((a, b) => a.stale_after.localeCompare(b.stale_after) || a.path.localeCompare(b.path)) };
   }
 
-  async tasks(options: { area?: string; includeDone?: boolean; assignee?: string; dueBefore?: string } = {}) {
+  /**
+   * Open tasks across maps: `due` ascending (none last), then path, then document order.
+   * `owner` is an alias of `assignee`; both filter exactly, ignoring case. `dueBefore` means due
+   * on or before that day (overdue ones included, tasks without due left out). `now` is "today".
+   */
+  async tasks(options: { area?: string; includeDone?: boolean; assignee?: string; owner?: string; dueBefore?: string; now?: Date } = {}) {
+    const assignee = options.assignee?.trim() || undefined;
+    const owner = options.owner?.trim() || undefined;
+    if (assignee && owner && assignee.toLowerCase() !== owner.toLowerCase()) {
+      throw new KnowledgeInputError(`owner is an alias of assignee; got different values "${owner}" and "${assignee}".`);
+    }
+    const wanted = (assignee ?? owner)?.toLowerCase();
+    if (options.dueBefore !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(options.dueBefore)) {
+      throw new KnowledgeInputError(`dueBefore must be YYYY-MM-DD, got "${options.dueBefore}".`);
+    }
     const result = [];
     for (const map of (await this.store.list()).filter((entry) => entry.available !== false && (options.area === undefined || inArea(entry.area, options.area)))) {
       const document = await this.store.read(map.path).catch(() => null);
       if (!document) continue;
-      for (const task of knowledgeTasks(document.markdown, options.includeDone)) {
-        if (options.assignee && task.assignee?.toLowerCase() !== options.assignee.toLowerCase()) continue;
+      for (const task of knowledgeTasks(document.markdown, options.includeDone, options.now)) {
+        if (wanted && task.assignee?.toLowerCase() !== wanted) continue;
         if (options.dueBefore && (!task.due || task.due > options.dueBefore)) continue;
         result.push({ path: map.path, mapTitle: map.title, ...task });
       }
     }
-    return { tasks: result.sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")) };
+    // Array.prototype.sort is stable, so equal due and path keep document order.
+    return { tasks: result.sort((a, b) => compareTaskDue(a, b) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)) };
   }
 
   async decisions(area?: string) {

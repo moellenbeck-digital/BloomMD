@@ -31,6 +31,7 @@ const nodeSchema = {
     decision: { type: "string", enum: ["proposed", "accepted", "rejected"] },
     due: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Due date YYYY-MM-DD, only if the source names it." },
     assignee: { type: "string", description: "Responsible person as named in the source." },
+    owner: { type: "string", description: "Alias of assignee (stored as assignee); not both with different values." },
     note: { type: "string", description: "Link text of a vault note this node stands for (shows a badge that opens it)." },
     citation: { type: "string", description: "Where this comes from (e.g. 'Teams-Transkript 30.09., 12:40')." },
     url: { type: "string" },
@@ -188,7 +189,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_update_node",
     title: "Knoten ändern",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: "Change ONE existing node partially: only the fields you pass change (title, content, kind, status, decision, due, assignee, note, citation, url, relations); everything else of the node and the map stays as it is. content is appended to the existing content unless contentMode is replace. children adds new nodes below this node, after its existing children (same fields as nodes of bloommd_update_map; a child may use ref and parent to build a sub-tree). Works while people edit the map. Same rights as bloommd_update_map: written directly or kept as a proposal for the owner. An unknown nodeId is refused.",
+    description: "Change ONE existing node partially: only the fields you pass change (title, content, kind, status, decision, due, assignee or its alias owner, note, citation, url, relations); everything else of the node and the map stays as it is. content is appended to the existing content unless contentMode is replace. children adds new nodes below this node, after its existing children (same fields as nodes of bloommd_update_map; a child may use ref and parent to build a sub-tree). Works while people edit the map. Same rights as bloommd_update_map: written directly or kept as a proposal for the owner. An unknown nodeId is refused.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -208,11 +209,18 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_tasks",
     title: "Aufgaben",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Open tasks across maps (status, due, assignee), soonest first. Use for reminders, planning and preparing meetings.",
+    description: "Open tasks across maps, soonest due first (no due date last, then path and document order): nodes of kind task that are not done, plus open '- [ ]' checkbox lines in node content (a checkbox inherits neither due nor owner). Each task has path, mapTitle, nodeId, title, status, due, owner (also as assignee), overdue (due before today) and context. Filters: owner (alias assignee; exact, case-insensitive) and dueBefore (due on or before that day, overdue included, tasks without due left out); area narrows to one area, includeDone adds done task nodes. Use for reminders, planning and preparing meetings.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
-      properties: { area: { type: "string" }, includeDone: { type: "boolean" }, assignee: { type: "string" }, dueBefore: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" }, ...targetProperty },
+      properties: {
+        area: { type: "string" },
+        includeDone: { type: "boolean" },
+        owner: { type: "string", description: "Only tasks of this person; alias of assignee." },
+        assignee: { type: "string", description: "Same as owner." },
+        dueBefore: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "YYYY-MM-DD; due on or before this day." },
+        ...targetProperty,
+      },
     },
   },
   {
@@ -375,6 +383,7 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
           area: string(args, "area"),
           includeDone: args.includeDone === true,
           assignee: string(args, "assignee"),
+          owner: string(args, "owner"),
           dueBefore: string(args, "dueBefore"),
         });
         case "bloommd_decisions": return service.decisions(string(args, "area"));

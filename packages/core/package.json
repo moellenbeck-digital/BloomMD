@@ -16,6 +16,10 @@
       "import": "./src/obsidian-markdown.ts",
       "types": "./src/obsidian-markdown.ts"
     },
+    "./note-templates": {
+      "import": "./src/note-templates.ts",
+      "types": "./src/note-templates.ts"
+    },
     "./learning": {
       "import": "./src/learning.ts",
       "types": "./src/learning.ts"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, FilePlus, FolderPlus, Upload, Download, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
+import { AlertTriangle, FilePlus, FilePlus2, FolderPlus, Upload, Download, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
 import { isWorkspaceMindMap, parseFile, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
@@ -18,6 +18,8 @@ interface ToolbarProps {
   docsHref?: string;
   accountHref?: string;
   onCreateFolder?: () => void;
+  /** Opens the new-file dialog, which offers the templates. */
+  onCreateFromTemplate?: () => void;
   onNewFile?: (doc: ReturnType<typeof parseFile>) => void | Promise<void>;
   onSaveFile?: (doc: ReturnType<typeof parseFile>) => void | Promise<void>;
   onImportFile?: () => Promise<void>;
@@ -111,7 +113,7 @@ function ToolbarMenu({ label, Icon, testId, children }: ToolbarMenuProps) {
 
 const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
 
-export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onNewFile, onSaveFile, onImportFile, onCreateNew, onExportFile, onShareLink }, ref) {
+export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onExportFile, onShareLink }, ref) {
   const { t, locale, toggleLocale } = useLocale();
   const { theme, toggleTheme } = useTheme();
   const document = useMindMapStore((s) => s.document);
@@ -353,6 +355,18 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           aria-label={t.reload}
         >
           <RefreshCw size={18} />
+        </button>
+      )}
+      {onCreateFromTemplate && (
+        <button
+          type="button"
+          data-testid="toolbar-create-from-template"
+          onClick={onCreateFromTemplate}
+          className="p-2 rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          title={t.newFromTemplate}
+          aria-label={t.newFromTemplate}
+        >
+          <FilePlus2 size={18} />
         </button>
       )}
       {onCreateFolder && (

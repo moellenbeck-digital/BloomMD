@@ -19,6 +19,7 @@ import {
   TFolder,
   Setting,
   WorkspaceLeaf,
+  getLanguage,
   type EventRef,
   type SettingDefinitionItem,
   type SettingDefinitionRender,
@@ -58,6 +59,8 @@ import { MAP_INK_PROPERTY, createLinkedMapInk, mapInkLink, retargetLinkedNotes, 
 import { migratePersistedPathState } from "./path-migration";
 import { LEARNING_FOLDER, emptyLearningFile, learningFilePath, learningKey, normalizeLearningSettings, rateEntry, type LearningFile, type LearningSettings } from "./learning";
 import { LearningStore } from "./learning-store";
+import { DEFAULT_TEMPLATE_FOLDER, noteNameProblem, planNoteFromTemplate, templateChoices } from "./template-note";
+import type { NoteTemplate } from "./note-templates";
 import { STUDY_ORDERS } from "./learning-panel";
 import { AgentHub, confirmAction } from "./agent-view";
 import { NavigatorView, VIEW_TYPE_NAVIGATOR, type NavigatorHost } from "./navigator-view";
@@ -95,6 +98,8 @@ interface BloomMDSettings {
   learning: LearningSettings;
   /** Recorded as reviewer when this person approves or rejects agent proposals. */
   agentReviewer: string;
+  /** Vault folder whose `.md` files are offered as templates by "New note from template". */
+  templateFolder: string;
 }
 
 interface BloomMDData {
@@ -200,6 +205,7 @@ const DEFAULT_SETTINGS: BloomMDSettings = {
   collaborationWorkspaceId: "",
   learning: normalizeLearningSettings(undefined),
   agentReviewer: "",
+  templateFolder: DEFAULT_TEMPLATE_FOLDER,
 };
 
 const EMPTY_LAYOUT: PersistedCanvasLayout = { positions: {}, collapsed: [] };
@@ -998,6 +1004,7 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
     this.addCommand({ id: "navigator-back", name: "Navigator: go back", checkCallback: (checking) => this.navigatorHistoryStep(-1, checking) });
     this.addCommand({ id: "navigator-forward", name: "Navigator: go forward", checkCallback: (checking) => this.navigatorHistoryStep(1, checking) });
     this.addCommand({ id: "share-current-note", name: "Share current note with workspace", callback: () => void this.shareCurrentNote() });
+    this.addCommand({ id: "new-note-from-template", name: "New note from template", callback: () => void this.newNoteFromTemplate() });
     this.addCommand({ id: "unshare-current-note", name: "Stop sharing current note with workspace", callback: () => void this.unshareCurrentNote() });
 
     this.registerEvent(this.app.vault.on("modify", (file) => {
@@ -1165,6 +1172,45 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
     const view = await this.getOrCreateView();
     await this.loadFileIntoView(file.path, view);
     await this.app.workspace.revealLeaf(view.leaf);
+  }
+
+  /**
+   * Offers the built-in templates (in the Obsidian language) and the `.md` files of the template
+   * folder, asks for a name, and creates the note in the folder Obsidian uses for new notes next to
+   * the active file. A name with `/` goes into a sub-folder of that folder.
+   */
+  async newNoteFromTemplate() {
+    try {
+      const vault = this.app.vault;
+      const templates = await templateChoices(
+        { markdownPaths: () => vault.getMarkdownFiles().map((file) => file.path), read: (path) => this.readTemplateFile(path) },
+        this.settings.templateFolder,
+        getLanguage(),
+      );
+      const folder = this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? "").path;
+      new NewFromTemplateModal(this.app, templates, folder, (template, name) => this.createNoteFromTemplate(folder, name, template)).open();
+    } catch (error) {
+      new Notice(`BloomMD: ${error instanceof Error ? error.message : "The templates could not be loaded."}`);
+    }
+  }
+
+  private async readTemplateFile(path: string): Promise<string> {
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile)) throw new Error(`The template ${path} was moved or deleted.`);
+    return this.app.vault.cachedRead(file);
+  }
+
+  private async createNoteFromTemplate(folder: string, name: string, template: NoteTemplate): Promise<void> {
+    const plan = planNoteFromTemplate({ folder, name, template });
+    if (this.app.vault.getAbstractFileByPath(plan.path)) throw new Error(`A note named ${plan.path} already exists.`);
+    // One level at a time: the mobile adapter does not create missing parents.
+    let current = "";
+    for (const segment of plan.folder.split("/").filter(Boolean)) {
+      current = current ? `${current}/${segment}` : segment;
+      if (!this.app.vault.getAbstractFileByPath(current)) await this.app.vault.createFolder(current);
+    }
+    const file = await this.app.vault.create(plan.path, plan.content);
+    await this.app.workspace.getLeaf(false).openFile(file);
   }
 
   async visualizeCurrentFolder() {
@@ -1604,6 +1650,11 @@ class BloomMDSettingTab extends PluginSettingTab {
           control: { type: "toggle", key: "showNodeContent", defaultValue: true },
         },
         {
+          name: "Template folder",
+          desc: "Vault folder whose Markdown files appear as your own templates in “New note from template”. Sub-folders are not searched. {{title}} and {{date}} are filled in.",
+          control: { type: "text", key: "templateFolder", defaultValue: DEFAULT_TEMPLATE_FOLDER, placeholder: DEFAULT_TEMPLATE_FOLDER },
+        },
+        {
           name: "Collaboration server",
           desc: "BloomMD app URL used only after you explicitly share a note.",
           control: { type: "text", key: "collaborationServerUrl", defaultValue: "https://bloommd.app", placeholder: "https://bloommd.app" },
@@ -1752,6 +1803,63 @@ class BloomMDSettingTab extends PluginSettingTab {
       }
     }
     return this.plugin.saveSettings();
+  }
+}
+
+/** Picks a template and a name for a new note. `onCreate` rejects with a message to show. */
+class NewFromTemplateModal extends Modal {
+  constructor(
+    app: App,
+    private readonly templates: NoteTemplate[],
+    private readonly folder: string,
+    private readonly onCreate: (template: NoteTemplate, name: string) => Promise<void>,
+  ) {
+    super(app);
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: "New note from template" });
+    let template = this.templates[0]!;
+    let name = "";
+    const where = this.folder.replace(/^\/+|\/+$/g, "") || "vault root";
+    const problem = contentEl.createEl("p", { cls: "mod-warning" });
+    const submit = async () => {
+      const invalid = noteNameProblem(name);
+      if (invalid) {
+        problem.setText(invalid);
+        return;
+      }
+      try {
+        await this.onCreate(template, name);
+        this.close();
+      } catch (error) {
+        problem.setText(error instanceof Error ? error.message : "The note could not be created.");
+      }
+    };
+    new Setting(contentEl)
+      .setName("Template")
+      .addDropdown((dropdown) => {
+        this.templates.forEach((entry) => dropdown.addOption(entry.id, entry.title));
+        dropdown.setValue(template.id).onChange((id) => { template = this.templates.find((entry) => entry.id === id) ?? template; });
+      });
+    new Setting(contentEl)
+      .setName("Name")
+      .setDesc(`Created in ${where}. Use / to put the note in a sub-folder.`)
+      .addText((text) => {
+        text.setPlaceholder("Note name").onChange((value) => { name = value; });
+        text.inputEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") { event.preventDefault(); void submit(); }
+        });
+        window.setTimeout(() => text.inputEl.focus(), 0);
+      });
+    new Setting(contentEl)
+      .addButton((button) => button.setButtonText("Create").setCta().onClick(() => void submit()))
+      .addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()));
+  }
+
+  onClose() {
+    this.contentEl.empty();
   }
 }
 

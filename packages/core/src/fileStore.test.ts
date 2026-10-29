@@ -330,3 +330,40 @@ describe("parsed file snapshots", () => {
     expect((await store.readWorkspaceMindMap()).nodes.has("file:test.md")).toBe(true);
   });
 });
+
+describe("readTemplates", () => {
+  test("a workspace without the template folder has no templates and raises no error", async () => {
+    const store = new FileStore({ baseDir: tempDir });
+    expect(await store.readTemplates()).toEqual([]);
+  });
+
+  test("a file named like the template folder is not a folder of templates", async () => {
+    await writeFile(join(tempDir, "Vorlagen"), "not a folder");
+    expect(await new FileStore({ baseDir: tempDir }).readTemplates()).toEqual([]);
+  });
+
+  test("reads the .md files directly inside Vorlagen, sorted, without sub-folders", async () => {
+    await mkdir(join(tempDir, "Vorlagen", "Archiv"), { recursive: true });
+    await mkdir(join(tempDir, "Uni", "Vorlagen"), { recursive: true });
+    await writeFile(join(tempDir, "Vorlagen", "Wochenplan.md"), "# {{title}}\n{{date}}\n");
+    await writeFile(join(tempDir, "Vorlagen", "Brief.md"), "# {{title}}\n{{name}}\n");
+    await writeFile(join(tempDir, "Vorlagen", "notizen.txt"), "ignored");
+    await writeFile(join(tempDir, "Vorlagen", "Archiv", "Alt.md"), "# old");
+    await writeFile(join(tempDir, "Uni", "Vorlagen", "Falsch.md"), "# wrong place");
+    const templates = await new FileStore({ baseDir: tempDir }).readTemplates();
+    expect(templates).toEqual([
+      { path: "Vorlagen/Brief.md", content: "# {{title}}\n{{name}}\n" },
+      { path: "Vorlagen/Wochenplan.md", content: "# {{title}}\n{{date}}\n" },
+    ]);
+  });
+
+  test("honours another folder name", async () => {
+    await mkdir(join(tempDir, "Templates"));
+    await writeFile(join(tempDir, "Templates", "A.md"), "# A");
+    expect(await new FileStore({ baseDir: tempDir }).readTemplates("Templates")).toEqual([{ path: "Templates/A.md", content: "# A" }]);
+  });
+
+  test("refuses a folder outside the workspace", async () => {
+    await expect(new FileStore({ baseDir: tempDir }).readTemplates("../outside")).rejects.toThrow();
+  });
+});

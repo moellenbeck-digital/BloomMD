@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, mock, test } from "bun:test";
-import { mkdtemp, readFile, rename, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import React from "react";
@@ -32,6 +32,7 @@ let delayedCreation: ReturnType<typeof deferred<void>> | null = null;
 let createWritten = false;
 let workspaceReads = 0;
 let createdFilename = "";
+let createdMarkdown = "";
 let saves = 0;
 let openedFiles = 0;
 let root: Root | null = null;
@@ -60,6 +61,7 @@ mock.module("./rpc", () => ({
     const doc = parseFile(join(directory, filename), markdown);
     await disk.write(doc);
     createdFilename = filename;
+    createdMarkdown = markdown;
     createWritten = true;
     if (delayedCreation) await delayedCreation.promise;
     return wire(doc);
@@ -81,7 +83,7 @@ mock.module("./rpc", () => ({
   getConnectionMode: async () => ({ type: "local" }),
   listConnectionProfiles: async () => ({ profiles: [], active: { type: "local" } }),
   listFolders: async () => ({ folders: [] }),
-  listTemplates: async () => ({ templates: [] }),
+  listTemplates: async () => ({ templates: await disk.readTemplates() }),
   getSharedDocument: async () => ({ sharedDocument: null }),
   getBuildInfo: async () => null,
   getUpdateState: async () => ({ local: { channel: "dev" }, update: {} }),
@@ -119,6 +121,7 @@ beforeEach(async () => {
   createWritten = false;
   workspaceReads = 0;
   createdFilename = "";
+  createdMarkdown = "";
   saves = 0;
   openedFiles = 0;
   win = new Window({ url: "https://bloommd.test/desktop" });
@@ -238,4 +241,62 @@ test("choose an empty folder → create file → add nodes → save writes every
   await waitFor(() => saves === 1 && Boolean(container.querySelector("[data-testid=toolbar-save] .lucide-check")));
   const restored = await disk.read(createdFilename);
   expect([...restored.nodes.values()].map((node) => node.title)).toEqual([doc.frontmatter.title, "Rolle", "Name", "Icon"]);
+});
+
+/**
+ * Types into a field. React DOM is imported before this test creates its window, so it may not
+ * listen for `input` events; a changed value is also picked up on `keyup`, which is sent too.
+ */
+function setValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
+  const prototype = element instanceof win.HTMLSelectElement ? win.HTMLSelectElement.prototype : win.HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(element, value);
+  const events = element instanceof win.HTMLSelectElement ? ["change"] : ["input", "keyup"];
+  for (const type of events) flushSync(() => element.dispatchEvent(new win.Event(type, { bubbles: true }) as unknown as Event));
+}
+const byId = <T extends HTMLElement>(id: string) => container.querySelector<T>(`[data-testid="${id}"]`);
+async function openFileDialog() {
+  click("toolbar-create-from-template");
+  await waitFor(() => Boolean(byId("create-entry-dialog")));
+}
+
+test("Neu aus Vorlage creates a file from a built-in template and opens it", async () => {
+  await openFileDialog();
+  const select = byId<HTMLSelectElement>("create-entry-template")!;
+  expect(select.value).toBe("");
+  setValue(select, "cornell");
+  setValue(byId<HTMLInputElement>("create-entry-name")!, "Biologie 1");
+  click("create-entry-submit");
+  await waitFor(() => createdFilename === "Biologie 1.md");
+
+  const doc = parseFile("Biologie 1.md", createdMarkdown);
+  expect(doc.frontmatter.title).toBe("Biologie 1");
+  expect([...doc.nodes.values()].map((node) => node.title)).toEqual(["Biologie 1", "Stichwörter", "Notizen", "Zusammenfassung"]);
+  expect(createdMarkdown).not.toContain("{{");
+  // The store adds node ids when it writes the file, so compare the structure, not the text.
+  const onDisk = await disk.read("Biologie 1.md");
+  expect([...onDisk.nodes.values()].map((node) => node.title)).toEqual(["Biologie 1", "Stichwörter", "Notizen", "Zusammenfassung"]);
+  await waitFor(() => !isWorkspaceMindMap(ui.useMindMapStore.getState().document));
+});
+
+test("the template list includes own templates from Vorlagen/, filled with title and date", async () => {
+  await mkdir(join(directory, "Vorlagen"));
+  await writeFile(join(directory, "Vorlagen", "Wochenplan.md"), "# {{title}}\n\nStand {{date}} {{andere}}\n");
+  await openFileDialog();
+  await waitFor(() => (byId<HTMLSelectElement>("create-entry-template")?.options.length ?? 0) === 7);
+  const select = byId<HTMLSelectElement>("create-entry-template")!;
+  expect(Array.from(select.options).at(-1)?.textContent).toBe("Wochenplan");
+  setValue(select, "custom:Vorlagen/Wochenplan.md");
+  setValue(byId<HTMLInputElement>("create-entry-name")!, "KW 44");
+  click("create-entry-submit");
+  await waitFor(() => createdFilename === "KW 44.md");
+  expect(createdMarkdown).toMatch(/# KW 44\n\nStand \d{4}-\d{2}-\d{2} \{\{andere\}\}\n$/);
+});
+
+test("without a template the new file is the usual blank one", async () => {
+  await openFileDialog();
+  setValue(byId<HTMLInputElement>("create-entry-name")!, "Leer");
+  click("create-entry-submit");
+  await waitFor(() => createdFilename === "Leer.md");
+  const doc = parseFile("Leer.md", createdMarkdown);
+  expect([...doc.nodes.values()].map((node) => node.title)).toEqual(["Leer"]);
 });

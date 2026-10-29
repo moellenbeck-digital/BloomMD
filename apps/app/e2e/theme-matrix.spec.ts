@@ -104,9 +104,17 @@ for (const theme of themes) {
     await expect(page).toHaveURL((url) => url.pathname === "/app");
     await expect(page.getByTestId("mindmap-canvas")).toBeVisible();
 
-    for (const path of ["/app", "/account", "/wiki"]) {
+    // No `networkidle` here: these pages keep requests open by design (agent-events SSE) or per environment,
+    // so idle may never occur. Wait for a UI signal that proves the surface is rendered, then check it.
+    const surfaces = [
+      { path: "/app", loaded: (p: Page) => p.getByTestId("mindmap-canvas") },
+      { path: "/account", loaded: (p: Page) => p.getByTestId("account-build-version") },
+      // The loading state of /wiki renders no <h1>; every loaded state (enabled, disabled, error, proposals) does.
+      { path: "/wiki", loaded: (p: Page) => p.getByRole("heading", { level: 1 }) },
+    ];
+    for (const { path, loaded } of surfaces) {
       await page.goto(path);
-      await page.waitForLoadState("networkidle");
+      await expect(loaded(page), `${path} did not finish rendering`).toBeVisible();
       if (theme === "dark") await assertNoLightSurfaces(page, path);
     }
   });

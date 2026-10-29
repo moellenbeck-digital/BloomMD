@@ -131,7 +131,7 @@ oder die Produktdatenbank.
 - Gemeinsame Release-Artefakte müssen dieselbe SemVer-Version tragen, z. B. Web-App + Marketing + Sync bei einem gemeinsamen Hosted-Beta-Release oder Desktop + CLI bei einem Desktop-Beta-Release. Interne Libraries (`packages/core`, `packages/ui`) werden mitgezogen, wenn sie als Teil dieses Release-Artefakts versioniert oder veröffentlicht werden.
 - Die sichtbare Kurzform bleibt konsistent: `BloomMD <version> (<short-sha>)`, z. B. `BloomMD 0.1.0-beta.2 (2269618)`.
 - Git-SHA, Git-Tag und Image-Digest sind Nachweis- und Rollout-Metadaten; die fachliche Produktversion bleibt SemVer.
-- App-Flächen mit sichtbarer Version: Login, Account/About, Help/Feedback und App-Shell, soweit der Viewport Platz hat.
+- App-Flächen mit sichtbarer Version: Login, Account/About, Help/Feedback und App-Shell, soweit der Viewport Platz hat; im Desktop zusätzlich der Splash (nativ, vor der App-Shell). Der Splash zeigt dieselbe Zeichenkette wie About und entsteht beim Build aus den Build-Metadaten (`packages/desktop/src/shared/display-version.ts`); eine Versionsnummer von Hand im Splash-HTML ist ein Fehler.
 - Marketing-Flächen mit sichtbarer Version: Footer; Legal-/Support-Kontext darf die Version ebenfalls nutzen.
 - App und Marketing bieten `/api/version` mit nicht-geheimer Build-Info: Produkt, Package, Deployment, Version, Git-SHA, Short-SHA, Git-Tag, Build-Zeitpunkt und Display-Version.
 - Feedback-Issues müssen Version, SHA, Deployment, Route, Browser/OS und Zeitstempel automatisch enthalten.

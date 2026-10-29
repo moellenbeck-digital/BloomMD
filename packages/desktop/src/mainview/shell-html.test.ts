@@ -41,6 +41,12 @@ describe("main window shell", () => {
 });
 
 describe("splash", () => {
+  test("takes its version from the build metadata, never from a literal", () => {
+    // It said `v0.3.0` for several releases. The version is a placeholder that the build fills in.
+    expect(splash).toContain("{{DISPLAY_VERSION}}");
+    expect(splash).not.toMatch(/v?\d+\.\d+\.\d+/);
+  });
+
   test("follows the system colour scheme", () => {
     // The splash is the first frame of the app. Hardcoded light meant a white flash before a dark
     // window — the worst possible opening.

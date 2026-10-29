@@ -51,6 +51,7 @@ import { isMarkdownPath, parseCliPath, parseExternalNodeId, parseExternalTarget 
 import { firstSelectedPath } from "./dialog-selection";
 import { startNativeDialog } from "./native-dialog";
 import { RPC_MAX_REQUEST_TIME_MS } from "../shared/native-dialog";
+import { formatDisplayVersion, resolveBuildVersion, resolveDisplayVersion, shortBuildSha } from "../shared/display-version";
 import { appendDesktopE2EEvent, parseDesktopArgs, writeDesktopE2EState } from "./e2e-mode";
 import { createDesktopInstanceHandoff, type DesktopInstanceHandoff } from "./instance-handoff";
 import { desktopHandoffPath, handoffPrivateDir, type HandoffPathInput } from "./handoff-path";
@@ -319,15 +320,13 @@ function desktopFeedbackEndpoint() {
 }
 
 function desktopDisplayVersion() {
-  const version = process.env.BLOOMMD_RELEASE_VERSION || packageJson.version;
-  const sha = process.env.BLOOMMD_BUILD_SHA || "";
-  return sha ? `BloomMD ${version} (${sha.slice(0, 7)})` : `BloomMD ${version}`;
+  return resolveDisplayVersion(process.env, packageJson.version);
 }
 
 async function desktopBuildInfo(): Promise<DesktopBuildInfo> {
-  const version = process.env.BLOOMMD_RELEASE_VERSION || packageJson.version;
+  const version = resolveBuildVersion(process.env, packageJson.version);
   const sha = process.env.BLOOMMD_BUILD_SHA || "";
-  const shortSha = sha.slice(0, 7);
+  const shortSha = shortBuildSha(sha);
   let channel = process.env.BLOOMMD_BUILD_CHANNEL || process.env.ELECTROBUN_BUILD_ENV || "development";
 
   try {
@@ -347,7 +346,7 @@ async function desktopBuildInfo(): Promise<DesktopBuildInfo> {
     tag: process.env.BLOOMMD_BUILD_TAG || "unknown",
     buildTime: process.env.BLOOMMD_BUILD_TIME || "unknown",
     channel,
-    displayVersion: shortSha ? `BloomMD ${version} (${shortSha})` : `BloomMD ${version}`,
+    displayVersion: formatDisplayVersion(version, sha),
   };
 }
 

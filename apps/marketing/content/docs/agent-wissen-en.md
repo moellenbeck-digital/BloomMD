@@ -187,7 +187,7 @@ Use a vault folder instead of `--cloud`; `--patch -` reads the JSON from stdin. 
 token's rights apply; with your owner token the command writes as you.
 
 Fields: `title`, `content` (appended; `contentMode: "replace"` replaces), `kind`, `status`,
-`decision`, `due`, `assignee`, `note`, `citation`, `url`, `relations` and `children`. New
+`decision`, `due`, `assignee` (also `owner` as an alias; `assignee` is what is stored), `note`, `citation`, `url`, `relations` and `children`. New
 `children` go to the end of the node (same fields as the `nodes` of `bloommd_update_map`; with `ref`
 and `parent` they can form sub-trees). Metadata can be set, not cleared.
 
@@ -268,6 +268,15 @@ openclaw cron add --name bloommd-due-tasks --cron "50 7 * * *" --tz Europe/Berli
   --command-argv '["bloommd-wiki","agent","due","/path/to/vault"]' \
   --announce --channel telegram --to <chat-id>
 ```
+
+For reports, `bloommd-wiki agent tasks <vault> [--owner <name>] [--faellig-bis <YYYY-MM-DD>]`
+(also `--vault <folder>` or `--cloud <url>`) prints all open tasks as JSON, just like the MCP tool
+`bloommd_tasks`: `{ "tasks": [...] }`, sorted by due date (no date last, then path and document order).
+Each task has `path`, `mapTitle`, `nodeId`, `title`, `status`, `due`, `owner`, `overdue` (due before
+today) and `context`. Tasks are nodes of `kind: task` (not done) and open `- [ ]` lines in a node's
+content (code blocks are skipped); a checkbox inherits neither due date nor owner from its node.
+`owner` is the name of the stored field `assignee`; `--owner` ignores case, and `--faellig-bis`
+includes overdue tasks. Without a match the output is `{ "tasks": [] }` with exit code 0.
 
 `--days 7` shows the whole coming week.
 

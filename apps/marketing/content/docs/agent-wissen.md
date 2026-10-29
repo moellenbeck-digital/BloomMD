@@ -188,7 +188,7 @@ Statt `--cloud` geht ein Vault-Ordner; `--patch -` liest das JSON von stdin. Mit
 dessen Rechte, mit deinem Besitzer-Token schreibt der Befehl wie du.
 
 Felder: `title`, `content` (wird angehängt, `contentMode: "replace"` ersetzt), `kind`, `status`,
-`decision`, `due`, `assignee`, `note`, `citation`, `url`, `relations` und `children`. Neue
+`decision`, `due`, `assignee` (auch `owner` als Alias, gespeichert wird `assignee`), `note`, `citation`, `url`, `relations` und `children`. Neue
 `children` stehen am Ende des Knotens (Felder wie bei den `nodes` von `bloommd_update_map`; mit `ref`
 und `parent` entstehen auch Unterbäume). Metadaten lassen sich setzen, nicht leeren.
 
@@ -274,6 +274,16 @@ openclaw cron add --name bloommd-faellige-aufgaben --cron "50 7 * * *" --tz Euro
   --command-argv '["bloommd-wiki","agent","due","/Pfad/zum/Vault"]' \
   --announce --channel telegram --to <chat-id>
 ```
+
+Für Auswertungen gibt `bloommd-wiki agent tasks <vault> [--owner <name>] [--faellig-bis <YYYY-MM-DD>]`
+(auch `--vault <ordner>` oder `--cloud <url>`) alle offenen Aufgaben als JSON aus, genau wie das
+MCP-Werkzeug `bloommd_tasks`: `{ "tasks": [...] }`, nach Fälligkeit sortiert (ohne Datum zuletzt, dann
+Pfad und Reihenfolge im Dokument). Jede Aufgabe hat `path`, `mapTitle`, `nodeId`, `title`, `status`,
+`due`, `owner`, `overdue` (Fälligkeit liegt vor heute) und `context`. Aufgaben sind Knoten mit
+`kind: task` (nicht erledigt) und offene `- [ ]`-Zeilen im Inhalt eines Knotens (ohne Codeblöcke); eine
+Checkbox erbt weder Fälligkeit noch Verantwortliche des Knotens. `owner` ist der Name für das
+gespeicherte Feld `assignee`; `--owner` filtert ohne Beachtung der Groß- und Kleinschreibung,
+`--faellig-bis` nimmt auch Überfällige mit. Ohne Treffer kommt `{ "tasks": [] }` mit Exitcode 0.
 
 `--days 7` zeigt die ganze kommende Woche.
 

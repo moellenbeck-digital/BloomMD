@@ -39,6 +39,8 @@ export interface KnowledgeNodeInput {
   decision?: "proposed" | "accepted" | "rejected";
   due?: string;
   assignee?: string;
+  /** Alias of `assignee` (stored as `assignee`); both with different values is an input error. */
+  owner?: string;
   note?: string;
   citation?: string;
   url?: string;
@@ -122,6 +124,14 @@ export function assertKnowledgeContent(content: string): void {
 export function assertKnowledgeNodeInput(input: KnowledgeNodeInput): void {
   if (input.title !== undefined) assertKnowledgeTitle(input.title);
   if (input.content !== undefined) assertKnowledgeContent(input.content);
+  const assignee = input.assignee?.trim();
+  const owner = input.owner?.trim();
+  if (assignee && owner && assignee !== owner) throw new KnowledgeInputError(`owner is an alias of assignee; got different values "${owner}" and "${assignee}".`);
+}
+
+/** The responsible person of an input: `assignee` or its alias `owner`; blank counts as not given. */
+function inputAssignee(input: KnowledgeNodeInput): string | undefined {
+  return input.assignee?.trim() || input.owner?.trim() || undefined;
 }
 
 const NODE_KINDS = new Set<string>(["topic", "task", "decision", "source", "web", "file", "pdf", "portal"]);
@@ -131,7 +141,7 @@ const NODE_ENUMS: Partial<Record<keyof KnowledgeNodeInput, Set<string>>> = {
   decision: new Set(["proposed", "accepted", "rejected"]),
   contentMode: new Set(["append", "replace"]),
 };
-const NODE_STRING_FIELDS = ["id", "ref", "parent", "title", "content", "contentMode", "kind", "status", "decision", "due", "assignee", "note", "citation", "url"] as const;
+const NODE_STRING_FIELDS = ["id", "ref", "parent", "title", "content", "contentMode", "kind", "status", "decision", "due", "assignee", "owner", "note", "citation", "url"] as const;
 const NODE_FIELDS = new Set<string>([...NODE_STRING_FIELDS, "relations"]);
 
 /**
@@ -288,11 +298,11 @@ function slugTag(value: string): string {
 
 /** The node metadata after applying an input's metadata fields to the current metadata. */
 export function knowledgeMetadata(input: KnowledgeNodeInput, current: MarkdownNodeMetadata | undefined, resolve: (handle: string) => string): MarkdownNodeMetadata | undefined {
-  const touched = input.kind ?? input.status ?? input.decision ?? input.due ?? input.assignee ?? input.note ?? input.citation ?? input.url ?? input.relations;
+  const touched = input.kind ?? input.status ?? input.decision ?? input.due ?? input.assignee ?? input.owner ?? input.note ?? input.citation ?? input.url ?? input.relations;
   if (touched === undefined) return current;
   if (input.due !== undefined && input.due !== "" && !DATE_RE.test(input.due)) throw new Error(`Due date must be YYYY-MM-DD, got "${input.due}".`);
   const inferredKind: MarkdownNodeKind = input.kind
-    ?? (input.decision ? "decision" : input.status || input.due || input.assignee ? "task" : current?.kind ?? "topic");
+    ?? (input.decision ? "decision" : input.status || input.due || inputAssignee(input) ? "task" : current?.kind ?? "topic");
   const relations = input.relations
     ? [
         ...(current?.relations ?? []).filter((existing) => !input.relations!.some((next) => resolve(next.target) === existing.target)),
@@ -305,7 +315,7 @@ export function knowledgeMetadata(input: KnowledgeNodeInput, current: MarkdownNo
     ...(input.status ? { status: input.status } : {}),
     ...(input.decision ? { decision: input.decision } : {}),
     ...(input.due ? { due: input.due } : {}),
-    ...(input.assignee?.trim() ? { assignee: input.assignee.trim().slice(0, 120) } : {}),
+    ...(inputAssignee(input) ? { assignee: inputAssignee(input)!.slice(0, 120) } : {}),
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
     ...(input.citation?.trim() ? { citation: input.citation.trim() } : {}),
     ...(input.url?.trim() ? { url: input.url.trim() } : {}),
@@ -393,33 +403,82 @@ export interface KnowledgeTask {
   title: string;
   status: "open" | "in_progress" | "done";
   due?: string;
+  /** Same person as `assignee` (the stored field), under the name the tools report. */
+  owner?: string;
   assignee?: string;
-  /** Titles from the root down to the parent, for context. */
+  /** True when `due` lies before today and the task is not done. */
+  overdue: boolean;
+  /** Titles from the root down to the parent, for context. For a checkbox: down to its node. */
   context: string[];
 }
 
-/** Open tasks (status not done) of a map, soonest due first. */
-export function knowledgeTasks(markdown: string, includeDone = false): KnowledgeTask[] {
+/** The local calendar day of `now` as YYYY-MM-DD ("today" for due dates). */
+export function localIsoDay(now = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+const CHECKBOX_RE = /^\s*[-*+]\s+\[ \]\s+(\S.*)$/;
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
+
+/** Texts of the open `- [ ]` lines in a node's content, in order; code blocks are skipped. */
+function openCheckboxes(content: string): string[] {
+  const texts: string[] = [];
+  let fence: { character: string; length: number } | null = null;
+  for (const line of content.split(/\r?\n/)) {
+    const marker = FENCE_RE.exec(line)?.[1];
+    if (marker) {
+      if (!fence) fence = { character: marker[0]!, length: marker.length };
+      else if (marker[0] === fence.character && marker.length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const text = CHECKBOX_RE.exec(line)?.[1]?.trim();
+    if (text) texts.push(text);
+  }
+  return texts;
+}
+
+/**
+ * Open tasks of a map, soonest due first (no due date last, then document order): nodes of kind
+ * task that are not done, plus every open `- [ ]` line in a node's content (titled by the
+ * checkbox text, belonging to the enclosing heading; it inherits neither due nor owner).
+ * `now` decides what is overdue.
+ */
+export function knowledgeTasks(markdown: string, includeDone = false, now = new Date()): KnowledgeTask[] {
+  const today = localIsoDay(now);
   const roots = parseHeadingTree(markdown);
   const tasks: KnowledgeTask[] = [];
   const walk = (list: MarkdownHeadingNode[], trail: string[]) => {
     for (const node of list) {
       const meta = node.metadata;
       if (meta?.kind === "task" && (includeDone || meta.status !== "done")) {
+        const status = meta.status ?? "open";
         tasks.push({
           nodeId: node.id,
           title: node.title,
-          status: meta.status ?? "open",
+          status,
           ...(meta.due ? { due: meta.due } : {}),
-          ...(meta.assignee ? { assignee: meta.assignee } : {}),
+          ...(meta.assignee ? { owner: meta.assignee, assignee: meta.assignee } : {}),
+          overdue: status !== "done" && !!meta.due && meta.due < today,
           context: trail,
         });
+      }
+      for (const text of openCheckboxes(node.content)) {
+        tasks.push({ nodeId: node.id, title: text, status: "open", overdue: false, context: [...trail, node.title] });
       }
       walk(node.children, [...trail, node.title]);
     }
   };
   walk(roots, []);
-  return tasks.sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+  return tasks.sort(compareTaskDue);
+}
+
+/** Due date ascending, tasks without one last; equal keys compare as 0 (a stable sort keeps document order). */
+export function compareTaskDue(a: { due?: string }, b: { due?: string }): number {
+  if (a.due === b.due) return 0;
+  if (a.due === undefined) return 1;
+  if (b.due === undefined) return -1;
+  return a.due < b.due ? -1 : 1;
 }
 
 export interface KnowledgeDecision {

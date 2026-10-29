@@ -85,6 +85,14 @@ function parseRelations(value: unknown): { relations: MindMapNodeRelation[] } | 
   return relations.length > 0 ? { relations } : {};
 }
 
+/** `owner` is read as an alias of `assignee`; the stored field stays `assignee` (the explicit one wins). Duplicated in both Markdown parsers, see parseRelations. */
+function parseAssignee(value: { assignee?: unknown; owner?: unknown }): { assignee: string } | Record<string, never> {
+  for (const candidate of [value.assignee, value.owner]) {
+    if (typeof candidate === "string" && candidate.trim()) return { assignee: candidate.trim().slice(0, 120) };
+  }
+  return {};
+}
+
 function extractNodeMetadata(node: Heading): MindMapNodeMetadata | undefined {
   for (const child of node.children) {
     if (child.type !== "html") continue;
@@ -106,7 +114,7 @@ function extractNodeMetadata(node: Heading): MindMapNodeMetadata | undefined {
         ...(value.decision === "proposed" || value.decision === "accepted" || value.decision === "rejected" ? { decision: value.decision } : {}),
         ...(typeof value.note === "string" && value.note.trim() ? { note: value.note } : {}),
         ...(typeof value.due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.due) ? { due: value.due } : {}),
-        ...(typeof value.assignee === "string" && value.assignee.trim() ? { assignee: value.assignee.trim().slice(0, 120) } : {}),
+        ...parseAssignee(value),
         ...parseRelations(value.relations),
       };
     } catch {

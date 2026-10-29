@@ -116,3 +116,18 @@ export {
   type WorkspaceAgentToolName,
   type WorkspaceAgentResult,
 } from "./workspace-agent";
+export {
+  DEFAULT_TEMPLATE_FOLDER,
+  builtInNoteTemplates,
+  customTemplateTitle,
+  isoDate,
+  listNoteTemplates,
+  normalizeTemplateFolder,
+  renderNoteTemplate,
+  selectTemplatePaths,
+  titleFromPath,
+  type BuiltInNoteTemplateId,
+  type CustomNoteTemplate,
+  type NoteTemplate,
+  type NoteTemplateLocale,
+} from "./note-templates";

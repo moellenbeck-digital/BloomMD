@@ -101,6 +101,10 @@ export async function listFolders() {
   return electrobun.rpc!.request.listFolders({});
 }
 
+export async function listTemplates() {
+  return electrobun.rpc!.request.listTemplates({});
+}
+
 export async function readResource(path: string) {
   return electrobun.rpc!.request.readResource({ path });
 }

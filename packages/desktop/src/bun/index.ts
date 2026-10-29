@@ -902,6 +902,12 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
         return { folders: await localStore.listFolders() };
       },
 
+      listTemplates: async () => {
+        // A remote workspace stores flat filenames, so it has no template folder.
+        if (isRemote()) return { templates: [] };
+        return { templates: await localStore.readTemplates() };
+      },
+
       readResource: async ({ path }) => {
         if (isRemote()) return { error: "Resource previews are only available for local workspaces." };
         const mimeType = resourceMimeType(path);

@@ -18,6 +18,7 @@ export interface Translations {
   documentActions: string;
   fileActions: string;
   newFolder: string;
+  newFromTemplate: string;
   openFileBrowser: string;
   changeFolder: string;
   share: string;
@@ -472,6 +473,7 @@ export const translations: Record<Locale, Translations> = {
     documentActions: "Dokumentaktionen",
     fileActions: "Dateiaktionen",
     newFolder: "Neuen Ordner anlegen",
+    newFromTemplate: "Neu aus Vorlage",
     openFileBrowser: "Datei-Browser",
     changeFolder: "Ordner wechseln...",
     share: "Teilen",
@@ -917,6 +919,7 @@ export const translations: Record<Locale, Translations> = {
     documentActions: "Document actions",
     fileActions: "File actions",
     newFolder: "Create new folder",
+    newFromTemplate: "New from template",
     openFileBrowser: "File Browser",
     changeFolder: "Change folder...",
     share: "Share",

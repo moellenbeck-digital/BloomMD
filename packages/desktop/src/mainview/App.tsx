@@ -27,7 +27,7 @@ import type { MindMapDocument, MindMapListEntry, SharedDocumentBinding } from "@
 import { documentToYDoc, filenameForTitleInPath, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
-  chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, serializeMindmap,
+  chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
   renameMindmap, deleteMindmap,
   listConnectionProfiles, saveConnectionProfile, connectProfile, useLocalConnection, deleteConnectionProfile, setConnectionProfileWorkspace,
   listRemoteWorkspaces, selectRemoteWorkspace,
@@ -889,7 +889,7 @@ export function App() {
    * Only the local mode reaches this: a remote workspace stores flat filenames, so the RPC refuses
    * rather than pretending it worked.
    */
-  const handleCreateEntry = useCallback(async (kind: CreateEntryKind, path: string) => {
+  const handleCreateEntry = useCallback(async (kind: CreateEntryKind, path: string, templateContent?: string) => {
     if (!assertRemoteWriteAccess()) return;
     if (kind === "folder") {
       await createFolder(path);
@@ -898,7 +898,11 @@ export function App() {
     }
     const name = path.split("/").pop()?.replace(/\.md$/i, "") ?? "Neu";
     const now = new Date().toISOString();
-    const markdown = `---\ntitle: ${name}\nid: ${crypto.randomUUID().slice(0, 8)}\ncreated: "${now}"\nupdated: "${now}"\n---\n\n# ${name}\n`;
+    const body = templateContent ?? `# ${name}\n`;
+    // A template that brings its own frontmatter keeps it; otherwise the usual BloomMD header is added.
+    const markdown = /^---\r?\n/.test(body)
+      ? body
+      : `---\ntitle: ${name}\nid: ${crypto.randomUUID().slice(0, 8)}\ncreated: "${now}"\nupdated: "${now}"\n---\n\n${body}`;
     const result = await createAndOpenFile(path, markdown);
     if (!result) return;
     await refreshFileList();
@@ -906,6 +910,9 @@ export function App() {
       if (currentFileRef.current === path) useMindMapStore.getState().setAutoEditNodeId(result.rootId);
     }, 200);
   }, [assertRemoteWriteAccess, createAndOpenFile, refreshFileList]);
+
+  // Own templates are the .md files in the workspace folder `Vorlagen`; a remote workspace has none.
+  const loadCustomTemplates = useCallback(async () => (await listTemplates()).templates, []);
 
   // Create new mindmap
   const handleCreateNew = useCallback(async () => {
@@ -1815,6 +1822,10 @@ export function App() {
               void listFolders().then((result) => setKnownFolders(result.folders));
               setCreateKind("folder");
             } : undefined}
+            onCreateFromTemplate={connectionMode !== "remote" ? () => {
+              void listFolders().then((result) => setKnownFolders(result.folders));
+              setCreateKind("file");
+            } : undefined}
             onCreateNew={handleCreateNew}
             onSaveFile={handleSaveFile}
             onImportFile={handleImportFile}
@@ -1828,8 +1839,9 @@ export function App() {
           kind={createKind}
           folders={knownFolders}
           onClose={() => setCreateKind(null)}
-          onCreate={async (path) => {
-            await handleCreateEntry(createKind, path);
+          loadCustomTemplates={loadCustomTemplates}
+          onCreate={async (path, content) => {
+            await handleCreateEntry(createKind, path, content);
             return path;
           }}
         />

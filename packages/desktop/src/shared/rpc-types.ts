@@ -1,5 +1,5 @@
 import type { RPCSchema } from "electrobun/bun";
-import type { MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, SharedDocumentBinding } from "@bloommd/core";
+import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, SharedDocumentBinding } from "@bloommd/core";
 
 export interface SerializedDocument {
   filePath: string;
@@ -218,6 +218,10 @@ export type BloomMDRPC = {
       listFolders: {
         params: Record<string, never>;
         response: { folders: string[] };
+      };
+      listTemplates: {
+        params: Record<string, never>;
+        response: { templates: CustomNoteTemplate[] };
       };
       readResource: {
         params: { path: string };

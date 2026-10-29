@@ -21,6 +21,9 @@ const inkSource = join(root, "packages", "ink", "src");
 // Learning progress (format and scheduling) is shared Core code; the mirror carries a snapshot too.
 const learningSource = join(root, "packages", "core", "src", "learning.ts");
 const generatedLearningPath = "src/learning.ts";
+// Note templates (built-in Markdown templates and their placeholders) are shared Core code as well.
+const noteTemplatesSource = join(root, "packages", "core", "src", "note-templates.ts");
+const generatedNoteTemplatesPath = "src/note-templates.ts";
 const inkModules = ["ink-geometry.ts", "ink-document.ts", "ink-state.ts", "ink-preview.tsx", "ink-editor.tsx", "pen-gestures.ts", "ink.css"];
 
 // Agent rules shared with the wiki CLI: the plugin re-exports packages/core/src/agent-ledger.ts; the
@@ -46,6 +49,7 @@ const excludedCanonicalPaths = new Set([
   generatedAgentLedgerPath,
   generatedSharedDependenciesPath,
   generatedLearningPath,
+  generatedNoteTemplatesPath,
   ...inkModules.map((file) => `src/${file}`),
 ]);
 
@@ -102,6 +106,7 @@ async function canonicalManifest() {
   });
   entries.push({ path: "packages/core/src/types.ts", bytes: await readBytes(coreTypesSource) });
   entries.push({ path: "packages/core/src/learning.ts", bytes: await readBytes(learningSource) });
+  entries.push({ path: "packages/core/src/note-templates.ts", bytes: await readBytes(noteTemplatesSource) });
   entries.push({ path: "packages/core/src/agent-ledger.ts", bytes: await readBytes(agentLedgerSource) });
   // The plugin's handwriting modules are re-exports of packages/ink: hash the shared sources.
   for (const file of inkModules) {
@@ -180,6 +185,16 @@ async function expectedFiles() {
     " */",
     learning,
   ].join("\n");
+  const noteTemplates = await readFile(noteTemplatesSource, "utf8");
+  const noteTemplatesSha256 = await sha256(Buffer.from(noteTemplates));
+  const generatedNoteTemplates = [
+    "/**",
+    " * GENERATED FILE — DO NOT EDIT.",
+    " * Snapshot of packages/core/src/note-templates.ts by the BloomMD mirror sync.",
+    ` * Source SHA-256: ${noteTemplatesSha256}`,
+    " */",
+    noteTemplates,
+  ].join("\n");
   const sharedRuntime = await buildSharedRuntime();
   const generatedSharedDependencies = [
     "/**",
@@ -232,6 +247,7 @@ async function expectedFiles() {
     "packages/core/src/obsidian-markdown.ts",
     "packages/core/src/types.ts",
     "packages/core/src/learning.ts",
+    "packages/core/src/note-templates.ts",
     "packages/core/src/agent-ledger.ts",
     "plugins/obsidian/src/shared-dependencies.ts",
     "scripts/obsidian-mirror-shared-runtime.ts",
@@ -242,6 +258,7 @@ async function expectedFiles() {
     [generatedParserPath, Buffer.from(generatedParser)],
     [generatedTypesPath, Buffer.from(generatedTypes)],
     [generatedLearningPath, Buffer.from(generatedLearning)],
+    [generatedNoteTemplatesPath, Buffer.from(generatedNoteTemplates)],
     [generatedAgentLedgerPath, Buffer.from(generatedAgentLedger)],
     [generatedSharedDependenciesPath, Buffer.from(generatedSharedDependencies)],
     [generatedSharedRuntimePath, sharedRuntime],
@@ -289,6 +306,12 @@ async function expectedFiles() {
       sourceSha256: learningSha256,
       generatedPath: generatedLearningPath,
       generatedSha256: await sha256(Buffer.from(generatedLearning)),
+    },
+    noteTemplates: {
+      sourcePath: "packages/core/src/note-templates.ts",
+      sourceSha256: noteTemplatesSha256,
+      generatedPath: generatedNoteTemplatesPath,
+      generatedSha256: await sha256(Buffer.from(generatedNoteTemplates)),
     },
     agentLedger: {
       sourcePath: "packages/core/src/agent-ledger.ts",

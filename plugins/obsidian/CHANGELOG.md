@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Templates
+
+- New command **New note from template**: pick one of five built-in templates (Lecture, Cornell, Literature note, Exam prep, Project; German when Obsidian is set to German, English otherwise) or one of your own, enter a name, and the note is created in the folder Obsidian uses for new notes next to the active file (a name with `/` goes into a sub-folder) and opened. Only `{{title}}` and `{{date}}` (`YYYY-MM-DD`) are replaced; other `{{…}}` stay as written.
+- Your own templates are the Markdown files directly inside the vault folder **Template folder** (Settings, default `Vorlagen`); sub-folders are not searched, and without the folder only the built-in templates appear.
+
 ### Navigator
 
 - New **BloomMD navigator** side view (ribbon icon, command **Open navigator**): the vault as a folder tree with open/close folders and the Markdown notes of the selected folder in a separate list. Click or `Enter` opens a note; the map is one step away (**Map of the selected note / folder**, or `M`) and is never loaded for the whole vault.

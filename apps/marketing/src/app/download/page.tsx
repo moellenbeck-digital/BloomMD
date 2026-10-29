@@ -31,8 +31,8 @@ export async function generateMetadata({
         : "Desktop-App herunterladen · BloomMD",
     description:
       locale === "en"
-        ? "Download the macOS and Omarchy/Linux desktop beta without an invitation. See what is public and what needs closed-beta access."
-        : "macOS- und Omarchy/Linux-Desktop-Beta ohne Einladung herunterladen. Sieh, was öffentlich ist und wofür du einen Closed-Beta-Zugang brauchst.",
+        ? "Download the macOS and Omarchy/Linux desktop beta without an invitation. See what is public and what needs an account."
+        : "macOS- und Omarchy/Linux-Desktop-Beta ohne Einladung herunterladen. Sieh, was öffentlich ist und wofür du ein Konto brauchst.",
     path: locale === "en" ? "/download?lang=en" : "/download",
     locale,
   });

@@ -227,11 +227,11 @@ Asset: ![](../assets/diagram.png)
 | WUI-009 | Workspace Map Reference Edges | `overview.md`, `roadmap.md` | 1. Reference/Kombiansicht pruefen. | Artikel-Links werden als Querverbindungen angezeigt, Broken Links sichtbar. | Links mit Anchor/Alias, images. | Auto | Browser-Workspace E2E, Core Graph-Tests |
 | WUI-010 | Account-Link | eingeloggter Nutzer | 1. Account Button klicken. | Account-Seite oeffnet, keine Layoutbrueche, Token-Bereich erreichbar. | mobile width, keine Tokens. | Auto | `toolbar/file drawer` E2E |
 
-## Web-App: Public, Beta, Waitlist und Doku
+## Web-App: Public, Beta, Registrierung und Doku
 
 | ID | Funktion | Testdaten | Schritte | Erwartete UX | Edge-Cases | Status | Evidence |
 |---|---|---|---|---|---|---|---|
-| PUI-001 | Landing Desktop-first | `/` | 1. Landing oeffnen.<br>2. Hero/CTA/Waitlist pruefen. | Desktop-App ist Primaerpfad, Browser-Demo sekundär, Closed-Beta klar. | mobile Navigation, no horizontal overflow. | Auto | `release-contracts`, `mobile-smoke` |
+| PUI-001 | Landing Desktop-first | `/` | 1. Landing oeffnen.<br>2. Hero/Registrierungs-CTA pruefen. | Desktop-App ist Primaerpfad, Browser-Demo sekundär, Closed-Beta klar. | mobile Navigation, no horizontal overflow. | Auto | `release-contracts`, `mobile-smoke` |
 | PUI-002 | Registrierungs-CTA (Waitlist beendet) | `#beta`, `/waitlist` | 1. CTA „Jetzt registrieren“ klicken.<br>2. `/waitlist`, `/waitlist/bestaetigt` aufrufen. | CTA führt zu `bloommd.app/signup`; alte Wartelisten-Links leiten per 308 dorthin; kein Formular. | `/waitlist/abgemeldet`, Abmelde-API bleiben erreichbar. | Auto | `release-contracts` |
 | PUI-003 | Beta Page | `/beta` | 1. Seite oeffnen.<br>2. Scope, Limits, bekannte Issues lesen. | Plattformstatus, ad-hoc signierter macOS-Build ohne Developer-ID/Notarisierung, Feedback, Wiederherstellungsgrenzen klar. | noindex, schmaler Viewport. | Auto | `release-contracts` |
 | PUI-004 | Docs | `/docs`, `/docs/desktop` | 1. Docs oeffnen.<br>2. Navigation pruefen.<br>3. Subpage oeffnen. | Alle M1-Abschnitte sichtbar; Mobile-out-of-scope klar. | unbekannter Slug, responsive Nav. | Auto | `release-contracts` |
@@ -363,7 +363,7 @@ klassifiziert sind.
 | Toolbar und Command Palette | TUI-001 bis TUI-011 | Theme/Sprache/Help Auto; Dateiaktionen Web-Auto, Desktop-Dialoge bleiben Restarbeit | Desktop-Palette- und Dialog-Paritaet bleibt Restarbeit |
 | Sidebar und Tabs | SUI-001 bis SUI-007 | Suche, Rename, Delete, Favorites und Tabs Auto; Drawer-Desktop-Paritaet bleibt hybrid | Keine Release-Freigabe ohne gruenen Sidebar-E2E |
 | Web App Shell | WUI-001 bis WUI-010 | Auth, Onboarding, Notice, Browser Workspace und Health Auto | Browser Workspace ist M1-relevant |
-| Public/Beta/Waitlist | PUI-001 bis PUI-007 | Gute Auto-Abdeckung | Legal/Cookies manuell schnell pruefen |
+| Public/Beta/Registrierung | PUI-001 bis PUI-007 | Gute Auto-Abdeckung | Legal/Cookies manuell schnell pruefen |
 | Auth/Account | AUI-001 bis AUI-005 | Gate Auto, Access Tokens manuell | Token-UI manuell vor Beta |
 | Wiki | KUI-001 bis KUI-008 | Gute Auto-Abdeckung | M1-ready nach gruenem `test:e2e:wiki` |
 | Remote/Collaboration | RUI-001 bis RUI-007 | Connect/Indicator/Reconnect/Disconnect als Desktop-Contract Auto; Zwei-Client Sync/Persistence/Awareness Auto; gleichzeitiger Editor-Merge Hybrid | Beta-Feature, Content-Merge-Restfall gezielt nachziehen |

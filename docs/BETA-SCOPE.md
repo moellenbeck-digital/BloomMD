@@ -11,7 +11,7 @@ niemand etwas erwartet, das nicht existiert.
 | Bereich | Was Tester erwarten dürfen |
 |---|---|
 | **Desktop-App** | **Der empfohlene Weg.** Arbeitet direkt auf einem lokalen Ordner, rendert den Ordner als Workspace-Mindmap mit Datei-, Ordner- und Heading-Nodes plus Querverweis-Edges, erkennt externe Änderungen über File Watching und öffnet konkrete `.md`-Dateien per Datei-Node. Braucht **keinen** Account und **keine** Cloud. |
-| **Web-App** | Dieselbe Oberfläche im Browser, für die Cloud-Beta auf Einladung. Command Palette, Fokus-, Outline- und Präsentationsmodus, gespeicherte Views. |
+| **Web-App** | Dieselbe Oberfläche im Browser, für die Cloud-Beta nach Registrierung (offen; der Zugangsschalter `BLOOMMD_BETA_ACCESS=1` bleibt als Einladungsmodus erhalten). Command Palette, Fokus-, Outline- und Präsentationsmodus, gespeicherte Views. |
 | **OKF / LLM-Wiki** | Wissensbündel im Open Knowledge Format v0.2 lesen und schreiben, Trust-Signale (`sources`, `generated`, `verified`, `status`, `stale_after`), deterministisches `status`/`lint`, und der Proposal-Workflow `propose → approve → apply` über CLI und MCP. Läuft lokal, ohne Modell und ohne Netzwerk. |
 | **Kollaboration** | Realtime-Sync über Yjs mit Presence, dokumentgebundenen Tickets und Rollenprüfung. **Als Beta gekennzeichnet**, eine Instanz, nicht beworben. |
 | **Obsidian-Kompatibilität** | Eine echte Obsidian-Notiz wird als BloomMD-Map visualisiert. Die vollständige Plugin-Beta-Verteilung über BRAT folgt in M2 (#89). |
@@ -21,7 +21,7 @@ niemand etwas erwartet, das nicht existiert.
 | Bereich | Warum |
 |---|---|
 | **Mobile Obsidian** | Die Touch-Matrix auf echten Geräten ist nicht gelaufen. `isDesktopOnly` bleibt `true`, `release:verify` erzwingt das. Siehe [#76](https://github.com/moellenbeck-digital/BloomMD/issues/76). |
-| **Öffentlicher SaaS-Launch** | Die Beta ist auf Einladung. Öffnen ist eine spätere, eigene Entscheidung mit eigenen Voraussetzungen. |
+| **Öffentlicher SaaS-Launch** | Die Registrierung für die Cloud-Beta ist offen, die Warteliste ist beendet. Ein öffentlicher SaaS-Launch (Preise, Support-Zusagen, Spamschutz) ist eine spätere, eigene Entscheidung mit eigenen Voraussetzungen. |
 | **Billing / bezahlte Pläne** | `BLOOMMD_BILLING_ENABLED=0`. Checkout, Portal und Webhook antworten 404. Es werden keine Zahlungsdaten erhoben. |
 | **Template-Marktplatz** | [#81](https://github.com/moellenbeck-digital/BloomMD/issues/81), kein Milestone. |
 | **VS-Code-Extension** | [#80](https://github.com/moellenbeck-digital/BloomMD/issues/80), kein Milestone. |

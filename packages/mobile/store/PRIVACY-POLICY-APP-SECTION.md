@@ -10,7 +10,8 @@ Grundlage: Code-Stand `packages/mobile` und `apps/app` (Share-Links), siehe `PRI
 ## Was die bestehende Seite abdeckt
 
 - Verantwortlicher, Accountdaten, local-first, keine Zahlungen in M1, Resend, Sentry/Plausible/
-  PostHog (Marketing/Web), optionaler Sync, Cookies, Warteliste, Rechtsgrundlagen, Betroffenenrechte.
+  PostHog (Marketing/Web), optionaler Sync, Cookies, Warteliste (beendet; Einträge werden 90 Tage nach der
+  Einladungs-E-Mail gelöscht), Rechtsgrundlagen, Betroffenenrechte.
 - **Fehlt:** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Standort, Speicherdauer der
   Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
   kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen.

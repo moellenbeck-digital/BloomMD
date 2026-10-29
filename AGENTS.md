@@ -93,6 +93,7 @@ Neue RPC-Methode hinzufügen = 3 Dateien:
 3. **`packages/desktop/src/mainview/rpc.ts`** — Aufruf im Webview via `electrobun.rpc!.request.methodName()`
 
 Messages (Bun → Webview, fire-and-forget) vs. Requests (bidirektional, mit Response).
+Electrobun kennt nur ein globales `maxRequestTime` (60 s, `RPC_MAX_REQUEST_TIME_MS`), kein Timeout je Request. Native Dialoge, die auf einen Menschen warten (`chooseDirectory`, `chooseResourceFile`, `importFile`), laufen deshalb nicht als Request mit Ergebnis: der Request quittiert nur den Start, das Ergebnis kommt als Message `nativeDialogResult` (`bun/native-dialog.ts`, `mainview/native-dialog-client.ts`). Neue Dialog-Requests genauso anbinden.
 File Watcher nutzt chokidar mit `awaitWriteFinish: { stabilityThreshold: 500 }`.
 
 ### Web API (Next.js 16)

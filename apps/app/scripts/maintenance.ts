@@ -1,4 +1,5 @@
 import { createSqlClient } from "../src/lib/sql-client";
+import { purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "../src/lib/unconfirmed-accounts";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required for maintenance.");
@@ -12,6 +13,7 @@ function positiveDays(name: string, fallback: number) {
 const deletedDocumentDays = positiveDays("BLOOMMD_DELETED_DOCUMENT_RETENTION_DAYS", 30);
 const stripeEventDays = positiveDays("BLOOMMD_STRIPE_EVENT_RETENTION_DAYS", 180);
 const auditEventDays = positiveDays("BLOOMMD_AUDIT_EVENT_RETENTION_DAYS", 365);
+const unconfirmedAccountDays = positiveDays("BLOOMMD_UNCONFIRMED_ACCOUNT_RETENTION_DAYS", UNCONFIRMED_ACCOUNT_RETENTION_DAYS);
 const sql = createSqlClient(databaseUrl);
 
 const [tokens, accessTokens, sessions, rates, documents, events, auditEvents] = await Promise.all([
@@ -24,6 +26,9 @@ const [tokens, accessTokens, sessions, rates, documents, events, auditEvents] = 
   sql`delete from bloom_audit_events where created_at < now() - (${auditEventDays} * interval '1 day') returning id`,
 ]);
 
+// Unconfirmed sign-ups (#169); `bun run db:purge-unconfirmed` shows what would go, without deleting.
+const unconfirmed = await purgeUnconfirmedAccounts(sql, { days: unconfirmedAccountDays, dryRun: false });
+
 console.log(JSON.stringify({
   deletedAuthTokens: tokens.length,
   deletedAccessTokens: accessTokens.length,
@@ -32,4 +37,5 @@ console.log(JSON.stringify({
   purgedDocuments: documents.length,
   deletedStripeEvents: events.length,
   deletedAuditEvents: auditEvents.length,
+  deletedUnconfirmedAccounts: unconfirmed.accounts,
 }));

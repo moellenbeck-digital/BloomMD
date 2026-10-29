@@ -31,6 +31,14 @@ let root: Root | null = null;
 let container: HTMLDivElement;
 let createdFilename = "";
 let createdMarkdown = "";
+// Disk reads the App started and the test did not wait for; they must finish before the directory is removed.
+const pendingDiskReads = new Set<Promise<unknown>>();
+function tracked<T>(read: Promise<T>): Promise<T> {
+  pendingDiskReads.add(read);
+  const forget = () => pendingDiskReads.delete(read);
+  read.then(forget, forget);
+  return read;
+}
 const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // The real App, Toolbar and dialog run; only canvas rendering and native RPC are replaced.
@@ -40,13 +48,13 @@ mock.module("@bloommd/ui", () => ({
   ResizableEditor: () => null,
 }));
 mock.module("./rpc", () => ({
-  listMindmaps: async () => ({ files: await disk.list() }),
+  listMindmaps: async () => ({ files: await tracked(disk.list()) }),
   openWorkspace: async () => {
-    const doc = await disk.readWorkspaceMindMap();
+    const doc = await tracked(disk.readWorkspaceMindMap());
     return { ...doc, nodes: Object.fromEntries(doc.nodes) };
   },
   openMindmap: async (filename: string) => {
-    const doc = await disk.read(filename);
+    const doc = await tracked(disk.read(filename));
     return { ...doc, nodes: Object.fromEntries(doc.nodes) };
   },
   createMindmap: async (filename: string, markdown: string) => {
@@ -56,8 +64,8 @@ mock.module("./rpc", () => ({
     createdMarkdown = markdown;
     return { ...doc, nodes: Object.fromEntries(doc.nodes) };
   },
-  listTemplates: async () => ({ templates: await disk.readTemplates() }),
-  listFolders: async () => ({ folders: await disk.listFolders() }),
+  listTemplates: async () => ({ templates: await tracked(disk.readTemplates()) }),
+  listFolders: async () => ({ folders: await tracked(disk.listFolders()) }),
   chooseDirectory: async () => ({ path: directory }),
   consumeExternalFile: async () => ({ kind: "folder", filename: null }),
   getConnectionMode: async () => ({ type: "local" }),
@@ -117,6 +125,7 @@ afterEach(async () => {
   root = null;
   ui.useMindMapStore.getState().setDocument(null);
   actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
+  await Promise.allSettled([...pendingDiskReads]);
   await rm(directory, { recursive: true, force: true });
 });
 

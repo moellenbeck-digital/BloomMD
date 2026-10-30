@@ -100,6 +100,18 @@ export {
   type LintOptions,
 } from "./workspace-lint";
 export {
+  buildWorkspaceIndex,
+  type WorkspaceIndex,
+  type WorkspaceIndexOptions,
+  type WorkspaceIndexSummary,
+  type WorkspaceIndexFinding,
+  type WorkspaceIndexFindingCode,
+  type IndexDocumentNode,
+  type IndexHeadingNode,
+  type IndexBacklink,
+  type IndexBacklinks,
+} from "./workspace-index";
+export {
   searchWorkspace,
   backlinksFor,
   type WorkspaceSearchQuery,

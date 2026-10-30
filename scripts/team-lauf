@@ -51,6 +51,11 @@ fi
 started=$(date +%s)
 echo "team-lauf: Sperre erhalten nach $((started - begin)) s Wartezeit" >&2
 
+# From here on a signal must reach the command, not kill the wrapper first: note it until the command runs.
+pending=""
+trap 'pending=INT' INT
+trap 'pending=TERM' TERM
+
 command_line=$(printf '%s ' "$@" | tr '\n' ' ')
 {
   echo "pid=$$"
@@ -69,7 +74,6 @@ else
   reset_signals=""
 fi
 exec 3<&0
-trap ':' INT TERM
 TEAM_LAUF_HELD=1 && export TEAM_LAUF_HELD
 (
   exec 9>&- 0<&3 3<&-
@@ -80,6 +84,9 @@ child=$!
 exec 3<&-
 trap 'kill -INT "$child" 2>/dev/null || true' INT
 trap 'kill -TERM "$child" 2>/dev/null || true' TERM
+if [ -n "$pending" ]; then
+  kill -"$pending" "$child" 2>/dev/null || true
+fi
 
 # `wait` returns early when a trap fires; repeat until the command is really gone.
 rc=0

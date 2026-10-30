@@ -121,8 +121,9 @@ describe("team-lauf script", () => {
       ["SIGTERM", 143],
       ["SIGINT", 130],
     ] as const) {
-      const run = start(["sleep", "30"]);
-      await holds();
+      const marker = join(base, `started-${counter}-${signal}`);
+      const run = start(["sh", "-c", `echo > ${marker}; exec sleep 30`]);
+      await until(() => existsSync(marker), "the command");
       run.proc.kill(signal);
       const result = await run.done;
       expect(result.code).toBe(code);

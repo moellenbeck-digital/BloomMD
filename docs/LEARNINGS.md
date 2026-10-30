@@ -45,7 +45,7 @@ gewöhnliche Wiki-Seite mit `type: learning` und lässt sich mit `bloommd-wiki l
 | Feld | Bedeutung |
 |---|---|
 | `type` | Immer `learning`. Die Vorlage setzt es. |
-| `status` | `neu`, `bestätigt`, `veraltet` oder `ersetzt` (siehe Lebenszyklus). Neue Learnings starten mit `neu`. |
+| `status` | `neu`, `bestätigt`, `veraltet`, `ersetzt` oder `unbestätigt` (siehe Lebenszyklus). Neue Learnings mit Vorfall und Quelle starten mit `neu`. |
 | `scope` | Wofür das Learning gilt, kurz, z. B. `BloomMD, coder`. Kommt aus dem Aufruf. |
 | `source` | Woher es stammt (Ticket, PR, Lauf, Datum). Kommt aus dem Aufruf. |
 | `verified` | Wer es bestätigt hat, als Liste aus `by` und `at` (wie überall im Wiki). Bei neuen Learnings leer oder nicht gesetzt. |
@@ -79,8 +79,9 @@ abgebildet:
 | `bestätigt` | `stable` |
 | `veraltet` | `deprecated` |
 | `ersetzt` | `deprecated` |
+| `unbestätigt` | `draft` |
 
-- Auf einer Learning-Seite sind nur diese vier Wörter gültig; `draft`, `stable` und `deprecated` meldet der Lint
+- Auf einer Learning-Seite sind nur diese fünf Wörter gültig; `draft`, `stable` und `deprecated` meldet der Lint
   dort als `invalid-status`. Auf jeder anderen Seite meldet er `neu` & Co. als `invalid-status`.
 - `stale_after` ist ein Datum. Ist es überschritten, meldet der Lint `expired-page`, auch bei Learnings.
 - `verified` bleibt die Liste aus `by` und `at`.
@@ -91,8 +92,11 @@ abgebildet:
 neu → bestätigt → veraltet → ersetzt
 ```
 
-1. **neu:** frisch angelegt, ein Beleg.
-2. **bestätigt:** ein zweiter, unabhängiger Beleg oder die Bestätigung durch einen Menschen. In `verified` einen
+1. **neu:** frisch angelegt; Vorfall und Quelle (Ticket, PR, Lauf) liegen vor.
+   **unbestätigt:** abgeleitete Aussage ohne Beleg. `Beleg` nennt, was fehlt. Kein Ruhestand: Die Standardsuche
+   liefert die Map weiter und nennt den Status im Treffer; der Lint meldet ihn als gültig (`draft`). Sobald ein
+   Beleg vorliegt, wird sie `neu` (ein Beleg) oder `bestätigt`.
+2. **bestätigt:** ein zweiter, unabhängiger Beleg oder die Bestätigung durch einen Menschen bzw. den Chief. In `verified` einen
    Eintrag (`by`, `at`) ergänzen und `status` ändern.
 3. **veraltet:** `stale_after` ist überschritten und das Learning wurde nicht erneut geprüft, oder es gilt nicht
    mehr. Stimmt es weiterhin, bleibt es `bestätigt`: `stale_after` um 90 Tage verlängern und `verified`
@@ -109,7 +113,7 @@ und Undo.
   (`{by, at}`), `scope` und `replaced_by`. Beim Anlegen überschreiben `status` und `stale_after` die Werte der
   Vorlage (`neu`, heute plus 90 Tage). `bloommd_update_map` ändert nur die mitgegebenen Felder und braucht dann
   keine `nodes`. `verified` hängt einen Eintrag an die Liste an und ersetzt sie nie. `replaced_by` ist nur
-  zusammen mit `status: ersetzt` erlaubt. Ungültige Eingaben (Status außerhalb der vier Wörter, kein echtes
+  zusammen mit `status: ersetzt` erlaubt. Ungültige Eingaben (Status außerhalb der fünf Wörter, kein echtes
   Datum, Text über mehrere Zeilen oder zu lang) lehnt der Server ab.
 - **Finden:** `bloommd_search` durchsucht zusätzlich `tags`, `scope`, `source`, `status` und `title` im
   Frontmatter (Trefferart `frontmatter`, `nodeId` leer) und filtert mit `status` (exakt), `tag` (exakt, ohne

@@ -516,10 +516,10 @@ export function searchKnowledge(markdown: string, query: string, limit = 20): Ar
 }
 
 /** Lifecycle of a learning (`docs/LEARNINGS.md`); the frontmatter field `status`. */
-export const KNOWLEDGE_STATUSES = ["neu", "bestätigt", "veraltet", "ersetzt"] as const;
+export const KNOWLEDGE_STATUSES = ["neu", "bestätigt", "veraltet", "ersetzt", "unbestätigt"] as const;
 export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
 
-/** Maps with one of these statuses are left out of the default search. */
+/** Maps with one of these statuses are left out of the default search; `unbestätigt` is not retired, it is still found (and named in the hit). */
 const RETIRED_STATUSES = new Set<string>(["veraltet", "ersetzt"]);
 
 const MAX_SCOPE_LENGTH = 300;

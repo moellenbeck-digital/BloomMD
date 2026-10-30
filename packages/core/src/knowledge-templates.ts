@@ -157,7 +157,7 @@ export const KNOWLEDGE_TEMPLATES: KnowledgeTemplate[] = [
       "Gilt für: Brand, Rolle und Komponente, für die das Learning gilt. Rolle zusätzlich als Tag (architect, coder, tester, chief).",
       "Aufgaben ist optional: nur füllen, wenn aus dem Learning Folgearbeit entsteht; sonst leer lassen.",
       "Übergib scope (z. B. 'BloomMD, coder') und source (Ticket oder Lauf) beim Anlegen; Status, Typ und stale_after setzt die Vorlage, status und stale_after lassen sich beim Anlegen überschreiben.",
-      "Später per bloommd_update_map nur die Felder ändern, die sich ändern: status (bestätigt, veraltet, ersetzt), stale_after verlängern, verified (by, at) anhängen, replaced_by nur mit status ersetzt. Abgelaufene Learnings listet bloommd_stale.",
+      "Später per bloommd_update_map nur die Felder ändern, die sich ändern: status (bestätigt, veraltet, ersetzt; unbestätigt für eine abgeleitete Aussage ohne Beleg), stale_after verlängern, verified (by, at) anhängen, replaced_by nur mit status ersetzt. Abgelaufene Learnings listet bloommd_stale.",
       "Keine Secrets, keine Personendaten, keine Rohlogs.",
       "Learnings sind Wissen, keine Regeln: Änderungen am Verhalten der Agenten (Regeln, Rollen, Hooks) laufen als Pull Request mit Review, nie nur als Learning.",
     ],

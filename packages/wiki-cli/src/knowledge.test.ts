@@ -939,6 +939,17 @@ describe("search with frontmatter, filters and expiry", () => {
     expect(paths((await service.search("läuft heute", { now: new Date("2026-10-28T08:00:00Z") })).hits)).toEqual([]);
   });
 
+  test("unbestätigt is no retirement: the default search finds it and the hit names the status", async () => {
+    const { root, service } = await learnings();
+    await writeFile(join(root, "Learnings", "Abgeleitet.md"), '---\ntitle: "Abgeleitet"\nstatus: "unbestätigt"\nscope: "BloomMD, coder"\nstale_after: "2027-01-01"\ntags: ["coder"]\n---\n\n# Abgeleitet\n\n## Ursache\n\nLockfile abgeleitet, Beleg fehlt.\n', "utf8");
+    const standard = await service.search("lockfile", { now: NOW });
+    expect(paths(standard.hits)).toEqual(["Abgeleitet", "Bun-Lockfile", "Ohne-Felder"]);
+    expect(standard.hits.find((hit) => hit.path === "Learnings/Abgeleitet.md")).toEqual(expect.objectContaining({ status: "unbestätigt", stale_after: "2027-01-01", expired: false }));
+    expect(paths((await service.search("lockfile", { now: NOW, status: "unbestätigt" })).hits)).toEqual(["Abgeleitet"]);
+    const created = await service.createMap({ area: "Learnings", title: "Per Dienst", template: "learning", frontmatter: { status: "unbestätigt" } });
+    expect(await readFile(join(root, created.path), "utf8")).toContain('status: "unbestätigt"');
+  });
+
   test("an explicit status filter wins over the default exclusion", async () => {
     const { service } = await learnings();
     expect(paths((await service.search("lockfile", { now: NOW, status: "veraltet" })).hits)).toEqual(["Veraltet-Learning"]);
@@ -1193,6 +1204,8 @@ describe("trust fields through the MCP tools", () => {
     expect(((await call("bloommd_search", { query: "", tag: "coder", includeStale: true })) as { hits: Array<{ expired: boolean }> }).hits).toEqual([expect.objectContaining({ expired: true })]);
     expect(((await call("bloommd_stale", { tag: "coder" })) as { stale: Array<{ path: string; daysOverdue: number }> }).stale).toEqual([expect.objectContaining({ path: created.path })]);
     await call("bloommd_update_map", { path: created.path, stale_after: "2099-01-01", status: "bestätigt", verified: { by: "Max", at: "2026-10-27" } });
+    await call("bloommd_update_map", { path: created.path, status: "unbestätigt" });
+    await call("bloommd_update_map", { path: created.path, status: "bestätigt" });
     expect(await call("bloommd_stale", {})).toEqual(new McpTextResult("NO_REPLY", { stale: [] }));
     expect(((await call("bloommd_stale", { days: 100000 })) as { stale: unknown[] }).stale).toHaveLength(1);
     expect(((await call("bloommd_search", { query: "per mcp" })) as { hits: unknown[] }).hits.length).toBeGreaterThan(0);

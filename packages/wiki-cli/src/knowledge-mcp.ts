@@ -50,7 +50,7 @@ const changeMeta = {
 
 /** Trust and lifecycle fields of a map (frontmatter); see docs/LEARNINGS.md. */
 const trustProperties = {
-  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet or ersetzt." },
+  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet, ersetzt or unbestätigt (derived statement without evidence; still found by the default search)." },
   stale_after: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date YYYY-MM-DD from which the map is to be checked again." },
   verified: {
     type: "object",

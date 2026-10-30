@@ -206,7 +206,7 @@ Body.
   });
 
   test("accepts the learning status words on type learning and maps them to the OKF lifecycle", async () => {
-    const lifecycle: Record<string, string> = { neu: "draft", "bestätigt": "stable", veraltet: "deprecated", ersetzt: "deprecated" };
+    const lifecycle: Record<string, string> = { neu: "draft", "bestätigt": "stable", veraltet: "deprecated", ersetzt: "deprecated", "unbestätigt": "draft" };
     for (const [word, expected] of Object.entries(lifecycle)) {
       const root = await bundleWith(`---\ntype: learning\nstatus: ${word}\nstale_after: 2099-01-01\nscope: BloomMD, coder\n---\n\nBody.\n`);
       expect((await lintWikiBundle(root)).filter((issue) => issue.code !== "unindexed-page")).toEqual([]);
@@ -222,7 +222,7 @@ Body.
     const foreign = await bundleWith("---\ntype: learning\nstatus: stable\n---\n\nBody.\n");
     const issues = await lintWikiBundle(foreign);
     expect(issues.map((issue) => issue.code)).toEqual(["invalid-status"]);
-    expect(issues[0]!.message).toContain("neu, bestätigt, veraltet, ersetzt");
+    expect(issues[0]!.message).toContain("neu, bestätigt, veraltet, ersetzt, unbestätigt");
     await rm(expired, { recursive: true, force: true });
     await rm(foreign, { recursive: true, force: true });
   });

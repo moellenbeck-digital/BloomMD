@@ -1,0 +1,103 @@
+#!/bin/sh
+# Runs one heavy command (build, `next dev`, E2E, full test suite) at a time in the dev-team pod.
+# Usage: team-lauf <command> [args...]
+# All roles share the container and /tmp, so the lock lives pod-wide in one file. It is a flock(1) on an
+# open file descriptor: the kernel drops it when the holder dies, so there is no stale lock to clean up.
+#   TEAM_LAUF_LOCK     lock file (default /tmp/team-lauf.lock); the holder is noted in <lock>.info
+#   TEAM_LAUF_TIMEOUT  longest wait for the lock in seconds (default 1800); on expiry exit 75
+# The exit code of the command is passed through. SIGINT and SIGTERM are forwarded to the command.
+# A nested call (TEAM_LAUF_HELD=1, set for the command) runs without the lock instead of deadlocking.
+set -eu
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: team-lauf <command> [args...]" >&2
+  echo "  Runs the command once the pod-wide lock for heavy runs is free (TEAM_LAUF_LOCK, TEAM_LAUF_TIMEOUT)." >&2
+  exit 2
+fi
+
+if [ -n "${TEAM_LAUF_HELD:-}" ]; then
+  exec "$@"
+fi
+
+LOCK="${TEAM_LAUF_LOCK:-/tmp/team-lauf.lock}"
+INFO="$LOCK.info"
+TIMEOUT="${TEAM_LAUF_TIMEOUT:-1800}"
+case "$TIMEOUT" in
+  '' | *[!0-9]*)
+    echo "team-lauf: TEAM_LAUF_TIMEOUT must be a number of seconds, got '$TIMEOUT'" >&2
+    exit 2
+    ;;
+esac
+
+stamp() { date '+%Y-%m-%d %H:%M:%S'; }
+
+# Opening for write creates the file if needed; the descriptor stays open for the whole run.
+if ! exec 9>>"$LOCK"; then
+  echo "team-lauf: cannot open lock file $LOCK" >&2
+  exit 1
+fi
+chmod 666 "$LOCK" 2>/dev/null || true
+
+begin=$(date +%s)
+if ! flock -n 9; then
+  holder=$(sed -n 's/^befehl=//p' "$INFO" 2>/dev/null | head -n 1)
+  since=$(sed -n 's/^seit=//p' "$INFO" 2>/dev/null | head -n 1)
+  echo "team-lauf: wartet auf Sperre (belegt von: ${holder:-unbekannt}, seit ${since:-unbekannt})" >&2
+  if ! flock -w "$TIMEOUT" 9; then
+    echo "team-lauf: Sperre nach ${TIMEOUT} s nicht frei geworden (belegt von: $(sed -n 's/^befehl=//p' "$INFO" 2>/dev/null | head -n 1)), Abbruch" >&2
+    exit 75
+  fi
+fi
+started=$(date +%s)
+echo "team-lauf: Sperre erhalten nach $((started - begin)) s Wartezeit" >&2
+
+# From here on a signal must reach the command, not kill the wrapper first: note it until the command runs.
+pending=""
+trap 'pending=INT' INT
+trap 'pending=TERM' TERM
+
+command_line=$(printf '%s ' "$@" | tr '\n' ' ')
+{
+  echo "pid=$$"
+  echo "befehl=${command_line% }"
+  echo "seit=$(stamp)"
+} >"$INFO.$$" && mv -f "$INFO.$$" "$INFO" || true
+
+# The command must not inherit the lock descriptor: the lock belongs to this wrapper, so it ends
+# with it (even on kill -9) and a leftover grandchild cannot keep it.
+# A background job of a non-interactive sh starts with SIGINT/SIGQUIT ignored and stdin on /dev/null;
+# undo both, so Ctrl-C and the forwarded SIGINT reach the command and it keeps its stdin.
+# `env --default-signal` (GNU coreutils) resets the signals; without it the command keeps them ignored.
+if env --default-signal=INT,QUIT true 2>/dev/null; then
+  reset_signals="env --default-signal=INT,QUIT"
+else
+  reset_signals=""
+fi
+exec 3<&0
+TEAM_LAUF_HELD=1 && export TEAM_LAUF_HELD
+(
+  exec 9>&- 0<&3 3<&-
+  # shellcheck disable=SC2086
+  exec $reset_signals "$@"
+) &
+child=$!
+exec 3<&-
+trap 'kill -INT "$child" 2>/dev/null || true' INT
+trap 'kill -TERM "$child" 2>/dev/null || true' TERM
+if [ -n "$pending" ]; then
+  kill -"$pending" "$child" 2>/dev/null || true
+fi
+
+# `wait` returns early when a trap fires; repeat until the command is really gone.
+rc=0
+while :; do
+  wait "$child" && rc=0 || rc=$?
+  kill -0 "$child" 2>/dev/null || break
+done
+
+# Release the note before the lock (the lock drops on exit), but only if it is still ours.
+if [ "$(sed -n 's/^pid=//p' "$INFO" 2>/dev/null)" = "$$" ]; then
+  rm -f "$INFO"
+fi
+echo "team-lauf: fertig nach $(($(date +%s) - started)) s, Exit $rc" >&2
+exit "$rc"

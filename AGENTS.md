@@ -41,6 +41,22 @@ cd packages/sync && bun run dev  # Sync-Server starten (localhost:4100)
 bun test ./packages/core/src/parser.test.ts
 ```
 
+## Schwere Läufe im Dev-Team-Pod
+
+Coder, Tester und Architect teilen sich einen Container (Limit 5Gi) und `/tmp`. Mehrere schwere Läufe zugleich haben ihn schon mehrfach per OOM abgerissen. Deshalb starten **Builds, `next dev`, E2E und Voll-Tests nur über `scripts/team-lauf <befehl>`**; der Wrapper erzwingt per `flock`, dass pod-weit nur ein schwerer Lauf zugleich läuft, die anderen warten.
+
+```bash
+scripts/team-lauf bun run dev:app          # next dev
+scripts/team-lauf bun run build:app        # Produktions-Build
+scripts/team-lauf bun run test:e2e         # E2E
+```
+
+- Einzelne Testdateien (`bun test ./datei`) sind leicht und brauchen ihn nicht.
+- Der Wrapper gibt den Exit-Code des Befehls weiter und meldet auf stderr Wartezeit und Laufzeit. Ist die Sperre belegt, steht dort, von wem (`<lock>.info`).
+- `TEAM_LAUF_TIMEOUT` (Sekunden, Standard 1800) begrenzt das Warten; danach Exit 75. `TEAM_LAUF_LOCK` ändert die Lockdatei (Standard `/tmp/team-lauf.lock`).
+- Ein `team-lauf` innerhalb eines `team-lauf`-Befehls läuft ohne Sperre weiter und hängt nicht (`TEAM_LAUF_HELD=1`).
+- Die Sperre gehört dem Wrapper-Prozess: stirbt er (auch per `kill -9`), ist sie frei. Ein dann verwaister Befehl läuft weiter, ohne die Sperre zu halten — in dem Fall zuerst beenden.
+
 ## Package-Struktur
 
 - `@bloommd/core` — Parser, Types, Operations, FileStore (Node.js)

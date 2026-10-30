@@ -112,6 +112,10 @@
       "import": "./src/workspace-lint.ts",
       "types": "./src/workspace-lint.ts"
     },
+    "./workspace-index": {
+      "import": "./src/workspace-index.ts",
+      "types": "./src/workspace-index.ts"
+    },
     "./workspace-search": {
       "import": "./src/workspace-search.ts",
       "types": "./src/workspace-search.ts"

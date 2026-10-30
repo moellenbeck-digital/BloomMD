@@ -35,7 +35,7 @@ async function run(
   env: Record<string, string> = {},
   cwd?: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const workspaceCommands = new Set(["open", "lint", "check", "search", "backlinks"]);
+  const workspaceCommands = new Set(["open", "lint", "check", "search", "backlinks", "index"]);
   const effectiveArgs = workspaceCommands.has(args[0] ?? "")
     ? ["workspace", ...args]
     : args;
@@ -275,6 +275,72 @@ describe("search and backlinks", () => {
     const parsed = JSON.parse(result.stdout) as Array<{ path: string; raw: string }>;
     expect(parsed[0]!.path).toBe("index.md");
     expect(parsed[0]!.raw).toContain("[[notes/one]]");
+  });
+});
+
+describe("index", () => {
+  async function indexWorkspace(files: Record<string, string>, body: (dir: string) => Promise<void>) {
+    const dir = await mkdtemp(join(tmpdir(), "bloommd-cli-index-"));
+    try {
+      for (const [path, markdown] of Object.entries(files)) {
+        await mkdir(join(dir, path, ".."), { recursive: true });
+        await writeFile(join(dir, path), markdown);
+      }
+      await body(dir);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+
+  const files = {
+    "ziel.md": "---\nstatus: veraltet\nreplaced_by: neu.md\n---\n# Ziel <!-- bloommd:id=dup -->\n\n## Abschnitt <!-- bloommd:id=dup -->\n",
+    "quelle.md": "# Quelle\n\nSiehe [[ziel#Abschnitt]] und [[ziel#Fehlt]] und [[ziel]].\n",
+  };
+
+  test("json carries nodes, backlinks and the three findings", async () => {
+    await indexWorkspace(files, async (dir) => {
+      const result = await run(["index", dir, "--format", "json"]);
+      expect(result.code).toBe(0);
+      const index = JSON.parse(result.stdout) as import("@bloommd/core").WorkspaceIndex;
+      expect(index.documents.map((entry) => entry.path)).toEqual(["quelle.md", "ziel.md"]);
+      expect(index.headings.find((entry) => entry.title === "Abschnitt")!.backlinks.count).toBe(1);
+      expect(index.findings.map((finding) => finding.code).sort()).toEqual(["duplicate-node-id", "stale-anchor", "stale-document", "stale-document", "stale-document"]);
+    });
+  });
+
+  test("text lists backlinks under the document and its heading, then the findings", async () => {
+    await indexWorkspace(files, async (dir) => {
+      const result = await run(["index", dir]);
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain("ziel.md  Ziel  (2 Rückverweise)");
+      expect(result.stdout).toMatch(/← quelle\.md:3  \[\[ziel#Abschnitt\]\]  \(unter „Quelle"\)/);
+      expect(result.stdout).toContain("## Abschnitt  (Zeile 7, 1 Rückverweis)");
+      expect(result.stdout).toContain("Nachfolger: neu.md");
+      expect(result.stdout).toContain("ziel.md:5, ziel.md:7");
+    });
+  });
+
+  test("warnings alone exit 0, with --strict they exit 1", async () => {
+    await indexWorkspace(files, async (dir) => {
+      expect((await run(["index", dir, "--quiet"])).code).toBe(0);
+      expect((await run(["index", dir, "--quiet", "--strict"])).code).toBe(1);
+    });
+  });
+
+  test("a broken link is an error", async () => {
+    await indexWorkspace({ "a.md": "# A\n\n[[nirgends]]\n" }, async (dir) => {
+      const result = await run(["index", dir, "--format", "github"]);
+      expect(result.code).toBe(1);
+      expect(result.stdout).toContain("::error file=a.md,line=3::");
+    });
+  });
+
+  test("a clean workspace exits 0", async () => {
+    await indexWorkspace({ "a.md": "# A\n\n[[b#B]]\n", "b.md": "# B\n" }, async (dir) => {
+      const result = await run(["index", dir]);
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain("nichts gefunden");
+    });
   });
 });
 

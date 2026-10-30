@@ -1249,7 +1249,7 @@ describe("bloommd_get_node, bloommd_backlinks and changes since", () => {
   test("lists the new tools as read-only and mentions them in the instructions", () => {
     const options = knowledgeServerOptions({}, "test");
     const byName = new Map(options.tools.map((tool) => [tool.name, tool]));
-    for (const name of ["bloommd_get_node", "bloommd_backlinks", "bloommd_changes"]) expect(byName.get(name)?.annotations?.readOnlyHint).toBe(true);
+    for (const name of ["bloommd_get_node", "bloommd_backlinks", "bloommd_workspace_index", "bloommd_changes"]) expect(byName.get(name)?.annotations?.readOnlyHint).toBe(true);
     const schema = (name: string) => byName.get(name)!.inputSchema as { properties: Record<string, unknown>; required?: string[] };
     expect(schema("bloommd_get_node").required).toEqual(["path", "nodeId"]);
     expect(schema("bloommd_backlinks").required).toEqual(["path"]);
@@ -1269,8 +1269,8 @@ describe("bloommd_get_node, bloommd_backlinks and changes since", () => {
     await Promise.allSettled([...pending]);
     await Bun.sleep(5);
     const names = (JSON.parse(out[0]!).result.tools as Array<{ name: string }>).map((tool) => tool.name);
-    expect(names).toEqual(expect.arrayContaining(["bloommd_get_node", "bloommd_backlinks", "bloommd_ingest"]));
-    expect(names).toHaveLength(18);
+    expect(names).toEqual(expect.arrayContaining(["bloommd_get_node", "bloommd_backlinks", "bloommd_workspace_index", "bloommd_ingest"]));
+    expect(names).toHaveLength(19);
   });
 
   test("get_node returns the node with parent, child ids, relations and the map version; an unknown id is refused", async () => {
@@ -1342,6 +1342,57 @@ describe("bloommd_get_node, bloommd_backlinks and changes since", () => {
     expect(JSON.stringify(result)).not.toContain("Weg");
     // A target that is not readable is an error, not an empty answer.
     await expect(service.backlinks("Gesperrt/Geheim.md")).rejects.toThrow(/403/);
+  });
+
+  test("workspace index: summary and findings for the vault, nodes with backlinks for one map", async () => {
+    const { root, service } = await vault("read");
+    await mkdir(join(root, "Arbeit"), { recursive: true });
+    await writeFile(join(root, "Arbeit", "Alt.md"), "---\nstatus: veraltet\nreplaced_by: Arbeit/Neu.md\n---\n# Alt <!-- bloommd:id=a-root -->\n\n## Teil <!-- bloommd:id=a-teil -->\n", "utf8");
+    await writeFile(join(root, "Arbeit", "Lernplan.md"), "# Lernplan <!-- bloommd:id=lp-root -->\n\n## Vorbereitung <!-- bloommd:id=a-teil -->\n\nSiehe [[Alt#Teil]], [[Alt#Weg]] und [[Nirgends]].\n", "utf8");
+    const call = knowledgeServerOptions({ vault: service }, "test").call;
+
+    const overview = await call("bloommd_workspace_index", {}) as Awaited<ReturnType<KnowledgeService["workspaceIndex"]>>;
+    expect(overview).not.toHaveProperty("document");
+    const codes = overview.findings.map((finding) => finding.code).sort();
+    expect(codes).toEqual(["broken-link", "duplicate-node-id", "stale-anchor", "stale-document", "stale-document"]);
+    expect(overview.findings.find((finding) => finding.code === "broken-link")).toMatchObject({ path: "Arbeit/Lernplan.md", area: "Arbeit", severity: "error" });
+    expect(overview.findings.find((finding) => finding.code === "stale-document")!.detail).toContain("Nachfolger: Arbeit/Neu.md");
+    expect(overview.findings.find((finding) => finding.code === "duplicate-node-id")!.detail).toContain("Arbeit/Alt.md:7");
+
+    const one = await call("bloommd_workspace_index", { path: "Arbeit/Alt.md" }) as Awaited<ReturnType<KnowledgeService["workspaceIndex"]>> & { document: { backlinks: { count: number } }; headings: Array<{ title: string; backlinks: { count: number; entries: Array<{ sourceHeadingTitle: string | null; line: number }> } }> };
+    expect(one).toMatchObject({ path: "Arbeit/Alt.md", area: "Arbeit" });
+    expect(one.document.backlinks.count).toBe(1);
+    const teil = one.headings.find((heading) => heading.title === "Teil")!;
+    expect(teil.backlinks.entries).toEqual([expect.objectContaining({ sourceHeadingTitle: "Vorbereitung", line: 5 })]);
+    // Only what belongs to this map: the duplicate id sits first in Alt.md; the link findings belong to Lernplan.md.
+    expect(one.findings.map((finding) => finding.code)).toEqual(["duplicate-node-id"]);
+    expect((await service.workspaceIndex("Arbeit/Lernplan.md")).findings.map((finding) => finding.code).sort()).toEqual(["broken-link", "stale-anchor", "stale-document", "stale-document"]);
+    await expect(service.workspaceIndex("Arbeit/Fehlt.md")).rejects.toThrow();
+  });
+
+  test("workspace index leaves out maps the agent cannot read", async () => {
+    const markdown: Record<string, string> = {
+      "Arbeit/Offen.md": "# Offen\n\nSiehe [[Verloren]].\n",
+      "Gesperrt/Geheim.md": "# Geheim\n\nSiehe [[Geheim-Ziel]].\n",
+      "Cloud/Weg.md": "# Weg\n\nSiehe [[Weg-Ziel]].\n",
+    };
+    const store: KnowledgeStore = {
+      kind: "cloud",
+      stateDir: await mkdtemp(join(tmpdir(), "bloommd-stub-")),
+      list: async () => Object.keys(markdown).map((path) => ({ path, title: path, area: path.split("/")[0]!, ...(path === "Cloud/Weg.md" ? { available: false } : {}) })),
+      read: async (path) => {
+        if (path === "Gesperrt/Geheim.md") throw new Error("BloomMD cloud could not read Gesperrt/Geheim.md (403).");
+        const text = markdown[path];
+        if (text === undefined) throw new Error(`not found: ${path}`);
+        return { path, markdown: text, version: "1" };
+      },
+      write: async () => { throw new Error("read only"); },
+      freePath: async () => "x.md",
+    };
+    const result = await new KnowledgeService(store, "OpenClaw").workspaceIndex();
+    expect(result.findings.map((finding) => finding.path)).toEqual(["Arbeit/Offen.md"]);
+    expect(JSON.stringify(result)).not.toContain("Geheim");
+    expect(JSON.stringify(result)).not.toContain("Weg");
   });
 
   test("changes with since keep only newer entries; without since nothing changes; an invalid since is refused", async () => {

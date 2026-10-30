@@ -36,10 +36,13 @@ Für reproduzierbare Automatisierung lädst du das Asset mit der zugehörigen SH
 ```bash
 bloommd-wiki workspace lint ./docs --format github --strict
 bloommd-wiki workspace check ./vault
+bloommd-wiki workspace index ./docs
 bloommd-wiki init ./wiki "Projektwissen"
 bloommd-wiki status ./wiki
 bloommd-wiki mcp ./wiki
 ```
+
+`workspace index` zeigt je Datei und je Überschrift, wer darauf verweist (ein Link mit Anker zählt für die Überschrift, einer ohne Anker für die Datei), und meldet drei Befunde: defekte oder mehrdeutige Links, veraltete Ziele (Anker ohne Überschrift; Zieldatei mit Status `veraltet`/`ersetzt` oder abgelaufenem `stale_after`, mit `replaced_by` als Nachfolger) und doppelte `bloommd:id`. Optionen wie bei `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; Fehler (defekte Links) ergeben Exit-Code 1, mit `--strict` auch Warnungen. `workspace lint` bleibt unverändert.
 
 `init`, `index`, `log`, `approve` und `apply` schreiben nur in den ausdrücklich angegebenen Wiki-Ordner. Die anderen Befehle lesen und berichten.
 

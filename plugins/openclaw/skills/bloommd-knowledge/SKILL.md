@@ -59,6 +59,8 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
   relations and the map `version`; an unknown `nodeId` is refused.
 - Who links here → `bloommd_backlinks {path}`: maps and nodes that link to a map or note (`path`, `nodeId`,
   `line`, `link`). Read-only; maps you cannot read are left out.
+- Link health → `bloommd_workspace_index`: broken links, stale anchors or targets (with `replaced_by`),
+  duplicate node ids; with `{path}` the backlinks per heading of one map. Read-only.
 - Mistake → `bloommd_changes` (`since` = ISO date or date-time keeps only newer changes), then `bloommd_undo {changeId}`.
 - Learnings and other maps with trust fields → `bloommd_search` with `tag`, `scope` or `status` (query may
   be empty); expired and veraltet/ersetzt maps only appear with `includeStale: true`. `bloommd_stale`

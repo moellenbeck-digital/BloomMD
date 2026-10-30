@@ -47,7 +47,7 @@ export function headingNodeId(path: string, ordinal: number, title: string): str
   return `${HEADING_NODE_PREFIX}${stableSegment(path)}:${ordinal}${label ? `-${label}` : ""}`;
 }
 
-function anchorKey(value: string): string {
+export function anchorKey(value: string): string {
   return value
     .trim()
     .toLowerCase()
@@ -98,7 +98,7 @@ function stripHeadingTitle(value: string): string {
   return title.replace(/<!--\s*bloommd:[\s\S]*?-->/gi, " ").trim();
 }
 
-function headingSections(markdown: string): Array<{ title: string; line: number }> {
+export function headingSections(markdown: string): Array<{ title: string; line: number }> {
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
   const sections: Array<{ title: string; line: number }> = [];
   let fence: string | null = null;

@@ -91,7 +91,7 @@ Teams can put the same entry into the project's `.mcp.json` with `--scope projec
 
 ## Tools
 
-The server offers 18 tools `bloommd_*`. Reading (no changes):
+The server offers 19 tools `bloommd_*`. Reading (no changes):
 
 | Tool | Purpose |
 |---|---|
@@ -100,6 +100,7 @@ The server offers 18 tools `bloommd_*`. Reading (no changes):
 | `bloommd_get_map` | a map as an outline with its `version` |
 | `bloommd_get_node` | **one** node: title, content, metadata, parent, child ids, relations and the map's `version` |
 | `bloommd_backlinks` | **backlinks**: maps and nodes that link to a map or note |
+| `bloommd_workspace_index` | **link health**: broken links, stale anchors and targets, duplicate node ids; with `path` the backlinks per heading of one map |
 | `bloommd_changes` | the agent's change log, with `since` from a point in time |
 | `bloommd_tasks`, `bloommd_decisions`, `bloommd_stale`, `bloommd_templates`, `bloommd_requests` | tasks, decisions, expiring maps, templates, requests |
 
@@ -113,11 +114,16 @@ Writing, according to the agent's rights: `bloommd_create_map`, `bloommd_ingest`
 - `bloommd_backlinks {path}` names, per hit, the map, the node (`nodeId`, `nodeTitle`), the line and the
   link as written (`[[Note]]` or Markdown link). Only maps the agent can read are searched; hits from
   maps the store does not let it read are left out.
+- `bloommd_workspace_index {path?}` checks all readable maps: without `path` a summary and the findings
+  (`broken-link`, `ambiguous-link`, `stale-anchor`, `stale-document` naming the successor from
+  `replaced_by`, `duplicate-node-id` with every place); with `path` the map, its headings and their
+  backlinks (source, source heading, line, link). A link with an anchor counts for the heading, one
+  without for the map.
 - `bloommd_changes {since}` shows only changes from an ISO date (`2026-10-27`, start of the day in UTC)
   or point in time (`2026-10-27T08:30:00Z`; without a time zone UTC applies). Without `since` nothing
   changes; `limit` still caps the list. An invalid `since` is refused.
 
-All three work for `target` `vault` and `cloud` and never change anything.
+All four work for `target` `vault` and `cloud` and never change anything.
 
 ## Use
 

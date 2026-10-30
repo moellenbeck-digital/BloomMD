@@ -13,7 +13,7 @@
 
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve, sep } from "node:path";
-import { backlinksFor, lintWorkspace, searchWorkspace, type LintResult } from "@bloommd/core";
+import { backlinksFor, buildWorkspaceIndex, lintWorkspace, searchWorkspace, type LintResult } from "@bloommd/core";
 import {
   appendWikiLog,
   applyWikiProposal,
@@ -33,7 +33,7 @@ import { WIKI_AGENT_TOOLS, callWikiAgentTool } from "@bloommd/core/wiki-agent";
 import { createWikiSourceCache, readLiveWikiSources, wikiSourceCheckOf, type WikiLiveSources } from "@bloommd/core/wiki-sources";
 import { exportWikiBundle } from "@bloommd/core/wiki-export";
 import { readWorkspace } from "./workspace";
-import { formatFindings, formatGithub, formatJson, plural } from "./report";
+import { formatFindings, formatGithub, formatIndex, formatJson, indexReport, plural } from "./report";
 import { forwardToRunningDesktop } from "./desktop-handoff";
 import { AGENT_USAGE, AgentUsageError, runAgentCli } from "./agent-cli";
 import { isLearningCommand } from "./agent-learnings";
@@ -69,6 +69,8 @@ Befehle:
   workspace check <pfad>                      Roundtrip prüfen
   workspace search <text> <pfad>              Markdown-Dateien durchsuchen
   workspace backlinks <datei> <pfad>          Rückverweise anzeigen
+  workspace index <pfad>                      Index: Rückverweise je Datei und Überschrift; defekte Links,
+                                              veraltete Ziele, doppelte Knoten-IDs
 
 ${AGENT_USAGE}
 
@@ -155,7 +157,7 @@ function parseArguments(argv: string[]): Parsed {
   return { command, path, options };
 }
 
-function exitCodeFor(result: LintResult, strict: boolean): number {
+function exitCodeFor(result: { summary: { errors: number; warnings: number } }, strict: boolean): number {
   if (result.summary.errors > 0) return 1;
   if (strict && result.summary.warnings > 0) return 1;
   return 0;
@@ -278,6 +280,36 @@ async function runSearch(text: string, path: string, options: Options): Promise<
   }
   // Finding nothing is a valid answer to a question, not a failure.
   return 0;
+}
+
+async function runIndex(path: string, options: Options): Promise<number> {
+  const workspace = await readWorkspace(path);
+  const index = buildWorkspaceIndex(workspace.files);
+
+  for (const failure of workspace.unreadable) {
+    // The index never reads files, so a file the reader could not load is reported here.
+    index.findings.push({
+      code: "unreadable-file",
+      severity: "error",
+      path: failure.path,
+      line: null,
+      message: "Datei konnte nicht gelesen werden.",
+      detail: failure.reason,
+    });
+    index.summary.errors += 1;
+  }
+
+  if (options.format === "json") {
+    console.log(formatJson(index));
+  } else if (options.format === "github") {
+    const annotations = formatGithub(indexReport(index));
+    if (annotations) console.log(annotations);
+    const { errors, warnings, documents } = index.summary;
+    console.log([plural(documents, "Datei", "Dateien"), plural(errors, "Fehler", "Fehler"), plural(warnings, "Warnung", "Warnungen")].join(" · "));
+  } else {
+    console.log(formatIndex(index, { quiet: options.quiet }));
+  }
+  return exitCodeFor(index, options.strict);
 }
 
 async function runBacklinks(file: string, path: string, options: Options): Promise<number> {
@@ -557,10 +589,12 @@ export async function runWikiCli(argv: string[]): Promise<number> {
       return runLint(target, options, false);
     case "check":
       return runLint(target, options, true);
+    case "index":
+      return runIndex(target, options);
     default:
       throw new WikiUsageError(`Unbekannter Befehl: ${command.join(" ") || "(keiner)"}`);
   }
 }
 
-export { formatFindings, formatGithub, formatJson, plural } from "./report";
+export { formatFindings, formatGithub, formatIndex, formatJson, plural } from "./report";
 export { readWorkspace } from "./workspace";

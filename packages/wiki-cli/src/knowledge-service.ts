@@ -30,6 +30,7 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
+import { buildWorkspaceIndex } from "@bloommd/core/workspace-index";
 import { backlinksFor } from "@bloommd/core/workspace-search";
 import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
@@ -375,6 +376,42 @@ export class KnowledgeService {
     return { path: document.path, version: document.version, area: this.areaOf(document.path), node: knowledgeNodeDetail(document.markdown, nodeId) };
   }
 
+  /** Every map the agent can read, except `skip`; one the store refuses to read is left out, never reported. */
+  private async readableMaps(skip?: string): Promise<Array<{ path: string; markdown: string }>> {
+    const files: Array<{ path: string; markdown: string }> = [];
+    for (const map of await this.store.list()) {
+      if (map.available === false || map.path === skip) continue;
+      const document = await this.store.read(map.path).catch(() => null);
+      if (document) files.push({ path: document.path, markdown: document.markdown });
+    }
+    return files;
+  }
+
+  /**
+   * The workspace index over all readable maps: broken and ambiguous links, links to a missing
+   * heading or to a veraltet/ersetzt/expired map, and `bloommd:id`s that occur twice. Without `path`
+   * the answer is the summary and the findings (bounded, whatever the size of the vault); with
+   * `path` it is that one map: its node, its headings and their backlinks, and the findings that
+   * belong to it (links written in it, a duplicate id first found in it). Maps the agent cannot read take no part, so they cannot leak through links.
+   */
+  async workspaceIndex(path?: string, options: { today?: string } = {}) {
+    const target = path ? await this.store.read(path) : null;
+    const files = target ? [{ path: target.path, markdown: target.markdown }, ...(await this.readableMaps(target.path))] : await this.readableMaps();
+    const index = buildWorkspaceIndex(files, options);
+    const withArea = <T extends { path: string }>(entry: T) => ({ ...entry, area: this.areaOf(entry.path) });
+    if (!target) return { today: index.today, summary: index.summary, findings: index.findings.map(withArea) };
+    const document = index.documents.find((entry) => entry.path === target.path);
+    return {
+      path: target.path,
+      area: this.areaOf(target.path),
+      today: index.today,
+      summary: index.summary,
+      document: document ? withArea(document) : null,
+      headings: index.headings.filter((heading) => heading.path === target.path),
+      findings: index.findings.filter((finding) => finding.path === target.path).map(withArea),
+    };
+  }
+
   /**
    * Maps and nodes that link to a map or note, with the line and the link as written. Only maps the
    * agent can read are searched: a map the store refuses to read (a cloud area the token may not
@@ -382,12 +419,7 @@ export class KnowledgeService {
    */
   async backlinks(path: string) {
     const target = await this.store.read(path);
-    const files = [{ path: target.path, markdown: target.markdown }];
-    for (const map of await this.store.list()) {
-      if (map.available === false || map.path === target.path) continue;
-      const document = await this.store.read(map.path).catch(() => null);
-      if (document) files.push({ path: document.path, markdown: document.markdown });
-    }
+    const files = [{ path: target.path, markdown: target.markdown }, ...(await this.readableMaps(target.path))];
     const markdownOf = new Map(files.map((file) => [file.path, file.markdown]));
     const backlinks = backlinksFor(files, target.path).map((entry) => {
       const node = knowledgeNodeAtLine(markdownOf.get(entry.path) ?? "", entry.line);

@@ -28,6 +28,7 @@ bloommd-wiki workspace lint ./docs --format github --strict
 bloommd-wiki workspace check ./vault
 bloommd-wiki workspace search "term" ./docs
 bloommd-wiki workspace backlinks "Note.md" ./docs
+bloommd-wiki workspace index ./docs --format json   # backlinks per file and heading; broken links, stale targets, duplicate node ids
 ```
 
 The binary writes only where the command explicitly requests it: `init`, `index`, `log`,

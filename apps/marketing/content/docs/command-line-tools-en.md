@@ -36,10 +36,13 @@ For reproducible automation, download the asset and its SHA-256 checksum from th
 ```bash
 bloommd-wiki workspace lint ./docs --format github --strict
 bloommd-wiki workspace check ./vault
+bloommd-wiki workspace index ./docs
 bloommd-wiki init ./wiki "Project knowledge"
 bloommd-wiki status ./wiki
 bloommd-wiki mcp ./wiki
 ```
+
+`workspace index` shows, per file and per heading, who links to it (a link with an anchor counts for the heading, one without for the file) and reports three findings: broken or ambiguous links, stale targets (an anchor without a heading; a target file with status `veraltet`/`ersetzt` or a past `stale_after`, naming `replaced_by` as the successor) and duplicate `bloommd:id`s. Options as for `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; errors (broken links) exit 1, with `--strict` warnings do too. `workspace lint` is unchanged.
 
 Only `init`, `index`, `log`, `approve`, and `apply` write to the explicitly named Wiki directory. The other commands read and report.
 

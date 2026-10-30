@@ -91,7 +91,7 @@ nur `${BLOOMMD_TOKEN}`, nie der Wert.
 
 ## Werkzeuge
 
-Der Server bietet 18 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
+Der Server bietet 19 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
 
 | Werkzeug | Zweck |
 |---|---|
@@ -100,6 +100,7 @@ Der Server bietet 18 Werkzeuge `bloommd_*`. Lesend (ohne Änderung):
 | `bloommd_get_map` | eine Map als Gliederung mit `version` |
 | `bloommd_get_node` | **ein** Knoten: Titel, Inhalt, Metadaten, Eltern, Kinder-IDs, Beziehungen und `version` der Map |
 | `bloommd_backlinks` | **Rückverweise**: Maps und Knoten, die auf eine Map oder Note verlinken |
+| `bloommd_workspace_index` | **Link-Gesundheit**: defekte Links, veraltete Anker und Ziele, doppelte Knoten-IDs; mit `path` die Rückverweise je Überschrift einer Map |
 | `bloommd_changes` | Änderungsprotokoll des Agenten, mit `since` ab einem Zeitpunkt |
 | `bloommd_tasks`, `bloommd_decisions`, `bloommd_stale`, `bloommd_templates`, `bloommd_requests` | Aufgaben, Entscheidungen, ablaufende Maps, Vorlagen, Anfragen |
 
@@ -113,11 +114,16 @@ Schreibend, nach den Rechten des Agenten: `bloommd_create_map`, `bloommd_ingest`
 - `bloommd_backlinks {path}` nennt je Treffer Map, Knoten (`nodeId`, `nodeTitle`), Zeile und den Link,
   wie er geschrieben steht (`[[Note]]` oder Markdown-Link). Es werden nur Maps durchsucht, die der Agent
   lesen kann; Treffer aus Maps, die der Speicher nicht lesen lässt, fehlen.
+- `bloommd_workspace_index {path?}` prüft alle lesbaren Maps: ohne `path` Zusammenfassung und Befunde
+  (`broken-link`, `ambiguous-link`, `stale-anchor`, `stale-document` mit Nachfolger aus `replaced_by`,
+  `duplicate-node-id` mit allen Fundstellen); mit `path` die Map, ihre Überschriften und deren
+  Rückverweise (Quelle, Quellüberschrift, Zeile, Link). Ein Link mit Anker zählt für die Überschrift,
+  einer ohne Anker für die Map.
 - `bloommd_changes {since}` zeigt nur Änderungen ab einem ISO-Datum (`2026-10-27`, ab Tagesbeginn UTC)
   oder Zeitpunkt (`2026-10-27T08:30:00Z`; ohne Zeitzone gilt UTC). Ohne `since` bleibt alles wie bisher;
   `limit` begrenzt weiter. Ein ungültiges `since` wird abgelehnt.
 
-Alle drei gelten für `target` `vault` und `cloud` und ändern nie etwas.
+Alle vier gelten für `target` `vault` und `cloud` und ändern nie etwas.
 
 ## Benutzen
 

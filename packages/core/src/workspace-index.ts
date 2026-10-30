@@ -29,7 +29,9 @@ export type WorkspaceIndexFindingCode =
   /** The link finds its file, but the frontmatter marks that file as veraltet/ersetzt or past `stale_after`. */
   | "stale-document"
   /** The same `bloommd:id` appears more than once, in one file or across files. */
-  | "duplicate-node-id";
+  | "duplicate-node-id"
+  /** Set by a reader (CLI) for a file it could not load; the index itself never reads files. */
+  | "unreadable-file";
 
 export interface WorkspaceIndexFinding {
   code: WorkspaceIndexFindingCode;

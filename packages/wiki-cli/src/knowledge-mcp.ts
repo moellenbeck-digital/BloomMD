@@ -123,6 +123,13 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string", description: "The map or note that is linked to." }, ...targetProperty }, required: ["path"] },
   },
   {
+    name: "bloommd_workspace_index",
+    title: "Workspace-Index",
+    annotations: { readOnlyHint: true, openWorldHint: false },
+    description: "Link health over all maps the agent can read. Without path: summary and findings — broken and ambiguous links, links to a heading that does not exist (stale-anchor), links to a map that is veraltet/ersetzt or past stale_after with its replaced_by (stale-document), and a bloommd:id that occurs more than once (duplicate-node-id) with every place. With path: that map's document node, its headings (level, line, anchor, id) with their backlinks (a link with an anchor counts for the heading, one without for the map; per backlink source map, source heading, line, link as written) and the findings that belong to it (links written in it, a duplicate id first found in it).",
+    inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string", description: "Only this map: nodes with backlinks and its findings." }, ...targetProperty } },
+  },
+  {
     name: "bloommd_templates",
     title: "Vorlagen",
     annotations: { readOnlyHint: true, openWorldHint: false },
@@ -289,7 +296,7 @@ export const KNOWLEDGE_INSTRUCTIONS = [
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",
   "5. Raw text (transcript, chat, note): structure it yourself, then bloommd_ingest files it as a map from a template with the original word for word as the source node; never put credentials or personal data in it.",
   "If a change comes back as 'proposed', the owner reviews it; tell them. Never try to approve proposals yourself.",
-  "Reading: bloommd_get_node returns one node (parent, child ids, relations, map version); bloommd_backlinks lists the maps and nodes that link to a map or note; bloommd_changes with since lists your changes from a date or time on.",
+  "Reading: bloommd_get_node returns one node (parent, child ids, relations, map version); bloommd_backlinks lists the maps and nodes that link to a map or note; bloommd_workspace_index reports link health over all readable maps (broken links, stale anchors or targets, duplicate node ids) and, with path, the backlinks of one map's headings; bloommd_changes with since lists your changes from a date or time on.",
   "Trust fields (status, stale_after, verified, scope, replaced_by) can be set with bloommd_create_map and bloommd_update_map; verified appends. bloommd_stale lists maps that are expired or about to expire, so they can be re-checked, renewed or retired.",
   "The owner can leave requests on map nodes: check bloommd_requests regularly, read the map, and answer each with bloommd_answer_request (optionally with nodes for that map).",
 ].join("\n");
@@ -343,6 +350,7 @@ export function knowledgeServerOptions(targets: KnowledgeTargets, version: strin
         case "bloommd_get_map": return service.getMap(string(args, "path", true)!);
         case "bloommd_get_node": return service.getNode(string(args, "path", true)!, string(args, "nodeId", true)!);
         case "bloommd_backlinks": return service.backlinks(string(args, "path", true)!);
+        case "bloommd_workspace_index": return service.workspaceIndex(string(args, "path"));
         case "bloommd_templates": return service.templates(string(args, "id"));
         case "bloommd_create_map": return service.createMap({
           area: string(args, "area", true)!,

@@ -126,9 +126,21 @@ Bestätigtes, also `bloommd-wiki agent search --status bestätigt`; ohne diesen 
 „Entscheidung“ mit Datum, Entscheid, Grund, Quelle und Name an. Grund und Quelle sind Pflicht. Der Eintrag steht im
 Protokoll und lässt sich mit `agent undo` zurücknehmen.
 
-Einmal in der Woche (Montag) fasst `bloommd-wiki agent review` zusammen, was zu tun ist: die Learnings mit Status
-`neu` (älteste zuerst, mit Beleg-Link), abgelaufene und bald ablaufende Learnings und Duplikat-Kandidaten. Das ist
-die Meldung an den CoS; sie soll höchstens zehn Minuten Aufmerksamkeit je Woche kosten.
+Einmal in der Woche (Montag 07:00 UTC, `scripts/learnings-review.sh`, Einrichtung in `docs/LEARNINGS-ABLAGE.md`) fasst
+`bloommd-wiki agent review` zusammen, was zu tun ist: die Learnings mit Status `neu` (älteste zuerst, mit Beleg-Link),
+abgelaufene und bald ablaufende Learnings und Duplikat-Kandidaten. Das ist die Meldung an den CoS; sie soll höchstens
+zehn Minuten Aufmerksamkeit je Woche kosten. Ohne Befund ist die Ausgabe genau `NO_REPLY`. Kommen in einer Woche mehr als
+10 neue Learnings ohne Bestätigung hinzu, steht oben die Zeile „Qualitätsmeldung: n neue Learnings ohne Bestätigung“.
+
+**Wer entscheidet was**
+
+- **`neu`:** der Chief of Staff entscheidet `bestätigt` oder `verworfen` (`agent decide`, mit Grund und Quelle).
+  `unbestätigt` (Ableitung ohne Vorfall) bleibt `unbestätigt`, bis ein Beleg vorliegt; es lässt sich nur verwerfen.
+- **Abgelaufen (`stale_after` überschritten):** der architect prüft und entscheidet mit Beleg: bestätigen (neues
+  `stale_after` und `verified` per `agent append`), ersetzen (`ersetzt` mit `replaced_by`) oder archivieren
+  (`veraltet`). Nie ohne Beleg löschen.
+- **Preflight:** Neue Learnings aus Tickets sind erst nach der Bestätigung für den Preflight sichtbar; er ruft
+  `bloommd-wiki agent search --status bestätigt` ab.
 
 Statuswechsel sind Änderungen wie jede andere: `bloommd_update_map` bzw. Bearbeitung der Datei, mit Protokoll
 und Undo.

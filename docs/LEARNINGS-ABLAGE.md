@@ -151,11 +151,20 @@ Entscheid, Grund, Quelle, wer) angehängt. Der Schreibweg ist der von `append` (
 vorgeschlagen, Protokoll mit `agent log`, `agent undo`), aber ohne `--ticket` und ohne Schreibzähler: Das ist keine
 Ticket-Schreibung.
 
-**Wochenlauf (`agent review`):** Text für den Chief of Staff, nur Bereich `Learnings`, ändert nichts. (a) alle Learnings mit
-Status `neu`: Pfad, Titel, Alter in Tagen (ab `created`), Beleg-Link, älteste zuerst; (b) abgelaufene und bald
-ablaufende Learnings (Logik von `agent stale`, `--days`, Standard 14); (c) Duplikat-Kandidaten unter den nicht
-ausgemusterten Learnings (gleiche Ähnlichkeit und Schwelle 0,7 wie bei `create`). Leere Teile entfallen; gibt es in
-keinem Teil etwas, ist die Ausgabe genau `NO_REPLY`.
+**Wochenlauf (`agent review`):** Text für den Chief of Staff, nur Bereich `Learnings`, ändert nichts, eine Zeile je Learning und
+keine Inhalte. (a) alle Learnings mit Status `neu`: Pfad, Titel, Alter in Tagen (ab `created`), Beleg-Link, älteste zuerst;
+(b) abgelaufene und bald ablaufende Learnings (Logik von `agent stale`, `--days`, Standard 14), ohne ausgemusterte
+(`veraltet`, `ersetzt`, `verworfen`); (c) Duplikat-Kandidaten unter den nicht ausgemusterten Learnings (gleiche
+Ähnlichkeit und Schwelle 0,7 wie bei `create`); (e) die Zeile `Qualitätsmeldung: n neue Learnings ohne Bestätigung`,
+wenn mehr als 10 Learnings mit Status `neu` in den letzten 7 Tagen angelegt wurden (`created` ab heute − 7 Tage; genau
+10 melden nichts). Leere Teile entfallen; gibt es in keinem Teil etwas, ist die Ausgabe genau `NO_REPLY`. Mit `--json`
+kommen dieselben Daten als JSON (`neu`, `stale`, `duplikate`, `qualitaet`, `befund`); wie bei `agent stale --json` nie
+`NO_REPLY`, sondern leere Listen und `"befund":false`.
+
+Der Lint des Wiki-Bundles (`lintWikiBundle`) ist bewusst nicht Teil des Wochenlaufs: Auf einem Vault meldet er den
+Aufbau eines Bundles (`index.md`, `log.md` fehlen, jede Learning-Seite ist `unindexed-page`), nicht die Learnings. Die
+inhaltlich brauchbaren Befunde decken andere Wege ab: `agent create`/`decide` und der MCP lehnen ungültigen Status
+beim Schreiben ab, Abgelaufenes steht unter (b).
 
 **Schreibzähler je Ticket:** `create` und `append` (nicht `decide`) brauchen `--ticket <id>` und erlauben höchstens 3 Schreibvorgänge
 je Ticket-ID (`113` und `#113` sind dasselbe Ticket). Der vierte Versuch endet mit Exitcode 4 und
@@ -213,6 +222,28 @@ openclaw cron list          # Status; openclaw cron runs --id <id> zeigt den let
 Das Ausliefern des Ordners (Webserver, Ingress) gehört nicht zu diesem Muster; ausgeliefert werden nur die
 Dateien in `/data/learnings-export`. Der Export enthält Learnings als Klartext, also vor dem Veröffentlichen die
 Zugriffsfrage klären.
+
+## Wochenroutine: Review für den Chief of Staff
+
+Montags 07:00 UTC liefert [`scripts/learnings-review.sh`](../scripts/learnings-review.sh) die Meldung von
+`agent review` (`LEARNINGS_VAULT` und `BLOOMMD_WIKI_BIN` überschreiben die Vorgaben, weitere Argumente wie `--days 7`
+gehen an den Befehl). Das Skript liest nur. Es zustellen ist ein Betriebsschritt der OpenClaw-Automation (`--announce`,
+`--channel`, `--to`), nicht des Skripts. Die Flags sind mit `openclaw cron add --help` (OpenClaw 2026.10.2) geprüft;
+das Ziel von `--channel`/`--to` setzt der Betrieb:
+
+```bash
+cp scripts/learnings-review.sh /home/node/.openclaw/bin/learnings-review.sh
+openclaw cron add --name learnings-review --cron "0 7 * * 1" --tz UTC \
+  --command /home/node/.openclaw/bin/learnings-review.sh --timeout-seconds 300 \
+  --announce --channel <kanal> --to <ziel-des-chief-of-staff>
+openclaw cron list          # Status; openclaw cron runs --id <id> zeigt den letzten Lauf
+```
+
+Vor dem Einrichten einmal von Hand prüfen, dass der Text ankommt und dass der Lauf bei `NO_REPLY` keine Meldung
+erzeugt; ob die Zustellung `NO_REPLY` unterdrückt, ist Sache der Automation und hier nicht belegt.
+
+Danach entscheidet der Chief of Staff höchstens zehn Minuten je Woche mit `agent decide` über die Learnings aus (a);
+Abgelaufenes aus (b) prüft der architect (siehe `docs/LEARNINGS.md`, „Bestätigen und Verwerfen“).
 
 ## Wiederherstellung
 

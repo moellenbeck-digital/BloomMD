@@ -37,6 +37,9 @@ export const LEARNINGS_AREA = "Learnings";
 export const WRITE_LIMIT_PER_TICKET = 3;
 /** A new learning at or above this similarity to an existing one (and sharing a tag) is a duplicate. */
 export const DUPLICATE_THRESHOLD = 0.7;
+/** More than this many `neu` learnings created in the last `QUALITY_WINDOW_DAYS` days make a quality message in `agent review`. */
+export const QUALITY_NEW_LIMIT = 10;
+const QUALITY_WINDOW_DAYS = 7;
 /** `agent review` lists learnings that expire within this many days (like `agent stale --days`). */
 const DEFAULT_REVIEW_DAYS = 14;
 const DEFAULT_SEARCH_LIMIT = 5;
@@ -210,15 +213,20 @@ mit --in-map ohne "vorlage", dafür "quellentitel","zugeordnet":[{"titel","id"}]
     positional: { min: 0, max: 0 },
   },
   review: {
-    usage: "agent review [--days <n>] (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    usage: "agent review [--days <n>] [--json] (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Wochenlauf für den Bereich Learnings: eine kurze Meldung als Text (kein JSON), was zu entscheiden oder zu prüfen ist.
   (a) alle Learnings mit Status neu: Pfad, Titel, Alter in Tagen, Beleg-Link, älteste zuerst
-  (b) abgelaufene und bald ablaufende Learnings (Logik von agent stale)
+  (b) abgelaufene und bald ablaufende Learnings (Logik von agent stale); veraltete, ersetzte und verworfene fehlen
   (c) Duplikat-Kandidaten unter den nicht ausgemusterten Learnings (Ähnlichkeit ab ${DUPLICATE_THRESHOLD}, wie bei agent create)
+  (e) „Qualitätsmeldung: n neue Learnings ohne Bestätigung“, wenn mehr als ${QUALITY_NEW_LIMIT} Learnings mit Status neu in den
+      letzten ${QUALITY_WINDOW_DAYS} Tagen angelegt wurden (created ab heute − ${QUALITY_WINDOW_DAYS} Tage; genau ${QUALITY_NEW_LIMIT} melden nichts)
   --days <n>         (b) nimmt auch die Learnings mit, die in den nächsten n Tagen ablaufen (Standard ${DEFAULT_REVIEW_DAYS})
+  --json             dieselben Daten als JSON (neu, stale, duplikate, qualitaet); nie NO_REPLY, sondern leere Listen und "befund":false
 ${TARGET_HELP}
-Gibt es nichts zu melden, ist die Ausgabe genau NO_REPLY. Entscheiden: agent decide. Lesend: ändert nichts.`,
+Eine Zeile je Learning, keine Inhalte. Gibt es nichts zu melden, ist der Text genau NO_REPLY. Entscheiden: agent decide. Lesend: ändert nichts.
+Der Lint des Wiki-Bundles (lintWikiBundle) ist nicht Teil davon: auf einem Vault meldet er Bundle-Aufbau (index.md, log.md, unindexed-page).`,
     values: ["--days", ...TARGET_FLAGS],
+    bools: ["--json"],
     positional: { min: 0, max: 0 },
   },
   stale: {
@@ -714,8 +722,12 @@ function evidenceLink(markdown: string, source: string | undefined): string | nu
 
 const dayCount = (days: number) => `${days} ${days === 1 ? "Tag" : "Tage"}`;
 
-/** The weekly message for the chief of staff; `NO_REPLY` when there is nothing to decide, renew or merge. */
-async function review(service: KnowledgeService, parsed: Parsed, deps: LearningDeps): Promise<string> {
+/**
+ * The weekly run for the chief of staff: what is to decide (neu), to renew (expired, expiring), to merge (duplicates)
+ * and, with more than `QUALITY_NEW_LIMIT` new learnings in a week, a quality message. Retired learnings
+ * (veraltet, ersetzt, verworfen) need nothing and stay out of the expiry list. Reads only.
+ */
+async function reviewData(service: KnowledgeService, parsed: Parsed, deps: LearningDeps) {
   const daysArg = one(parsed, "--days");
   const days = daysArg === undefined ? DEFAULT_REVIEW_DAYS : Number(daysArg);
   if (!Number.isInteger(days) || days < 0 || days > 3650) throw usageError("--days erwartet eine ganze Zahl von 0 bis 3650.");
@@ -732,14 +744,16 @@ async function review(service: KnowledgeService, parsed: Parsed, deps: LearningD
       tags: frontmatter.tags,
       status: frontmatter.status?.toLowerCase(),
       age: knowledgeLifecycle(frontmatter, day).ageDays,
+      created: frontmatter.created?.slice(0, 10),
       link: evidenceLink(document.markdown, frontmatter.source),
     });
   }
   learnings.sort((a, b) => a.path.localeCompare(b.path));
+  const isRetired = (status: string | undefined) => status !== undefined && RETIRED.has(status);
 
   const open = learnings.filter((entry) => entry.status === "neu").sort((a, b) => (b.age ?? -1) - (a.age ?? -1) || a.path.localeCompare(b.path));
-  const { stale } = await service.stale({ area: LEARNINGS_AREA, days, now });
-  const active = learnings.filter((entry) => !entry.status || !RETIRED.has(entry.status));
+  const stale = (await service.stale({ area: LEARNINGS_AREA, days, now })).stale.filter((entry) => !isRetired(entry.status?.toLowerCase()));
+  const active = learnings.filter((entry) => !isRetired(entry.status));
   const duplicates = [];
   for (let i = 0; i < active.length; i += 1) {
     for (let j = i + 1; j < active.length; j += 1) {
@@ -748,18 +762,45 @@ async function review(service: KnowledgeService, parsed: Parsed, deps: LearningD
     }
   }
   duplicates.sort((x, y) => y.score - x.score || x.a.path.localeCompare(y.a.path) || x.b.path.localeCompare(y.b.path));
-  if (open.length === 0 && stale.length === 0 && duplicates.length === 0) return "NO_REPLY";
+  // Created on or after (today - 7 days); a learning without a created date is not counted.
+  const recent = open.filter((entry) => entry.created !== undefined && entry.age !== undefined && entry.age <= QUALITY_WINDOW_DAYS).length;
+  const quality = recent > QUALITY_NEW_LIMIT ? `Qualitätsmeldung: ${recent} neue Learnings ohne Bestätigung` : null;
+  return { day, days, open, stale, duplicates, recent, quality, empty: open.length === 0 && stale.length === 0 && duplicates.length === 0 && quality === null };
+}
 
+/** The weekly message as short text: one line per learning, no content; exactly `NO_REPLY` when there is nothing. */
+function reviewText(data: Awaited<ReturnType<typeof reviewData>>): string {
+  if (data.empty) return "NO_REPLY";
+  const { open, stale, duplicates, days } = data;
   const staleLine = (entry: (typeof stale)[number]) => `• ${entry.title} – ${entry.path}${entry.status ? `, ${entry.status}` : ""}, ${entry.daysOverdue > 0 ? `seit ${entry.stale_after} (${dayCount(entry.daysOverdue)} überfällig)` : entry.daysOverdue === 0 ? "heute abgelaufen" : `läuft ab ${entry.stale_after}`}`;
   const expired = stale.filter((entry) => entry.daysOverdue >= 0);
   const expiring = stale.filter((entry) => entry.daysOverdue < 0);
   return [
-    `📚 Learnings-Review ${day}`,
+    `📚 Learnings-Review ${data.day}`,
+    ...(data.quality ? [data.quality] : []),
     ...(open.length ? ["", `Zu entscheiden – Status neu (${open.length}), älteste zuerst:`, ...open.map((entry) => `• ${entry.path} – ${entry.title} – ${entry.age === undefined ? "Alter unbekannt" : dayCount(entry.age)} – ${entry.link ?? "kein Beleg-Link"}`), "Entscheiden: agent decide <pfad> --entscheid bestaetigt|verworfen --grund \"…\" --quelle \"…\" --name <wer>"] : []),
     ...(expired.length ? ["", `Abgelaufen (${expired.length}):`, ...expired.map(staleLine)] : []),
     ...(expiring.length ? ["", `Läuft in den nächsten ${days} ${days === 1 ? "Tag" : "Tagen"} ab (${expiring.length}):`, ...expiring.map(staleLine)] : []),
     ...(duplicates.length ? ["", `Duplikat-Kandidaten (${duplicates.length}), Ähnlichkeit ab ${DUPLICATE_THRESHOLD}:`, ...duplicates.map((pair) => `• ${pair.a.title} ↔ ${pair.b.title} (${pair.score}): ${pair.a.path} | ${pair.b.path}`)] : []),
   ].join("\n");
+}
+
+/** The same data as JSON; like `agent stale --json` it is never `NO_REPLY`: nothing to report gives empty lists and `"befund":false`. */
+function reviewJson(data: Awaited<ReturnType<typeof reviewData>>) {
+  return {
+    datum: data.day,
+    befund: !data.empty,
+    neu: data.open.map((entry) => ({ pfad: entry.path, titel: entry.title, alter_tage: entry.age ?? null, beleg: entry.link })),
+    stale: data.stale.map((entry) => ({ pfad: entry.path, titel: entry.title, status: entry.status ?? null, stale_after: entry.stale_after, tage_ueberfaellig: entry.daysOverdue, abgelaufen: entry.daysOverdue >= 0, scope: entry.scope ?? null })),
+    duplikate: data.duplicates.map((pair) => ({ a: { pfad: pair.a.path, titel: pair.a.title }, b: { pfad: pair.b.path, titel: pair.b.title }, aehnlichkeit: pair.score })),
+    qualitaet: { neu_letzte_7_tage: data.recent, grenze: QUALITY_NEW_LIMIT, meldung: data.quality },
+    tage: data.days,
+  };
+}
+
+async function review(service: KnowledgeService, parsed: Parsed, deps: LearningDeps): Promise<string | ReturnType<typeof reviewJson>> {
+  const data = await reviewData(service, parsed, deps);
+  return parsed.bools.has("--json") ? reviewJson(data) : reviewText(data);
 }
 
 /** Text of a file, or of stdin for `-`; word for word (unlike `contentOf`). `stdinUsed` guards that stdin is read once. */

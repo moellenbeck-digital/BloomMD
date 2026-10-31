@@ -105,7 +105,8 @@ bloommd-wiki agent decide "Learnings/coder/Bun-Version.md" --vault /data/learnin
   --entscheid bestaetigt --grund "Second incident confirms the rule" --quelle https://github.com/org/repo/issues/120
 # {"ok":true,"pfad":"…","modus":"geschrieben","entscheid":"bestätigt","vorher":"neu","status":"bestätigt","verified":{"by":"chief-of-staff","at":"2026-10-31"},"stale_after":"2027-01-29"}
 
-# review: weekly text for the chief of staff (neu learnings, expired/expiring ones, duplicate candidates); NO_REPLY if nothing
+# review: weekly text for the chief of staff (neu learnings, expired/expiring ones without retired ones, duplicate candidates,
+# and a quality line when more than 10 neu learnings were created in 7 days); NO_REPLY if nothing; --json for the same data
 bloommd-wiki agent review --vault /data/learnings --days 14
 ```
 

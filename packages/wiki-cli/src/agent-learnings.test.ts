@@ -804,6 +804,104 @@ describe("agent review", () => {
     expect((await agent(["log", root])).json.changes).toEqual([]);
   });
 
+  test("(b) leaves out retired learnings (veraltet, ersetzt, verworfen), agent stale itself stays as it was", async () => {
+    const root = await learningVault();
+    await learningFile(root, "Learnings/coder/Abgelaufen.md", { title: "Abgelaufen bestätigt", status: "bestätigt", staleAfter: PAST, created: "2026-01-01" });
+    for (const status of ["veraltet", "ersetzt", "verworfen"]) {
+      await learningFile(root, `Learnings/coder/${status}.md`, { title: `Ausgemustert ${status}`, tags: ["coder", status], status, staleAfter: PAST, created: "2026-01-01" });
+    }
+    const text = (await review(root)).out.join("\n");
+    expect(text).toContain("Abgelaufen (1):");
+    expect(text).toContain("Learnings/coder/Abgelaufen.md");
+    for (const status of ["veraltet", "ersetzt", "verworfen"]) expect(text).not.toContain(`Learnings/coder/${status}.md`);
+    expect((await agent(["stale", "--vault", root])).json.anzahl).toBe(4);
+    // Only retired learnings, all expired: nothing to report.
+    const quiet = await learningVault();
+    await learningFile(quiet, "Learnings/coder/Alt.md", { title: "Alt", status: "verworfen", staleAfter: PAST });
+    expect((await review(quiet)).out).toEqual(["NO_REPLY"]);
+  });
+
+  async function newLearnings(root: string, count: number, created: string, offset = 0) {
+    for (let index = 0; index < count; index += 1) {
+      const number = offset + index;
+      await learningFile(root, `Learnings/coder/Thema ${number}.md`, { title: `Thema Nummer ${number} ganz eigen${"x".repeat(number)}`, tags: ["coder", `thema${number}`], status: "neu", staleAfter: FUTURE, created });
+    }
+  }
+
+  test("(e) more than 10 neu learnings from the last 7 days make a quality line; exactly 10 do not", async () => {
+    const eleven = await learningVault();
+    await newLearnings(eleven, 11, "2026-10-28");
+    const text = (await review(eleven)).out.join("\n");
+    expect(text.split("\n")[1]).toBe("Qualitätsmeldung: 11 neue Learnings ohne Bestätigung");
+    expect(text).toContain("Status neu (11)");
+    const ten = await learningVault();
+    await newLearnings(ten, 10, "2026-10-28");
+    const quiet = (await review(ten)).out.join("\n");
+    expect(quiet).not.toContain("Qualitätsmeldung");
+    expect(quiet).toContain("Status neu (10)");
+  });
+
+  test("(e) counts only neu learnings created within 7 days of today", async () => {
+    const root = await learningVault();
+    await newLearnings(root, 10, "2026-10-24");
+    await newLearnings(root, 5, "2026-10-23", 10);
+    await newLearnings(root, 5, "2026-10-01", 15);
+    let text = (await review(root)).out.join("\n");
+    // created 2026-10-24 is exactly 7 days back and counts; 2026-10-23 and older do not.
+    expect(text).not.toContain("Qualitätsmeldung");
+    await newLearnings(root, 1, "2026-10-31", 20);
+    text = (await review(root)).out.join("\n");
+    expect(text).toContain("Qualitätsmeldung: 11 neue Learnings ohne Bestätigung");
+    // Learnings of other statuses are not counted.
+    const other = await learningVault();
+    await newLearnings(other, 10, "2026-10-30");
+    for (let index = 0; index < 5; index += 1) await learningFile(other, `Learnings/coder/Fest ${index}.md`, { title: `Fester Fall ${index} völlig anders${"y".repeat(index)}`, tags: ["coder", `fest${index}`], status: "bestätigt", staleAfter: FUTURE, created: "2026-10-30" });
+    expect((await review(other)).out.join("\n")).not.toContain("Qualitätsmeldung");
+  });
+
+  test("--json has the same data; with nothing to report it is no NO_REPLY but empty lists", async () => {
+    const root = await seeded();
+    await learningFile(root, "Learnings/tester/Lint zweiter.md", { title: "Lint nur über cli.ts prüfen", tags: ["tester", "lint"], status: "unbestätigt", staleAfter: FUTURE, created: "2026-10-30" });
+    const run = await review(root, ["--json"]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.out).toHaveLength(1);
+    expect(run.json).toMatchObject({ datum: "2026-10-31", befund: true, tage: 14, qualitaet: { neu_letzte_7_tage: 1, grenze: 10, meldung: null } });
+    expect(run.json.neu).toEqual([
+      { pfad: "Learnings/tester/Alt neu.md", titel: "Lint nur über cli.ts", alter_tage: 30, beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/159" },
+      { pfad: "Learnings/coder/Mitte neu.md", titel: "Postgres Healthcheck im CI", alter_tage: 11, beleg: null },
+      { pfad: "Learnings/coder/Jung neu.md", titel: "Playwright Browser nachinstallieren", alter_tage: 2, beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/141" },
+    ]);
+    expect(run.json.stale.map((entry: { pfad: string }) => entry.pfad)).toEqual(["Learnings/architect/Bestaetigt.md", "Learnings/architect/Bald.md"]);
+    expect(run.json.stale[0]).toMatchObject({ status: "bestätigt", stale_after: "2026-10-10", tage_ueberfaellig: 21, abgelaufen: true });
+    expect(run.json.duplikate).toEqual([{ a: { pfad: "Learnings/tester/Alt neu.md", titel: "Lint nur über cli.ts" }, b: { pfad: "Learnings/tester/Lint zweiter.md", titel: "Lint nur über cli.ts prüfen" }, aehnlichkeit: expect.any(Number) }]);
+    expect(run.json.duplikate[0].aehnlichkeit).toBeGreaterThanOrEqual(DUPLICATE_THRESHOLD);
+    const empty = await review(await learningVault(), ["--json"]);
+    expect(empty.code).toBe(EXIT.ok);
+    expect(empty.json).toMatchObject({ befund: false, neu: [], stale: [], duplikate: [], qualitaet: { neu_letzte_7_tage: 0, meldung: null } });
+    const quality = await learningVault();
+    await newLearnings(quality, 11, "2026-10-30");
+    expect((await review(quality, ["--json"])).json.qualitaet).toEqual({ neu_letzte_7_tage: 11, grenze: 10, meldung: "Qualitätsmeldung: 11 neue Learnings ohne Bestätigung" });
+  });
+
+  test("scripts/learnings-review.sh runs agent review on LEARNINGS_VAULT and passes extra arguments", async () => {
+    const script = join(import.meta.dir, "..", "..", "..", "scripts", "learnings-review.sh");
+    const cli = join(import.meta.dir, "cli.ts");
+    const run = (vault: string, args: string[] = []) => new Promise<{ code: number | null; out: string }>((resolve) => {
+      const child = spawn("sh", [script, ...args], { env: { ...process.env, LEARNINGS_VAULT: vault, BLOOMMD_WIKI_BIN: `${process.execPath} ${cli}` } });
+      let out = "";
+      child.stdout.on("data", (chunk) => { out += String(chunk); });
+      child.on("close", (code) => resolve({ code, out }));
+    });
+    const root = await learningVault();
+    expect(await run(root)).toEqual({ code: 0, out: "NO_REPLY\n" });
+    await learningFile(root, "Learnings/coder/Offen.md", { title: "Offen", status: "neu", staleAfter: FUTURE, created: "2026-10-01" });
+    const text = await run(root);
+    expect(text.code).toBe(0);
+    expect(text.out).toContain("Status neu (1)");
+    expect(text.out).toContain("Learnings/coder/Offen.md");
+    expect(JSON.parse((await run(root, ["--json"])).out)).toMatchObject({ befund: true, neu: [{ pfad: "Learnings/coder/Offen.md" }] });
+  });
+
   test("a wrong call is exit 2 with JSON on stdout; the help names the three parts", async () => {
     const root = await learningVault();
     for (const args of [["review"], ["review", "--vault", root, "--days", "-1"], ["review", "--vault", root, "--days", "x"], ["review", "--vault", root, "extra"], ["review", "--vault", root, "--cloud", "https://x.example"]]) {

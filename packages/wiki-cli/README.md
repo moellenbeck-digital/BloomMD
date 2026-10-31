@@ -77,7 +77,8 @@ approve a proposal (a person does that with `agent approve`). All commands work 
 of the vault) and `--name <agent>`.
 
 ```bash
-# search: valid learnings only (not veraltet/ersetzt, not expired); --include-stale adds the rest; --limit defaults to 5
+# search: valid learnings only (not veraltet/ersetzt/verworfen, not expired); --include-stale adds the rest; --limit defaults to 5;
+# --status <s> is an exact status filter (any case, bestaetigt = bestätigt) that wins over that exclusion and lets the text be missing
 bloommd-wiki agent search "lockfile" --vault /data/learnings --name coder --rolle coder --tag bun --komponente Dockerfile
 # {"treffer":[{"pfad":"Learnings/coder/Bun-Version.md","titel":"…","status":"neu","rolle":"coder","tags":["coder"],"auszug":"…","stale_after":"2027-01-25","abgelaufen":false}],"anzahl":1,"gesamt":1,"limit":5}
 
@@ -98,7 +99,20 @@ bloommd-wiki agent append "Learnings/coder/Bun-Version.md" --vault /data/learnin
 # stale: expired learnings, with --days also those expiring within n days (the form `agent stale <folder>` stays the plain-text routine)
 bloommd-wiki agent stale --vault /data/learnings --days 14
 # {"stale":[{"pfad":"…","titel":"…","status":"neu","stale_after":"2026-10-20","tage_ueberfaellig":7,"abgelaufen":true,"scope":"…"}],"anzahl":1,"tage":14}
+
+# decide: confirm or discard a learning (no --ticket, no write counter); required: --entscheid bestaetigt|verworfen --grund --quelle --name
+bloommd-wiki agent decide "Learnings/coder/Bun-Version.md" --vault /data/learnings --name chief-of-staff \
+  --entscheid bestaetigt --grund "Second incident confirms the rule" --quelle https://github.com/org/repo/issues/120
+# {"ok":true,"pfad":"…","modus":"geschrieben","entscheid":"bestätigt","vorher":"neu","status":"bestätigt","verified":{"by":"chief-of-staff","at":"2026-10-31"},"stale_after":"2027-01-29"}
+
+# review: weekly text for the chief of staff (neu learnings, expired/expiring ones without retired ones, duplicate candidates,
+# and a quality line when more than 10 neu learnings were created in 7 days); NO_REPLY if nothing; --json for the same data
+bloommd-wiki agent review --vault /data/learnings --days 14
 ```
+
+`decide` allows `neu` → `bestätigt`/`verworfen`, `unbestätigt` → `verworfen` and `bestätigt` → `verworfen`; anything else
+(including `unbestätigt` → `bestätigt` and `veraltet`/`ersetzt`/`verworfen` as the starting status) exits with 2 and writes nothing.
+It sets `status`, appends `verified`, sets `stale_after` to today + 90 days on `bestätigt` and adds a node "Entscheidung".
 
 `create` refuses to file a learning when one with the same title (ignoring case and punctuation), or a very
 similar one (title and tags, role included), exists: nothing is written, the exit code is 3 and the JSON is

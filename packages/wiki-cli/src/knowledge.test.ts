@@ -950,6 +950,16 @@ describe("search with frontmatter, filters and expiry", () => {
     expect(await readFile(join(root, created.path), "utf8")).toContain('status: "unbestätigt"');
   });
 
+  test("verworfen is retired like veraltet: left out by default, back with includeStale, found by the status filter", async () => {
+    const { root, service } = await learnings();
+    await writeFile(join(root, "Learnings", "Verworfen-Learning.md"), '---\ntitle: "Verworfen-Learning"\nstatus: "verworfen"\nscope: "BloomMD, coder"\nstale_after: "2027-01-01"\ntags: ["coder"]\n---\n\n# Verworfen-Learning\n\n## Ursache\n\nLockfile verworfen.\n', "utf8");
+    expect(paths((await service.search("lockfile", { now: NOW })).hits)).not.toContain("Verworfen-Learning");
+    expect(paths((await service.search("lockfile", { now: NOW, includeStale: true })).hits)).toContain("Verworfen-Learning");
+    expect(paths((await service.search("lockfile", { now: NOW, status: "verworfen" })).hits)).toEqual(["Verworfen-Learning"]);
+    const created = await service.createMap({ area: "Learnings", title: "Per Dienst verworfen", template: "learning", frontmatter: { status: "verworfen" } });
+    expect(await readFile(join(root, created.path), "utf8")).toContain('status: "verworfen"');
+  });
+
   test("an explicit status filter wins over the default exclusion", async () => {
     const { service } = await learnings();
     expect(paths((await service.search("lockfile", { now: NOW, status: "veraltet" })).hits)).toEqual(["Veraltet-Learning"]);

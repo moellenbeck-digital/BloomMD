@@ -58,12 +58,13 @@ async function agent(args: string[], deps?: LearningDeps): Promise<Run> {
 const create = (root: string, title: string, extra: string[] = [], ticket = "113") =>
   agent(["create", "--vault", root, "--name", "coder", "--ticket", ticket, "--titel", title, "--rolle", "coder", "--beleg", "https://github.com/moellenbeck-digital/BloomMD/issues/113", "--inhalt", `Regel zu ${title}`, ...extra]);
 
-async function learningFile(root: string, path: string, options: { title: string; status?: string; tags?: string[]; scope?: string; staleAfter?: string; text?: string }) {
+async function learningFile(root: string, path: string, options: { title: string; status?: string; tags?: string[]; scope?: string; staleAfter?: string; text?: string; created?: string; beleg?: string }) {
   await mkdir(join(root, path, ".."), { recursive: true });
   const lines = ["---", "type: learning", `title: "${options.title}"`, `status: ${options.status ?? "neu"}`, `tags: [${(options.tags ?? ["coder"]).map((tag) => `"${tag}"`).join(", ")}]`];
   if (options.scope) lines.push(`scope: "${options.scope}"`);
   if (options.staleAfter) lines.push(`stale_after: ${options.staleAfter}`);
-  lines.push("---", "", `# ${options.title}`, "", "## Symptom", "", options.text ?? "Der Lockfile-Fehler tritt auf.", "", "## Ursache", "", "## Regel", "", "Version festhalten.", "", "## Beleg", "", "## Gilt für", "");
+  if (options.created) lines.push(`created: ${options.created}`);
+  lines.push("---", "", `# ${options.title}`, "", "## Symptom", "", options.text ?? "Der Lockfile-Fehler tritt auf.", "", "## Ursache", "", "## Regel", "", "Version festhalten.", "", "## Beleg", "", ...(options.beleg ? [`- ${options.beleg}`, ""] : []), "## Gilt für", "");
   await writeFile(join(root, path), lines.join("\n"), "utf8");
 }
 
@@ -497,9 +498,427 @@ describe("agent stale", () => {
   });
 });
 
+describe("agent search --status", () => {
+  async function statuses() {
+    const root = await learningVault();
+    await learningFile(root, "Learnings/coder/Neu.md", { title: "Lockfile neu", status: "neu", staleAfter: FUTURE });
+    await learningFile(root, "Learnings/coder/Bestaetigt.md", { title: "Lockfile bestätigt", status: "bestätigt", staleAfter: FUTURE });
+    await learningFile(root, "Learnings/coder/Bestaetigt abgelaufen.md", { title: "Lockfile bestätigt abgelaufen", status: "bestätigt", staleAfter: PAST });
+    await learningFile(root, "Learnings/coder/Verworfen.md", { title: "Lockfile verworfen", status: "verworfen", staleAfter: FUTURE });
+    await learningFile(root, "Learnings/coder/Veraltet.md", { title: "Lockfile veraltet", status: "veraltet", staleAfter: FUTURE });
+    await learningFile(root, "Learnings/coder/Unbestaetigt.md", { title: "Lockfile unbestätigt", status: "unbestätigt", staleAfter: FUTURE });
+    return root;
+  }
+  const names = (run: Run) => run.json.treffer.map((hit: { pfad: string }) => hit.pfad.replace("Learnings/coder/", "").replace(".md", "")).sort();
+
+  test("an exact status filter, in any case and with bestaetigt, wins over the exclusion of expired and retired ones", async () => {
+    const root = await statuses();
+    for (const word of ["bestätigt", "BESTÄTIGT", "Bestaetigt", "bestaetigt"]) {
+      const run = await agent(["search", "Lockfile", "--status", word, "--vault", root, "--name", "tester"]);
+      expect(run.code).toBe(EXIT.ok);
+      expect(names(run)).toEqual(["Bestaetigt", "Bestaetigt abgelaufen"]);
+      expect(run.json.treffer.every((hit: { status: string }) => hit.status === "bestätigt")).toBe(true);
+    }
+    expect(names(await agent(["search", "Lockfile", "--status", "verworfen", "--vault", root]))).toEqual(["Verworfen"]);
+    expect(names(await agent(["search", "Lockfile", "--status", "veraltet", "--vault", root]))).toEqual(["Veraltet"]);
+    expect(names(await agent(["search", "Lockfile", "--status", "neu", "--vault", root]))).toEqual(["Neu"]);
+    expect(names(await agent(["search", "Lockfile", "--status", "unbestätigt", "--vault", root]))).toEqual(["Unbestaetigt"]);
+  });
+
+  test("with a status filter the search text may be missing; it still narrows when given", async () => {
+    const root = await statuses();
+    const run = await agent(["search", "--status", "bestätigt", "--vault", root]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(names(run)).toEqual(["Bestaetigt", "Bestaetigt abgelaufen"]);
+    expect(run.json.treffer[0].auszug).toContain("status: bestätigt");
+    expect(names(await agent(["search", "abgelaufen", "--status", "bestätigt", "--vault", root]))).toEqual(["Bestaetigt abgelaufen"]);
+    const without = await agent(["search", "--vault", root]);
+    expect(without.code).toBe(EXIT.usage);
+    expect(without.json.fehler).toContain("--status");
+  });
+
+  test("without --status nothing changes: neu and unbestätigt are found, verworfen and veraltet are not (no default of only bestätigt)", async () => {
+    const root = await statuses();
+    expect(names(await agent(["search", "Lockfile", "--limit", "50", "--vault", root]))).toEqual(["Bestaetigt", "Neu", "Unbestaetigt"]);
+    expect(names(await agent(["search", "Lockfile", "--limit", "50", "--include-stale", "--vault", root]))).toEqual(["Bestaetigt", "Bestaetigt abgelaufen", "Neu", "Unbestaetigt", "Veraltet", "Verworfen"]);
+  });
+
+  test("an unknown status is exit 2", async () => {
+    const root = await statuses();
+    const run = await agent(["search", "Lockfile", "--status", "stable", "--vault", root]);
+    expect(run.code).toBe(EXIT.usage);
+    expect(run.json.fehler).toContain("--status erwartet neu, bestätigt, veraltet, ersetzt, unbestätigt, verworfen");
+    expect((await agent(["search", "Lockfile", "--status", "--vault", root])).code).toBe(EXIT.usage);
+  });
+});
+
+describe("agent decide", () => {
+  const NOW = new Date("2026-10-31T10:00:00Z");
+  const deps: LearningDeps = { ...learningDeps, now: () => NOW };
+  const PFAD = "Learnings/coder/Fall.md";
+  const decide = (root: string, extra: string[] = [], path = PFAD) =>
+    agent(["decide", path, "--vault", root, "--name", "chief-of-staff", "--grund", "Zweiter Vorfall belegt die Regel.", "--quelle", "https://github.com/moellenbeck-digital/BloomMD/issues/176", ...extra], deps);
+
+  async function seeded(status = "neu", access: Access = "write") {
+    const root = await learningVault(access);
+    await learningFile(root, PFAD, { title: "Fall", status, staleAfter: "2026-12-01", created: "2026-10-26" });
+    return root;
+  }
+  const markdown = (root: string, path = PFAD) => readFile(join(root, path), "utf8");
+
+  test("neu → bestätigt: sets status, appends verified, renews stale_after by 90 days and adds the node Entscheidung", async () => {
+    const root = await seeded();
+    const run = await decide(root, ["--entscheid", "bestaetigt"]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.out).toHaveLength(1);
+    expect(run.json).toMatchObject({ ok: true, pfad: PFAD, modus: "geschrieben", entscheid: "bestätigt", vorher: "neu", status: "bestätigt", verified: { by: "chief-of-staff", at: "2026-10-31" }, stale_after: addDays("2026-10-31", 90) });
+    expect(run.json.aenderung).toBeTruthy();
+    const text = await markdown(root);
+    expect(text).toContain('status: "bestätigt"');
+    expect(text).toMatch(new RegExp(`stale_after: "?${addDays("2026-10-31", 90)}"?`));
+    expect(text).toMatch(/verified:\s+- by: "?chief-of-staff"?\s+at: "?2026-10-31"?/);
+    expect(text).toMatch(/## Entscheidung/);
+    for (const line of ["- Datum: 2026-10-31", "- Entscheid: bestätigt", "- Grund: Zweiter Vorfall belegt die Regel.", "- Quelle: https://github.com/moellenbeck-digital/BloomMD/issues/176", "- Wer: chief-of-staff"]) expect(text).toContain(line);
+    // The result is found by the status filter of the preflight.
+    const found = await agent(["search", "--status", "bestätigt", "--vault", root]);
+    expect(found.json.treffer.map((hit: { pfad: string }) => hit.pfad)).toEqual([PFAD]);
+    expect(found.json.treffer[0]).toMatchObject({ status: "bestätigt", stale_after: addDays("2026-10-31", 90), abgelaufen: false });
+  });
+
+  test("neu, unbestätigt and bestätigt → verworfen: status and verified, stale_after stays", async () => {
+    for (const from of ["neu", "unbestätigt", "bestätigt"]) {
+      const root = await seeded(from);
+      const run = await decide(root, ["--entscheid", "verworfen"]);
+      expect(run.code).toBe(EXIT.ok);
+      expect(run.json).toMatchObject({ ok: true, entscheid: "verworfen", vorher: from, status: "verworfen", verified: { by: "chief-of-staff", at: "2026-10-31" } });
+      expect(run.json).not.toHaveProperty("stale_after");
+      const text = await markdown(root);
+      expect(text).toContain('status: "verworfen"');
+      expect(text).toContain("stale_after: 2026-12-01");
+      expect(text).toContain("- Entscheid: verworfen");
+      // Retired now: the default search no longer finds it, the status filter does.
+      expect((await agent(["search", "Fall", "--vault", root])).json.anzahl).toBe(0);
+      expect((await agent(["search", "--status", "verworfen", "--vault", root])).json.anzahl).toBe(1);
+    }
+  });
+
+  test("every other transition is exit 2 with a clear message and writes nothing", async () => {
+    const cases: Array<[string, string, string]> = [
+      ["unbestätigt", "bestaetigt", "bleibt unbestätigt"],
+      ["bestätigt", "bestaetigt", "schon bestätigt"],
+      ["veraltet", "bestaetigt", "ausgemustert"],
+      ["veraltet", "verworfen", "ausgemustert"],
+      ["ersetzt", "bestaetigt", "ausgemustert"],
+      ["ersetzt", "verworfen", "ausgemustert"],
+      ["verworfen", "bestaetigt", "ausgemustert"],
+      ["verworfen", "verworfen", "ausgemustert"],
+    ];
+    for (const [from, to, hint] of cases) {
+      const root = await seeded(from);
+      const before = await markdown(root);
+      const run = await decide(root, ["--entscheid", to]);
+      expect(run.code).toBe(EXIT.usage);
+      expect(run.json.fehler).toContain(`Status „${from}“`);
+      expect(run.json.fehler).toContain(hint);
+      expect(run.json.fehler).toContain("Nichts geschrieben");
+      expect(run.err).toContain(run.json.fehler);
+      expect(await markdown(root)).toBe(before);
+      expect((await agent(["log", root])).json.changes).toEqual([]);
+    }
+  });
+
+  test("a learning without status is refused; the status word is read in any case", async () => {
+    const root = await learningVault();
+    await mkdir(join(root, "Learnings", "coder"), { recursive: true });
+    await writeFile(join(root, PFAD), "---\ntype: learning\ntitle: Fall\n---\n\n# Fall\n\n## Regel\n\nx\n", "utf8");
+    const run = await decide(root, ["--entscheid", "verworfen"]);
+    expect(run.code).toBe(EXIT.usage);
+    expect(run.json.fehler).toContain("ohne Status");
+    const upper = await seeded("NEU");
+    expect((await decide(upper, ["--entscheid", "VERWORFEN"])).code).toBe(EXIT.ok);
+  });
+
+  test("--grund, --quelle and --name are required, --entscheid must be bestaetigt or verworfen, there is no --ticket", async () => {
+    const root = await seeded();
+    const full = ["decide", PFAD, "--vault", root, "--name", "chief-of-staff", "--entscheid", "verworfen", "--grund", "g", "--quelle", "q"];
+    expect((await agent(full, deps)).code).toBe(EXIT.ok);
+    const fresh = await seeded();
+    const without = (flag: string) => {
+      const index = full.indexOf(flag);
+      return full.map((value, position) => (position === 3 ? fresh : value)).filter((_, position) => position !== index && position !== index + 1);
+    };
+    for (const flag of ["--grund", "--quelle", "--name", "--entscheid"]) {
+      const run = await agent(without(flag), deps);
+      expect(run.code).toBe(EXIT.usage);
+      expect(run.json.fehler).toContain(flag);
+    }
+    for (const bad of ["neu", "veraltet", "ersetzt", "unbestaetigt", "stable", ""]) {
+      expect((await agent(["decide", PFAD, "--vault", fresh, "--name", "x", "--entscheid", bad, "--grund", "g", "--quelle", "q"], deps)).code).toBe(EXIT.usage);
+    }
+    expect((await agent(["decide", PFAD, "--vault", fresh, "--name", "x", "--entscheid", "verworfen", "--grund", "g", "--quelle", "q", "--ticket", "176"], deps)).code).toBe(EXIT.usage);
+    expect((await agent(["decide", "--vault", fresh, "--name", "x", "--entscheid", "verworfen", "--grund", "g", "--quelle", "q"], deps)).code).toBe(EXIT.usage);
+    expect((await agent(["decide", PFAD, "--grund", "g", "--quelle", "q", "--name", "x", "--entscheid", "verworfen"], deps)).code).toBe(EXIT.usage);
+    expect(await markdown(fresh)).toContain("status: neu");
+  });
+
+  test("a path outside Learnings or a missing learning is refused", async () => {
+    const root = await seeded();
+    await mkdir(join(root, "Schule"), { recursive: true });
+    await writeFile(join(root, "Schule", "Privat.md"), "---\nstatus: neu\n---\n# Privat\n", "utf8");
+    const outside = await decide(root, ["--entscheid", "verworfen"], "Schule/Privat.md");
+    expect(outside.code).toBe(EXIT.usage);
+    expect(await readFile(join(root, "Schule", "Privat.md"), "utf8")).toContain("status: neu");
+    expect((await decide(root, ["--entscheid", "verworfen"], "Learnings/coder/Gibt es nicht.md")).code).toBe(EXIT.error);
+    expect((await decide(root, ["--entscheid", "verworfen"], "../x.md")).code).toBe(EXIT.usage);
+  });
+
+  test("it is no ticket write: no counter, any number of decisions; the entry is in the log and undo takes it back", async () => {
+    const root = await learningVault();
+    for (const name of ["Eins", "Zwei", "Drei", "Vier", "Fuenf"]) await learningFile(root, `Learnings/coder/${name}.md`, { title: name, status: "neu", staleAfter: "2026-12-01" });
+    for (const name of ["Eins", "Zwei", "Drei", "Vier", "Fuenf"]) expect((await decide(root, ["--entscheid", "bestaetigt"], `Learnings/coder/${name}.md`)).code).toBe(EXIT.ok);
+    expect((await readdir(join(root, ".bloommd"))).includes("ticket-writes")).toBe(false);
+    const log = (await agent(["log", root])).json.changes as Array<{ changeId: string; path: string; reason?: string; source?: string }>;
+    expect(log).toHaveLength(5);
+    expect(log[0]!.reason).toContain("Entscheidung bestätigt");
+    expect(log[0]!.source).toContain("issues/176");
+    const target = log.find((entry) => entry.path.endsWith("Eins.md"))!;
+    const undone = await agent(["undo", root, target.changeId]);
+    expect(undone.code).toBe(EXIT.ok);
+    const text = await markdown(root, "Learnings/coder/Eins.md");
+    expect(text).toContain("status: neu");
+    expect(text).not.toContain("Entscheidung");
+    expect(text).not.toContain("chief-of-staff");
+    expect(await markdown(root, "Learnings/coder/Zwei.md")).toContain('status: "bestätigt"');
+  });
+
+  test("a deciding agent with propose rights only files a proposal", async () => {
+    const root = await seeded("neu", "propose");
+    const before = await markdown(root);
+    const run = await decide(root, ["--entscheid", "bestaetigt"]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.json).toMatchObject({ ok: true, modus: "vorgeschlagen" });
+    expect(run.json.vorschlag).toBeTruthy();
+    expect(await markdown(root)).toBe(before);
+    const readOnly = await seeded("neu", "read");
+    expect((await decide(readOnly, ["--entscheid", "bestaetigt"])).code).toBe(EXIT.error);
+  });
+
+  test("--help and the usage list decide", async () => {
+    const run = await agent(["decide", "--help"]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.out[0]).toContain("bloommd-wiki agent decide");
+    expect(run.out[0]).toContain("unbestätigt → bestätigt");
+    expect(AGENT_USAGE).toContain("agent decide <pfad> --entscheid");
+  });
+});
+
+describe("agent review", () => {
+  const NOW = new Date("2026-10-31T10:00:00Z");
+  const deps: LearningDeps = { ...learningDeps, now: () => NOW };
+  const review = (root: string, extra: string[] = []) => agent(["review", "--vault", root, ...extra], deps);
+
+  async function seeded() {
+    const root = await learningVault();
+    await learningFile(root, "Learnings/tester/Alt neu.md", { title: "Lint nur über cli.ts", tags: ["tester", "lint"], status: "neu", staleAfter: FUTURE, created: "2026-10-01", beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/159" });
+    await learningFile(root, "Learnings/coder/Jung neu.md", { title: "Playwright Browser nachinstallieren", tags: ["coder", "playwright"], status: "neu", staleAfter: FUTURE, created: "2026-10-29", beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/141" });
+    await learningFile(root, "Learnings/coder/Mitte neu.md", { title: "Postgres Healthcheck im CI", tags: ["coder", "ci"], status: "neu", staleAfter: FUTURE, created: "2026-10-20" });
+    await learningFile(root, "Learnings/architect/Bestaetigt.md", { title: "Ticket zuschneiden", tags: ["architect"], status: "bestätigt", staleAfter: "2026-10-10", created: "2026-09-01", beleg: "https://example.org/b" });
+    await learningFile(root, "Learnings/architect/Bald.md", { title: "Worktree aufräumen", tags: ["architect", "git"], status: "unbestätigt", staleAfter: "2026-11-05", created: "2026-10-02" });
+    await learningFile(root, "Learnings/architect/Spaeter.md", { title: "Branch benennen", tags: ["architect", "git"], status: "bestätigt", staleAfter: "2026-12-31", created: "2026-10-02" });
+    return root;
+  }
+
+  test("(a) lists all neu learnings, oldest first, with path, title, age in days and evidence link", async () => {
+    const root = await seeded();
+    const run = await review(root);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.err).toBe("");
+    const text = run.out.join("\n");
+    expect(run.out).toHaveLength(1);
+    expect(text).toContain("Learnings-Review 2026-10-31");
+    expect(text).toContain("Status neu (3)");
+    const lines = text.split("\n").filter((line) => line.startsWith("• Learnings/") && line.includes(" – "));
+    expect(lines.slice(0, 3)).toEqual([
+      "• Learnings/tester/Alt neu.md – Lint nur über cli.ts – 30 Tage – https://github.com/moellenbeck-digital/BloomMD/pull/159",
+      "• Learnings/coder/Mitte neu.md – Postgres Healthcheck im CI – 11 Tage – kein Beleg-Link",
+      "• Learnings/coder/Jung neu.md – Playwright Browser nachinstallieren – 2 Tage – https://github.com/moellenbeck-digital/BloomMD/pull/141",
+    ]);
+    expect(text).toContain("agent decide <pfad> --entscheid bestaetigt|verworfen");
+    // Only neu is listed there; the others are not.
+    expect(text.split("Abgelaufen")[0]).not.toContain("Bestaetigt.md");
+  });
+
+  test("(b) lists expired and soon expiring learnings with the logic of agent stale and --days", async () => {
+    const root = await seeded();
+    const text = (await review(root)).out.join("\n");
+    expect(text).toContain("Abgelaufen (1):");
+    expect(text).toContain("• Ticket zuschneiden – Learnings/architect/Bestaetigt.md, bestätigt, seit 2026-10-10 (21 Tage überfällig)");
+    expect(text).toContain("Läuft in den nächsten 14 Tagen ab (1):");
+    expect(text).toContain("• Worktree aufräumen – Learnings/architect/Bald.md, unbestätigt, läuft ab 2026-11-05");
+    expect(text).not.toContain("Branch benennen");
+    const short = (await review(root, ["--days", "3"])).out.join("\n");
+    expect(short).toContain("Abgelaufen (1):");
+    expect(short).not.toContain("Läuft in den nächsten");
+    const wide = (await review(root, ["--days", "61"])).out.join("\n");
+    expect(wide).toContain("Läuft in den nächsten 61 Tagen ab (2):");
+    expect(wide).toContain("Branch benennen");
+    // Same set as agent stale.
+    const stale = (await agent(["stale", "--vault", root, "--days", "14"])).json.stale.map((entry: { pfad: string }) => entry.pfad).sort();
+    expect(stale).toEqual(["Learnings/architect/Bald.md", "Learnings/architect/Bestaetigt.md"]);
+  });
+
+  test("(c) lists duplicate candidates among learnings that are not retired", async () => {
+    const root = await seeded();
+    await learningFile(root, "Learnings/tester/Lint zweiter.md", { title: "Lint nur über cli.ts prüfen", tags: ["tester", "lint"], status: "unbestätigt", staleAfter: FUTURE, created: "2026-10-30" });
+    await learningFile(root, "Learnings/tester/Lint verworfen.md", { title: "Lint nur über cli.ts", tags: ["tester", "lint"], status: "verworfen", staleAfter: FUTURE, created: "2026-10-30" });
+    await learningFile(root, "Learnings/tester/Lint veraltet.md", { title: "Lint nur über cli.ts", tags: ["tester", "lint"], status: "veraltet", staleAfter: FUTURE, created: "2026-10-30" });
+    await learningFile(root, "Learnings/tester/Lint ersetzt.md", { title: "Lint nur über cli.ts", tags: ["tester", "lint"], status: "ersetzt", staleAfter: FUTURE, created: "2026-10-30" });
+    const text = (await review(root)).out.join("\n");
+    const duplicates = text.split("Duplikat-Kandidaten")[1]!;
+    expect(duplicates).toContain(`(1), Ähnlichkeit ab ${DUPLICATE_THRESHOLD}`);
+    expect(duplicates).toContain("Lint nur über cli.ts ↔ Lint nur über cli.ts prüfen");
+    expect(duplicates).toContain("Learnings/tester/Alt neu.md | Learnings/tester/Lint zweiter.md");
+    for (const retired of ["verworfen", "veraltet", "ersetzt"]) expect(duplicates).not.toContain(`Lint ${retired}.md`);
+    // Retired learnings are not listed under neu either.
+    expect(text).toContain("Status neu (3)");
+  });
+
+  test("a learning that is no longer neu leaves the list; decided ones do not come back", async () => {
+    const root = await seeded();
+    expect((await agent(["decide", "Learnings/tester/Alt neu.md", "--vault", root, "--name", "cos", "--entscheid", "bestaetigt", "--grund", "g", "--quelle", "q"], deps)).code).toBe(EXIT.ok);
+    const text = (await review(root)).out.join("\n");
+    expect(text).toContain("Status neu (2)");
+    expect(text.split("Abgelaufen")[0]).not.toContain("Alt neu.md");
+  });
+
+  test("nothing to report is exactly NO_REPLY; only Learnings is looked at; it writes nothing", async () => {
+    const root = await learningVault();
+    expect((await review(root)).out).toEqual(["NO_REPLY"]);
+    await learningFile(root, "Learnings/coder/Fest.md", { title: "Fest", status: "bestätigt", staleAfter: FUTURE, created: "2026-10-01" });
+    await mkdir(join(root, "Schule"), { recursive: true });
+    await writeFile(join(root, "Schule", "Privat.md"), "---\nstatus: neu\nstale_after: 2020-01-01\n---\n# Privat\n", "utf8");
+    const before = await readFile(join(root, "Learnings/coder/Fest.md"), "utf8");
+    const run = await review(root);
+    expect(run).toMatchObject({ code: EXIT.ok, out: ["NO_REPLY"] });
+    expect(await readFile(join(root, "Learnings/coder/Fest.md"), "utf8")).toBe(before);
+    expect((await agent(["log", root])).json.changes).toEqual([]);
+  });
+
+  test("(b) leaves out retired learnings (veraltet, ersetzt, verworfen), agent stale itself stays as it was", async () => {
+    const root = await learningVault();
+    await learningFile(root, "Learnings/coder/Abgelaufen.md", { title: "Abgelaufen bestätigt", status: "bestätigt", staleAfter: PAST, created: "2026-01-01" });
+    for (const status of ["veraltet", "ersetzt", "verworfen"]) {
+      await learningFile(root, `Learnings/coder/${status}.md`, { title: `Ausgemustert ${status}`, tags: ["coder", status], status, staleAfter: PAST, created: "2026-01-01" });
+    }
+    const text = (await review(root)).out.join("\n");
+    expect(text).toContain("Abgelaufen (1):");
+    expect(text).toContain("Learnings/coder/Abgelaufen.md");
+    for (const status of ["veraltet", "ersetzt", "verworfen"]) expect(text).not.toContain(`Learnings/coder/${status}.md`);
+    expect((await agent(["stale", "--vault", root])).json.anzahl).toBe(4);
+    // Only retired learnings, all expired: nothing to report.
+    const quiet = await learningVault();
+    await learningFile(quiet, "Learnings/coder/Alt.md", { title: "Alt", status: "verworfen", staleAfter: PAST });
+    expect((await review(quiet)).out).toEqual(["NO_REPLY"]);
+  });
+
+  async function newLearnings(root: string, count: number, created: string, offset = 0) {
+    for (let index = 0; index < count; index += 1) {
+      const number = offset + index;
+      await learningFile(root, `Learnings/coder/Thema ${number}.md`, { title: `Thema Nummer ${number} ganz eigen${"x".repeat(number)}`, tags: ["coder", `thema${number}`], status: "neu", staleAfter: FUTURE, created });
+    }
+  }
+
+  test("(e) more than 10 neu learnings from the last 7 days make a quality line; exactly 10 do not", async () => {
+    const eleven = await learningVault();
+    await newLearnings(eleven, 11, "2026-10-28");
+    const text = (await review(eleven)).out.join("\n");
+    expect(text.split("\n")[1]).toBe("Qualitätsmeldung: 11 neue Learnings ohne Bestätigung");
+    expect(text).toContain("Status neu (11)");
+    const ten = await learningVault();
+    await newLearnings(ten, 10, "2026-10-28");
+    const quiet = (await review(ten)).out.join("\n");
+    expect(quiet).not.toContain("Qualitätsmeldung");
+    expect(quiet).toContain("Status neu (10)");
+  });
+
+  test("(e) counts only neu learnings created within 7 days of today", async () => {
+    const root = await learningVault();
+    await newLearnings(root, 10, "2026-10-24");
+    await newLearnings(root, 5, "2026-10-23", 10);
+    await newLearnings(root, 5, "2026-10-01", 15);
+    let text = (await review(root)).out.join("\n");
+    // created 2026-10-24 is exactly 7 days back and counts; 2026-10-23 and older do not.
+    expect(text).not.toContain("Qualitätsmeldung");
+    await newLearnings(root, 1, "2026-10-31", 20);
+    text = (await review(root)).out.join("\n");
+    expect(text).toContain("Qualitätsmeldung: 11 neue Learnings ohne Bestätigung");
+    // Learnings of other statuses are not counted.
+    const other = await learningVault();
+    await newLearnings(other, 10, "2026-10-30");
+    for (let index = 0; index < 5; index += 1) await learningFile(other, `Learnings/coder/Fest ${index}.md`, { title: `Fester Fall ${index} völlig anders${"y".repeat(index)}`, tags: ["coder", `fest${index}`], status: "bestätigt", staleAfter: FUTURE, created: "2026-10-30" });
+    expect((await review(other)).out.join("\n")).not.toContain("Qualitätsmeldung");
+  });
+
+  test("--json has the same data; with nothing to report it is no NO_REPLY but empty lists", async () => {
+    const root = await seeded();
+    await learningFile(root, "Learnings/tester/Lint zweiter.md", { title: "Lint nur über cli.ts prüfen", tags: ["tester", "lint"], status: "unbestätigt", staleAfter: FUTURE, created: "2026-10-30" });
+    const run = await review(root, ["--json"]);
+    expect(run.code).toBe(EXIT.ok);
+    expect(run.out).toHaveLength(1);
+    expect(run.json).toMatchObject({ datum: "2026-10-31", befund: true, tage: 14, qualitaet: { neu_letzte_7_tage: 1, grenze: 10, meldung: null } });
+    expect(run.json.neu).toEqual([
+      { pfad: "Learnings/tester/Alt neu.md", titel: "Lint nur über cli.ts", alter_tage: 30, beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/159" },
+      { pfad: "Learnings/coder/Mitte neu.md", titel: "Postgres Healthcheck im CI", alter_tage: 11, beleg: null },
+      { pfad: "Learnings/coder/Jung neu.md", titel: "Playwright Browser nachinstallieren", alter_tage: 2, beleg: "https://github.com/moellenbeck-digital/BloomMD/pull/141" },
+    ]);
+    expect(run.json.stale.map((entry: { pfad: string }) => entry.pfad)).toEqual(["Learnings/architect/Bestaetigt.md", "Learnings/architect/Bald.md"]);
+    expect(run.json.stale[0]).toMatchObject({ status: "bestätigt", stale_after: "2026-10-10", tage_ueberfaellig: 21, abgelaufen: true });
+    expect(run.json.duplikate).toEqual([{ a: { pfad: "Learnings/tester/Alt neu.md", titel: "Lint nur über cli.ts" }, b: { pfad: "Learnings/tester/Lint zweiter.md", titel: "Lint nur über cli.ts prüfen" }, aehnlichkeit: expect.any(Number) }]);
+    expect(run.json.duplikate[0].aehnlichkeit).toBeGreaterThanOrEqual(DUPLICATE_THRESHOLD);
+    const empty = await review(await learningVault(), ["--json"]);
+    expect(empty.code).toBe(EXIT.ok);
+    expect(empty.json).toMatchObject({ befund: false, neu: [], stale: [], duplikate: [], qualitaet: { neu_letzte_7_tage: 0, meldung: null } });
+    const quality = await learningVault();
+    await newLearnings(quality, 11, "2026-10-30");
+    expect((await review(quality, ["--json"])).json.qualitaet).toEqual({ neu_letzte_7_tage: 11, grenze: 10, meldung: "Qualitätsmeldung: 11 neue Learnings ohne Bestätigung" });
+  });
+
+  test("scripts/learnings-review.sh runs agent review on LEARNINGS_VAULT and passes extra arguments", async () => {
+    const script = join(import.meta.dir, "..", "..", "..", "scripts", "learnings-review.sh");
+    const cli = join(import.meta.dir, "cli.ts");
+    const run = (vault: string, args: string[] = []) => new Promise<{ code: number | null; out: string }>((resolve) => {
+      const child = spawn("sh", [script, ...args], { env: { ...process.env, LEARNINGS_VAULT: vault, BLOOMMD_WIKI_BIN: `${process.execPath} ${cli}` } });
+      let out = "";
+      child.stdout.on("data", (chunk) => { out += String(chunk); });
+      child.on("close", (code) => resolve({ code, out }));
+    });
+    const root = await learningVault();
+    expect(await run(root)).toEqual({ code: 0, out: "NO_REPLY\n" });
+    await learningFile(root, "Learnings/coder/Offen.md", { title: "Offen", status: "neu", staleAfter: FUTURE, created: "2026-10-01" });
+    const text = await run(root);
+    expect(text.code).toBe(0);
+    expect(text.out).toContain("Status neu (1)");
+    expect(text.out).toContain("Learnings/coder/Offen.md");
+    expect(JSON.parse((await run(root, ["--json"])).out)).toMatchObject({ befund: true, neu: [{ pfad: "Learnings/coder/Offen.md" }] });
+  });
+
+  test("a wrong call is exit 2 with JSON on stdout; the help names the three parts", async () => {
+    const root = await learningVault();
+    for (const args of [["review"], ["review", "--vault", root, "--days", "-1"], ["review", "--vault", root, "--days", "x"], ["review", "--vault", root, "extra"], ["review", "--vault", root, "--cloud", "https://x.example"]]) {
+      const run = await agent(args, deps);
+      expect(run.code).toBe(EXIT.usage);
+      expect(run.json.fehler).toBeTruthy();
+    }
+    const help = await agent(["review", "--help"]);
+    expect(help.code).toBe(EXIT.ok);
+    expect(help.out[0]).toContain("bloommd-wiki agent review");
+    expect(AGENT_USAGE).toContain("agent review");
+  });
+});
+
 describe("help and usage", () => {
   test("--help per command prints text and exits 0; AGENT_USAGE lists the commands", async () => {
-    for (const command of ["search", "read", "create", "append", "stale"]) {
+    for (const command of ["search", "read", "create", "append", "decide", "review", "stale"]) {
       const run = await agent([command, "--help"]);
       expect(run.code).toBe(EXIT.ok);
       expect(run.out[0]).toContain(`bloommd-wiki agent ${command}`);

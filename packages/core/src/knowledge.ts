@@ -516,11 +516,11 @@ export function searchKnowledge(markdown: string, query: string, limit = 20): Ar
 }
 
 /** Lifecycle of a learning (`docs/LEARNINGS.md`); the frontmatter field `status`. */
-export const KNOWLEDGE_STATUSES = ["neu", "bestätigt", "veraltet", "ersetzt", "unbestätigt"] as const;
+export const KNOWLEDGE_STATUSES = ["neu", "bestätigt", "veraltet", "ersetzt", "unbestätigt", "verworfen"] as const;
 export type KnowledgeStatus = (typeof KNOWLEDGE_STATUSES)[number];
 
 /** Maps with one of these statuses are left out of the default search; `unbestätigt` is not retired, it is still found (and named in the hit). */
-const RETIRED_STATUSES = new Set<string>(["veraltet", "ersetzt"]);
+const RETIRED_STATUSES = new Set<string>(["veraltet", "ersetzt", "verworfen"]);
 
 const MAX_SCOPE_LENGTH = 300;
 const MAX_REPLACED_BY_LENGTH = 300;
@@ -769,7 +769,7 @@ export function knowledgeLifecycle(frontmatter: KnowledgeFrontmatter, today: str
   };
 }
 
-/** Default search leaves out maps that are expired or marked `veraltet`/`ersetzt`. */
+/** Default search leaves out maps that are expired or marked `veraltet`/`ersetzt`/`verworfen`. */
 export function isKnowledgeRetired(lifecycle: KnowledgeLifecycle): boolean {
   return lifecycle.expired === true || (lifecycle.status !== undefined && RETIRED_STATUSES.has(lifecycle.status.toLowerCase()));
 }

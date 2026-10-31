@@ -291,10 +291,10 @@ Likewise `bloommd-wiki agent stale <vault>` reports maps whose `stale_after` has
 
 ### Trust and expiry
 
-The agent can set `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`), `stale_after`, `verified` (appended),
+The agent can set `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`, `verworfen`), `stale_after`, `verified` (appended),
 `scope` and `replaced_by` when creating a map and later on; `bloommd_update_map` then changes only those
 fields. `bloommd_search` also finds tags and frontmatter values and filters by `status`, `tag` and `scope`.
-Expired maps and maps marked `veraltet` or `ersetzt` are only returned with `includeStale: true` (or with a
+Expired maps and maps marked `veraltet`, `ersetzt` or `verworfen` are only returned with `includeStale: true` (or with a
 `status` filter). `bloommd_stale` lists the expired maps.
 
 ## Control

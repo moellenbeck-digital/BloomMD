@@ -45,7 +45,7 @@ gewöhnliche Wiki-Seite mit `type: learning` und lässt sich mit `bloommd-wiki l
 | Feld | Bedeutung |
 |---|---|
 | `type` | Immer `learning`. Die Vorlage setzt es. |
-| `status` | `neu`, `bestätigt`, `veraltet`, `ersetzt` oder `unbestätigt` (siehe Lebenszyklus). Neue Learnings mit Vorfall und Quelle starten mit `neu`. |
+| `status` | `neu`, `bestätigt`, `veraltet`, `ersetzt`, `unbestätigt` oder `verworfen` (siehe Lebenszyklus). Neue Learnings mit Vorfall und Quelle starten mit `neu`. |
 | `scope` | Wofür das Learning gilt, kurz, z. B. `BloomMD, coder`. Kommt aus dem Aufruf. |
 | `source` | Woher es stammt (Ticket, PR, Lauf, Datum). Kommt aus dem Aufruf. |
 | `verified` | Wer es bestätigt hat, als Liste aus `by` und `at` (wie überall im Wiki). Bei neuen Learnings leer oder nicht gesetzt. |
@@ -80,8 +80,9 @@ abgebildet:
 | `veraltet` | `deprecated` |
 | `ersetzt` | `deprecated` |
 | `unbestätigt` | `draft` |
+| `verworfen` | `deprecated` |
 
-- Auf einer Learning-Seite sind nur diese fünf Wörter gültig; `draft`, `stable` und `deprecated` meldet der Lint
+- Auf einer Learning-Seite sind nur diese sechs Wörter gültig; `draft`, `stable` und `deprecated` meldet der Lint
   dort als `invalid-status`. Auf jeder anderen Seite meldet er `neu` & Co. als `invalid-status`.
 - `stale_after` ist ein Datum. Ist es überschritten, meldet der Lint `expired-page`, auch bei Learnings.
 - `verified` bleibt die Liste aus `by` und `at`.
@@ -103,6 +104,31 @@ neu → bestätigt → veraltet → ersetzt
    ergänzen.
 4. **ersetzt:** ein Nachfolger deckt es ab. `replaced_by` zeigt auf den Nachfolger; das alte Learning bleibt als
    Verlauf erhalten und wird nicht gelöscht.
+5. **verworfen:** ein Mensch (der Chief of Staff) hat gegen das Learning entschieden, mit Grund und Quelle. Es ist
+   ausgemustert wie `veraltet` und `ersetzt`: Die Standardsuche blendet es aus, `includeStale` und ein
+   `status`-Filter holen es zurück, es zählt nicht für die Duplikatprüfung, und der Lint bildet es auf
+   `deprecated` ab. Es bleibt als Verlauf erhalten und wird nicht gelöscht.
+
+### Bestätigen und Verwerfen (Kreislauf)
+
+Kein Learning wird von allein `bestätigt`: Der Chief of Staff (CoS) entscheidet. Der Preflight (#171) liest nur
+Bestätigtes, also `bloommd-wiki agent search --status bestätigt`; ohne diesen Filter bleibt die Suche wie sie ist.
+
+| von | nach `bestätigt` | nach `verworfen` |
+|---|---|---|
+| `neu` | ja | ja |
+| `unbestätigt` | nein (eine Ableitung ohne Vorfall bleibt `unbestätigt`) | ja |
+| `bestätigt` | nein (schon bestätigt) | ja (Korrektur) |
+| `veraltet`, `ersetzt`, `verworfen` | nein | nein |
+
+`bloommd-wiki agent decide` führt den Wechsel aus (`docs/LEARNINGS-ABLAGE.md`): Er setzt `status`, hängt
+`verified` (`by`, `at`) an, setzt bei `bestätigt` `stale_after` auf heute plus 90 Tage und hängt einen Knoten
+„Entscheidung“ mit Datum, Entscheid, Grund, Quelle und Name an. Grund und Quelle sind Pflicht. Der Eintrag steht im
+Protokoll und lässt sich mit `agent undo` zurücknehmen.
+
+Einmal in der Woche (Montag) fasst `bloommd-wiki agent review` zusammen, was zu tun ist: die Learnings mit Status
+`neu` (älteste zuerst, mit Beleg-Link), abgelaufene und bald ablaufende Learnings und Duplikat-Kandidaten. Das ist
+die Meldung an den CoS; sie soll höchstens zehn Minuten Aufmerksamkeit je Woche kosten.
 
 Statuswechsel sind Änderungen wie jede andere: `bloommd_update_map` bzw. Bearbeitung der Datei, mit Protokoll
 und Undo.
@@ -113,14 +139,14 @@ und Undo.
   (`{by, at}`), `scope` und `replaced_by`. Beim Anlegen überschreiben `status` und `stale_after` die Werte der
   Vorlage (`neu`, heute plus 90 Tage). `bloommd_update_map` ändert nur die mitgegebenen Felder und braucht dann
   keine `nodes`. `verified` hängt einen Eintrag an die Liste an und ersetzt sie nie. `replaced_by` ist nur
-  zusammen mit `status: ersetzt` erlaubt. Ungültige Eingaben (Status außerhalb der fünf Wörter, kein echtes
+  zusammen mit `status: ersetzt` erlaubt. Ungültige Eingaben (Status außerhalb der sechs Wörter, kein echtes
   Datum, Text über mehrere Zeilen oder zu lang) lehnt der Server ab.
 - **Finden:** `bloommd_search` durchsucht zusätzlich `tags`, `scope`, `source`, `status` und `title` im
   Frontmatter (Trefferart `frontmatter`, `nodeId` leer) und filtert mit `status` (exakt), `tag` (exakt, ohne
   Beachtung der Groß-/Kleinschreibung) und `scope` (Teilstring); mit Filter darf `query` leer sein. Jeder Treffer
   nennt `status`, `stale_after`, `expired` und `ageDays` (ab `created`, sonst ab dem letzten `verified.at`), soweit
   die Map sie hat.
-- **Abgelaufenes:** Die Suche liefert Maps mit überschrittenem `stale_after` und Status `veraltet` oder `ersetzt`
+- **Abgelaufenes:** Die Suche liefert Maps mit überschrittenem `stale_after` und Status `veraltet`, `ersetzt` oder `verworfen`
   nur mit `includeStale: true`; ein `status`-Filter hat Vorrang. `bloommd_stale` (nur lesend) listet Maps mit
   `stale_after` bis heute, mit `days` auch die der nächsten n Tage (ohne Treffer ist der Text genau `NO_REPLY`,
   `structuredContent` bleibt `{stale: []}`); `bloommd-wiki agent stale <ziel> [--days <n>]` gibt dasselbe als

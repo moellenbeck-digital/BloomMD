@@ -85,7 +85,7 @@ Einzelbefehle mit JSON (siehe unten).
 
 ## Einzelbefehle für Skripte und den Adapter
 
-Neben dem MCP gibt es unter `bloommd-wiki agent …` fünf Einzelbefehle mit **JSON auf stdout** (Meldungen auf
+Neben dem MCP gibt es unter `bloommd-wiki agent …` Einzelbefehle mit **JSON auf stdout** (Meldungen auf
 stderr). **Sie sind die Grundlage des künftigen Adapters `wissen/bloommd` in `md-agents`**: Der Adapter ruft sie
 auf, statt den MCP zu sprechen. Sie arbeiten nur im Bereich `Learnings`, mit denselben Rechten, demselben
 Protokoll und demselben Undo wie der MCP (`--name` nennt die Rolle). Freigeben kann ein Agent nichts: Liegt das
@@ -95,7 +95,7 @@ Recht auf `propose`, kommt `"modus":"vorgeschlagen"` mit einer Vorschlags-ID zur
 
 ```bash
 V=/data/learnings
-# Suchen: nur gültige Learnings (nicht veraltet/ersetzt, nicht abgelaufen); --include-stale nimmt die übrigen mit
+# Suchen: nur gültige Learnings (nicht veraltet/ersetzt/verworfen, nicht abgelaufen); --include-stale nimmt die übrigen mit
 bloommd-wiki agent search "lockfile" --vault $V --name coder --rolle coder --tag bun --komponente Dockerfile --limit 5
 # {"treffer":[{"pfad":"Learnings/coder/Bun-Version je Repo festhalten.md","titel":"Bun-Version je Repo festhalten","status":"neu","rolle":"coder","tags":["bereich/learnings/coder","coder"],"auszug":"Symptom Lockfile scheitert.","stale_after":"2027-01-25","abgelaufen":false}],"anzahl":1,"gesamt":1,"limit":5}
 
@@ -110,7 +110,7 @@ bloommd-wiki agent create --vault $V --name coder --ticket 113 --titel "Bun-Vers
 # {"ok":true,"pfad":"Learnings/coder/Bun-Version je Repo festhalten.md","modus":"geschrieben","aenderung":"cmvr43otp11l8p","version":"d7e468b17e7313d7","status":"neu","ticket":"113","schreibvorgang":1,"limit":3}
 
 # Ergänzen: neuer Knoten (--abschnitt, --titel) und/oder Beleg-Link; hängt verified an (by = --name) und
-# verlängert stale_after auf heute + 90 Tage, außer bei veraltet/ersetzt; der Status bleibt
+# verlängert stale_after auf heute + 90 Tage, außer bei veraltet/ersetzt/verworfen; der Status bleibt
 bloommd-wiki agent append "Learnings/coder/Bun-Version je Repo festhalten.md" --vault $V --name tester --ticket 113 \
   --inhalt "Zweiter Vorfall" --beleg https://github.com/org/repo/actions/runs/1
 # {"ok":true,"pfad":"…","modus":"geschrieben","aenderung":"…","version":"…","verified":{"by":"tester","at":"2026-10-27"},"stale_after":"2027-01-25","ticket":"113","schreibvorgang":2,"limit":3}
@@ -118,17 +118,46 @@ bloommd-wiki agent append "Learnings/coder/Bun-Version je Repo festhalten.md" --
 # Abgelaufene und bald ablaufende Learnings (gleiche Logik wie bloommd_stale)
 bloommd-wiki agent stale --vault $V --days 14
 # {"stale":[{"pfad":"…","titel":"…","status":"neu","stale_after":"2026-10-20","tage_ueberfaellig":7,"abgelaufen":true,"scope":"Dockerfile, coder"}],"anzahl":1,"tage":14}
+
+# Nur Bestätigtes suchen (so liest der Preflight): exakter Statusfilter, Groß-/Kleinschreibung egal, bestaetigt = bestätigt.
+# Der Filter hat Vorrang vor dem Ausblenden von Abgelaufenem und Ausgemustertem; der Suchtext darf dann fehlen.
+bloommd-wiki agent search "lockfile" --status bestätigt --vault $V --name coder
+bloommd-wiki agent search --status neu --vault $V --name chief-of-staff --limit 50
+
+# Entscheiden (CoS): neu → bestätigt|verworfen, unbestätigt → verworfen, bestätigt → verworfen (Korrektur). Pflicht:
+# --entscheid bestaetigt|verworfen, --grund, --quelle (Link oder Text), --name (wer). Kein --ticket, kein Schreibzähler.
+bloommd-wiki agent decide "Learnings/coder/Bun-Version je Repo festhalten.md" --vault $V --name chief-of-staff \
+  --entscheid bestaetigt --grund "Zweiter Vorfall im Cluster belegt die Regel" --quelle https://github.com/org/repo/issues/120
+# {"ok":true,"pfad":"…","modus":"geschrieben","aenderung":"…","version":"…","entscheid":"bestätigt","vorher":"neu","status":"bestätigt","verified":{"by":"chief-of-staff","at":"2026-10-31"},"stale_after":"2027-01-29"}
+
+# Wochenlauf (Montag): Text für den CoS, kein JSON; ohne Befund genau NO_REPLY
+bloommd-wiki agent review --vault $V --days 14
 ```
 
 `agent stale <ordner>` ohne `--vault`/`--json` bleibt die Textform für Routinen (leer: `NO_REPLY`).
 
 **Duplikatprüfung vor `create`:** Gibt es ein Learning mit gleichem Titel (ohne Beachtung von Groß-/Kleinschreibung
 und Satzzeichen) oder ein sehr ähnliches (70 % Wortüberlappung des Titels, 30 % der Tags, mindestens ein gemeinsamer
-Tag, Schwelle 0,7; `veraltet` und `ersetzt` zählen nicht), wird nichts angelegt. Der Befehl endet mit Exitcode 3 und
+Tag, Schwelle 0,7; `veraltet`, `ersetzt` und `verworfen` zählen nicht), wird nichts angelegt. Der Befehl endet mit Exitcode 3 und
 `{"fehler":"…","duplicate":true,"pfad":"Learnings/coder/…md","titel":"…","aehnlichkeit":1}`; der Aufrufer nimmt dann
 `append`. Ein `--force` gibt es nicht.
 
-**Schreibzähler je Ticket:** `create` und `append` brauchen `--ticket <id>` und erlauben höchstens 3 Schreibvorgänge
+**Entscheidung (`agent decide`):** Erlaubt sind `neu` → `bestätigt`, `neu` → `verworfen`, `unbestätigt` → `verworfen` und
+`bestätigt` → `verworfen` (Korrektur). Alles andere endet mit Exitcode 2 und einer Meldung, ohne etwas zu schreiben:
+`unbestätigt` → `bestätigt` (eine Ableitung ohne Vorfall bleibt unbestätigt), `bestätigt` → `bestätigt` und
+`veraltet`, `ersetzt` oder `verworfen` als Ausgangsstatus. Wirkung: `status` wird gesetzt, `verified` um (`by` = `--name`,
+`at` = heute) ergänzt, bei `bestätigt` `stale_after` auf heute + 90 Tage gesetzt, und ein Knoten „Entscheidung“ (Datum,
+Entscheid, Grund, Quelle, wer) angehängt. Der Schreibweg ist der von `append` (Rechte, `modus` geschrieben oder
+vorgeschlagen, Protokoll mit `agent log`, `agent undo`), aber ohne `--ticket` und ohne Schreibzähler: Das ist keine
+Ticket-Schreibung.
+
+**Wochenlauf (`agent review`):** Text für den Chief of Staff, nur Bereich `Learnings`, ändert nichts. (a) alle Learnings mit
+Status `neu`: Pfad, Titel, Alter in Tagen (ab `created`), Beleg-Link, älteste zuerst; (b) abgelaufene und bald
+ablaufende Learnings (Logik von `agent stale`, `--days`, Standard 14); (c) Duplikat-Kandidaten unter den nicht
+ausgemusterten Learnings (gleiche Ähnlichkeit und Schwelle 0,7 wie bei `create`). Leere Teile entfallen; gibt es in
+keinem Teil etwas, ist die Ausgabe genau `NO_REPLY`.
+
+**Schreibzähler je Ticket:** `create` und `append` (nicht `decide`) brauchen `--ticket <id>` und erlauben höchstens 3 Schreibvorgänge
 je Ticket-ID (`113` und `#113` sind dasselbe Ticket). Der vierte Versuch endet mit Exitcode 4 und
 `{"fehler":"…","limit":3,"ticket":"113","geschrieben":3}`. Lesen und Suchen zählen nicht, ein Duplikat oder ein
 abgelehnter Schreibversuch auch nicht; ein Vorschlag zählt. Der Zähler liegt im Vault unter

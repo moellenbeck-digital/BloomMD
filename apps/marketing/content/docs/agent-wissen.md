@@ -298,10 +298,10 @@ Ebenso meldet `bloommd-wiki agent stale <vault>` Maps, deren `stale_after` errei
 
 ### Vertrauen und Veraltung
 
-Der Agent kann `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`), `stale_after`, `verified` (wird angehängt),
+Der Agent kann `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`, `verworfen`), `stale_after`, `verified` (wird angehängt),
 `scope` und `replaced_by` beim Anlegen und später gezielt setzen; `bloommd_update_map` ändert dann nur diese
 Felder. `bloommd_search` findet zusätzlich Tags und Frontmatter-Werte und filtert nach `status`, `tag` und
-`scope`. Abgelaufene sowie als `veraltet` oder `ersetzt` markierte Maps liefert die Suche nur mit
+`scope`. Abgelaufene sowie als `veraltet`, `ersetzt` oder `verworfen` markierte Maps liefert die Suche nur mit
 `includeStale: true` (oder mit einem `status`-Filter). `bloommd_stale` listet die abgelaufenen Maps.
 
 ## Kontrolle

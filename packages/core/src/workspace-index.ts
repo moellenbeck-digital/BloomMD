@@ -26,7 +26,7 @@ export type WorkspaceIndexFindingCode =
   | "ambiguous-link"
   /** The link finds its file, but no heading of that file carries the anchor. */
   | "stale-anchor"
-  /** The link finds its file, but the frontmatter marks that file as veraltet/ersetzt or past `stale_after`. */
+  /** The link finds its file, but the frontmatter marks that file as veraltet/ersetzt/verworfen or past `stale_after`. */
   | "stale-document"
   /** The same `bloommd:id` appears more than once, in one file or across files. */
   | "duplicate-node-id"

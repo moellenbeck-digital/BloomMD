@@ -50,7 +50,7 @@ const changeMeta = {
 
 /** Trust and lifecycle fields of a map (frontmatter); see docs/LEARNINGS.md. */
 const trustProperties = {
-  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet, ersetzt or unbestätigt (derived statement without evidence; still found by the default search)." },
+  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet, ersetzt, unbestätigt (derived statement without evidence; still found by the default search) or verworfen (decided against by a person; retired like veraltet)." },
   stale_after: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date YYYY-MM-DD from which the map is to be checked again." },
   verified: {
     type: "object",
@@ -75,17 +75,17 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_search",
     title: "Suchen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt are left out unless includeStale is true (a status filter always applies as given).",
+    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt/verworfen are left out unless includeStale is true (a status filter always applies as given).",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
         query: { type: "string", description: "Text to find; may be empty when status, tag or scope is given." },
         area: { type: "string" },
-        status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt)." },
+        status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt/verworfen)." },
         tag: { type: "string", description: "Only maps with this tag (exact, case-insensitive), e.g. a role like coder." },
         scope: { type: "string", description: "Only maps whose scope contains this text (case-insensitive), e.g. a component." },
-        includeStale: { type: "boolean", description: "Also return expired maps and maps with status veraltet or ersetzt." },
+        includeStale: { type: "boolean", description: "Also return expired maps and maps with status veraltet, ersetzt or verworfen." },
         ...targetProperty,
       },
     },
@@ -94,7 +94,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_stale",
     title: "Abgelaufene Maps",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Nothing to check: the text is exactly NO_REPLY. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt.",
+    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Nothing to check: the text is exactly NO_REPLY. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt/verworfen.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -126,7 +126,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_workspace_index",
     title: "Workspace-Index",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Link health over all maps the agent can read. Without path: summary and findings — broken and ambiguous links, links to a heading that does not exist (stale-anchor), links to a map that is veraltet/ersetzt or past stale_after with its replaced_by (stale-document), and a bloommd:id that occurs more than once (duplicate-node-id) with every place. With path: that map's document node, its headings (level, line, anchor, id) with their backlinks (a link with an anchor counts for the heading, one without for the map; per backlink source map, source heading, line, link as written) and the findings that belong to it (links written in it, a duplicate id first found in it).",
+    description: "Link health over all maps the agent can read. Without path: summary and findings — broken and ambiguous links, links to a heading that does not exist (stale-anchor), links to a map that is veraltet/ersetzt/verworfen or past stale_after with its replaced_by (stale-document), and a bloommd:id that occurs more than once (duplicate-node-id) with every place. With path: that map's document node, its headings (level, line, anchor, id) with their backlinks (a link with an anchor counts for the heading, one without for the map; per backlink source map, source heading, line, link as written) and the findings that belong to it (links written in it, a duplicate id first found in it).",
     inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string", description: "Only this map: nodes with backlinks and its findings." }, ...targetProperty } },
   },
   {
@@ -290,7 +290,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
 export const KNOWLEDGE_INSTRUCTIONS = [
   "BloomMD shows Markdown notes as mind maps: every heading is a node, the document is the map.",
   "File information so that a person can understand and explain it from the map alone:",
-  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt maps are left out unless includeStale is true).",
+  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt/verworfen maps are left out unless includeStale is true).",
   "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent (several nodes at once) or bloommd_update_node to change one node (status, content, relations) and/or add children below it. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",

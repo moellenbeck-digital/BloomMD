@@ -214,8 +214,9 @@ describe("trust fields in the frontmatter", () => {
   });
 
   test("parseKnowledgeFrontmatterInput refuses invalid values with KnowledgeInputError", () => {
-    expect(rejected({ status: "stable" })).toMatch(/neu, bestätigt, veraltet, ersetzt, unbestätigt/);
+    expect(rejected({ status: "stable" })).toMatch(/neu, bestätigt, veraltet, ersetzt, unbestätigt, verworfen/);
     expect(parseKnowledgeFrontmatterInput({ status: "unbestätigt" })).toEqual({ status: "unbestätigt" });
+    expect(parseKnowledgeFrontmatterInput({ status: "verworfen" })).toEqual({ status: "verworfen" });
     rejected({ status: 1 });
     for (const date of ["morgen", "2026-02-30", "2026-13-01", "26-01-01", "2026-10-27T10:00", 20261027]) rejected({ stale_after: date });
     for (const verified of ["Max", null, [], { by: "Max" }, { at: "2026-10-27" }, { by: "", at: "2026-10-27" }, { by: "Max", at: "gestern" }, { by: "Max", at: "2026-10-27", role: "x" }, { by: "x".repeat(121), at: "2026-10-27" }]) rejected({ verified });
@@ -304,6 +305,7 @@ describe("trust fields in the frontmatter", () => {
     expect(searchKnowledgeFrontmatter(frontmatter, " ")).toBeNull();
     expect(isKnowledgeRetired({ status: "veraltet" })).toBe(true);
     expect(isKnowledgeRetired({ status: "ersetzt" })).toBe(true);
+    expect(isKnowledgeRetired({ status: "verworfen" })).toBe(true);
     expect(isKnowledgeRetired({ status: "bestätigt", stale_after: "2026-01-01", expired: true })).toBe(true);
     expect(isKnowledgeRetired({ status: "neu", stale_after: "2027-01-01", expired: false })).toBe(false);
     expect(isKnowledgeRetired({ status: "unbestätigt" })).toBe(false);

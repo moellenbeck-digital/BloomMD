@@ -1,6 +1,6 @@
 /**
- * `bloommd-wiki agent search|read|create|append|stale`: the learnings of a vault or cloud workspace as
- * single commands with JSON on stdout, for scripts and for the adapter `wissen/bloommd` in `md-agents`.
+ * `bloommd-wiki agent search|read|create|append|decide|stale|review`: the learnings of a vault or cloud workspace as
+ * single commands with JSON on stdout (`review`: a short text), for scripts and for the adapter `wissen/bloommd` in `md-agents`.
  * `agent ingest` files raw text (transcript, chat, note) as a map from a template the same way.
  *
  * Everything runs through `KnowledgeService`, so the rights of the agent (read, propose, write per area),
@@ -9,7 +9,7 @@
  *
  * stdout carries one JSON document (`--help` aside); errors are `{"fehler": …}` on stdout and a message on
  * stderr. Exit codes: 0 ok, 1 error, 2 wrong call or refused input, 3 duplicate, 4 write limit of the ticket
- * reached (create and append only).
+ * reached (create and append only). `decide` is no ticket write: it has no `--ticket` and no counter.
  */
 import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -17,6 +17,7 @@ import { areaCovers, cloudAreaOf, vaultAreaPath } from "@bloommd/core/agent-ledg
 import { parseFrontmatter } from "@bloommd/core/frontmatter";
 import {
   isKnowledgeInputError,
+  KNOWLEDGE_STATUSES,
   knowledgeLifecycle,
   outlineMarkdown,
   parseKnowledgeFrontmatterInput,
@@ -36,11 +37,13 @@ export const LEARNINGS_AREA = "Learnings";
 export const WRITE_LIMIT_PER_TICKET = 3;
 /** A new learning at or above this similarity to an existing one (and sharing a tag) is a duplicate. */
 export const DUPLICATE_THRESHOLD = 0.7;
+/** `agent review` lists learnings that expire within this many days (like `agent stale --days`). */
+const DEFAULT_REVIEW_DAYS = 14;
 const DEFAULT_SEARCH_LIMIT = 5;
 const MAX_SEARCH_LIMIT = 50;
 const ROLES = ["architect", "coder", "tester", "chief"];
 const SECTIONS: Record<string, string> = { symptom: "Symptom", ursache: "Ursache", regel: "Regel", beleg: "Beleg", "gilt-fuer": "Gilt für", aufgaben: "Aufgaben" };
-const RETIRED = new Set(["veraltet", "ersetzt"]);
+const RETIRED = new Set(["veraltet", "ersetzt", "verworfen"]);
 
 /** A failure with its exit code and extra JSON fields; every other error is exit 1 (or 2 for invalid input). */
 export class LearningCliError extends Error {
@@ -84,17 +87,20 @@ const TARGET_HELP = `  --vault <ordner>   Vault (z. B. /data/learnings) — oder
 
 const COMMANDS: Record<string, CommandSpec> = {
   search: {
-    usage: "agent search <text> [--rolle <r>] [--tag <t>] [--komponente <c>] [--include-stale] [--limit <n>] (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    usage: "agent search <text> [--rolle <r>] [--tag <t>] [--komponente <c>] [--status <s>] [--include-stale] [--limit <n>] (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Sucht Learnings (Bereich Learnings) und gibt die Treffer als JSON aus.
-  <text>             Suchtext; darf fehlen, wenn --rolle, --tag oder --komponente gesetzt ist
+  <text>             Suchtext; darf fehlen, wenn --rolle, --tag, --komponente oder --status gesetzt ist
   --rolle <r>        nur Learnings mit diesem Rollen-Tag (architect, coder, tester, chief …)
   --tag <t>          nur Learnings mit diesem Tag (zusätzlich zu --rolle)
   --komponente <c>   nur Learnings, deren scope diesen Text enthält
-  --include-stale    auch abgelaufene (stale_after) und veraltete/ersetzte Learnings
+  --status <s>       nur Learnings mit genau diesem Status (${KNOWLEDGE_STATUSES.join(", ")}; Groß-/Kleinschreibung egal,
+                     bestaetigt = bestätigt). Der Filter hat Vorrang vor dem Ausblenden von Abgelaufenem und Ausgemustertem.
+                     Ohne --status bleibt die Suche wie sie ist (der Standard ist nicht „nur bestätigt“)
+  --include-stale    auch abgelaufene (stale_after) und veraltete/ersetzte/verworfene Learnings
   --limit <n>        höchstens n Treffer (Standard ${DEFAULT_SEARCH_LIMIT}, höchstens ${MAX_SEARCH_LIMIT})
 ${TARGET_HELP}
 Ausgabe: {"treffer":[{"pfad","titel","status","rolle","tags","auszug","stale_after","abgelaufen"}],"anzahl","gesamt","limit"}`,
-    values: ["--rolle", "--limit", "--komponente", ...TARGET_FLAGS],
+    values: ["--rolle", "--limit", "--komponente", "--status", ...TARGET_FLAGS],
     many: ["--tag"],
     bools: ["--include-stale"],
     positional: { min: 0, max: 1 },
@@ -130,7 +136,7 @@ Ausgabe: {"ok":true,"pfad","status":"neu","modus":"geschrieben"|"vorgeschlagen",
   append: {
     usage: "agent append <pfad> --ticket <id> --name <agent> (--inhalt <text|-> | --beleg <url>) [--abschnitt <a>] [--titel <t>] (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Ergänzt ein bestehendes Learning um einen neuen Knoten und/oder einen Beleg-Link und hängt einen
-verified-Eintrag (by = --name, at = heute) an. Ist das Learning nicht veraltet/ersetzt, wird stale_after auf
+verified-Eintrag (by = --name, at = heute) an. Ist das Learning nicht veraltet/ersetzt/verworfen, wird stale_after auf
 heute + ${LEARNING_STALE_AFTER_DAYS} Tage verlängert, falls es früher abläuft. Der Status bleibt unverändert.
   --inhalt <text|->  neuer Knoten mit diesem Inhalt (Markdown ohne Überschriften); "-" liest stdin
   --abschnitt <a>    Abschnitt, in den er kommt: symptom, ursache, regel (Standard), beleg, gilt-fuer, aufgaben
@@ -140,6 +146,25 @@ heute + ${LEARNING_STALE_AFTER_DAYS} Tage verlängert, falls es früher abläuft
 ${TARGET_HELP}
 Ausgabe: {"ok":true,"pfad","modus":"geschrieben"|"vorgeschlagen",…}`,
     values: ["--ticket", "--inhalt", "--abschnitt", "--titel", "--beleg", ...TARGET_FLAGS],
+    positional: { min: 1, max: 1 },
+  },
+  decide: {
+    usage: "agent decide <pfad> --entscheid <bestaetigt|verworfen> --grund <text> --quelle <link|text> --name <wer> (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    help: `Entscheidet über ein Learning (Pfad aus agent search): bestätigen oder verwerfen, mit Grund und Quelle.
+  --entscheid <e>    bestaetigt (auch: bestätigt) oder verworfen
+  --grund <text>     Pflicht: warum
+  --quelle <l|text>  Pflicht: Beleg des Entscheids (Link oder Text)
+  --name <wer>       Pflicht: wer entscheidet (kommt in verified.by und in die Entscheidung)
+Erlaubt sind neu → bestätigt, neu → verworfen, unbestätigt → verworfen und bestätigt → verworfen (Korrektur).
+Alles andere endet mit Exitcode 2 und einer Meldung, nichts wird geschrieben: unbestätigt → bestätigt (eine Ableitung ohne
+Vorfall bleibt unbestätigt), bestätigt → bestätigt sowie veraltet, ersetzt und verworfen als Ausgangsstatus.
+Wirkung: status wird gesetzt, verified um (by = --name, at = heute) ergänzt, bei bestätigt stale_after auf heute +
+${LEARNING_STALE_AFTER_DAYS} Tage gesetzt, und ein Knoten „Entscheidung“ (Datum, Entscheid, Grund, Quelle, wer) angehängt.
+Schreibweg und Rechte wie agent append (Vorschlag oder direkt), aber ohne --ticket und ohne Schreibzähler: das ist keine
+Ticket-Schreibung. Die Änderung steht im Protokoll (agent log) und lässt sich mit agent undo zurücknehmen.
+${TARGET_HELP}
+Ausgabe: {"ok":true,"pfad","modus":"geschrieben"|"vorgeschlagen","entscheid","vorher","status","verified":{"by","at"},"stale_after"?,…}`,
+    values: ["--entscheid", "--grund", "--quelle", ...TARGET_FLAGS],
     positional: { min: 1, max: 1 },
   },
   ingest: {
@@ -184,6 +209,18 @@ mit --in-map ohne "vorlage", dafür "quellentitel","zugeordnet":[{"titel","id"}]
     values: ["--vorlage", "--titel", "--text", "--quelle", "--quelle-datum", "--abschnitte", "--bereich", "--in-map", ...TARGET_FLAGS],
     positional: { min: 0, max: 0 },
   },
+  review: {
+    usage: "agent review [--days <n>] (--vault <ordner> | --cloud <url> [--workspace <id>])",
+    help: `Wochenlauf für den Bereich Learnings: eine kurze Meldung als Text (kein JSON), was zu entscheiden oder zu prüfen ist.
+  (a) alle Learnings mit Status neu: Pfad, Titel, Alter in Tagen, Beleg-Link, älteste zuerst
+  (b) abgelaufene und bald ablaufende Learnings (Logik von agent stale)
+  (c) Duplikat-Kandidaten unter den nicht ausgemusterten Learnings (Ähnlichkeit ab ${DUPLICATE_THRESHOLD}, wie bei agent create)
+  --days <n>         (b) nimmt auch die Learnings mit, die in den nächsten n Tagen ablaufen (Standard ${DEFAULT_REVIEW_DAYS})
+${TARGET_HELP}
+Gibt es nichts zu melden, ist die Ausgabe genau NO_REPLY. Entscheiden: agent decide. Lesend: ändert nichts.`,
+    values: ["--days", ...TARGET_FLAGS],
+    positional: { min: 0, max: 0 },
+  },
   stale: {
     usage: "agent stale [--days <n>] [--json] (--vault <ordner> | --cloud <url> [--workspace <id>])",
     help: `Zeigt Learnings mit abgelaufenem stale_after (mit --days auch die der nächsten n Tage) als JSON.
@@ -202,7 +239,7 @@ Die Form "agent stale <ordner>" (Text, NO_REPLY ohne Treffer) bleibt für Routin
 export const LEARNING_USAGE = `Learnings als Einzelbefehle (JSON auf stdout; Grundlage des Adapters wissen/bloommd in md-agents):
 ${Object.values(COMMANDS).map((spec) => `  ${spec.usage}`).join("\n")}
   Alle Befehle: --vault <ordner> oder --cloud <url> [--workspace <id>] (Token in BLOOMMD_TOKEN), dazu --name <agent>.
-  create und append brauchen --ticket <id> (höchstens ${WRITE_LIMIT_PER_TICKET} Schreibvorgänge je Ticket). Exitcodes: 0 ok, 1 Fehler,
+  create und append brauchen --ticket <id> (höchstens ${WRITE_LIMIT_PER_TICKET} Schreibvorgänge je Ticket); decide nicht. Exitcodes: 0 ok, 1 Fehler,
   2 Aufruf bzw. abgelehnte Eingabe, 3 Duplikat, 4 Limit (nur create/append). ingest (Text als Map nach Vorlage): agent ingest --help. Hilfe je Befehl: agent <befehl> --help. Rechte wie bei agent mcp; freigeben
   können nur Menschen (agent approve).`;
 
@@ -273,6 +310,16 @@ function linkOf(value: string): string {
   const link = value.trim();
   if (link.length > 500 || !/^https?:\/\/[^\s<>]+$/i.test(link)) throw usageError("--beleg erwartet einen http(s)-Link ohne Leerzeichen.");
   return link;
+}
+
+const STATUS_ASCII: Record<string, string> = { bestaetigt: "bestätigt", unbestaetigt: "unbestätigt" };
+
+/** A status word from the command line (any case, `bestaetigt` for `bestätigt`); anything else is a usage error. */
+function statusOf(value: string, flag: string): string {
+  const word = value.normalize("NFC").trim().toLowerCase();
+  const status = STATUS_ASCII[word] ?? word;
+  if (!(KNOWLEDGE_STATUSES as readonly string[]).includes(status)) throw usageError(`${flag} erwartet ${KNOWLEDGE_STATUSES.join(", ")}, nicht "${value}".`);
+  return status;
 }
 
 const today = (deps: LearningDeps): string => (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
@@ -440,12 +487,14 @@ async function search(service: KnowledgeService, parsed: Parsed, deps: LearningD
   const text = parsed.positional[0] ?? "";
   const rolle = one(parsed, "--rolle")?.trim();
   const komponente = one(parsed, "--komponente")?.trim();
+  const statusArg = one(parsed, "--status");
+  const status = statusArg === undefined ? undefined : statusOf(statusArg, "--status");
   const tags = [...(rolle ? [rolle] : []), ...(parsed.values.get("--tag") ?? []).map((tag) => tag.trim()).filter(Boolean)];
-  if (!text.trim() && tags.length === 0 && !komponente) throw usageError("Suchtext fehlt (oder --rolle, --tag, --komponente).");
+  if (!text.trim() && tags.length === 0 && !komponente && !status) throw usageError("Suchtext fehlt (oder --rolle, --tag, --komponente, --status).");
   const limit = Number(one(parsed, "--limit") ?? DEFAULT_SEARCH_LIMIT);
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_SEARCH_LIMIT) throw usageError(`--limit erwartet eine ganze Zahl von 1 bis ${MAX_SEARCH_LIMIT}.`);
   const now = deps.now?.();
-  const { hits } = await service.search(text, { area: LEARNINGS_AREA, tags, scope: komponente, includeStale: parsed.bools.has("--include-stale"), limit: 500, now });
+  const { hits } = await service.search(text, { area: LEARNINGS_AREA, tags, scope: komponente, status, includeStale: parsed.bools.has("--include-stale"), limit: 500, now });
   // One entry per map: maps with a hit in title or frontmatter first, then the ones with more hits.
   const byMap = new Map<string, typeof hits>();
   for (const hit of hits) byMap.set(hit.path, [...(byMap.get(hit.path) ?? []), hit]);
@@ -608,6 +657,111 @@ async function append(service: KnowledgeService, parsed: Parsed, target: Learnin
   }
 }
 
+/** Statuses a decision may start from, with the decisions allowed there. */
+const DECISIONS_FROM: Record<string, string[]> = { neu: ["bestätigt", "verworfen"], "unbestätigt": ["verworfen"], "bestätigt": ["verworfen"] };
+
+/** A value for the one-line `Entscheidung` node: line breaks become spaces; limited in length. */
+function oneLine(value: string, flag: string, max: number): string {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length > max) throw usageError(`${flag} ist zu lang (höchstens ${max} Zeichen).`);
+  return text;
+}
+
+async function decide(service: KnowledgeService, parsed: Parsed, target: LearningTarget, deps: LearningDeps) {
+  const path = learningPath(service, parsed.positional[0]!);
+  const entscheidArg = required(parsed, "--entscheid");
+  const entscheid = statusOf(entscheidArg, "--entscheid");
+  if (entscheid !== "bestätigt" && entscheid !== "verworfen") throw usageError(`--entscheid erwartet bestaetigt oder verworfen, nicht "${entscheidArg}".`);
+  const grund = oneLine(required(parsed, "--grund"), "--grund", 1000);
+  const quelle = oneLine(required(parsed, "--quelle"), "--quelle", 500);
+  const document = await service.store.read(path);
+  if (!areaCovers(LEARNINGS_AREA, areaOf(service, document.path))) throw usageError(`"${document.path}" liegt nicht im Bereich ${LEARNINGS_AREA}.`);
+  const frontmatter = readKnowledgeFrontmatter(document.markdown);
+  const vorher = frontmatter.status?.toLowerCase();
+  const refused = (hinweis: string) => new LearningCliError(EXIT.usage, `${document.path}: ${vorher ? `Status „${vorher}“` : "ohne Status"} → „${entscheid}“ ist nicht erlaubt: ${hinweis} Nichts geschrieben.`, { pfad: document.path, vorher: vorher ?? null, entscheid });
+  if (vorher === undefined || !Object.hasOwn(DECISIONS_FROM, vorher)) {
+    throw refused("Entscheiden lässt sich nur über neu, unbestätigt (nur → verworfen) und bestätigt (nur → verworfen); ausgemusterte Learnings (veraltet, ersetzt, verworfen) bleiben, wie sie sind.");
+  }
+  if (!DECISIONS_FROM[vorher]!.includes(entscheid)) {
+    throw refused(vorher === "unbestätigt" ? "Eine Ableitung ohne Vorfall bleibt unbestätigt; sie lässt sich nur verwerfen." : "Es ist schon bestätigt; zurücknehmen lässt es sich nur mit --entscheid verworfen.");
+  }
+  const day = today(deps);
+  const renewed = entscheid === "bestätigt" ? addDays(day, LEARNING_STALE_AFTER_DAYS) : undefined;
+  const trust = parseKnowledgeFrontmatterInput({ status: entscheid, verified: { by: target.name, at: day }, ...(renewed ? { stale_after: renewed } : {}) });
+  const nodes: KnowledgeNodeInput[] = [{
+    title: "Entscheidung",
+    content: [`- Datum: ${day}`, `- Entscheid: ${entscheid}`, `- Grund: ${grund}`, `- Quelle: ${quelle}`, `- Wer: ${oneLine(target.name, "--name", 120)}`].join("\n"),
+  }];
+  const result = await service.updateMap({ path: document.path, version: document.version, nodes, frontmatter: trust, source: quelle, reason: `Entscheidung ${entscheid}: ${excerpt(grund, 200)}` });
+  return { ok: true, ...describeWrite(result), entscheid, vorher, status: entscheid, verified: { by: target.name, at: day }, ...(renewed ? { stale_after: renewed } : {}) };
+}
+
+// --- weekly review ---------------------------------------------------------------------------
+
+const URL_RE = /https?:\/\/[^\s<>()\]]+/i;
+
+/** First link of the "Beleg" section (with the nodes below it), else the first link of `source`. */
+function evidenceLink(markdown: string, source: string | undefined): string | null {
+  const outline = outlineMarkdown(markdown);
+  const section = outline.nodes.find((node) => node.parentId === outline.rootId && node.title.trim().toLowerCase() === "beleg");
+  if (section) {
+    const below = (id: string): string[] => outline.nodes.filter((node) => node.parentId === id).flatMap((node) => [node.content, ...below(node.id)]);
+    const link = [section.content, ...below(section.id)].join("\n").match(URL_RE)?.[0];
+    if (link) return link.replace(/[.,;:]+$/, "");
+  }
+  return source?.match(URL_RE)?.[0]?.replace(/[.,;:]+$/, "") ?? null;
+}
+
+const dayCount = (days: number) => `${days} ${days === 1 ? "Tag" : "Tage"}`;
+
+/** The weekly message for the chief of staff; `NO_REPLY` when there is nothing to decide, renew or merge. */
+async function review(service: KnowledgeService, parsed: Parsed, deps: LearningDeps): Promise<string> {
+  const daysArg = one(parsed, "--days");
+  const days = daysArg === undefined ? DEFAULT_REVIEW_DAYS : Number(daysArg);
+  if (!Number.isInteger(days) || days < 0 || days > 3650) throw usageError("--days erwartet eine ganze Zahl von 0 bis 3650.");
+  const now = deps.now?.();
+  const day = (now ?? new Date()).toISOString().slice(0, 10);
+  const learnings = [];
+  for (const entry of (await service.store.list()).filter((map) => map.available !== false && areaCovers(LEARNINGS_AREA, map.area))) {
+    const document = await service.store.read(entry.path).catch(() => null);
+    if (!document) continue;
+    const frontmatter = readKnowledgeFrontmatter(document.markdown);
+    learnings.push({
+      path: entry.path,
+      title: frontmatter.title ?? entry.title,
+      tags: frontmatter.tags,
+      status: frontmatter.status?.toLowerCase(),
+      age: knowledgeLifecycle(frontmatter, day).ageDays,
+      link: evidenceLink(document.markdown, frontmatter.source),
+    });
+  }
+  learnings.sort((a, b) => a.path.localeCompare(b.path));
+
+  const open = learnings.filter((entry) => entry.status === "neu").sort((a, b) => (b.age ?? -1) - (a.age ?? -1) || a.path.localeCompare(b.path));
+  const { stale } = await service.stale({ area: LEARNINGS_AREA, days, now });
+  const active = learnings.filter((entry) => !entry.status || !RETIRED.has(entry.status));
+  const duplicates = [];
+  for (let i = 0; i < active.length; i += 1) {
+    for (let j = i + 1; j < active.length; j += 1) {
+      const score = learningSimilarity({ title: active[i]!.title, tags: active[i]!.tags }, { title: active[j]!.title, tags: active[j]!.tags });
+      if (score >= DUPLICATE_THRESHOLD) duplicates.push({ a: active[i]!, b: active[j]!, score });
+    }
+  }
+  duplicates.sort((x, y) => y.score - x.score || x.a.path.localeCompare(y.a.path) || x.b.path.localeCompare(y.b.path));
+  if (open.length === 0 && stale.length === 0 && duplicates.length === 0) return "NO_REPLY";
+
+  const staleLine = (entry: (typeof stale)[number]) => `• ${entry.title} – ${entry.path}${entry.status ? `, ${entry.status}` : ""}, ${entry.daysOverdue > 0 ? `seit ${entry.stale_after} (${dayCount(entry.daysOverdue)} überfällig)` : entry.daysOverdue === 0 ? "heute abgelaufen" : `läuft ab ${entry.stale_after}`}`;
+  const expired = stale.filter((entry) => entry.daysOverdue >= 0);
+  const expiring = stale.filter((entry) => entry.daysOverdue < 0);
+  return [
+    `📚 Learnings-Review ${day}`,
+    ...(open.length ? ["", `Zu entscheiden – Status neu (${open.length}), älteste zuerst:`, ...open.map((entry) => `• ${entry.path} – ${entry.title} – ${entry.age === undefined ? "Alter unbekannt" : dayCount(entry.age)} – ${entry.link ?? "kein Beleg-Link"}`), "Entscheiden: agent decide <pfad> --entscheid bestaetigt|verworfen --grund \"…\" --quelle \"…\" --name <wer>"] : []),
+    ...(expired.length ? ["", `Abgelaufen (${expired.length}):`, ...expired.map(staleLine)] : []),
+    ...(expiring.length ? ["", `Läuft in den nächsten ${days} ${days === 1 ? "Tag" : "Tagen"} ab (${expiring.length}):`, ...expiring.map(staleLine)] : []),
+    ...(duplicates.length ? ["", `Duplikat-Kandidaten (${duplicates.length}), Ähnlichkeit ab ${DUPLICATE_THRESHOLD}:`, ...duplicates.map((pair) => `• ${pair.a.title} ↔ ${pair.b.title} (${pair.score}): ${pair.a.path} | ${pair.b.path}`)] : []),
+  ].join("\n");
+}
+
 /** Text of a file, or of stdin for `-`; word for word (unlike `contentOf`). `stdinUsed` guards that stdin is read once. */
 async function inputOf(flag: string, value: string, deps: LearningDeps, stdin: { used: boolean }): Promise<string> {
   if (value === "-") {
@@ -685,7 +839,7 @@ export async function runLearningCommand(command: string, args: string[], deps: 
   }
   try {
     const parsed = parse(command, spec, args);
-    const writes = command === "create" || command === "append" || command === "ingest";
+    const writes = command === "create" || command === "append" || command === "ingest" || command === "decide";
     const target = targetOf(parsed, writes);
     const service = await deps.open(target);
     let result: unknown;
@@ -695,9 +849,11 @@ export async function runLearningCommand(command: string, args: string[], deps: 
       case "stale": result = await stale(service, parsed, deps); break;
       case "create": result = await create(service, parsed, target, deps); break;
       case "ingest": result = await ingest(service, parsed, deps); break;
+      case "decide": result = await decide(service, parsed, target, deps); break;
+      case "review": result = await review(service, parsed, deps); break;
       default: result = await append(service, parsed, target, deps);
     }
-    console.log(JSON.stringify(result));
+    console.log(typeof result === "string" ? result : JSON.stringify(result));
     return EXIT.ok;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

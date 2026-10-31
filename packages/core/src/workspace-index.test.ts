@@ -171,7 +171,7 @@ describe("stale targets", () => {
     expect(document(index, "t.md").backlinks.entries[0]).toMatchObject({ anchorMatched: false });
   });
 
-  test.each(["veraltet", "ersetzt"])("status %s on the target is reported, with the successor", (status) => {
+  test.each(["veraltet", "ersetzt", "verworfen"])("status %s on the target is reported, with the successor", (status) => {
     const index = indexOf({
       "alt.md": `---\nstatus: ${status}\nreplaced_by: neu.md\n---\n# Alt\n`,
       "neu.md": "# Neu\n",

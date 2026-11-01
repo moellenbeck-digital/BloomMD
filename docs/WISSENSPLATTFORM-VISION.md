@@ -40,6 +40,14 @@ SSO/SCIM, Ende-zu-Ende-Verschlüsselung, DLP und breit föderierte Suche sind m�
 
 ### Übergabe und nächste Entscheidung
 
+Lesereihenfolge für den Chief of Staff:
+
+1. [README](../README.md) und [Beta-Umfang](BETA-SCOPE.md): heutiger Produktkern und aktuelle Zusagen.
+2. [Architektur](ARCHITECTURE.md): Datenformat, lokale Nutzung, Sync und bestehende Sicherheitsgrenzen.
+3. [Learnings-Modell](LEARNINGS.md) und [Learnings-Ablage](LEARNINGS-ABLAGE.md): vorhandene Regeln und Betrieb des ersten internen Pilots.
+4. [Grundlage #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) mit [Draft-PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189): verbindliche Positionierung, separat freizugeben.
+5. Dieses Visionsdokument und [Pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): Einordnung, offene Entscheidungen und erster realer Nutzen.
+
 Briefing für den Brand Chief of Staff:
 
 > BloomMD bleibt ein offener, lokal nutzbarer Markdown-Workspace. #116 ist unser erster interner Test der Backend-Funktionen für bestätigte Learnings. Bitte prüfe den Pilot anhand der vorhandenen Tickets und benenne Nutzer, Erfolgskriterien, zulässigen Speicherort und Rechte. Schlage erst nach der Abnahme den nächsten Anwendungsfall vor. Die größere Wissensplattform-Vision ist eine Richtung, keine Freigabe für zusätzliche Releases.
@@ -83,6 +91,14 @@ The pilot builds on existing work for [trust fields and search #110](https://git
 SSO/SCIM, end-to-end encryption, DLP, and broad federated search remain possible later directions, not architecture or release commitments.
 
 ### Handoff and next decision
+
+Reading order for the Chief of Staff:
+
+1. [README](../README.md) and [beta scope](BETA-SCOPE.md): current product foundation and commitments.
+2. [Architecture](ARCHITECTURE.md): file format, local use, sync, and existing security boundaries.
+3. [Learnings model](LEARNINGS.md) and [learnings storage](LEARNINGS-ABLAGE.md): existing rules and operations for the first internal pilot.
+4. [Foundation issue #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) and [draft PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189): authoritative positioning, subject to separate approval.
+5. This vision draft and [pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): framing, open decisions, and first real use.
 
 Brief for the brand Chief of Staff:
 

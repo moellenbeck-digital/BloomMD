@@ -1,6 +1,6 @@
 ---
 title: Obsidian plugin
-description: Edit Markdown notes in Obsidian as a map, with handwriting in the node inspector – on the Mac and as a beta on iPad.
+description: Edit Markdown notes in Obsidian as a map, with handwriting in the node inspector – on desktop, iPad, iPhone and Android.
 order: 5
 draft: true
 ---
@@ -15,8 +15,9 @@ ordinary Markdown file in your vault.
 - **Obsidian on Mac, Windows or Linux:** via BRAT with the repository
   `moellenbeck-digital/bloommd-obsidian`, or by copying `manifest.json`, `main.js`,
   `shared-runtime.js` and `styles.css` to `.obsidian/plugins/bloommd/`.
-- **Obsidian on iPad (beta):** from version 0.6.0, also via BRAT. Mobile support is a beta; known
-  limits are listed below.
+- **Obsidian on iPad, iPhone and Android (beta):** with public release 0.7.0 or later, via BRAT
+  or the GitHub release. Version 0.6.0 was not released separately. Mobile limitations are
+  listed below.
 
 Commands: **Visualize current note** opens the current note as a map, **Visualize current folder**
 opens the folder.

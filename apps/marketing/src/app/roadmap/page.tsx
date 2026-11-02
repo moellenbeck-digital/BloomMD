@@ -7,7 +7,7 @@ export const revalidate = 30;
 
 export const metadata: Metadata = marketingMetadata({
   title: "BloomMD Roadmap - Öffentliches Beta-Feedback",
-  description: "Kuratierte öffentliche BloomMD-Roadmap mit Feedback, Ready, In progress und In review.",
+  description: "Kuratierte öffentliche BloomMD-Roadmap mit Feedback, Planung, Umsetzung und Review.",
   path: "/roadmap",
   languages: {
     de: "/roadmap",

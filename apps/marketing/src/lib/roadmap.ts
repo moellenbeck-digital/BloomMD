@@ -4,7 +4,7 @@ const roadmapProjectTitle = "BloomMD Roadmap";
 const publicRoadmapLabel = "public-roadmap";
 export const roadmapRevalidateSeconds = 30;
 
-export type RoadmapStatus = "Feedback" | "Ready" | "In progress" | "In review";
+export type RoadmapStatus = "Feedback" | "Planned" | "In progress" | "In review";
 
 export type RoadmapTag =
   | "Mac"
@@ -73,7 +73,19 @@ type GitHubIssueNode = {
   };
 };
 
-const publicStatuses: RoadmapStatus[] = ["Feedback", "Ready", "In progress", "In review"];
+const publicStatuses: RoadmapStatus[] = ["Feedback", "Planned", "In progress", "In review"];
+const boardStatusToPublicStatus: Record<string, RoadmapStatus | null> = {
+  "Neue Aufgabe": "Feedback",
+  Todo: "Planned",
+  "In Arbeit": "In progress",
+  "Zu reviewen": "In review",
+  Nacharbeiten: "In progress",
+  Fertig: null,
+  Feedback: "Feedback",
+  Ready: "Planned",
+  "In progress": "In progress",
+  "In review": "In review",
+};
 
 const fallbackRoadmapIssues: RoadmapIssue[] = [];
 
@@ -210,7 +222,10 @@ function toRoadmapIssue(node: GitHubIssueNode): RoadmapIssue | null {
     return null;
   }
 
-  const status = readProjectStatus(node) ?? "Feedback";
+  const status = readProjectStatus(node);
+  if (!status) {
+    return null;
+  }
   const body = typeof node.body === "string" ? node.body : "";
   const description = readPublicSummary(body) ?? summarizeBody(body);
 
@@ -231,17 +246,13 @@ function readProjectStatus(node: GitHubIssueNode): RoadmapStatus | null {
     }
 
     for (const value of item.fieldValues?.nodes ?? []) {
-      if (value.field?.name === "Status" && typeof value.name === "string" && isRoadmapStatus(value.name)) {
-        return value.name;
+      if (value.field?.name === "Status" && typeof value.name === "string") {
+        return boardStatusToPublicStatus[value.name] ?? null;
       }
     }
   }
 
   return null;
-}
-
-function isRoadmapStatus(value: string): value is RoadmapStatus {
-  return publicStatuses.includes(value as RoadmapStatus);
 }
 
 function publicTagsFromLabels(labels: string[], title: string): RoadmapTag[] {

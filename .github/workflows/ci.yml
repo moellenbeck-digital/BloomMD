@@ -197,10 +197,25 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/app/package.json', 'apps/marketing/package.json') }}
           restore-keys: |
             playwright-${{ runner.os }}-
-      - name: Install Playwright browser and system dependencies
+      # Two steps instead of `playwright install --with-deps`: the browser cache above only covers
+      # the browser download, while the apt part runs on every job. Each part retries on its own, and
+      # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut
+      # off per attempt instead of eating the whole 10 minutes; every failed attempt is a
+      # ::warning:: in the log, and the last failure is a hard red (#141).
+      - name: Install Playwright system dependencies
         working-directory: apps/app
         timeout-minutes: 10
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15
+          -- ./node_modules/.bin/playwright install-deps chromium
+      - name: Install Playwright browser
+        working-directory: apps/app
+        timeout-minutes: 10
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright browser download" --attempts 3 --timeout 120 --pause 15
+          -- ./node_modules/.bin/playwright install chromium
       # Eats its own cooking: the repository's own Markdown goes through the checks BloomMD ships.
       # A broken link in our docs should fail our pipeline, not just other people's.
       - name: Lint repository Markdown

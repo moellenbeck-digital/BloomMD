@@ -32,23 +32,23 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Set up Node.js for Vite tooling
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
@@ -148,7 +148,7 @@ jobs:
         run: python3 .github/scripts/macos-signing-keychain.py cleanup
 
       - name: Upload stable macOS artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-desktop-release-macos-arm64
           path: packages/desktop/artifacts/*
@@ -173,23 +173,23 @@ jobs:
             electrobun_arch: arm64
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Set up Node.js for Vite tooling
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.3.14
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ matrix.electrobun_arch }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
@@ -256,7 +256,7 @@ jobs:
         run: tar -czf "linux-${{ matrix.artifact }}-app.tar.gz" -C "build/stable-linux-${{ matrix.electrobun_arch }}" package-app
 
       - name: Upload stable Linux artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-desktop-release-${{ matrix.artifact }}
           path: |
@@ -290,14 +290,14 @@ jobs:
           sed -i 's/^#DisableSandboxSyscalls/DisableSandboxSyscalls/' /etc/pacman.conf
           pacman -Syu --noconfirm --needed ca-certificates desktop-file-utils file git nodejs ripgrep zstd gtk3 webkit2gtk-4.1 libayatana-appindicator librsvg libsecret ttf-dejavu xorg-server-xvfb
 
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Download native Linux bundle
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: bloommd-desktop-release-${{ matrix.artifact }}
           path: transfer
@@ -400,7 +400,7 @@ jobs:
         run: bash packaging/arch/prepare-release-asset.sh
 
       - name: Upload Pacman package
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-desktop-release-pacman-${{ matrix.package_arch }}
           path: packages/desktop/artifacts/*.pacman
@@ -414,7 +414,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download stable desktop artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: bloommd-desktop-release-*
           path: release-assets

@@ -1,27 +1,30 @@
-# BloomMD Private Beta — Scope
+# BloomMD Beta — aktueller Umfang
 
-Stand: 9. August 2026 · Entscheidung: [Archiv #43](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/43)
+Stand: 2. November 2026 · Historischer M1-Beschluss: [Archiv #43](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/43)
 
-Dieses Dokument legt fest, was in der geschlossenen Beta enthalten ist und was nicht. Die Formulierungen
-hier sind verbindlich: README, Website und Tester-Kommunikation verwenden dieselbe Sprache, damit
-niemand etwas erwartet, das nicht existiert.
+Dieses Dokument beschreibt den aktuell veröffentlichten Beta-Umfang. Der Produktionsstand und die
+Funktionen auf `main` können sich unterscheiden: Die gehostete App verlangt derzeit noch eine
+Einladung, obwohl die offene Registrierung im Code vorbereitet ist. Die Umstellung erfolgt erst mit
+dem freigegebenen [Produktions-Rollout #164](https://github.com/moellenbeck-digital/BloomMD/issues/164).
+README, Website und Tester-Kommunikation verwenden dieselbe Sprache, damit niemand etwas erwartet,
+das noch nicht ausgeliefert ist.
 
 ## Enthalten
 
 | Bereich | Was Tester erwarten dürfen |
 |---|---|
 | **Desktop-App** | **Der empfohlene Weg.** Arbeitet direkt auf einem lokalen Ordner, rendert den Ordner als Workspace-Mindmap mit Datei-, Ordner- und Heading-Nodes plus Querverweis-Edges, erkennt externe Änderungen über File Watching und öffnet konkrete `.md`-Dateien per Datei-Node. Braucht **keinen** Account und **keine** Cloud. |
-| **Web-App** | Dieselbe Oberfläche im Browser, für die Cloud-Beta nach Registrierung (offen; der Zugangsschalter `BLOOMMD_BETA_ACCESS=1` bleibt als Einladungsmodus erhalten). Command Palette, Fokus-, Outline- und Präsentationsmodus, gespeicherte Views. |
+| **Web-App** | Dieselbe Oberfläche im Browser. Der produktive Cloud-Zugang ist derzeit auf Einladungen beschränkt; nach Freigabe von #164 kann das vorbereitete offene Signup aktiviert werden. Command Palette, Fokus-, Outline- und Präsentationsmodus, gespeicherte Views. |
 | **OKF / LLM-Wiki** | Wissensbündel im Open Knowledge Format v0.2 lesen und schreiben, Trust-Signale (`sources`, `generated`, `verified`, `status`, `stale_after`), deterministisches `status`/`lint`, und der Proposal-Workflow `propose → approve → apply` über CLI und MCP. Läuft lokal, ohne Modell und ohne Netzwerk. |
 | **Kollaboration** | Realtime-Sync über Yjs mit Presence, dokumentgebundenen Tickets und Rollenprüfung. **Als Beta gekennzeichnet**, eine Instanz, nicht beworben. |
-| **Obsidian-Kompatibilität** | Eine echte Obsidian-Notiz wird als BloomMD-Map visualisiert. Die vollständige Plugin-Beta-Verteilung über BRAT folgt in M2 (#89). |
+| **Obsidian-Plugin** | Die öffentlich verteilte Plugin-Beta 0.7.1 läuft auf Desktop, iPad, iPhone und Android. Sie bearbeitet lokale Vault-Notizen als Maps, ohne BloomMD-Konto. Das ist von der eigenständigen Mobile-App getrennt. |
 
 ## Ausdrücklich nicht enthalten
 
 | Bereich | Warum |
 |---|---|
-| **Mobile Obsidian** | Die Touch-Matrix auf echten Geräten ist nicht gelaufen. `isDesktopOnly` bleibt `true`, `release:verify` erzwingt das. Siehe [#76](https://github.com/moellenbeck-digital/BloomMD/issues/76). |
-| **Öffentlicher SaaS-Launch** | Die Registrierung für die Cloud-Beta ist offen, die Warteliste ist beendet. Ein öffentlicher SaaS-Launch (Preise, Support-Zusagen, Spamschutz) ist eine spätere, eigene Entscheidung mit eigenen Voraussetzungen. |
+| **Eigenständige Mobile-App in App Stores** | Der Capacitor-Build ist in Entwicklung; ein öffentlicher App-Store-Release ist ein eigener Lieferumfang. Das veröffentlichte Obsidian-Plugin auf Mobilgeräten ist davon unabhängig. |
+| **Öffentlicher SaaS-Launch** | Die produktive Cloud-Beta ist noch einladungspflichtig. Offene Registrierung und Ende der Warteliste sind vorbereitet, aber noch nicht produktiv ausgerollt. Ein allgemeiner SaaS-Launch (Preise, Support-Zusagen, Spamschutz) ist eine weitere Entscheidung. |
 | **Billing / bezahlte Pläne** | `BLOOMMD_BILLING_ENABLED=0`. Checkout, Portal und Webhook antworten 404. Es werden keine Zahlungsdaten erhoben. |
 | **Template-Marktplatz** | [#81](https://github.com/moellenbeck-digital/BloomMD/issues/81), kein Milestone. |
 | **VS-Code-Extension** | [#80](https://github.com/moellenbeck-digital/BloomMD/issues/80), kein Milestone. |
@@ -29,20 +32,18 @@ niemand etwas erwartet, das nicht existiert.
 
 ## Desktop-Plattformen
 
-M1 Closed Beta ist **macOS-first** fuer die native Desktop-App. Linux und Windows werden bewusst als
-eigene Beta-Releases nach M1 nachgezogen, damit der Closed-Beta-Start nicht an zusätzlichem
-Plattform-Packaging und manueller Plattform-Evidence hängt.
+M1 startete **macOS-first**. Die lokale Desktop-Beta ist inzwischen auch fuer Omarchy/Arch Linux
+verfuegbar. Windows bleibt ein eigener spaeterer Beta-Release.
 
 | System | Stand | Erster Start |
 |---|---|---|
-| macOS (arm64) | **M1 unterstützt.** Lokal geprüft, App startet, gültiges DMG erzeugt | Rechtsklick → Öffnen (Gatekeeper) |
-| Linux (x64) | **Nach M1.** Eigener Linux Beta Release | noch nicht Teil der Tester-Kommunikation |
+| macOS (arm64) | Lokale Beta, DMG auf der Downloadseite | Freigabehinweise auf der Downloadseite beachten |
+| Omarchy/Arch Linux (x86_64, ARM64) | Lokale Beta als Pacman-Paket auf der Downloadseite | Paket installieren und lokalen Markdown-Ordner öffnen |
 | Windows (x64) | **Nach M1.** Eigener Windows Beta Release; #73 bleibt vor Cloud-Nutzung zu lösen oder klar zu begrenzen | noch nicht Teil der Tester-Kommunikation |
 
-**M1-Builds sind ad-hoc signiert, aber nicht Developer-ID-signiert oder notarisiert.** Das `.app`-
-Bundle ist intern konsistent und besteht `codesign --verify`. Die finale Developer-ID-Signatur und
-Notarisierung warten auf die Freigabe des Apple Developer Accounts. Für eingeladene Tester ist der
-Umweg über die Gatekeeper-Warnung zumutbar, solange er erklärt wird — das tut die `/beta`-Seite.
+Der historische M1-Build war ad-hoc signiert. Aktuelle Signatur und Installationshinweise stehen
+bei den jeweiligen Artefakten auf der [Downloadseite](https://bloommd.io/download); alte M1-Angaben
+sind keine Aussage ueber spaetere Desktop-Releases.
 
 Ein `--env=stable`-Build legt die verteilbaren Dateien in `packages/desktop/artifacts/` ab, nicht in
 `build/`: ein DMG (ca. 20 MB), ein komprimiertes App-Bundle und eine `update.json` für den
@@ -52,9 +53,9 @@ Auto-Updater. Auf macOS lokal erzeugt und als gültiges Disk-Image geprüft.
 
 Wichtig für Tester, die keinen SaaS-Zugang haben oder ihn nicht wollen:
 
-- **Desktop lokal** braucht keinen Account und keine Einladung. Dateien liegen in `~/bloommd`. Das ist der Hauptweg der Beta.
+- **Desktop lokal** braucht keinen Account und keine Einladung. Dateien liegen standardmaessig in `~/bloommd`. Das ist der Hauptweg der Beta.
 - **Lokale OKF-/Wiki-Bündel** funktionieren vollständig offline über `bloommd-wiki …` und den MCP-Transport.
-- **Obsidian-Kompatibilität** wird lokal demonstriert; die vollständige Plugin-Verteilung folgt nach M1.
+- **Obsidian-Plugin 0.7.1** ist fuer Desktop, iPad, iPhone und Android oeffentlich verfuegbar und arbeitet lokal im Vault.
 - **Öffentliche Demo und Templates** brauchen keine Einladung.
 
 Gesperrt ist ausschließlich die **Registrierung für die Cloud-App**.
@@ -76,9 +77,7 @@ individuelle Wiederherstellungszusage und keine Restore-SLA. Fuer Tester gilt de
 ## Bekannte Einschränkungen
 
 - Sync läuft mit `SYNC_REPLICA_COUNT=1`. Mehr-Instanz-Koordination existiert nicht.
-- Keine Konfliktauflösung als Diff-Oberfläche ([Archiv #29](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/29)).
-- Neue Dateien anderer Teilnehmer erscheinen nicht per Push, sondern erst über Polling, Fensterfokus oder Reload ([Archiv #1](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/1)).
-- Desktop-Auto-Reconnect zum Remote-Server ist unzuverlässig ([Archiv #2](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/2)).
 - Der Desktop-File-Watcher beobachtet `.md`-Dateien rekursiv; sehr schnelle externe Schreibvorgaenge werden ueber `awaitWriteFinish` zusammengezogen.
 
-Diese Punkte sind bekannt und müssen nicht gemeldet werden. Alles andere schon.
+Aktuelle Bugs und Plattformgrenzen werden im [BloomMD-Board](https://github.com/orgs/moellenbeck-digital/projects/3)
+gepflegt; historische M1-Befunde gelten nicht automatisch fuer die aktuellen Builds.

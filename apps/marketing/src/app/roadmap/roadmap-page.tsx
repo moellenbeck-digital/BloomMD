@@ -32,7 +32,7 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
     eyebrow: "Öffentliche Roadmap",
     title: "Was gerade aus Beta-Feedback entsteht.",
     intro:
-      "Diese Seite zeigt nur kuratierte BloomMD-Tickets. Interne Kommentare, Anhänge, Assignees und nicht freigegebene Labels bleiben im privaten Project Board.",
+      "Diese Seite zeigt kuratierte BloomMD-Tickets. Die verlinkten GitHub-Issues sind öffentlich, einschließlich ihrer Kommentare und Anhänge.",
     languageLabel: "Sprache",
     switchLabel: "EN",
     switchHref: "/en/roadmap",
@@ -47,9 +47,9 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
       "Ein Ticket erscheint hier nur mit dem Label public-roadmap. Ticket-Titel bleiben in der Originalsprache, UI und Orientierung sind Deutsch und Englisch gepflegt.",
     statusText: {
       Feedback: "Feedback",
-      Ready: "Ready",
-      "In progress": "In progress",
-      "In review": "In review",
+      Planned: "Geplant",
+      "In progress": "In Arbeit",
+      "In review": "In Prüfung",
     },
     tagText: {
       Mac: "Mac",
@@ -74,7 +74,7 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
     eyebrow: "Public roadmap",
     title: "What beta feedback is turning into.",
     intro:
-      "This page only shows curated BloomMD tickets. Internal comments, attachments, assignees and non-public labels stay in the private project board.",
+      "This page shows curated BloomMD tickets. Linked GitHub issues are public, including their comments and attachments.",
     languageLabel: "Language",
     switchLabel: "DE",
     switchHref: "/roadmap",
@@ -89,7 +89,7 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
       "A ticket appears here only with the public-roadmap label. Ticket titles keep their original language; interface and orientation are maintained in German and English.",
     statusText: {
       Feedback: "Feedback",
-      Ready: "Ready",
+      Planned: "Planned",
       "In progress": "In progress",
       "In review": "In review",
     },

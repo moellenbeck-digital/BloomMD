@@ -1,6 +1,6 @@
 ---
 title: Obsidian-Plugin
-description: Markdown-Notizen in Obsidian als Map bearbeiten, mit Handschrift im Knoten-Inspector – auf dem Mac und als Beta auf dem iPad.
+description: Markdown-Notizen in Obsidian als Map bearbeiten, mit Handschrift im Knoten-Inspector – auf Desktop, iPad, iPhone und Android.
 order: 5
 draft: true
 ---
@@ -15,8 +15,9 @@ bleibt eine normale Markdown-Datei in deinem Vault.
 - **Obsidian auf dem Mac, Windows oder Linux:** über BRAT mit dem Repository
   `moellenbeck-digital/bloommd-obsidian` oder durch Kopieren von `manifest.json`, `main.js`,
   `shared-runtime.js` und `styles.css` nach `.obsidian/plugins/bloommd/`.
-- **Obsidian auf dem iPad (Beta):** ab Version 0.6.0. Installation ebenfalls über BRAT. Die
-  Mobile-Unterstützung ist eine Beta; bekannte Grenzen stehen unten.
+- **Obsidian auf iPad, iPhone und Android (Beta):** mit der öffentlich veröffentlichten Version
+  0.7.0 oder neuer, ebenfalls über BRAT oder den GitHub-Release. Version 0.6.0 wurde nicht separat
+  veröffentlicht. Bekannte Mobile-Grenzen stehen unten.
 
 Befehle: **Visualize current note** öffnet die aktuelle Notiz als Map, **Visualize current folder**
 den Ordner.

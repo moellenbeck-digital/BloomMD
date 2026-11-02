@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>The Markdown workspace for LLM-maintained knowledge.</strong>
+  <strong>Visual Markdown workspaces, local first.</strong>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="https://bloommd.io">Website</a> ·
   <a href="https://bloommd.io/demo">Open Demo</a> ·
   <a href="https://bloommd.io/templates">Browse Templates</a> ·
-  <a href="plugins/obsidian">Obsidian Preview</a> ·
+  <a href="plugins/obsidian">Obsidian Plugin</a> ·
   <a href="https://github.com/moellenbeck-digital/BloomMD/issues/new/choose">Report a Bug</a>
 </p>
 
@@ -29,23 +29,23 @@
 
 ## What is BloomMD?
 
-BloomMD is a local-first workspace for building an LLM-maintained wiki from ordinary Markdown. Headings become nodes, nested headings become branches, and the text under each heading stays as the node content.
+BloomMD is a local-first visual workspace for ordinary Markdown files. Headings become nodes, nested headings become branches, and the text under each heading stays as the node content.
 
 You can explore raw sources visually, connect concepts across maps, drag branches to restructure them, edit the distilled knowledge, and save the result back to normal `.md` files. The map is the interface; Markdown files remain portable and inspectable in Git, Obsidian, VS Code, or any text editor.
 
 BloomMD is becoming the visual layer for the **LLM Wiki pattern**: raw sources stay immutable, an interconnected Markdown wiki becomes the queryable knowledge layer, and human-defined conventions form the schema. Agents may later maintain the wiki, but every change remains reviewable Markdown rather than hidden model memory.
 
-BloomMD runs as a **closed beta**: while the closed-beta gate is on (`BLOOMMD_BETA_ACCESS=1`) the hosted
-cloud application is invitation only; with the gate off, anyone can register themselves (email
-confirmation, consent to privacy policy and terms, and signup rate limits still apply). The demo
-and the template library stay open to everyone. Desktop workspaces and local OKF/LLM-Wiki bundles
-work without any account. Obsidian compatibility is demonstrated during M1 with real local notes;
-the full Obsidian plugin beta distribution follows in M2.
+The hosted app currently runs as an **invitation-only closed beta**. The code supports open
+self-registration when `BLOOMMD_BETA_ACCESS` is off, but the production gate remains on until the
+approved rollout. Email confirmation, consent, and signup limits apply in either mode. The demo,
+templates, local Desktop builds, and local OKF/LLM-Wiki bundles need no BloomMD account. The
+separately released Obsidian plugin 0.7.1 is available on desktop, iPad, iPhone, and Android.
 
-**In scope:** Web, macOS Desktop, OKF/LLM-Wiki, and collaboration marked as beta on a single instance.
-Linux and Windows desktop builds are planned as follow-up beta releases after M1.
-**Out of scope:** mobile Obsidian, a public SaaS launch, billing, the template marketplace, the VS Code
-extension, and hosted autonomous agents.
+**Available now:** invited Web/Cloud beta; local Desktop builds for macOS and Omarchy/Arch Linux;
+local OKF/LLM-Wiki tools; Obsidian plugin beta on desktop and mobile. Collaboration remains a beta
+feature on one sync writer. **Not publicly available:** Windows Desktop beta, the standalone
+BloomMD mobile app in app stores, a general SaaS launch, billing, the template marketplace, the
+VS Code extension, and hosted autonomous agents.
 
 Full wording is in [docs/BETA-SCOPE.md](docs/BETA-SCOPE.md). Active launch work is tracked in the
 [public BloomMD roadmap](https://bloommd.io/roadmap).
@@ -175,9 +175,12 @@ Each template has `template.md`, `metadata.json`, and a public preview image pat
 
 [`plugins/obsidian`](plugins/obsidian) contains the BloomMD for Obsidian companion plugin. The
 monorepo is its only development source; `moellenbeck-digital/bloommd-obsidian` is a generated,
-read-only release mirror for BRAT and manual distribution. The M1 plugin beta is desktop-only.
+read-only release mirror for BRAT and manual distribution. The public 0.7.1 plugin beta supports
+desktop Obsidian as well as iPad, iPhone, and Android. This is separate from the standalone
+BloomMD mobile app.
 
-The Markdown parser and lossless structural operations are shared through `@bloommd/core/browser`.
+The Markdown parser and lossless structural operations are shared through the narrow
+`@bloommd/core/obsidian-markdown` export.
 Obsidian-specific Vault, View, settings, and UI behavior stays in the plugin. Use
 [`plugins/obsidian/RELEASE.md`](plugins/obsidian/RELEASE.md) for the mirror and release contract.
 
@@ -199,14 +202,13 @@ By default, the plugin keeps vault contents local and does not put Markdown cont
 | Area | Technology | Beta status |
 |---|---|
 | Web | Next.js 16 App Router with Turbopack | Hosted beta: invitation only with the gate on, open self-registration with the gate off |
-| Desktop | Electrobun v1 | Recommended local beta path on macOS for M1, no account required |
+| Desktop | Electrobun v1 | Local beta builds for macOS and Omarchy/Arch Linux, no account required |
 | OKF / LLM-Wiki | BloomMD CLI, MCP transport, `@bloommd/core` | Local and offline-capable |
 | Sync | Bun WebSocket service, Yjs, Postgres persistence | Beta, one writer replica only |
-| Mobile | Capacitor 8 | Package exists, but mobile support is outside the M1 beta scope |
+| Standalone mobile app | Capacitor 8 | Package exists, but no public app-store release yet |
 
-The mobile package remains in the monorepo for technical continuity, but mobile testing and support
-are explicitly out of scope for the closed beta. The beta promise is Web, Desktop, local
-OKF/LLM-Wiki, and collaboration marked as beta.
+The standalone mobile package remains in the monorepo for technical continuity. Obsidian plugin
+support on mobile has its own release and test matrix.
 
 The supported build runtime is Node.js 22. Node.js 23 and other odd-numbered releases are intentionally outside the release matrix.
 
@@ -290,9 +292,10 @@ bloommd-wiki lint ./wiki
 bloommd-wiki mcp ./wiki
 ```
 
-## M1 Release Artifacts
+## M1 Release Artifacts (historical scope)
 
-M1 uses deliberately separate artifacts:
+The release workflow uses deliberately separate artifacts. M1 began with macOS; the Linux
+Pacman packages were added afterward:
 
 | Artifact | Build command | Purpose |
 |---|---|---|
@@ -574,16 +577,13 @@ Useful starting points:
 - [Request an integration](https://github.com/moellenbeck-digital/BloomMD/issues/new?template=integration_request.yml)
 - [Obsidian plugin issue](https://github.com/moellenbeck-digital/BloomMD/issues/new?template=obsidian_plugin_issue.yml)
 
-GitHub Discussions should be enabled with categories for Ideas, Feature Requests, Questions, Show and Tell, Templates, and Integrations.
-
 ## License
 
 BloomMD source from the Marketing 0.5.1 release commit onward is licensed under the
 [Elastic License 2.0](LICENSE). Earlier published versions, including Desktop
 `v0.5.14`, remain under their original MIT terms; the previous license text is
 preserved in [LICENSE-MIT-legacy](LICENSE-MIT-legacy). The separately released
-[Obsidian plugin](plugins/obsidian/LICENSE) uses ELv2 from its next public release;
-published plugin versions through 0.5.12 remain MIT.
+[Obsidian plugin](plugins/obsidian/LICENSE) remains under MIT in its current public 0.7.1 release.
 
 Historical binary releases and their license boundary are explained in
 [Release history](docs/RELEASE-HISTORY.md).

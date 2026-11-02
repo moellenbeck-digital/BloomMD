@@ -1,5 +1,5 @@
 import { createSqlClient } from "../src/lib/sql-client";
-import { purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "../src/lib/unconfirmed-accounts";
+import { purgeUnactivatedWaitlistAccounts, purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "../src/lib/unconfirmed-accounts";
 
 /**
  * Removes accounts whose email address was never confirmed (#169).
@@ -7,6 +7,9 @@ import { purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "..
  *   bun run db:purge-unconfirmed                dry run (default): counts, deletes nothing
  *   bun run db:purge-unconfirmed --apply        deletes
  *   ... --days 14                               age limit, default 7 (or BLOOMMD_UNCONFIRMED_ACCOUNT_RETENTION_DAYS)
+ *
+ * Also removes the prepared waitlist accounts (#105) nobody activated 90 days after the activation
+ * mail (`unactivatedWaitlistAccounts` in the output); `--days` does not change that limit.
  */
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required.");
@@ -20,7 +23,10 @@ if (args.includes("--apply") && args.includes("--dry-run")) throw new Error("--a
 
 const sql = createSqlClient(databaseUrl);
 try {
-  console.log(JSON.stringify(await purgeUnconfirmedAccounts(sql, { days, dryRun: !args.includes("--apply") })));
+  const dryRun = !args.includes("--apply");
+  const unconfirmed = await purgeUnconfirmedAccounts(sql, { days, dryRun });
+  const unactivatedWaitlistAccounts = await purgeUnactivatedWaitlistAccounts(sql, { dryRun });
+  console.log(JSON.stringify({ ...unconfirmed, unactivatedWaitlistAccounts }));
 } finally {
   await sql.end();
 }

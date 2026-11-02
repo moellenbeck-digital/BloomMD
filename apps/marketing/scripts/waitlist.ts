@@ -12,6 +12,7 @@
  *   bun run --cwd apps/marketing waitlist count
  *   bun run --cwd apps/marketing waitlist export [--out datei.csv]
  *   bun run --cwd apps/marketing waitlist invite [--apply]
+ *   bun run --cwd apps/marketing waitlist mark-transferred [--apply]
  *   bun run --cwd apps/marketing waitlist purge [--apply]
  *   bun run --cwd apps/marketing waitlist list
  *   bun run --cwd apps/marketing waitlist allowlist [anzahl]
@@ -30,6 +31,7 @@ import {
   evaluateWaitlistPurge,
   listConfirmedWaitlist,
   listWaitlistAdminEntries,
+  markWaitlistInvitedWithoutMail,
   purgeWaitlist,
   waitlistPurgeStatus,
   waitlistRetentionPolicy,
@@ -46,6 +48,12 @@ const USAGE = `waitlist — Warteliste abwickeln (Registrierung ersetzt sie)
                                 Adressen, die noch keine bekommen haben. Standard ist Dry-Run
                                 (listet nur); gesendet wird nur mit --apply. Jede Adresse
                                 höchstens einmal.
+  mark-transferred [--apply]    Bestätigte, nicht abgemeldete Adressen ohne Einladung als
+                                eingeladen markieren, OHNE Mail: für die Adressen, die die
+                                Konto-Übertragung der App (apps/app, db:transfer-waitlist)
+                                angeschrieben hat. Danach schickt invite niemanden mehr an, und
+                                die Frist für purge läuft. Erst nach vollständigem Lauf der
+                                Übertragung. Standard ist Dry-Run (zählt nur).
   purge [--apply]               ALLE Einträge löschen. Dry-Run zeigt, ob es erlaubt wäre;
                                 --apply wird verweigert, solange jemand noch nicht eingeladen
                                 wurde oder die Frist von ${WAITLIST_PURGE_RETENTION_DAYS} Tagen nach der
@@ -196,6 +204,20 @@ async function runInvite(values: string[]) {
   }
 }
 
+async function runMarkTransferred(values: string[]) {
+  const apply = parseApplyOnly(values, "Mark-transferred");
+  const status = await waitlistPurgeStatus();
+  console.log(`Modus:     ${apply ? "Apply" : "Dry-Run"}`);
+  console.log(`Würden als eingeladen markiert: ${status.notInvited} (bestätigt, nicht abgemeldet, noch ohne Einladung)`);
+  if (!apply) {
+    console.log("");
+    console.log("Nichts geändert. Zum Anwenden denselben Befehl mit --apply ausführen — erst, wenn die Übertragung der App vollständig gelaufen ist.");
+    return;
+  }
+  const marked = await markWaitlistInvitedWithoutMail();
+  console.log(`Markiert:  ${marked}`);
+}
+
 async function runPurge(values: string[]) {
   const apply = parseApplyOnly(values, "Purge");
   const status = await waitlistPurgeStatus();
@@ -254,6 +276,10 @@ switch (command) {
 
   case "invite":
     await runInvite(args);
+    break;
+
+  case "mark-transferred":
+    await runMarkTransferred(args);
     break;
 
   case "purge":

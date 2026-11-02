@@ -12,6 +12,7 @@ import {
   listConfirmedWaitlist,
   listInvitableWaitlist,
   listWaitlistAdminEntries,
+  markWaitlistInvitedWithoutMail,
   purgeWaitlist,
   releaseWaitlistInvitation,
   unsubscribeFromWaitlist,
@@ -37,6 +38,7 @@ describe("without a database", () => {
     expect(await claimWaitlistInvitation("someone@example.com")).toBeNull();
     expect(await listInvitableWaitlist()).toEqual([]);
     expect(await purgeWaitlist()).toBe(0);
+    expect(await markWaitlistInvitedWithoutMail()).toBe(0);
     expect(await waitlistPurgeStatus()).toEqual({ total: 0, invitable: 0, notInvited: 0, lastInvitedAt: null });
   });
 
@@ -275,6 +277,20 @@ describe("the one-time invitation", () => {
     const stored = calls.filter((call) => call.statement.startsWith("update bloom_waitlist set invited_at")).flatMap((call) => call.values);
     expect(stored).not.toContain(first);
     expect(stored.some((value) => typeof value === "string" && /^[0-9a-f]{64}$/.test(value))).toBe(true);
+  });
+
+  test("marking addresses as transferred touches only confirmed, not unsubscribed, not yet invited entries and sends nothing (#105)", async () => {
+    const calls = installFakeSql((statement) => (statement.startsWith("update bloom_waitlist set invited_at = now()") ? [{ id: "1" }, { id: "2" }] : []));
+    const marked = await markWaitlistInvitedWithoutMail();
+    uninstallFakeSql();
+
+    expect(marked).toBe(2);
+    const update = calls.find((call) => call.statement.startsWith("update bloom_waitlist set invited_at = now()"));
+    expect(update?.statement).toContain("confirmed_at is not null");
+    expect(update?.statement).toContain("unsubscribed_at is null");
+    expect(update?.statement).toContain("invited_at is null");
+    // No unsubscribe token is created for them: nobody was mailed from this table.
+    expect(update?.statement).not.toContain("invite_token_hash");
   });
 
   test("releasing takes the marker and its token back", async () => {

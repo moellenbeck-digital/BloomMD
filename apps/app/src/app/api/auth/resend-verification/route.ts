@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateLoginEmail } from "../../../../lib/auth";
-import { createAuthToken, findPasswordUserByEmail } from "../../../../lib/db";
+import { createAuthToken, findPasswordUserByEmail, isPreparedWaitlistAccount } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { MAIL_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
 import { sendVerificationEmail } from "../../../../lib/email";
@@ -26,7 +26,9 @@ export async function POST(request: Request) {
       windowMs: ACCOUNT_MAIL_RATE_LIMIT.windowMs,
     });
     const user = await findPasswordUserByEmail(email);
-    if (user && !user.emailVerifiedAt) {
+    // A prepared waitlist account (#105) is activated by its activation link, not by a confirmation
+    // mail: confirming it that way would skip the consent to privacy policy and terms.
+    if (user && !user.emailVerifiedAt && !(await isPreparedWaitlistAccount(user))) {
       await assertAccountMailBudget("verification");
       const verification = await createAuthToken({
         userId: user.id,

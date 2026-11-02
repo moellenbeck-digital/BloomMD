@@ -39,6 +39,7 @@ Einladungen **an** eine Adresse (Workspace-Einladung, Beta-Einladung) hängen an
 - **60 Mails je Stunde, 300 je Tag** sind die Vorschlagswerte aus dem Ticket. Sie begrenzen den Schaden eines Angriffs mit vielen Adressen auf höchstens 300 Mails am Tag (Kosten und Absender-Ruf bei Resend), ohne die Limits je Konto (5 je Stunde) und je Quelladresse (20 je Stunde) zu ersetzen.
 - Normalbetrieb der offenen Registrierung ist noch nicht gemessen. Ob die Werte passen, zeigt sich nach dem Rollout am `[ALERT]`-Eintrag und an den Zählern in `bloom_mail_budget`; Max kann sie mit den beiden Variablen anpassen.
 - Die Fenster sind feste UTC-Stunden und UTC-Tage. Eine abgelehnte Anfrage verbraucht kein Budget.
+- Die einmalige Aktivierungsmail der Waitlist-Übertragung (`db:transfer-waitlist`, #105) zählt gegen dasselbe Budget und konkurriert dort mit der Registrierung. Bei 60 Mails je Stunde reicht eine große Waitlist nicht in einem Lauf: Der Lauf hält an der Grenze an und meldet den Rest als `deferred`; mit `--limit <n>` bleibt Platz für Registrierungen. Neue Migration `011_waitlist_transfers.sql` (Tabelle `bloom_waitlist_transfers`) gehört ebenfalls vor den Rollout (`db:migrate`), sonst schlägt der Schema-Check der Produktions-App fehl.
 
 ## Testsysteme
 

@@ -440,7 +440,8 @@ step is a dry-run unless `--apply` is given):
 bun run --cwd apps/marketing waitlist count               # confirmed / pending / unsubscribed / total
 bun run --cwd apps/marketing waitlist export --out waitlist.csv   # email, status, time, source; ends with "N Einträge, davon bestätigt M"
 bun run --cwd apps/marketing waitlist invite              # dry-run: lists who would get the one-time mail
-bun run --cwd apps/marketing waitlist invite --apply      # sends it (confirmed, not unsubscribed, once per address)
+bun run --cwd apps/marketing waitlist invite --apply      # sends it (confirmed, not unsubscribed, once per address); NOT together with the transfer below
+bun run --cwd apps/marketing waitlist mark-transferred    # dry-run: counts addresses to mark as invited without a mail (see below)
 bun run --cwd apps/marketing waitlist purge               # dry-run: would deleting be allowed?
 bun run --cwd apps/marketing waitlist purge --apply       # deletes ALL entries
 ```
@@ -449,6 +450,73 @@ bun run --cwd apps/marketing waitlist purge --apply       # deletes ALL entries
 again; a failed send releases the mark. `purge --apply` is refused while confirmed addresses have not
 been invited and until `WAITLIST_PURGE_RETENTION_DAYS` (90, `src/lib/waitlist-retention.ts`) after the
 last invitation mail. The privacy policy names the same 90 days.
+
+### Transferring the waitlist to accounts (#105)
+
+Instead of the one-time `invite` mail, the confirmed waitlist addresses get a prepared account in
+the product app and one activation mail. The accounts live in `apps/app` (`bloom_users`,
+`bloom_waitlist_transfers`); the marketing app has no app database. **Do not run `invite --apply`
+for these addresses** (they would be mailed twice); `mark-transferred` below switches it off.
+
+Order (a human runs it against production; everything that writes or sends needs `--apply`):
+
+```bash
+bun run --cwd apps/app db:migrate                    # first: migration 011_waitlist_transfers.sql
+bun run --cwd apps/marketing waitlist export --out waitlist.csv     # closing line: "N Einträge, davon bestätigt M"
+bun run --cwd apps/app db:transfer-waitlist waitlist.csv --expected M            # dry run: numbers only
+bun run --cwd apps/app db:transfer-waitlist waitlist.csv --apply --expected M    # creates accounts, sends the mails
+bun run --cwd apps/marketing waitlist mark-transferred --apply   # only after a complete run: no second mail, purge clock starts
+```
+
+Add `--limit <n>` to cap the mails of one run. The mails count against the global account mail cap
+(`BLOOMMD_MAIL_HOURLY_LIMIT`, default 60 per hour and 300 per day, shared with sign-up), so a large
+waitlist needs several runs; use `--limit` to leave room for sign-ups. The run stops when the cap is
+reached and reports the rest as `deferred`; run it again later, finished addresses are skipped.
+
+What a run does per confirmed address:
+
+- no account yet: creates one with `password_hash = null` and no confirmed address, claims the
+  mail (`bloom_waitlist_transfers.invited_at`) and only then sends it, so a second run or a crash
+  halfway never mails anybody twice. A failed send gives the claim back, so only that address is
+  repeated (`retried`). The claim is taken before sending on purpose: if the process dies between
+  claim and send, that person gets no mail and is not retried automatically; they can still sign
+  up on the signup page.
+- account exists (registered by themselves, also since #104): nothing is created, changed or
+  mailed (`alreadyRegistered`).
+- prepared and mailed by an earlier run: skipped (`alreadyInvited`).
+
+The output is one JSON line of numbers, no addresses. `confirmed` equals
+`created + retried + alreadyRegistered + alreadyInvited + deferred + duplicates + invalid`, and in
+`--apply` `created + retried` equals `mailSent + mailFailed`; `balanced` and `matchesExport` say
+whether that holds and whether `confirmed` equals the M of the export. `--apply` refuses to start
+when the CSV has a different number of confirmed rows than `--expected`. The exit code is 1 when the
+numbers do not add up, a mail failed or the run stopped early. Run it soon after the export:
+somebody who unsubscribes in between is still in the CSV.
+
+Example with synthetic test data (a throwaway Postgres, not production): a CSV of 18 rows (14
+confirmed, 2 of them already registered, 8 prepared by an earlier run, 4 open or unsubscribed):
+
+```json
+{"dryRun":true,"rows":18,"notConfirmed":4,"confirmed":14,"created":4,"retried":0,"alreadyRegistered":2,"alreadyInvited":8,"deferred":0,"duplicates":0,"invalid":0,"mailSent":0,"mailFailed":0,"expectedConfirmed":null,"balanced":true,"matchesExport":null}
+{"dryRun":false,"rows":18,"notConfirmed":4,"confirmed":14,"created":4,"retried":0,"alreadyRegistered":2,"alreadyInvited":8,"deferred":0,"duplicates":0,"invalid":0,"mailSent":4,"mailFailed":0,"expectedConfirmed":14,"balanced":true,"matchesExport":true}
+```
+
+The production numbers (confirmed, created, already registered, mails sent, failed) are copied
+into the PR text by whoever runs the dry run; this repository has no access to the production
+waitlist.
+
+The person gets one mail (German, or English when the source ends in `-en`) with the link
+`/activate?token=…`. Opening the page changes nothing; the form on it posts to
+`/api/auth/activate-account`, which enforces the consent to privacy policy and terms on the server,
+sets the password and confirms the address in one statement that also uses up the single-use token
+(purpose `waitlist_activation`, 14 days, `WAITLIST_ACTIVATION_TTL_DAYS`). It only works for an
+account from the transfer whose mail was sent and whose address is still unconfirmed. Until then no
+login can succeed (`password_hash` is null and the address unconfirmed), and password reset and
+"resend confirmation" do nothing for such an account, so a reset link cannot activate it without
+the consent. A link that expired is no dead end: signing up with the address works as for anyone.
+Prepared accounts nobody activated are deleted 90 days after the mail by `db:maintenance` (preview
+with `db:purge-unconfirmed`, key `unactivatedWaitlistAccounts`), the same period as the waitlist
+entries.
 
 The public marketing entrypoints are `/` for German and `/en` for English beta participants. Both
 must keep the same product scope, beta CTA, app login target and release version visibility before

@@ -16,8 +16,12 @@ import { checkWaitlistTransferBalance, parseWaitlistExportCsv, runWaitlistTransf
  * printed. The exit code is 1 when the numbers do not add up, a mail failed or the run stopped
  * early (run it again; finished addresses are skipped).
  */
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is required.");
+function fail(message: string): never {
+  console.error(message);
+  process.exit(2);
+}
+
+if (!process.env.DATABASE_URL) fail("DATABASE_URL is required.");
 
 const USAGE = "Usage: transfer-waitlist-accounts.ts <waitlist.csv> [--apply] [--expected <M>] [--limit <n>]";
 const args = process.argv.slice(2);
@@ -29,35 +33,40 @@ for (let index = 0; index < args.length; index += 1) {
   const arg = args[index]!;
   if (arg === "--apply") continue;
   if (arg === "--dry-run") {
-    if (apply) throw new Error("--apply and --dry-run exclude each other.");
+    if (apply) fail("--apply and --dry-run exclude each other.");
     continue;
   }
   if (arg === "--expected" || arg === "--limit") {
     const value = Number(args[index + 1]);
-    if (!Number.isSafeInteger(value) || value < (arg === "--limit" ? 1 : 0)) throw new Error(`${arg} needs a number.\n${USAGE}`);
+    if (!Number.isSafeInteger(value) || value < (arg === "--limit" ? 1 : 0)) fail(`${arg} needs a number.\n${USAGE}`);
     if (arg === "--expected") expected = value;
     else limit = value;
     index += 1;
     continue;
   }
-  if (arg.startsWith("--") || file) throw new Error(`Unknown argument: ${arg}\n${USAGE}`);
+  if (arg.startsWith("--") || file) fail(`Unknown argument: ${arg}\n${USAGE}`);
   file = arg;
 }
-if (!file) throw new Error(USAGE);
+if (!file) fail(USAGE);
 
-const parsed = parseWaitlistExportCsv(readFileSync(file, "utf8"));
+let parsed: ReturnType<typeof parseWaitlistExportCsv>;
+try {
+  parsed = parseWaitlistExportCsv(readFileSync(file, "utf8"));
+} catch (error) {
+  fail(`${file}: ${error instanceof Error ? error.message : "cannot be read"}`);
+}
 const expectedConfirmed = expected ?? parsed.trailer?.confirmed ?? null;
 if (expected != null && parsed.trailer && parsed.trailer.confirmed !== expected) {
-  throw new Error("--expected differs from the summary line in the file.");
+  fail("--expected differs from the summary line in the file.");
 }
 if (expectedConfirmed != null && expectedConfirmed !== parsed.confirmed.length) {
-  throw new Error(`The CSV has ${parsed.confirmed.length} confirmed rows, the export said ${expectedConfirmed}. Nothing was done; export again.`);
+  fail(`The CSV has ${parsed.confirmed.length} confirmed rows, the export said ${expectedConfirmed}. Nothing was done; export again.`);
 }
 if (apply && expectedConfirmed == null) {
-  throw new Error("--apply needs --expected <M> from the closing line of the export (\"N Einträge, davon bestätigt M\").");
+  fail("--apply needs --expected <M> from the closing line of the export (\"N Einträge, davon bestätigt M\").");
 }
 if (apply && !isEmailConfigured()) {
-  throw new Error("RESEND_API_KEY and RESEND_FROM_EMAIL are missing: nothing is sent and nothing is created.");
+  fail("RESEND_API_KEY and RESEND_FROM_EMAIL are missing: nothing is sent and nothing is created.");
 }
 
 const result = await runWaitlistTransfer(parsed.confirmed, { apply, rows: parsed.rows, limit });

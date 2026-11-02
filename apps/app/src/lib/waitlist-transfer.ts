@@ -82,14 +82,16 @@ function readCsvRows(text: string) {
  * file ends with the export's summary line, its numbers must equal what was read.
  */
 export function parseWaitlistExportCsv(text: string): ParsedWaitlistExport {
-  const all = readCsvRows(text.replace(/^﻿/, ""));
+  let body = (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text).trimEnd();
+  // The summary line has a comma of its own, so it is split off before the CSV is read.
   let trailer: ParsedWaitlistExport["trailer"] = null;
-  const last = all[all.length - 1];
-  const trailerMatch = last && last.length === 1 ? TRAILER.exec(last[0]!.trim()) : null;
+  const lastBreak = Math.max(body.lastIndexOf("\n"), body.lastIndexOf("\r"));
+  const trailerMatch = TRAILER.exec(body.slice(lastBreak + 1).trim());
   if (trailerMatch) {
     trailer = { total: Number(trailerMatch[1]), confirmed: Number(trailerMatch[2]) };
-    all.pop();
+    body = lastBreak < 0 ? "" : body.slice(0, lastBreak);
   }
+  const all = readCsvRows(body);
 
   const [header, ...data] = all;
   if (!header || header.map((cell) => cell.trim().toLowerCase()).join(",") !== EXPORT_HEADER.join(",")) {

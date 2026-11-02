@@ -77,10 +77,13 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
           Herkunftsseite und der Status (bestätigt, abgemeldet). Rechtsgrundlage ist die Einwilligung bei der Eintragung
           (Art. 6 Abs. 1 lit. a DSGVO). Unbestätigte Einträge werden nicht angeschrieben.
         </>}</p>
-        <p>{en ? `All waitlist entries are deleted ${WAITLIST_PURGE_RETENTION_DAYS} days after that invitation email. Unsubscribing remains possible through the link in the invitation email and in earlier waitlist messages, without an account or sign-in; this withdraws consent at any time. After unsubscribing, the address is not contacted again and is removed with all other entries.` : <>
+        <p>{en ? `All waitlist entries are deleted ${WAITLIST_PURGE_RETENTION_DAYS} days after that invitation email. Unsubscribing remains possible through the link in the invitation email and in earlier waitlist messages, without an account or sign-in; this withdraws consent at any time. After unsubscribing, the address is not contacted again and is removed with all other entries. For confirmed entries we also prepare an account that is not active yet, under the same address; the invitation email carries the link to activate it. Nobody can sign in before the person confirms the address, chooses a password and agrees to the privacy policy and the terms through that link. An account that is not activated is deleted ${WAITLIST_PURGE_RETENTION_DAYS} days after that email.` : <>
           Alle Wartelisten-Einträge werden {WAITLIST_PURGE_RETENTION_DAYS} Tage nach dieser Einladungs-E-Mail gelöscht. Die Abmeldung bleibt weiter möglich — über den Link
           in der Einladung und in früheren Wartelisten-Nachrichten, ohne Konto und ohne Anmeldung; damit kann die Einwilligung jederzeit widerrufen
-          werden. Nach der Abmeldung wird die Adresse nicht mehr angeschrieben und mit allen übrigen Einträgen gelöscht.
+          werden. Nach der Abmeldung wird die Adresse nicht mehr angeschrieben und mit allen übrigen Einträgen gelöscht. Für bestätigte Einträge
+          bereiten wir zusätzlich einen noch nicht aktiven Account mit derselben Adresse vor; die Einladungs-E-Mail enthält den Link, ihn zu aktivieren.
+          Vor der Bestätigung der Adresse, der Wahl eines Passworts und der Zustimmung zu Datenschutzerklärung und AGB über diesen Link kann sich
+          niemand anmelden. Ein nicht aktivierter Account wird {WAITLIST_PURGE_RETENTION_DAYS} Tage nach dieser E-Mail gelöscht.
         </>}</p>
       </LegalSection>
 

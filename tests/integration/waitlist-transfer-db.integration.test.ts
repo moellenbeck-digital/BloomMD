@@ -125,6 +125,37 @@ describe.skipIf(!url)("waitlist transfer (Postgres)", () => {
     expect((await db.findPasswordUserByEmail(hijacked.email))?.passwordHash).toBe(HASH);
   });
 
+  test("prepared accounts nobody activated are purged after 90 days, everything else stays", async () => {
+    const { purgeUnactivatedWaitlistAccounts } = await import("../../apps/app/src/lib/unconfirmed-accounts");
+    const old = await prepared("purge-old");
+    await db.claimWaitlistInvitation(old.userId);
+    await issue(old.userId, old.email);
+    const neverMailed = await prepared("purge-never-mailed");
+    const recent = await prepared("purge-recent");
+    await db.claimWaitlistInvitation(recent.userId);
+    const activated = await prepared("purge-activated");
+    await db.claimWaitlistInvitation(activated.userId);
+    await db.activateWaitlistAccount({ token: await issue(activated.userId, activated.email), passwordHash: HASH });
+    const signedUp = await prepared("purge-signed-up");
+    await db.claimWaitlistInvitation(signedUp.userId);
+    await db.updatePasswordForEmail({ email: signedUp.email, passwordHash: HASH });
+    const ids = [old, neverMailed, recent, activated, signedUp].map((entry) => entry.userId);
+    await sql`update bloom_waitlist_transfers set invited_at = now() - interval '100 days' where user_id in ${sql([old.userId, activated.userId, signedUp.userId])}`;
+    await sql`update bloom_waitlist_transfers set created_at = now() - interval '100 days' where user_id = ${neverMailed.userId}`;
+    await sql`update bloom_users set created_at = now() - interval '100 days' where id in ${sql(ids)}`;
+
+    const dry = await purgeUnactivatedWaitlistAccounts(sql, { dryRun: true });
+    expect(dry.accounts).toBeGreaterThanOrEqual(2);
+    const remaining = async () => (await sql`select id from bloom_users where id in ${sql(ids)}`).map((row) => row.id as string);
+    expect(await remaining()).toHaveLength(5);
+
+    const applied = await purgeUnactivatedWaitlistAccounts(sql, { dryRun: false });
+    expect(applied.accounts).toBe(dry.accounts);
+    expect((await remaining()).sort()).toEqual([recent.userId, activated.userId, signedUp.userId].sort());
+    expect(await sql`select 1 from bloom_waitlist_transfers where user_id in ${sql([old.userId, neverMailed.userId])}`).toHaveLength(0);
+    expect(await sql`select 1 from bloom_auth_tokens where user_id = ${old.userId}`).toHaveLength(0);
+  });
+
   test("the run prepares each confirmed address once, skips existing accounts and repeats a failed mail", async () => {
     const existing = await db.createPasswordUser({ email: address("existing"), passwordHash: HASH });
     const entries = [

@@ -4,6 +4,7 @@ import { isE2ETestModeEnabled } from "./e2e-mode";
 import { publicAppUrl } from "./deployment";
 import { formatAuthDate, roleLabel, type AuthLocale } from "./auth-copy";
 import { serializeAuthParams } from "./invite-intent";
+import { WAITLIST_ACTIVATION_TTL_DAYS, WAITLIST_UNACTIVATED_RETENTION_DAYS } from "./waitlist-transfer-constants";
 
 /**
  * Where an account mail should point.
@@ -134,6 +135,41 @@ export async function sendPasswordResetEmail(email: string, token: string, optio
     subject: copy.subject,
     text: `${copy.intro}\n\n${url}\n\n${copy.footer}`,
     html: `<p>${copy.intro}</p><p><a href="${url}">${copy.link}</a></p><p>${copy.footer}</p>`,
+  });
+}
+
+/**
+ * One-time mail of the waitlist transfer (#105): the account is prepared but inactive, and this link
+ * is the only way to activate it. The page behind it asks for a password and the consent; opening
+ * the link changes nothing.
+ */
+export async function sendWaitlistActivationEmail(email: string, token: string, options?: { lang?: AuthLocale }) {
+  const locale = options?.lang ?? "de";
+  const urlParams = new URLSearchParams({ token });
+  if (locale === "en") urlParams.set("lang", locale);
+  const url = `${accountLinkBase()}/activate?${serializeAuthParams(urlParams)}`;
+  const ttl = WAITLIST_ACTIVATION_TTL_DAYS;
+  const retention = WAITLIST_UNACTIVATED_RETENTION_DAYS;
+  const copy = locale === "en"
+    ? {
+        subject: "BloomMD: your account is ready - activate it now",
+        intro: "You joined the BloomMD waitlist. The waitlist has ended, and we have prepared a BloomMD account for this email address. It is not active yet: nobody can sign in to it until you confirm.",
+        action: "Activate your account: confirm the address, choose a password and agree to the privacy policy and the terms.",
+        link: "Activate account",
+        footer: `The link works once and for ${ttl} days. This is the only message we send you about this. If you do not want an account, ignore this message: the prepared account and your waitlist entry are deleted ${retention} days after this email.`,
+      }
+    : {
+        subject: "BloomMD: Dein Account ist vorbereitet - jetzt aktivieren",
+        intro: "Du hast dich auf die BloomMD-Warteliste eingetragen. Die Warteliste ist beendet, und wir haben für diese E-Mail-Adresse einen BloomMD-Account vorbereitet. Er ist noch nicht aktiv: Ohne deine Bestätigung kann sich niemand dort anmelden.",
+        action: "Account aktivieren: Adresse bestätigen, Passwort wählen und der Datenschutzerklärung und den AGB zustimmen.",
+        link: "Account aktivieren",
+        footer: `Der Link funktioniert einmal und ${ttl} Tage lang. Das ist die einzige Nachricht, die wir dir dazu schicken. Wenn du keinen Account möchtest, ignoriere diese Nachricht: Der vorbereitete Account und dein Wartelisten-Eintrag werden ${retention} Tage nach dieser E-Mail gelöscht.`,
+      };
+  return sendTransactionalEmail({
+    to: email,
+    subject: copy.subject,
+    text: `${copy.intro}\n\n${copy.action}\n${url}\n\n${copy.footer}`,
+    html: `<p>${copy.intro}</p><p>${copy.action}</p><p><a href="${url}">${copy.link}</a></p><p>${copy.footer}</p>`,
   });
 }
 

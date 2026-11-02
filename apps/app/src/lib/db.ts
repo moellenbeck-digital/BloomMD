@@ -189,7 +189,8 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_agent_token_changes') as agent_token_changes,
       to_regclass('public.bloom_documents') as documents,
       to_regclass('public.bloom_document_views') as document_views,
-      to_regclass('public.bloom_mail_budget') as mail_budget
+      to_regclass('public.bloom_mail_budget') as mail_budget,
+      to_regclass('public.bloom_waitlist_transfers') as waitlist_transfers
   `;
   const row = rows[0] as Record<string, string | null> | undefined;
   const missing = Object.entries(row ?? {})
@@ -867,6 +868,18 @@ async function createMarketSchema() {
     )
   `;
   await sql`create index if not exists bloom_mail_budget_updated_idx on bloom_mail_budget(updated_at)`;
+
+  // Accounts prepared from the ended waitlist; see db/011_waitlist_transfers.sql.
+  await sql`
+    create table if not exists bloom_waitlist_transfers (
+      user_id uuid primary key references bloom_users(id) on delete cascade,
+      locale text not null default 'de',
+      invited_at timestamptz,
+      activated_at timestamptz,
+      created_at timestamptz not null default now(),
+      check (locale in ('de', 'en'))
+    )
+  `;
 
   const tenantConstraints = await sql`
     select conname
@@ -3172,6 +3185,8 @@ type AuditEventType =
   | "auth_token.issued"
   | "email.verified"
   | "password.changed"
+  | "waitlist_account.prepared"
+  | "waitlist_account.activated"
   | "session.created"
   | "session.revoked"
   | "session.revoked_all"
@@ -3684,7 +3699,7 @@ export async function revokeMobileAppToken(userId: string, tokenId: string) {
 export async function createAuthToken(input: {
   userId: string;
   email: string;
-  purpose: "email_verification" | "password_reset";
+  purpose: "email_verification" | "password_reset" | "waitlist_activation";
   ttlMinutes: number;
 }) {
   if (!isDatabaseConfigured()) return null;
@@ -3785,6 +3800,174 @@ export async function updatePasswordForEmail(input: {
       eventType: "password.changed",
     });
   return Boolean(row);
+}
+
+export type WaitlistLocale = "de" | "en";
+
+/** What the waitlist transfer needs to know about an address before it touches anything (#105). */
+export interface WaitlistTransferState {
+  userId: string;
+  hasPassword: boolean;
+  emailVerified: boolean;
+  /** Null: the account does not come from a waitlist transfer. */
+  transfer: { invitedAt: string | null } | null;
+}
+
+export async function findWaitlistTransferState(email: string): Promise<WaitlistTransferState | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    select
+      u.id,
+      u.password_hash is not null as has_password,
+      u.email_verified_at is not null as email_verified,
+      t.user_id is not null as is_transfer,
+      t.invited_at
+    from bloom_users u
+    left join bloom_waitlist_transfers t on t.user_id = u.id
+    where lower(u.email) = ${email.trim().toLowerCase()}
+    limit 1
+  `;
+  const row = rows[0] as
+    | { id: string; has_password: boolean; email_verified: boolean; is_transfer: boolean; invited_at: Date | string | null }
+    | undefined;
+  if (!row) return null;
+  return {
+    userId: row.id,
+    hasPassword: row.has_password,
+    emailVerified: row.email_verified,
+    transfer: row.is_transfer ? { invitedAt: row.invited_at ? new Date(row.invited_at).toISOString() : null } : null,
+  };
+}
+
+/**
+ * Creates the account for a waitlist address: no password (so no login can ever match), address not
+ * confirmed, and a transfer row that marks the origin. Returns null when the address already has an
+ * account (also one created in the meantime); an existing account is never touched.
+ */
+export async function createPreparedWaitlistAccount(input: { email: string; locale: WaitlistLocale }): Promise<string | null> {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL ist nicht konfiguriert.");
+  await ensureMarketSchema();
+
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const rows = await getSql()`
+    with created as (
+      insert into bloom_users (auth_provider, auth_user_id, email)
+      values ('password', ${normalizedEmail}, ${normalizedEmail})
+      on conflict ((lower(email))) do nothing
+      returning id
+    )
+    insert into bloom_waitlist_transfers (user_id, locale)
+    select id, ${input.locale} from created
+    returning user_id
+  `;
+  const userId = (rows[0] as { user_id: string } | undefined)?.user_id ?? null;
+  if (userId) await recordAuditEvent({ actorUserId: userId, eventType: "waitlist_account.prepared" });
+  return userId;
+}
+
+/**
+ * Takes the one-time activation mail of a prepared account before it is sent, so a second run or a
+ * crash halfway never mails the person twice. Returns the mail language, or null when the mail was
+ * already claimed (or the account was activated or confirmed in the meantime).
+ */
+export async function claimWaitlistInvitation(userId: string): Promise<WaitlistLocale | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    update bloom_waitlist_transfers t
+    set invited_at = now()
+    from bloom_users u
+    where t.user_id = ${userId}
+      and u.id = t.user_id
+      and t.invited_at is null
+      and t.activated_at is null
+      and u.email_verified_at is null
+    returning t.locale
+  `;
+  const locale = (rows[0] as { locale: string } | undefined)?.locale;
+  return locale === "en" ? "en" : locale === "de" ? "de" : null;
+}
+
+/** Gives the claim back after a failed send; the next run tries this address again. */
+export async function releaseWaitlistInvitation(userId: string) {
+  if (!isDatabaseConfigured()) return;
+  await ensureMarketSchema();
+
+  await getSql()`
+    update bloom_waitlist_transfers
+    set invited_at = null
+    where user_id = ${userId} and activated_at is null
+  `;
+}
+
+/**
+ * A prepared waitlist account that nobody has claimed yet: no password, address not confirmed.
+ * Password reset and "resend confirmation" must not work on it, or a reset link alone would
+ * activate an account without the consent to privacy policy and terms; the activation link is the
+ * only way in (signing up on the signup page works too and enforces the consent itself).
+ */
+export async function isPreparedWaitlistAccount(user: { id: string; passwordHash: string | null; emailVerifiedAt: string | null }) {
+  if (user.passwordHash || user.emailVerifiedAt) return false;
+  if (!isDatabaseConfigured()) return false;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    select 1 as prepared
+    from bloom_waitlist_transfers
+    where user_id = ${user.id} and activated_at is null
+  `;
+  return rows.length > 0;
+}
+
+/**
+ * Redeems an activation link: in one statement the single-use token is consumed and, only for a
+ * prepared waitlist account whose address is still unconfirmed and whose mail was sent, the
+ * password is set and the address confirmed. The token proves the address, so a password somebody
+ * else set through the signup form in the meantime is replaced. A confirmed account is never
+ * changed. Returns null for an unknown, used or expired token, or when nothing may be activated.
+ */
+export async function activateWaitlistAccount(input: { token: string; passwordHash: string }) {
+  if (!isDatabaseConfigured()) return null;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    with consumed as (
+      update bloom_auth_tokens
+      set consumed_at = now()
+      where token_hash = ${hashAuthToken(input.token)}
+        and purpose = 'waitlist_activation'
+        and consumed_at is null
+        and expires_at > now()
+      returning user_id
+    ), activated as (
+      update bloom_users u
+      set password_hash = ${input.passwordHash}, email_verified_at = now(), updated_at = now()
+      from consumed c
+      where u.id = c.user_id
+        and u.email_verified_at is null
+        and exists (
+          select 1 from bloom_waitlist_transfers w
+          where w.user_id = u.id and w.invited_at is not null and w.activated_at is null
+        )
+      returning u.id, u.email
+    ), marked as (
+      update bloom_waitlist_transfers w
+      set activated_at = now()
+      from activated a
+      where w.user_id = a.id
+      returning w.user_id
+    )
+    select a.id, a.email from activated a
+  `;
+  const row = rows[0] as { id: string; email: string } | undefined;
+  if (!row) return null;
+  await recordAuditEvent({ actorUserId: row.id, eventType: "auth_token.consumed", targetType: "auth_token" });
+  await recordAuditEvent({ actorUserId: row.id, eventType: "waitlist_account.activated" });
+  await recordAuditEvent({ actorUserId: row.id, eventType: "email.verified" });
+  return { userId: row.id, email: row.email };
 }
 
 export async function createSessionRecord(userId: string, expiresAt: string) {

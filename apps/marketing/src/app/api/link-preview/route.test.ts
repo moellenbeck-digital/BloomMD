@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { setLinkPreviewTransportForTests } from "../../../lib/link-preview";
 import { LINK_PREVIEW_RATE_LIMIT } from "../../../lib/link-preview-rate-limit";
 import { resetMemoryRateLimitsForTests } from "../../../lib/request-security";
 import { GET } from "./route";
@@ -6,7 +7,6 @@ import { GET } from "./route";
 // No module mocks here: marketing runs all tests in one process and Bun shares mocks between files.
 const mutableEnv = process.env as Record<string, string | undefined>;
 const savedEnv = { ...mutableEnv };
-const realFetch = globalThis.fetch;
 const realNow = Date.now;
 const WINDOW = LINK_PREVIEW_RATE_LIMIT.windowMs;
 const START = Math.floor(1_800_000_000_000 / WINDOW) * WINDOW;
@@ -27,16 +27,18 @@ beforeEach(() => {
   Date.now = () => now;
   outbound = [];
   warn = spyOn(console, "warn").mockImplementation(() => {});
-  globalThis.fetch = (async (input: Request | string | URL) => {
-    outbound.push(String(input));
-    return new Response("<html><head><title>Example</title></head></html>", { headers: { "content-type": "text/html" } });
-  }) as typeof fetch;
+  setLinkPreviewTransportForTests({
+    request: async (target) => {
+      outbound.push(target.url.toString());
+      return { status: 200, headers: { "content-type": "text/html" }, read: async () => new TextEncoder().encode("<html><head><title>Example</title></head></html>"), close: () => {} };
+    },
+  });
 });
 
 afterEach(() => {
   warn.mockRestore();
   Date.now = realNow;
-  globalThis.fetch = realFetch;
+  setLinkPreviewTransportForTests(null);
   for (const key of ["BLOOMMD_WAITLIST_DATABASE_URL", "BLOOMMD_TRUSTED_PROXY_HEADER", "BLOOMMD_E2E_AUTH_BYPASS"]) {
     if (savedEnv[key] === undefined) delete mutableEnv[key];
     else mutableEnv[key] = savedEnv[key];

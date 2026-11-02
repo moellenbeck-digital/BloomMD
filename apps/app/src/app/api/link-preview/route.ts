@@ -1,9 +1,13 @@
 import { fetchLinkPreview } from "../../../lib/link-preview";
+import { enforceLinkPreviewRateLimit } from "../../../lib/link-preview-rate-limit";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Count first: a rejected request must not cause any outbound fetch.
+  const limited = await enforceLinkPreviewRateLimit(request);
+  if (limited) return limited;
   const value = new URL(request.url).searchParams.get("url")?.trim() ?? "";
   if (!value || value.length > 2048) return NextResponse.json({ error: "A valid URL is required." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
   try {

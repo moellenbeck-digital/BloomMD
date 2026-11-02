@@ -5,6 +5,8 @@ import {
   assertSameOrigin,
   assertSameOriginForIdentity,
   clientAddress,
+  trustedProxyHeaderName,
+  UNATTRIBUTED_SOURCE,
   FormSpamError,
   RateLimitError,
   readJsonBody,
@@ -16,6 +18,8 @@ import {
 const originalDatabaseUrl = process.env.DATABASE_URL;
 const originalBypass = process.env.BLOOMMD_E2E_AUTH_BYPASS;
 const originalWaitlistDatabaseUrl = process.env.BLOOMMD_WAITLIST_DATABASE_URL;
+const originalNodeEnv = process.env.NODE_ENV;
+const mutableEnv = process.env as Record<string, string | undefined>;
 
 afterEach(() => {
   if (originalDatabaseUrl == null) delete process.env.DATABASE_URL;
@@ -23,6 +27,8 @@ afterEach(() => {
   process.env.BLOOMMD_E2E_AUTH_BYPASS = originalBypass;
   if (originalWaitlistDatabaseUrl == null) delete process.env.BLOOMMD_WAITLIST_DATABASE_URL;
   else process.env.BLOOMMD_WAITLIST_DATABASE_URL = originalWaitlistDatabaseUrl;
+  mutableEnv.NODE_ENV = originalNodeEnv;
+  delete mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER;
   resetMemoryRateLimitsForTests();
 });
 
@@ -62,11 +68,40 @@ describe("request security", () => {
     await expect(readUrlEncodedForm(multipart)).rejects.toMatchObject({ status: 415 });
   });
 
-  test("uses the first trusted proxy address", () => {
-    const request = new Request("https://bloommd.io", {
-      headers: { "x-vercel-forwarded-for": "203.0.113.4, 10.0.0.1" },
+  describe("client address (#208, same rule as apps/app)", () => {
+    const req = (headers: Record<string, string>) => new Request("https://bloommd.io", { headers });
+
+    test("believes the last x-forwarded-for entry by default, not the first", () => {
+      mutableEnv.NODE_ENV = "production";
+      expect(clientAddress(req({ "x-forwarded-for": "198.51.100.99, 203.0.113.4" }))).toBe("203.0.113.4");
+      expect(clientAddress(req({ "x-forwarded-for": "203.0.113.4" }))).toBe("203.0.113.4");
     });
-    expect(clientAddress(request)).toBe("203.0.113.4");
+
+    test("in production only the configured header or x-forwarded-for is believed", () => {
+      mutableEnv.NODE_ENV = "production";
+      const headers = { "x-vercel-forwarded-for": "198.51.100.1", "cf-connecting-ip": "198.51.100.2", "x-real-ip": "198.51.100.3" };
+      expect(clientAddress(req(headers))).toBe(UNATTRIBUTED_SOURCE);
+      expect(clientAddress(req({ ...headers, "x-forwarded-for": "203.0.113.4" }))).toBe("203.0.113.4");
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "cf-connecting-ip";
+      expect(clientAddress(req({ ...headers, "x-forwarded-for": "203.0.113.4" }))).toBe("198.51.100.2");
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "x-vercel-forwarded-for";
+      expect(clientAddress(req(headers))).toBe("198.51.100.1");
+      // x-forwarded-for is not the configured header, so it is not believed either.
+      mutableEnv.BLOOMMD_TRUSTED_PROXY_HEADER = "cf-connecting-ip";
+      expect(clientAddress(req({ "x-forwarded-for": "203.0.113.4" }))).toBe(UNATTRIBUTED_SOURCE);
+    });
+
+    test("outside production the other common headers keep local development distinguishable", () => {
+      expect(clientAddress(req({ "x-vercel-forwarded-for": "198.51.100.1" }))).toBe("198.51.100.1");
+      expect(clientAddress(req({ "x-real-ip": "203.0.113.5" }))).toBe("203.0.113.5");
+      expect(clientAddress(req({}))).toBe("unknown");
+    });
+
+    test("validates the configured header name", () => {
+      expect(trustedProxyHeaderName({})).toBeNull();
+      expect(trustedProxyHeaderName({ BLOOMMD_TRUSTED_PROXY_HEADER: " CF-Connecting-IP " })).toBe("cf-connecting-ip");
+      expect(trustedProxyHeaderName({ BLOOMMD_TRUSTED_PROXY_HEADER: "a:b" })).toBeUndefined();
+    });
   });
 
   test("limits both IP and account identifiers", async () => {

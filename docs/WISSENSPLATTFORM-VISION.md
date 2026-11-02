@@ -1,6 +1,6 @@
 # BloomMD: Wissens- und Handlungsschicht / Knowledge and action layer
 
-> **Entwurf zur Produktplanung / Product planning draft.** Dieses Dokument ordnet den ersten Pilot und die nächsten Entscheidungen ein. Die [verbindliche Grundlage #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) bestimmt die Produktstrategie, sobald sie freigegeben ist. Weder dieses Dokument noch die Reihenfolge unten sind Release-Zusagen. Das [GitHub Project Board](https://github.com/orgs/moellenbeck-digital/projects/3) bleibt die verbindliche Aufgabenquelle. / This document frames the first pilot and the next decisions. The foundation in issue #188 governs product strategy once approved. Neither this document nor the sequence below commits a release. The GitHub Project Board remains the source of truth for work.
+> **Entwurf zur Produktplanung / Product planning draft.** Dieses Dokument ordnet den ersten Pilot und die nächsten Entscheidungen ein. Weder dieses Dokument noch die Reihenfolge unten sind Release-Zusagen. Das [GitHub Project Board](https://github.com/orgs/moellenbeck-digital/projects/3) bleibt die verbindliche Aufgabenquelle. / This document frames the first pilot and the next decisions. Neither this document nor the sequence below commits a release. The GitHub Project Board remains the source of truth for work.
 
 ## Deutsch
 
@@ -45,16 +45,15 @@ Lesereihenfolge für den Chief of Staff:
 1. [README](../README.md) und [Beta-Umfang](BETA-SCOPE.md): heutiger Produktkern und aktuelle Zusagen.
 2. [Architektur](ARCHITECTURE.md): Datenformat, lokale Nutzung, Sync und bestehende Sicherheitsgrenzen.
 3. [Learnings-Modell](LEARNINGS.md) und [Learnings-Ablage](LEARNINGS-ABLAGE.md): vorhandene Regeln und Betrieb des ersten internen Pilots.
-4. [Grundlage #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) mit [Draft-PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189): verbindliche Positionierung, separat freizugeben.
-5. Dieses Visionsdokument und [Pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): Einordnung, offene Entscheidungen und erster realer Nutzen.
+4. Dieses Visionsdokument und [Pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): Einordnung, offene Entscheidungen und erster realer Nutzen.
 
 Briefing für den Brand Chief of Staff:
 
 > BloomMD bleibt ein offener, lokal nutzbarer Markdown-Workspace. #116 ist unser erster interner Test der Backend-Funktionen für bestätigte Learnings. Bitte prüfe den Pilot anhand der vorhandenen Tickets und benenne Nutzer, Erfolgskriterien, zulässigen Speicherort und Rechte. Schlage erst nach der Abnahme den nächsten Anwendungsfall vor. Die größere Wissensplattform-Vision ist eine Richtung, keine Freigabe für zusätzliche Releases.
 
-Der Chief of Staff beantwortet dabei vier Fragen: Wer nutzt den Pilot? Woran messen wir seinen Nutzen und seine Zuverlässigkeit? Welcher Speicherort und welche Rechte sind zulässig? Welcher nächste Anwendungsfall folgt nur bei erfolgreicher Abnahme? Die [verbindliche Grundlage #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) und ihr [Draft-PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189) haben eine eigene Freigabe und werden durch dieses Dokument nicht ersetzt.
+Der Chief of Staff beantwortet dabei vier Fragen: Wer nutzt den Pilot? Woran messen wir seinen Nutzen und seine Zuverlässigkeit? Welcher Speicherort und welche Rechte sind zulässig? Welcher nächste Anwendungsfall folgt nur bei erfolgreicher Abnahme?
 
-Die Reihenfolge folgt der verbindlichen Grundlage aus #188: Markdown-Kern, Sync-Grundlage, erste Konnektoren, Identität/Rechte, Suche, Lebenszyklus, Agenten-Workflows und später Enterprise-Funktionen. Der Pilot #116 prüft den ersten internen Nutzen innerhalb dieses Wegs; er verschiebt Sync nicht ans Ende. Die Reihenfolge gehört ins Epic und in verlinkte Teil-Issues im BloomMD-Board. Ein neuer Meilenstein entsteht erst für einen beschlossenen, testbaren Lieferumfang einschließlich Versionen, Artefakten, Dokumentation und Release-Kommunikation.
+Die vorgeschlagene Reihenfolge lautet: Markdown-Kern, Sync-Grundlage, erste Konnektoren, Identität/Rechte, Suche, Lebenszyklus, Agenten-Workflows und später Enterprise-Funktionen. Der Pilot #116 prüft den ersten internen Nutzen innerhalb dieses Wegs; er verschiebt Sync nicht ans Ende. Die Reihenfolge gehört ins Epic und in verlinkte Teil-Issues im BloomMD-Board. Ein neuer Meilenstein entsteht erst für einen beschlossenen, testbaren Lieferumfang einschließlich Versionen, Artefakten, Dokumentation und Release-Kommunikation.
 
 ## English
 
@@ -97,13 +96,12 @@ Reading order for the Chief of Staff:
 1. [README](../README.md) and [beta scope](BETA-SCOPE.md): current product foundation and commitments.
 2. [Architecture](ARCHITECTURE.md): file format, local use, sync, and existing security boundaries.
 3. [Learnings model](LEARNINGS.md) and [learnings storage](LEARNINGS-ABLAGE.md): existing rules and operations for the first internal pilot.
-4. [Foundation issue #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) and [draft PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189): authoritative positioning, subject to separate approval.
-5. This vision draft and [pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): framing, open decisions, and first real use.
+4. This vision draft and [pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116): framing, open decisions, and first real use.
 
 Brief for the brand Chief of Staff:
 
 > BloomMD remains an open, locally usable Markdown workspace. #116 is our first internal test of backend capabilities for confirmed learnings. Please assess the pilot through the existing issues and identify its users, success criteria, acceptable storage, and permissions. Propose the next use case after the pilot has passed acceptance. The broader knowledge platform vision is a direction, not approval for additional releases.
 
-The brief asks who will use the pilot, how its value and reliability will be measured, which storage and rights model is acceptable, and which use case should follow a successful pilot. The separate [foundation issue #188](https://github.com/moellenbeck-digital/BloomMD/issues/188) and [draft PR #189](https://github.com/moellenbeck-digital/BloomMD/pull/189) retain their own approval requirement.
+The brief asks who will use the pilot, how its value and reliability will be measured, which storage and rights model is acceptable, and which use case should follow a successful pilot.
 
-The sequence follows the foundation in #188: Markdown core, sync, initial connectors, identity and rights, search, knowledge lifecycle, agent workflows, and later enterprise capabilities. Pilot #116 tests the first internal value along this path; it does not move sync to the end. The epic and linked issues establish execution order in the BloomMD board. A new milestone is warranted only for an agreed, testable delivery scope with versions, artifacts, documentation, and release communication.
+The proposed sequence is Markdown core, sync, initial connectors, identity and rights, search, knowledge lifecycle, agent workflows, and later enterprise capabilities. Pilot #116 tests the first internal value along this path; it does not move sync to the end. The epic and linked issues establish execution order in the BloomMD board. A new milestone is warranted only for an agreed, testable delivery scope with versions, artifacts, documentation, and release communication.

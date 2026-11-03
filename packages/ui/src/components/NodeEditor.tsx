@@ -198,7 +198,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
   const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
   const [viewer, setViewer] = useState<ViewerRequest | null>(null);
-  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const [editorContainer, setEditorContainer] = useState<HTMLDivElement | null>(null);
   const notePath = document?.filePath ?? "";
   const imageCopy = useMemo(() => ({ notFound: t.visualImageNotFound, rejected: t.visualImagePathRejected }), [t.visualImageNotFound, t.visualImagePathRejected]);
   const { handler: imagePreviewHandler, sourceFor: imageSourceFor } = useInlineImagePreview(notePath, imageCopy);
@@ -212,7 +212,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     },
     [imageSourceFor, t.visualSaveImage],
   );
-  useEditorImageZoom(editorContainerRef, openEditorImage, t.visualEnlarge);
+  useEditorImageZoom(editorContainer, openEditorImage, t.visualEnlarge);
 
   const selectedNode = selectedNodeId
     ? document?.nodes.get(selectedNodeId)
@@ -1142,7 +1142,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       {showPrimaryMarkdownEditor ? (
         <details open className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="node-content-panel">
           <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
-          <div ref={editorContainerRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={setEditorContainer} className="min-h-0 flex-1 overflow-y-auto">
             <VisualsContext.Provider value={visualsContext}>
             <MDXEditor
               ref={editorRef}

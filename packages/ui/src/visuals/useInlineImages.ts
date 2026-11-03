@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface Loaded {
   path: string;
@@ -67,15 +67,16 @@ const IMAGE_SELECTOR = "[data-editor-block-type='image'] img";
  * tab stop); the single click stays with the editor, where it selects the image.
  */
 export function useEditorImageZoom(
-  container: RefObject<HTMLElement | null>,
+  root: HTMLElement | null,
   onOpen: (image: { src: string; alt: string }) => void,
   label: string,
 ) {
   const onOpenRef = useRef(onOpen);
   onOpenRef.current = onOpen;
 
+  // `root` is the element itself, not a ref: the editor panel mounts after this hook first runs (there is
+  // no panel until a node is selected), and the effect has to run again once it is there.
   useEffect(() => {
-    const root = container.current;
     if (!root) return;
 
     const mark = () => {
@@ -114,5 +115,5 @@ export function useEditorImageZoom(
       root.removeEventListener("dblclick", onDoubleClick);
       root.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [container, label]);
+  }, [root, label]);
 }

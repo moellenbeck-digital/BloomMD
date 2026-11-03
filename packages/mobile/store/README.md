@@ -73,6 +73,8 @@ Browser (Authorization Code + PKCE, [Archiv #503](https://github.com/moellenbeck
   `src/shell-text.ts`) und Entscheidungs-Status auf der Map.
 - **Mac mit Apple Silicon:** entschieden, die iPad-App wird dort angeboten (Anbieter Möllenbeck
   Digital); der Satz am Ende der iOS-Beschreibung bleibt.
+  `scripts/check-ios-release.sh` prüft, dass Projekt und Bundle die Mac-Verfügbarkeit nicht abwählen;
+  was das nicht absichert, steht in `docs/MOBILE-APP.md` (Abschnitt „Mac-Verfügbarkeit“).
 - **Support-URL:** zeigt auf `https://bloommd.io/docs`. Eine eigene Hilfeseite für die iPad/iPhone-App
   gibt es noch nicht; Apple verlangt dort erreichbare Kontaktinformationen. Owner-Entscheidung:
   Hilfeseite `docs/ipad` anlegen oder Kontaktseite.

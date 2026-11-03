@@ -16,6 +16,10 @@
       "import": "./src/obsidian-markdown.ts",
       "types": "./src/obsidian-markdown.ts"
     },
+    "./opml": {
+      "import": "./src/opml.ts",
+      "types": "./src/opml.ts"
+    },
     "./note-history": {
       "import": "./src/note-history.ts",
       "types": "./src/note-history.ts"

@@ -26,6 +26,15 @@ export function assertReleaseSignature(details: string, team: string, hardened: 
   }
 }
 
+export function assertReleaseEntitlements(entitlements: Record<string, unknown>, path: string): void {
+  if (entitlements["com.apple.security.get-task-allow"] === true) {
+    throw new Error(`Development entitlement in ${path}`);
+  }
+  if (entitlements["com.apple.security.cs.disable-library-validation"] === true) {
+    throw new Error(`Library validation is disabled (disable-library-validation) in ${path}`);
+  }
+}
+
 function verifyCode(path: string, team: string, hardened = true): void {
   run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", path]);
   assertReleaseSignature(signature(path), team, hardened);
@@ -35,9 +44,7 @@ function verifyCode(path: string, team: string, hardened = true): void {
     const entitlements: Record<string, unknown> = JSON.parse(run([
       "plutil", "-convert", "json", "-o", "-", "-",
     ], Buffer.from(xml)));
-    if (entitlements["com.apple.security.get-task-allow"] === true) {
-      throw new Error(`Development entitlement in ${path}`);
-    }
+    assertReleaseEntitlements(entitlements, path);
   }
 }
 

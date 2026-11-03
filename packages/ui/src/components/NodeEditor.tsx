@@ -201,7 +201,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const notePath = document?.filePath ?? "";
   const imageCopy = useMemo(() => ({ notFound: t.visualImageNotFound, rejected: t.visualImagePathRejected }), [t.visualImageNotFound, t.visualImagePathRejected]);
-  const { sourceFor: imageSourceFor } = useInlineImagePreview(notePath, imageCopy);
+  const { handler: imagePreviewHandler, sourceFor: imageSourceFor } = useInlineImagePreview(notePath, imageCopy);
   const openEditorImage = useCallback(
     (image: { src: string; alt: string }) => {
       const original = imageSourceFor(image.src);
@@ -1158,7 +1158,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 tablePlugin(),
                 codeBlockPlugin({ defaultCodeBlockLanguage: "typescript", codeBlockEditorDescriptors: [mermaidCodeBlockDescriptor] }),
                 codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", mermaid: "Mermaid", "": "Plain Text" } }),
-                imagePlugin(),
+                imagePlugin({ imagePreviewHandler }),
                 linkPlugin(),
                 linkDialogPlugin(),
                 toolbarPlugin({

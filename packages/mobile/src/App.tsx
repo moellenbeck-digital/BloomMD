@@ -528,6 +528,8 @@ export function App() {
       });
       return;
     }
+    // Cloud documents (`doc`) are parsed but not opened yet: the app has no lookup by document id.
+    if (link.kind !== "open") return;
     setDrawerOpen(false);
     await loadFile(link.path, link.node).catch(() => undefined);
   }, [completeSignIn, flushSave, loadFile, refreshFiles]);

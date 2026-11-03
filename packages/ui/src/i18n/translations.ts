@@ -393,6 +393,33 @@ export interface Translations {
   feedbackScreenshotSize: string;
   feedbackVideoSize: string;
   resourcePreviewFailed: string;
+  visualMermaidTitle: string;
+  visualMermaidEditSource: string;
+  visualMermaidShowPreview: string;
+  visualMermaidSourceLabel: string;
+  visualMermaidRendering: string;
+  visualMermaidEmpty: string;
+  visualMermaidErrorTitle: string;
+  visualMermaidErrorLine: string;
+  visualMermaidErrorHint: string;
+  visualMermaidLoadFailed: string;
+  visualEnlarge: string;
+  visualViewerImage: string;
+  visualViewerDiagram: string;
+  visualZoomIn: string;
+  visualZoomOut: string;
+  visualZoomReset: string;
+  visualZoomLevel: string;
+  visualClose: string;
+  visualViewerHint: string;
+  visualSaveImage: string;
+  visualSaveDiagramSvg: string;
+  visualSaveDiagramPng: string;
+  visualSaveFailed: string;
+  visualImageNotFound: string;
+  visualImagePathRejected: string;
+  visualEmbeddedImages: string;
+  visualImageLoading: string;
   serverUrl: string;
   accessToken: string;
   connecting: string;
@@ -907,6 +934,33 @@ export const translations: Record<Locale, Translations> = {
     feedbackScreenshotSize: "Screenshots dürfen maximal 10 MB groß sein.",
     feedbackVideoSize: "Das Video darf maximal 50 MB groß sein.",
     resourcePreviewFailed: "Ressourcen-Vorschau konnte nicht geladen werden.",
+    visualMermaidTitle: "Mermaid-Diagramm",
+    visualMermaidEditSource: "Quelltext bearbeiten",
+    visualMermaidShowPreview: "Vorschau anzeigen",
+    visualMermaidSourceLabel: "Mermaid-Quelltext",
+    visualMermaidRendering: "Diagramm wird gerendert …",
+    visualMermaidEmpty: "Der Mermaid-Block ist leer.",
+    visualMermaidErrorTitle: "Das Diagramm konnte nicht dargestellt werden",
+    visualMermaidErrorLine: "Zeile",
+    visualMermaidErrorHint: "Der Quelltext bleibt unverändert und lässt sich über „Quelltext bearbeiten“ korrigieren.",
+    visualMermaidLoadFailed: "Die Diagramm-Bibliothek konnte nicht geladen werden.",
+    visualEnlarge: "Vergrößern",
+    visualViewerImage: "Bildansicht",
+    visualViewerDiagram: "Diagrammansicht",
+    visualZoomIn: "Hineinzoomen",
+    visualZoomOut: "Herauszoomen",
+    visualZoomReset: "Zoom zurücksetzen",
+    visualZoomLevel: "Zoomstufe",
+    visualClose: "Großansicht schließen",
+    visualViewerHint: "Ziehen oder Pfeiltasten zum Verschieben, Mausrad oder +/− zum Zoomen, 0 zum Zurücksetzen, Esc zum Schließen.",
+    visualSaveImage: "Bild speichern",
+    visualSaveDiagramSvg: "Diagramm als SVG speichern",
+    visualSaveDiagramPng: "Diagramm als PNG speichern",
+    visualSaveFailed: "Das Speichern ist fehlgeschlagen.",
+    visualImageNotFound: "Bild nicht gefunden:",
+    visualImagePathRejected: "Pfad nicht erlaubt:",
+    visualEmbeddedImages: "Eingebettete Bilder",
+    visualImageLoading: "Bild wird geladen …",
     serverUrl: "Server-URL",
     accessToken: "Persönliches Zugriffstoken",
     connecting: "Verbinde...",
@@ -1415,6 +1469,33 @@ export const translations: Record<Locale, Translations> = {
     feedbackScreenshotSize: "Screenshots must be no larger than 10 MB.",
     feedbackVideoSize: "The video must be no larger than 50 MB.",
     resourcePreviewFailed: "The resource preview could not be loaded.",
+    visualMermaidTitle: "Mermaid diagram",
+    visualMermaidEditSource: "Edit source",
+    visualMermaidShowPreview: "Show preview",
+    visualMermaidSourceLabel: "Mermaid source",
+    visualMermaidRendering: "Rendering diagram…",
+    visualMermaidEmpty: "The Mermaid block is empty.",
+    visualMermaidErrorTitle: "The diagram could not be rendered",
+    visualMermaidErrorLine: "Line",
+    visualMermaidErrorHint: "The source is unchanged; fix it with “Edit source”.",
+    visualMermaidLoadFailed: "The diagram library could not be loaded.",
+    visualEnlarge: "Enlarge",
+    visualViewerImage: "Image viewer",
+    visualViewerDiagram: "Diagram viewer",
+    visualZoomIn: "Zoom in",
+    visualZoomOut: "Zoom out",
+    visualZoomReset: "Reset zoom",
+    visualZoomLevel: "Zoom level",
+    visualClose: "Close viewer",
+    visualViewerHint: "Drag or use the arrow keys to pan, mouse wheel or +/− to zoom, 0 to reset, Esc to close.",
+    visualSaveImage: "Save image",
+    visualSaveDiagramSvg: "Save diagram as SVG",
+    visualSaveDiagramPng: "Save diagram as PNG",
+    visualSaveFailed: "Saving failed.",
+    visualImageNotFound: "Image not found:",
+    visualImagePathRejected: "Path not allowed:",
+    visualEmbeddedImages: "Embedded images",
+    visualImageLoading: "Loading image…",
     serverUrl: "Server URL",
     accessToken: "Personal access token",
     connecting: "Connecting...",

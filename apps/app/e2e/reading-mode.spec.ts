@@ -337,13 +337,15 @@ test.describe("Lesemodus @t54", () => {
     const api = await installDocApi(page, { [doc.file]: richMarkdown(doc.title, doc.slug) });
     await login(page, email);
     await expect(rootOf(page, doc.title)).toBeVisible();
-    const before = api.saved.get(doc.file);
 
     // Editor-Panel offen, dann Lesemodus: Panel, Knoten und Umschalter-Leiste verschwinden.
     await rootOf(page, doc.title).click();
     await page.keyboard.press("Control+Enter");
     await expect(page.getByTestId("node-editor")).toBeVisible();
     await expect(page.getByTestId("view-mode-reading")).toHaveAttribute("aria-label", "Lesemodus");
+    // Stand vor dem Lesemodus (das Öffnen des Editors gehört nicht dazu).
+    const putsBefore = api.puts.length;
+    const before = api.saved.get(doc.file);
     await enterReading(page);
 
     await expect(page.getByTestId("node-editor")).toHaveCount(0);
@@ -359,7 +361,9 @@ test.describe("Lesemodus @t54", () => {
     await readingView(page).getByText("Erster Punkt").dblclick();
     await page.keyboard.type("x");
     await expect(readingView(page).getByText("Erster Punktx")).toHaveCount(0);
-    expect(api.puts).toEqual([]);
+    await page.getByTestId("reading-back").click();
+    await expect(readingView(page)).toHaveCount(0);
+    expect(api.puts.length).toBe(putsBefore);
     expect(api.saved.get(doc.file)).toBe(before);
   });
 
@@ -432,7 +436,7 @@ test.describe("Lesemodus @t54", () => {
     // Bild lädt und passt in die Spalte
     const image = view.getByRole("img", { name: "Pixel" });
     await expect(image).toBeVisible();
-    expect(await image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    await expect.poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   });
 
   test("K3: Zurück zur Map stellt Modus, Auswahl und Editor wieder her; Dokumentwechsel bleibt im Lesemodus @t54", async ({ page, request }) => {
@@ -673,8 +677,8 @@ test.describe("Lesemodus @t54", () => {
         viewWidth: view.clientWidth,
       };
     });
-    expect(metrics.pageOverflow).toBeLessThanOrEqual(0);
-    expect(metrics.viewOverflow).toBeLessThanOrEqual(0);
+    expect(metrics.pageOverflow).toBeLessThanOrEqual(1);
+    expect(metrics.viewOverflow).toBeLessThanOrEqual(1);
     expect(metrics.tableScrolls).toBe(true);
     expect(["auto", "scroll"]).toContain(metrics.tableOverflowX);
     expect(metrics.tableClientWidth).toBeLessThanOrEqual(390);

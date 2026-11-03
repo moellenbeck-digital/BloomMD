@@ -12,6 +12,7 @@ export type {
 
 export { HeadingDepthError, MAX_HEADING_LEVEL } from "./types";
 export { parseFile, serializeToMarkdown } from "./parser";
+export { exportOpml, exportOpmlOutline, importOpml, OpmlError, type OpmlErrorCode, type OpmlImportResult, type OpmlOutlineNode } from "./opml";
 export {
   CONFLICT_COPY_LABELS,
   conflictCopyPath,

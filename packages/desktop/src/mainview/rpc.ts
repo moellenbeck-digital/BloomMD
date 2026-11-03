@@ -140,6 +140,10 @@ export async function createMindmap(filename: string, markdown: string) {
   return electrobun.rpc!.request.createMindmap({ filename, markdown });
 }
 
+export async function saveExport(filename: string, dataBase64: string) {
+  return electrobun.rpc!.request.saveExport({ filename, dataBase64 });
+}
+
 export async function serializeMindmap(doc: { filePath: string; frontmatter: unknown; nodes: Record<string, unknown>; rootId: string; preamble?: string }) {
   return electrobun.rpc!.request.serializeMindmap(doc as never);
 }

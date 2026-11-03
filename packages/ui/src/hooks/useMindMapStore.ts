@@ -69,6 +69,8 @@ interface MindMapState {
   remoteUsers: RemoteUser[];
   edgeMode: EdgeMode;
   canvasMode: CanvasMode;
+  /** While a map export runs, the canvas mounts every node instead of only those in view. */
+  exportRenderAll: boolean;
   focusNodeId: string | null;
   copiedBranches: BranchSnapshot[];
   /** Last blocked structural edit, shown to the user and cleared on the next successful action. */
@@ -105,6 +107,7 @@ interface MindMapState {
   relayout: () => void;
   setEdgeMode: (mode: EdgeMode) => void;
   setCanvasMode: (mode: CanvasMode) => void;
+  setExportRenderAll: (renderAll: boolean) => void;
   setFocusNodeId: (nodeId: string | null) => void;
   copyBranches: (nodeIds?: string[]) => BranchSnapshot[];
   pasteBranches: (parentId?: string) => string[];
@@ -263,6 +266,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   remoteUsers: [],
   edgeMode: "hierarchy",
   canvasMode: "map",
+  exportRenderAll: false,
   focusNodeId: null,
   copiedBranches: [],
   statusMessage: null,
@@ -831,6 +835,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   },
 
   setCanvasMode: (canvasMode) => set({ canvasMode }),
+  setExportRenderAll: (exportRenderAll) => set({ exportRenderAll }),
 
   setFocusNodeId: (focusNodeId) => {
     const { document: doc, collapsedIds, edgeMode } = get();

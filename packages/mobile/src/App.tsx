@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Menu, FilePlus, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search } from "lucide-react";
+import { Menu, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search } from "lucide-react";
 import {
   ConflictCopyBadge,
   ConflictCopyBanner,
@@ -10,13 +10,21 @@ import {
   requestNodeFocus,
   useMindMapStore,
   useLocale,
+  buildTextExport,
+  downloadExportFile,
+  exportMapFile,
+  EXPORT_FORMATS,
+  MapExportError,
+  type ExportFormat,
 } from "@bloommd/ui";
-import { findConflictCopyOriginal, parseConflictCopy, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { findConflictCopyOriginal, importOpml, isWorkspaceMindMap, OpmlError, parseConflictCopy, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { BloomFolder } from "@bloommd/capacitor-folder";
 import { BloomKeychain } from "@bloommd/capacitor-keychain";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { markdownFilename } from "./mobile-files";
+import { shareExportFile, type ExportShareDeps } from "./export-share";
 import { MobileRemoteClient, RemoteRequestError } from "./remote-client";
 import { DEFAULT_SERVER_URL, describeDevice, MobileAuth, MobileAuthError, normalizeServerUrl, type MobileSession } from "./mobile-auth";
 import { parseAppLink } from "./app-links";
@@ -94,6 +102,27 @@ const AUTH_TEXT = {
   },
 } as const;
 
+/** System share sheet with a temporary file in the app cache ("Save to Files", AirDrop, Mail, …). */
+const nativeShareDeps: ExportShareDeps = {
+  writeFile: async (path, data) => (await Filesystem.writeFile({ path, data, directory: Directory.Cache, recursive: true })).uri,
+  removeFile: async (path) => { await Filesystem.deleteFile({ path, directory: Directory.Cache }); },
+  canShare: async () => (await (await import("@capacitor/share")).Share.canShare()).value,
+  share: async ({ title, files }) => { await (await import("@capacitor/share")).Share.share({ title, files }); },
+  download: downloadExportFile,
+};
+
+const EXPORT_ICONS = { markdown: FileText, opml: ListTree, pdf: FileDown, png: ImageDown, svg: Shapes } as const;
+
+function exportEntries(t: ReturnType<typeof useLocale>["t"]): Record<ExportFormat, { label: string; Icon: typeof FileText }> {
+  return {
+    markdown: { label: t.exportMarkdown, Icon: EXPORT_ICONS.markdown },
+    opml: { label: t.exportOpml, Icon: EXPORT_ICONS.opml },
+    pdf: { label: t.exportPdf, Icon: EXPORT_ICONS.pdf },
+    png: { label: t.exportPng, Icon: EXPORT_ICONS.png },
+    svg: { label: t.exportSvg, Icon: EXPORT_ICONS.svg },
+  };
+}
+
 export function App() {
   const { t, locale } = useLocale();
   const authText = AUTH_TEXT[locale === "en" ? "en" : "de"];
@@ -115,6 +144,7 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -381,8 +411,19 @@ export function App() {
     }
     try {
       await flushSave();
-      const markdown = await file.text();
-      const base = file.name.replace(/\.(md|markdown)$/i, "") || "Import";
+      let markdown = await file.text();
+      const isOpml = /\.opml$/i.test(file.name);
+      if (isOpml) {
+        try {
+          markdown = importOpml(markdown).markdown;
+        } catch (opmlError) {
+          if (!(opmlError instanceof OpmlError)) throw opmlError;
+          console.error("[BloomMD] OPML import failed:", opmlError);
+          setError(`${t.importOpmlFailed} ${opmlError.message}`);
+          return;
+        }
+      }
+      const base = file.name.replace(/\.(md|markdown|opml)$/i, "") || "Import";
       const filename = markdownFilename(base, crypto.randomUUID().slice(0, 8), files.map((entry) => entry.path.split("/").pop() ?? entry.path));
       const doc = parseFile(storeRef.current.pathFor(filename), markdown);
       saver.open(storeRef.current, await storeRef.current.save({ document: doc, baseline: "" }, doc));
@@ -393,7 +434,7 @@ export function App() {
     } catch {
       setError(textRef.current.errors.importFailed);
     }
-  }, [files, flushSave, refreshFiles, saver, setDocument]);
+  }, [files, flushSave, refreshFiles, saver, setDocument, t.importOpmlFailed]);
 
   const handleDelete = useCallback(async (path: string) => {
     if (!window.confirm(store.kind === "folder" ? textRef.current.confirmDeleteFromFolder(path, store.name) : textRef.current.confirmDeleteFromDevice(path))) return;
@@ -412,20 +453,22 @@ export function App() {
     }
   }, [document, flushSave, loadFile, refreshFiles, saver, store]);
 
-  const handleShare = useCallback(async () => {
-    if (!document) return;
-    const markdown = serializeToMarkdown(document);
-    try {
-      const { Share } = await import("@capacitor/share");
-      await Share.share({
-        title: document.frontmatter.title,
-        text: markdown,
-      });
-    } catch {
-      // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(markdown);
+  const handleExport = useCallback(async (format: ExportFormat) => {
+    setExportOpen(false);
+    const current = useMindMapStore.getState().document;
+    if (!current) return;
+    if (isWorkspaceMindMap(current)) {
+      useMindMapStore.getState().setStatusMessage(t.derivedWorkspaceExport);
+      return;
     }
-  }, [document]);
+    try {
+      const file = format === "markdown" || format === "opml" ? buildTextExport(format, current) : await exportMapFile(format);
+      await shareExportFile(file, nativeShareDeps);
+    } catch (exportError) {
+      console.error("[BloomMD] export failed:", exportError);
+      setError(exportError instanceof MapExportError && exportError.code === "no-map" ? t.exportNoMap : t.exportFailed);
+    }
+  }, [t]);
 
   useEffect(() => {
     if (!document) return;
@@ -455,12 +498,13 @@ export function App() {
       // An open drawing keeps its strokes until Done: back never discards it.
       if (window.document.querySelector(".bloommd-ink-surface")) return;
       if (helpOpen) setHelpOpen(false);
+      else if (exportOpen) setExportOpen(false);
       else if (drawerOpen) setDrawerOpen(false);
       else if (editorVisible) useMindMapStore.getState().setEditorVisible(false);
       else void flushSave().finally(() => void CapacitorApp.minimizeApp());
     });
     return () => { void listener.then((handle) => handle.remove()).catch(() => undefined); };
-  }, [drawerOpen, editorVisible, flushSave, helpOpen]);
+  }, [drawerOpen, editorVisible, exportOpen, flushSave, helpOpen]);
 
   const handleLink = useCallback(async (raw: string) => {
     const link = parseAppLink(raw);
@@ -566,7 +610,7 @@ export function App() {
   return (
     <InkAttachmentsContext.Provider value={inkAttachments}>
     <div className="h-full flex flex-col bg-[#FAFAFA]">
-      <input ref={fileInputRef} type="file" accept=".md,.markdown,text/markdown,text/plain" className="hidden" onChange={handleImport} />
+      <input ref={fileInputRef} type="file" accept=".md,.markdown,.opml,text/markdown,text/plain,text/x-opml+xml,text/xml" className="hidden" onChange={handleImport} />
       {/* Header — compact for mobile */}
       <header className="h-12 border-b border-[#E8E4DF] bg-white flex items-center px-3 shrink-0">
         <button
@@ -596,15 +640,37 @@ export function App() {
           >
             {saved ? <Check size={20} /> : <Save size={20} />}
           </button>
-          <button
-            onClick={handleShare}
-            aria-label={text.shareMarkdown}
-            title={text.shareMarkdown}
-            disabled={!document}
-            className="p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-30"
-          >
-            <Share2 size={20} />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportOpen((open) => !open)}
+              aria-label={t.exportMenu}
+              title={t.exportMenu}
+              aria-haspopup="menu"
+              aria-expanded={exportOpen}
+              data-testid="toolbar-export"
+              disabled={!document}
+              className="p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-30"
+            >
+              <Share2 size={20} />
+            </button>
+            {exportOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} aria-hidden="true" />
+                <div role="menu" aria-label={t.exportMenu} data-testid="export-menu" className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[#E8E4DF] bg-white p-1.5 shadow-xl">
+                  {EXPORT_FORMATS.map((format) => {
+                    const { label, Icon } = exportEntries(t)[format];
+                    return (
+                      <button key={format} type="button" role="menuitem" data-testid={`export-${format}`} onClick={() => void handleExport(format)} className="flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-[#1A1A1A] active:bg-[#F5F3F0]">
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 

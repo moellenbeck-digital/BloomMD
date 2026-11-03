@@ -24,13 +24,15 @@ import {
   type CreateEntryKind,
   fileEntryIsActive,
   requestNodeFocus,
+  bytesToBase64,
+  type ExportFile,
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
 import type { MindMapDocument, MindMapListEntry, NoteRevision, SharedDocumentBinding } from "@bloommd/core/browser";
 import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, pdfPageUrl, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
-  chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
+  chooseDirectory, chooseResourceFile, importFile, saveExport, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
   renameMindmap, deleteMindmap, listNoteHistory, restoreNoteVersion,
   listConnectionProfiles, saveConnectionProfile, connectProfile, useLocalConnection, deleteConnectionProfile, setConnectionProfileWorkspace,
   listRemoteWorkspaces, selectRemoteWorkspace,
@@ -1136,7 +1138,10 @@ export function App() {
   const handleImportFile = useCallback(async () => {
     if (!assertRemoteWriteAccess()) return;
     const result = await importFile();
-    if (!("frontmatter" in result)) return;
+    if (!("frontmatter" in result)) {
+      if (result.error) useMindMapStore.getState().setStatusMessage(`${t.importOpmlFailed} ${result.error}`);
+      return;
+    }
     const doc: MindMapDocument = {
       ...result,
       nodes: new Map(Object.entries(result.nodes)),
@@ -1153,32 +1158,15 @@ export function App() {
       await connectRemoteFileSync(importedFilename);
     }
     await refreshFileList();
-  }, [assertRemoteWriteAccess, clearForwardNavigation, connectionMode, syncUrl, setDocument, refreshFileList, connectRemoteFileSync]);
+  }, [assertRemoteWriteAccess, clearForwardNavigation, connectionMode, syncUrl, setDocument, refreshFileList, connectRemoteFileSync, t]);
 
-  // Export
-  const handleExportFile = useCallback(async () => {
-    const doc = useMindMapStore.getState().document;
-    if (!doc) return;
-    if (isWorkspaceMindMap(doc)) {
-      useMindMapStore.getState().setStatusMessage(t.derivedWorkspaceExport);
-      return;
-    }
-    const serializedDoc = {
-      filePath: doc.filePath,
-      frontmatter: doc.frontmatter,
-      nodes: Object.fromEntries(doc.nodes),
-      rootId: doc.rootId,
-      preamble: doc.preamble,
-    };
-    const { markdown } = await serializeMindmap(serializedDoc);
-    const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement("a");
-    a.href = url;
-    a.download = `${doc.frontmatter.title || "mindmap"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
+  // Export: the toolbar builds the file; the webview cannot reliably download blobs, so the bun
+  // process saves it into the Downloads folder and shows it there.
+  const handleDeliverExport = useCallback(async (file: ExportFile) => {
+    const result = await saveExport(file.filename, bytesToBase64(file.data));
+    if ("error" in result) throw new Error(result.error);
+    useMindMapStore.getState().setStatusMessage(`${t.exportSavedTo} ${result.path}`);
+  }, [t]);
 
   // Delete
   const handleDeleteMindmap = useCallback(async (filename: string) => {
@@ -1899,7 +1887,7 @@ export function App() {
             onCreateNew={handleCreateNew}
             onSaveFile={handleSaveFile}
             onImportFile={handleImportFile}
-            onExportFile={handleExportFile}
+            onDeliverExport={handleDeliverExport}
             onOpenHistory={document && !isWorkspaceMindMap(document) ? () => void handleOpenHistory() : undefined}
           />
         </div>

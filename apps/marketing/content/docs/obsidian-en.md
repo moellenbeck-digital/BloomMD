@@ -125,7 +125,7 @@ In draw mode the whole map works with Apple Pencil (or the mouse):
 
 - **Long press** (iPad) or **right click** a node for a menu with all actions.
 - **Study mode** (hat icon): node contents are covered; tap to reveal them one by one.
-- **Export** (image icon): the whole map as PNG or PDF in the attachment folder.
+- **Export** (image icon): the whole map as Markdown, OPML, PDF, PNG or SVG in the attachment folder — the same five entries as in the apps, see [Export and import](/docs/export). The command **Import OPML** creates a new note from an OPML file (MindNode, Xmind).
 
 ## Learning progress on the map
 

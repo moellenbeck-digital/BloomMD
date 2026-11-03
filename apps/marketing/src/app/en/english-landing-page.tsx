@@ -651,7 +651,7 @@ function DesktopSection() {
         </div>
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
           {[
-            { icon: HardDrive, title: "Your files, your machine", text: "Work directly on a local folder. No upload, no account and no hidden background sync." },
+            { icon: HardDrive, title: "Your files, your machine", text: "Work directly on a local folder. No upload, no account and no hidden background sync. Your files belong to you: every export (Markdown, OPML, PDF, PNG, SVG) is free for everyone." },
             { icon: RefreshCw, title: "External edits show up", text: "Changes from Obsidian, VS Code or Git can be reflected without copying files into a platform." },
             { icon: FileCode2, title: "Open Markdown directly", text: "The beta path includes opening .md files and folders as maps from the native app." },
           ].map((reason) => (

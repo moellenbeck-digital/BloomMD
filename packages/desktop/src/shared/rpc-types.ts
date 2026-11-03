@@ -175,7 +175,7 @@ export interface LinkPreviewResult {
 export interface NativeDialogResults {
   chooseDirectory: { path: string | null; error?: string };
   chooseResourceFile: { path: string | null; error?: string };
-  importFile: SerializedDocument | { filePath: null };
+  importFile: SerializedDocument | { filePath: null; error?: string };
 }
 
 export type NativeDialogMethod = keyof NativeDialogResults;
@@ -268,6 +268,11 @@ export type BloomMDRPC = {
       serializeMindmap: {
         params: SerializedDocument;
         response: { markdown: string };
+      };
+      /** Saves an exported file (base64) into the Downloads folder and shows it in the file manager. */
+      saveExport: {
+        params: { filename: string; dataBase64: string };
+        response: { path: string } | { error: string };
       };
       renameMindmap: {
         params: { oldFilename: string; newFilename: string };

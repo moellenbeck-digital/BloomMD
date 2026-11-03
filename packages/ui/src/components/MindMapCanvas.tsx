@@ -191,6 +191,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const edgeMode = useMindMapStore((state) => state.edgeMode);
   const setEdgeMode = useMindMapStore((state) => state.setEdgeMode);
   const canvasMode = useMindMapStore((state) => state.canvasMode);
+  const exportRenderAll = useMindMapStore((state) => state.exportRenderAll);
   const setCanvasMode = useMindMapStore((state) => state.setCanvasMode);
   const focusNodeId = useMindMapStore((state) => state.focusNodeId);
   const setFocusNodeId = useMindMapStore((state) => state.setFocusNodeId);
@@ -413,7 +414,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       </div>}
       {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
-            onlyRenderVisibleElements={onlyRenderVisibleElements}
+            onlyRenderVisibleElements={onlyRenderVisibleElements && !exportRenderAll}
             nodes={styledNodes}
             edges={edges}
             onNodesChange={onNodesChange}

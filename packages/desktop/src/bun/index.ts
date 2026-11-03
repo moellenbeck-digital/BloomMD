@@ -1,7 +1,9 @@
 import Electrobun, { BrowserWindow, BrowserView, Updater, Utils } from "electrobun/bun";
 import {
   FileStore,
+  OpmlError,
   buildWorkspaceMindMap,
+  importOpml,
   normalizeMarkdownFilename,
   normalizeMarkdownPath,
   parseFile,
@@ -10,6 +12,7 @@ import {
   serializeToMarkdown,
 } from "@bloommd/core";
 import { watchWorkspace } from "./workspace-watcher";
+import { saveExportFile } from "./save-export";
 import { copyFile, mkdir, readFile, rename, access, stat } from "node:fs/promises";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -775,8 +778,20 @@ async function runImportFile() {
       return { filePath: null };
     }
 
-    const content = await readFile(srcPath, "utf-8");
-    const filename = sanitizeMarkdownFilename(srcPath.split("/").pop() || "imported.md");
+    let content = await readFile(srcPath, "utf-8");
+    let sourceName = srcPath.split("/").pop() || "imported.md";
+    if (/\.opml$/i.test(sourceName)) {
+      // OPML becomes a new Markdown map; the title follows the file name, as for .md files.
+      try {
+        content = importOpml(content).markdown;
+      } catch (err) {
+        if (!(err instanceof OpmlError)) throw err;
+        console.error("[BloomMD] OPML import failed:", err);
+        return { filePath: null, error: err.message };
+      }
+      sourceName = sourceName.replace(/\.opml$/i, ".md");
+    }
+    const filename = sanitizeMarkdownFilename(sourceName);
 
     if (isRemote()) {
       // Upload to remote server
@@ -1013,6 +1028,17 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
           rootId: doc.rootId,
           preamble: doc.preamble,
         };
+      },
+
+      saveExport: async ({ filename, dataBase64 }) => {
+        try {
+          const result = await saveExportFile(Utils.paths.downloads, filename, dataBase64);
+          if ("path" in result) Utils.showItemInFolder(result.path);
+          return result;
+        } catch (err) {
+          console.error("[BloomMD] saveExport error:", err);
+          return { error: err instanceof Error ? err.message : String(err) };
+        }
       },
 
       serializeMindmap: async (data) => {

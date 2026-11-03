@@ -76,9 +76,10 @@ import {
   Undo2,
 } from "lucide-react";
 import type { MarkdownNodeKind, MarkdownNodeMetadata } from "./markdown-document";
-import { toPng } from "html-to-image";
+import { toPng, toSvg } from "html-to-image";
 import { InkEditor } from "./ink-editor";
-import { dataUrlToBytes, exportBounds, exportSize, jpegToPdf } from "./map-export";
+import { composeMapSvg, dataUrlToBytes, exportBounds, exportSize, jpegToPdf, type MapExportEdge, type MapExportOverlayPath } from "./map-export";
+import { headingsToOpml } from "./opml-note";
 import { MapInkLayer } from "./map-ink-layer";
 import { inkContentBounds, serializeInkSvg, type InkDocument } from "./ink-document";
 import { InkDrawingList, nodeDrawings, useInkSession, type InkVaultActions } from "./ink-panel";
@@ -162,8 +163,10 @@ export interface CanvasActions {
   renderMarkdown: (element: HTMLElement, markdown: string) => () => void;
   /** Saves the map's own drawing; creates it (and links it in the frontmatter) when `path` is null. */
   saveMapInk: (path: string | null, svg: string, expectedSvg: string | null, conflictOf?: string) => Promise<string | null>;
-  /** Saves an exported map image into the vault; resolves to its path. */
-  saveExport: (extension: "png" | "pdf", data: Uint8Array) => Promise<string | null>;
+  /** Saves an exported map file (image, OPML or a Markdown copy) into the vault; resolves to its path. */
+  saveExport: (extension: "png" | "pdf" | "svg" | "opml" | "md", data: Uint8Array) => Promise<string | null>;
+  /** The Markdown text of the note this map shows; null when it shows a folder. */
+  readNote: () => Promise<string | null>;
   /** Shows a native Obsidian menu at a screen position. */
   openMenu: (position: { x: number; y: number }, items: CanvasMenuItem[], onHide?: () => void) => void;
   /** Creates a child node of `parentId` titled `title` whose content embeds a new drawing. */
@@ -1827,7 +1830,7 @@ function CanvasInner(props: CanvasProps) {
     setSizeRevision((value) => value + 1);
   }, [persist]);
 
-  const exportMap = useCallback(async (format: "png" | "pdf") => {
+  const exportMap = useCallback(async (format: "png" | "pdf" | "svg") => {
     const shell = shellRef.current;
     const viewportElement = shell?.querySelector<HTMLElement>(".react-flow__viewport");
     if (!shell || !viewportElement) return;
@@ -1841,15 +1844,49 @@ function CanvasInner(props: CanvasProps) {
     const background = flowBackground && flowBackground !== "rgba(0, 0, 0, 0)" ? flowBackground : getComputedStyle(document.body).backgroundColor;
     try {
       // Nodes and labels come from html-to-image, without edges and without editing chrome.
-      const nodesUrl = await toPng(viewportElement, {
+      const nodesOptions = {
         width,
         height,
         pixelRatio: 1,
         // Fonts are the system's; skipping the web-font scan avoids fetching Obsidian's stylesheets.
         skipFonts: true,
-        filter: (node) => !(node.instanceOf(Element) && EXPORT_HIDDEN.some((selector) => node.matches(selector))),
+        filter: (node: HTMLElement) => !(node.instanceOf(Element) && EXPORT_HIDDEN.some((selector) => node.matches(selector))),
         style: { width: `${width}px`, height: `${height}px`, transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` },
-      });
+      };
+      if (format === "svg") {
+        // A real SVG file: edges and handwriting as vector paths, nodes as live text (no bitmap).
+        const svgUrl = await toSvg(viewportElement, nodesOptions);
+        const edges: MapExportEdge[] = [];
+        for (const path of shell.querySelectorAll<SVGPathElement>(".react-flow__edges path")) {
+          const style = getComputedStyle(path);
+          const d = path.getAttribute("d");
+          if (!d || style.stroke === "none" || style.visibility === "hidden") continue;
+          edges.push({
+            d,
+            stroke: style.stroke,
+            strokeWidth: Number.parseFloat(style.strokeWidth) || 1,
+            dashArray: style.strokeDasharray && style.strokeDasharray !== "none" ? style.strokeDasharray.split(/[ ,]+/).map(Number.parseFloat) : [],
+            lineCap: style.strokeLinecap || undefined,
+          });
+        }
+        const overlay: MapExportOverlayPath[] = [];
+        for (const path of shell.querySelectorAll<SVGPathElement>(".bloommd-map-ink path[data-stroke-id]")) {
+          const d = path.getAttribute("d");
+          if (d) overlay.push({ d, fill: path.getAttribute("fill") ?? "#000", opacity: Number.parseFloat(path.getAttribute("fill-opacity") ?? "1") || 1 });
+        }
+        const svg = composeMapSvg({
+          width,
+          height,
+          background,
+          view: { x: view.x, y: view.y, scale: view.zoom },
+          edges,
+          nodesSvg: decodeURIComponent(svgUrl.slice(svgUrl.indexOf(",") + 1)),
+          overlay,
+        });
+        await props.actions.saveExport("svg", new TextEncoder().encode(svg));
+        return;
+      }
+      const nodesUrl = await toPng(viewportElement, nodesOptions);
       // React Flow draws each edge in its own unsized SVG, which html-to-image loses; the edges are
       // painted directly from their path data underneath the nodes instead.
       const canvas = createEl("canvas");
@@ -1893,6 +1930,21 @@ function CanvasInner(props: CanvasProps) {
       console.error("BloomMD could not export the map", error);
     }
   }, [shownMapInk, props.actions, reactFlow]);
+
+  const exportText = useCallback(async (format: "md" | "opml") => {
+    try {
+      if (format === "opml") {
+        const title = props.filePath.replace(/^.*\//, "").replace(/\.md$/i, "");
+        await props.actions.saveExport("opml", new TextEncoder().encode(headingsToOpml(title, props.headings)));
+        return;
+      }
+      const markdown = await props.actions.readNote();
+      if (markdown === null) return;
+      await props.actions.saveExport("md", new TextEncoder().encode(markdown));
+    } catch (error) {
+      console.error("BloomMD could not export the map", error);
+    }
+  }, [props.actions, props.filePath, props.headings]);
 
   useEffect(() => {
     // Load the map's drawing when the note links one; keep an open session while the frontmatter
@@ -2543,13 +2595,17 @@ function CanvasInner(props: CanvasProps) {
             <button
               type="button"
               className="bloommd-icon-control"
-              title="Export map as PNG or PDF"
+              title="Export map"
               aria-label="Export map"
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 openMenu({ x: rect.left, y: rect.bottom + 4 }, [
+                  // Same entries in the same order as the export menu of the apps.
+                  { title: "Export as Markdown", icon: "file-text", onClick: () => void exportText("md") },
+                  { title: "Export as OPML", icon: "list-tree", onClick: () => void exportText("opml") },
+                  { title: "Export as PDF", icon: "file-down", onClick: () => void exportMap("pdf") },
                   { title: "Export as PNG", icon: "image", onClick: () => void exportMap("png") },
-                  { title: "Export as PDF", icon: "file-text", onClick: () => void exportMap("pdf") },
+                  { title: "Export as SVG", icon: "shapes", onClick: () => void exportMap("svg") },
                 ]);
               }}
             >

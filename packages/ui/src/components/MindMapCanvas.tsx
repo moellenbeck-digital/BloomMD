@@ -19,7 +19,9 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
+  ArrowLeft,
   BookmarkPlus,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   ClipboardCopy,
@@ -38,6 +40,7 @@ import {
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { MindMapNode } from "./MindMapNode";
 import { MindMapEdge } from "./MindMapEdge";
+import { ReadingView } from "./ReadingView";
 import { useMindMapStore, type LocalViewState } from "../hooks/useMindMapStore";
 import type { RootRenameEvent } from "../hooks/useMindMapLayout";
 import { dropTargetToMoveIntent, findCanvasDropTarget, type CanvasDropTarget } from "../utils/canvas-drag";
@@ -193,6 +196,9 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const canvasMode = useMindMapStore((state) => state.canvasMode);
   const exportRenderAll = useMindMapStore((state) => state.exportRenderAll);
   const setCanvasMode = useMindMapStore((state) => state.setCanvasMode);
+  const exitReadingMode = useMindMapStore((state) => state.exitReadingMode);
+  const setMapViewport = useMindMapStore((state) => state.setMapViewport);
+  const restoreViewport = useMindMapStore((state) => state.restoreViewport);
   const focusNodeId = useMindMapStore((state) => state.focusNodeId);
   const setFocusNodeId = useMindMapStore((state) => state.setFocusNodeId);
   const collapsedIds = useMindMapStore((state) => state.collapsedIds);
@@ -363,11 +369,26 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
     },
   })), [agentActivity, document?.rootId, dropTarget, nodes, onAskAgent, onRootRename, selectedNodeId]);
 
-  const modeToolbar = (
+  // Back from the reading mode is always visible and is the only control there: no map, editor or node actions.
+  const modeToolbar = canvasMode === "reading" ? (
+    <div className="absolute left-3 top-3 z-20" data-testid="reading-toolbar">
+      <button
+        type="button"
+        onClick={exitReadingMode}
+        className="flex min-h-11 items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-surface-sunken)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-bloom)]"
+        title={`${t.backToMap} (Esc)`}
+        data-testid="reading-back"
+      >
+        <ArrowLeft size={16} aria-hidden="true" />
+        {t.backToMap}
+      </button>
+    </div>
+  ) : (
     <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-sm" aria-label={t.canvasModes} data-testid="view-mode-toggle">
       <button type="button" className={iconButton(canvasMode === "map")} onClick={() => setCanvasMode("map")} title={t.mindMap} aria-label={t.mindMap} data-testid="view-mode-map"><Network size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "outline")} onClick={() => setCanvasMode("outline")} title={t.outline} aria-label={t.outline} data-testid="view-mode-outline"><ListTree size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
+      <button type="button" className={`${iconButton(false)} max-sm:h-11 max-sm:w-11`} onClick={() => setCanvasMode("reading")} title={`${t.readingMode} (Alt+L)`} aria-label={t.readingMode} data-testid="view-mode-reading"><BookOpen size={16} /></button>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
       <label className="sr-only" htmlFor="edge-mode">{t.edgeMode}</label>
       <select id="edge-mode" className="h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
@@ -412,7 +433,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
         {layoutPending ? t.layoutInProgress : t.layoutFailed}
         {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline">{t.retryLayout}</button>}
       </div>}
-      {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
+      {canvasMode === "reading" ? <ReadingView /> : canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
             onlyRenderVisibleElements={onlyRenderVisibleElements && !exportRenderAll}
             nodes={styledNodes}
@@ -450,7 +471,10 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            fitView
+            // "Back to map" from the reading mode returns to the exact pan/zoom instead of fitting the whole map.
+            fitView={!restoreViewport}
+            defaultViewport={restoreViewport ?? undefined}
+            onMoveEnd={(_, viewport) => setMapViewport(viewport)}
             fitViewOptions={{ padding: 0.3 }}
             minZoom={0.1}
             maxZoom={2}

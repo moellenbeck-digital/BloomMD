@@ -246,6 +246,16 @@ export interface Translations {
   mindMap: string;
   outline: string;
   presentation: string;
+  readingMode: string;
+  readingModeHint: string;
+  readingView: string;
+  readingEmpty: string;
+  backToMap: string;
+  codeBlockPlainText: string;
+  readingTable: string;
+  readingTaskDone: string;
+  readingTaskOpen: string;
+  readingImageUnavailable: string;
   edgeMode: string;
   structure: string;
   links: string;
@@ -487,6 +497,9 @@ export interface Translations {
   shortcutBackToWorkspace: string;
   shortcutForwardToFile: string;
   shortcutBackToCanvas: string;
+  shortcutReadingMode: string;
+  shortcutExitReading: string;
+  shortcutReadingScroll: string;
   shortcutSelectNode: string;
   shortcutSelectChild: string;
   shortcutSelectParent: string;
@@ -760,6 +773,16 @@ export const translations: Record<Locale, Translations> = {
     mindMap: "Mindmap",
     outline: "Gliederung",
     presentation: "Präsentation",
+    readingMode: "Lesemodus",
+    readingModeHint: "Dokument ruhig und nur lesend ansehen",
+    readingView: "Lesemodus: Dokument",
+    readingEmpty: "Dieses Dokument hat noch keinen Inhalt.",
+    backToMap: "Zurück zur Map",
+    codeBlockPlainText: "Text",
+    readingTable: "Tabelle",
+    readingTaskDone: "Erledigt",
+    readingTaskOpen: "Offen",
+    readingImageUnavailable: "Bild nicht verfügbar",
     edgeMode: "Kantenmodus",
     structure: "Struktur",
     links: "Links",
@@ -1000,6 +1023,9 @@ export const translations: Record<Locale, Translations> = {
     shortcutBackToWorkspace: "Zur Workspace-Übersicht",
     shortcutForwardToFile: "Zur zuletzt geöffneten Datei",
     shortcutBackToCanvas: "Am Knoten: Panel schließen / Auswahl aufheben",
+    shortcutReadingMode: "Lesemodus betreten oder verlassen",
+    shortcutExitReading: "Im Lesemodus: zurück zur Map",
+    shortcutReadingScroll: "Im Lesemodus: Text scrollen",
     shortcutSelectNode: "Node auswählen",
     shortcutSelectChild: "Erstes Kind auswählen",
     shortcutSelectParent: "Parent auswählen",
@@ -1268,6 +1294,16 @@ export const translations: Record<Locale, Translations> = {
     mindMap: "Mind map",
     outline: "Outline",
     presentation: "Presentation",
+    readingMode: "Reading mode",
+    readingModeHint: "View the document calmly, read-only",
+    readingView: "Reading mode: document",
+    readingEmpty: "This document has no content yet.",
+    backToMap: "Back to map",
+    codeBlockPlainText: "Text",
+    readingTable: "Table",
+    readingTaskDone: "Done",
+    readingTaskOpen: "Open",
+    readingImageUnavailable: "Image not available",
     edgeMode: "Edge mode",
     structure: "Structure",
     links: "Links",
@@ -1508,6 +1544,9 @@ export const translations: Record<Locale, Translations> = {
     shortcutBackToWorkspace: "Back to workspace overview",
     shortcutForwardToFile: "Forward to the previously opened file",
     shortcutBackToCanvas: "On a node: close panel / clear selection",
+    shortcutReadingMode: "Enter or leave reading mode",
+    shortcutExitReading: "In reading mode: back to the map",
+    shortcutReadingScroll: "In reading mode: scroll the text",
     shortcutSelectNode: "Select node",
     shortcutSelectChild: "Select first child",
     shortcutSelectParent: "Select parent",

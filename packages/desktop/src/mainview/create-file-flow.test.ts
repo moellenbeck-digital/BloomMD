@@ -90,7 +90,7 @@ mock.module("./rpc", () => ({
   setApplicationLocale: async () => {},
   recordE2EState: async () => {},
   onConnectionModeChanged: () => {}, onExternalFileOpened: () => {}, onAboutRequested: () => {}, onUpdateStatus: () => {},
-  chooseResourceFile: () => {}, importFile: () => {}, createFolder: () => {}, deleteMindmap: () => {}, listNoteHistory: () => {}, restoreNoteVersion: () => {},
+  chooseResourceFile: () => {}, importFile: () => {}, saveExport: () => {}, createFolder: () => {}, deleteMindmap: () => {}, listNoteHistory: () => {}, restoreNoteVersion: () => {},
   saveConnectionProfile: () => {}, connectProfile: () => {}, useLocalConnection: () => {}, deleteConnectionProfile: () => {}, setConnectionProfileWorkspace: () => {},
   listRemoteWorkspaces: () => {}, selectRemoteWorkspace: () => {}, getSyncTicket: () => {}, getSharedSyncTicket: () => {}, listProfileWorkspaces: () => {},
   shareLocalMindmap: () => {}, unshareLocalMindmap: () => {}, updateSharedDocumentBinding: () => {}, readResource: () => {}, fetchLinkPreview: () => {}, openExternalUrl: () => {},

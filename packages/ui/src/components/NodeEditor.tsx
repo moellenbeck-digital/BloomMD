@@ -68,7 +68,7 @@ import {
   workspaceReferencesForNode,
   type ResourcePreviewKind,
 } from "./node-panel-model";
-import { LazyNodeImageGallery, LazyVisualViewer } from "../visuals/lazy";
+import { LazyNodeImageGallery, LazyVisualViewer, mermaidCodeBlockDescriptor } from "../visuals/lazy";
 import { canSaveOriginal } from "../visuals/save-policy";
 import type { VisualViewerAction } from "../visuals/VisualViewer";
 import { useEditorImageZoom, useInlineImagePreview } from "../visuals/useInlineImages";
@@ -1156,7 +1156,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 thematicBreakPlugin(),
                 markdownShortcutPlugin(),
                 tablePlugin(),
-                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript" }),
+                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript", codeBlockEditorDescriptors: [mermaidCodeBlockDescriptor] }),
                 codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", mermaid: "Mermaid", "": "Plain Text" } }),
                 imagePlugin(),
                 linkPlugin(),

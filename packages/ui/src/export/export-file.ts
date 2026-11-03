@@ -58,3 +58,11 @@ export function downloadExportFile(file: ExportFile): void {
   // Revoking right away can cancel the download in some browsers.
   window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** Base64 of binary data, for RPC and native file APIs that only carry strings. */
+export function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+  return btoa(binary);
+}

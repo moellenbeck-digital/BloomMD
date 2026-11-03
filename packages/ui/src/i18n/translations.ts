@@ -21,6 +21,7 @@ export interface Translations {
   exportPng: string;
   exportSvg: string;
   exportFailed: string;
+  exportSavedTo: string;
   exportNoMap: string;
   importOpmlFailed: string;
   shareReadOnlyLink: string;
@@ -537,6 +538,7 @@ export const translations: Record<Locale, Translations> = {
     exportPng: "PNG (.png)",
     exportSvg: "SVG (.svg)",
     exportFailed: "Der Export ist fehlgeschlagen.",
+    exportSavedTo: "Exportiert nach:",
     exportNoMap: "Die Karte ist nicht sichtbar. Wechsle in die Kartenansicht und exportiere erneut.",
     importOpmlFailed: "OPML konnte nicht importiert werden:",
     shareReadOnlyLink: "Lese-Links für Kolleg:innen",
@@ -1044,6 +1046,7 @@ export const translations: Record<Locale, Translations> = {
     exportPng: "PNG (.png)",
     exportSvg: "SVG (.svg)",
     exportFailed: "The export failed.",
+    exportSavedTo: "Exported to:",
     exportNoMap: "The map is not visible. Switch to the map view and export again.",
     importOpmlFailed: "OPML could not be imported:",
     shareReadOnlyLink: "Read-only links for colleagues",

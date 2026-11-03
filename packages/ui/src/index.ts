@@ -5,6 +5,7 @@ export { MindMapEdge } from "./components/MindMapEdge";
 export { LazyNodeEditor } from "./components/LazyNodeEditor";
 export { ResizableEditor } from "./components/ResizableEditor";
 export { Toolbar, type ToolbarHandle } from "./components/Toolbar";
+export { buildExportFile, bytesToBase64, downloadExportFile, EXPORT_FORMATS, exportFilename, type ExportFile, type ExportFormat } from "./export/export-file";
 export { FileBrowser, fileEntryIsActive } from "./components/FileBrowser";
 export { CommandPalette } from "./components/CommandPalette";
 export { HelpModal } from "./components/HelpModal";

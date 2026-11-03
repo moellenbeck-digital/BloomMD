@@ -78,7 +78,7 @@ describe("desktop mainview contract", () => {
       "onCreateNew={handleCreateNew}",
       "onSaveFile={handleSaveFile}",
       "onImportFile={handleImportFile}",
-      "onExportFile={handleExportFile}",
+      "onDeliverExport={handleDeliverExport}",
       "onNew={() => toolbarRef.current?.triggerNew()}",
       "onSave={() => void toolbarRef.current?.triggerSave()}",
       "onImport={() => toolbarRef.current?.triggerImport()}",

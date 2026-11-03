@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Live Preview
+
+- The `<!-- bloommd:id=… -->` and `<!-- bloommd:meta=… -->` comments BloomMD writes behind headings are now hidden in Live Preview, so notes no longer look cluttered. The file is not changed: the comments stay exactly as they are, and Source mode still shows them. Other HTML comments in your notes stay visible. The cursor skips the hidden part, and typing or deleting at the end of a heading never removes the comment.
+
 ### Templates
 
 - New command **New note from template**: pick one of five built-in templates (Lecture, Cornell, Literature note, Exam prep, Project; German when Obsidian is set to German, English otherwise) or one of your own, enter a name, and the note is created in the folder Obsidian uses for new notes next to the active file (a name with `/` goes into a sub-folder) and opened. Only `{{title}}` and `{{date}}` (`YYYY-MM-DD`) are replaced; other `{{…}}` stay as written.

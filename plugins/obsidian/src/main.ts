@@ -19,6 +19,7 @@ import {
   TFolder,
   Setting,
   WorkspaceLeaf,
+  editorLivePreviewField,
   getLanguage,
   type EventRef,
   type SettingDefinitionItem,
@@ -50,6 +51,7 @@ import {
   type ResourceEntry,
 } from "./canvas";
 import { historyFocusId } from "./history-focus";
+import { livePreviewCommentsExtension } from "./live-preview-comments";
 import { conflictFileName, linkDrawingIntoNode, saveDrawing } from "./drawing-save";
 import { linkTargetsPath, parseInkSvg, retargetInkLinks, serializeInkSvg } from "./ink-document";
 import { appendSvgEmbed, ensureWikiLink, inkFileName } from "./ink-embeds";
@@ -959,6 +961,8 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
     this.registerDomEvent(document, "visibilitychange", () => {
       if (document.visibilityState === "visible") this.bloomViews().forEach((view) => void view.reloadLearning());
     });
+    // Live Preview hides the bloommd:id / bloommd:meta comments behind headings; the file keeps them.
+    this.registerEditorExtension(livePreviewCommentsExtension((state) => state.field(editorLivePreviewField, false) ?? false));
     this.registerView(VIEW_TYPE_BLOOMMD, (leaf) => new BloomMDView(leaf, this));
     // Page Preview shows notes linked from handwriting on hover (mouse or Apple Pencil) without a modifier key.
     this.registerHoverLinkSource(VIEW_TYPE_BLOOMMD, { display: "BloomMD", defaultMod: false });

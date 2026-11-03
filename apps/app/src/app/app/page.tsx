@@ -295,6 +295,8 @@ type RenameResult =
 interface ResourcePreviewRequest {
   kind?: string;
   file?: string;
+  /** Inline Markdown images name exactly one file; file nodes and Obsidian embeds may match by name. */
+  exact?: boolean;
   respond: (
     result: { url: string; revokeOnCleanup?: boolean } | { error: string },
   ) => void;
@@ -1415,7 +1417,11 @@ export default function Home() {
         return;
       }
 
-      const resolvedPath = workspace.resolvePath(detail.file);
+      const resolvedPath = detail.exact
+        ? workspace.resourcePaths().includes(detail.file)
+          ? detail.file
+          : null
+        : workspace.resolvePath(detail.file);
       if (!resolvedPath) {
         detail.respond({
           error: `„${detail.file}“ wurde im geöffneten Ordner nicht gefunden — oder der Name kommt mehrfach vor.`,

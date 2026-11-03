@@ -1,5 +1,3 @@
-import { maskCode } from "./code-mask";
-
 /**
  * Resolution of image and attachment references inside a note.
  *
@@ -24,25 +22,18 @@ const IMAGE_MIME_TYPES: Record<(typeof IMAGE_EXTENSIONS)[number], string> = {
 export type AssetPathRejection = "empty" | "escapes-workspace" | "unsupported-scheme" | "absolute-path" | "control-characters";
 
 export type AssetPathResult =
-  /** A file inside the workspace; `path` is normalized, `/`-separated and relative to the workspace root. */
+  /**
+   * A file inside the workspace; `path` is normalized and `/`-separated. It is relative to the
+   * workspace root, except when the note itself is known by an absolute path (the desktop app opens
+   * notes that way): then `path` is absolute too, and the shell checks that it stays inside its
+   * folder before it reads anything.
+   */
   | { kind: "workspace"; path: string }
   /** A URL the browser can load itself (`https:`, `blob:`, `data:image/…`). */
   | { kind: "remote"; url: string }
   | { kind: "invalid"; reason: AssetPathRejection };
 
 export type ImageRefSyntax = "markdown" | "wiki";
-
-export interface ImageRef {
-  syntax: ImageRefSyntax;
-  /** The path or URL as written in the note, before any decoding. */
-  target: string;
-  alt: string;
-  /** Obsidian size hint (`![[a.png|300]]` or `|300x200`); absent otherwise. */
-  width?: number;
-  height?: number;
-  /** 1-based line in the note. */
-  line: number;
-}
 
 const REMOTE_PATTERN = /^(https?:\/\/|blob:|data:image\/)/i;
 const SCHEME_PATTERN = /^[A-Za-z][A-Za-z0-9+.-]*:/;
@@ -79,11 +70,16 @@ function directorySegments(notePath: string): string[] {
   return segments;
 }
 
+function isAbsoluteNotePath(notePath: string): boolean {
+  return notePath.replace(/\\/g, "/").startsWith("/");
+}
+
 /**
- * Resolves `target` as written in the note at `notePath` (workspace-relative, `/`-separated).
+ * Resolves `target` as written in the note at `notePath` (`/`-separated; workspace-relative, or
+ * absolute where the shell opens notes by absolute path).
  *
  * - `./a.png` and `a.png` are relative to the note's folder, `../a.png` climbs out of it.
- * - `/a.png` is relative to the workspace root.
+ * - `/a.png` is relative to the workspace root (not resolvable for a note with an absolute path).
  * - Spaces, umlauts, `%20` escapes and `<a b.png>` brackets all work.
  * - Anything that would leave the workspace (`../` past the root, drive letters, `file:`) is rejected.
  */
@@ -103,6 +99,9 @@ export function resolveAssetPath(notePath: string, target: string): AssetPathRes
   if (!lastSegment || lastSegment === "." || lastSegment === "..") return { kind: "invalid", reason: "empty" };
 
   const fromRoot = decoded.startsWith("/");
+  const absoluteNote = isAbsoluteNotePath(notePath);
+  // Where the workspace root is, is not known for an absolute note: only its own folder can be reached.
+  if (fromRoot && absoluteNote) return { kind: "invalid", reason: "absolute-path" };
   const resolved: string[] = fromRoot ? [] : directorySegments(notePath);
   for (const segment of decoded.split("/")) {
     if (segment === "" || segment === ".") continue;
@@ -114,7 +113,7 @@ export function resolveAssetPath(notePath: string, target: string): AssetPathRes
     resolved.push(segment);
   }
   if (resolved.length === 0) return { kind: "invalid", reason: "empty" };
-  return { kind: "workspace", path: resolved.join("/").normalize("NFC") };
+  return { kind: "workspace", path: `${absoluteNote ? "/" : ""}${resolved.join("/")}`.normalize("NFC") };
 }
 
 /**
@@ -133,7 +132,7 @@ export function assetPathCandidates(notePath: string, target: string, syntax: Im
   };
   const first = resolveAssetPath(notePath, target);
   add(first);
-  if (syntax === "wiki" && first.kind === "workspace") {
+  if (syntax === "wiki" && first.kind === "workspace" && !isAbsoluteNotePath(notePath)) {
     const trimmed = target.trim();
     add(resolveAssetPath(notePath, trimmed.startsWith("/") ? trimmed : `/${trimmed}`));
   }
@@ -154,40 +153,4 @@ export function describeAssetRejection(reason: AssetPathRejection): string {
     case "control-characters":
       return "path contains control characters";
   }
-}
-
-const MARKDOWN_IMAGE = /!\[([^\]\n]*)\]\(\s*(<[^>\n]*>|[^)\n]*?)(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g;
-const WIKI_EMBED = /!\[\[([^\]\n|]+?)(?:\|([^\]\n]*))?\]\]/g;
-
-function parseEmbedHint(hint: string | undefined): Pick<ImageRef, "alt" | "width" | "height"> {
-  const text = (hint ?? "").trim();
-  const size = /^(\d+)(?:x(\d+))?$/.exec(text);
-  if (!size) return { alt: text };
-  return { alt: "", width: Number(size[1]), ...(size[2] ? { height: Number(size[2]) } : {}) };
-}
-
-/**
- * Image references in note text, in document order: `![alt](path)` and Obsidian `![[image.png|300]]`.
- * References inside code fences and inline code are examples, not images, and are skipped. Embeds of
- * notes or PDFs (`![[Note]]`) are not images and are skipped too.
- */
-export function extractImageRefs(markdown: string): ImageRef[] {
-  const lines = markdown.split("\n");
-  const masked = maskCode(lines);
-  const refs: ImageRef[] = [];
-  masked.forEach((maskedLine, index) => {
-    const found: Array<{ at: number; ref: ImageRef }> = [];
-    for (const match of maskedLine.matchAll(MARKDOWN_IMAGE)) {
-      const target = (match[2] ?? "").trim();
-      if (target) found.push({ at: match.index ?? 0, ref: { syntax: "markdown", target, alt: match[1] ?? "", line: index + 1 } });
-    }
-    for (const match of maskedLine.matchAll(WIKI_EMBED)) {
-      const target = (match[1] ?? "").trim().split("#")[0]!.trim();
-      if (!target || !isImagePath(target)) continue;
-      found.push({ at: match.index ?? 0, ref: { syntax: "wiki", target, ...parseEmbedHint(match[2]), line: index + 1 } });
-    }
-    found.sort((a, b) => a.at - b.at);
-    for (const { ref } of found) refs.push(ref);
-  });
-  return refs;
 }

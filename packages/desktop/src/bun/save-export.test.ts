@@ -16,8 +16,11 @@ async function tempDir(): Promise<string> {
 }
 
 describe("safeExportName", () => {
-  test("accepts the five export formats only", () => {
-    for (const extension of ["md", "opml", "pdf", "png", "svg"]) expect(safeExportName(`Karte.${extension}`)).toBe(`Karte.${extension}`);
+  test("accepts the five export formats and the image formats of saved originals only", () => {
+    for (const extension of ["md", "opml", "pdf", "png", "svg", "jpg", "jpeg", "gif", "webp", "avif", "bmp"]) expect(safeExportName(`Karte.${extension}`)).toBe(`Karte.${extension}`);
+    expect(safeExportName("Foto.JPG")).toBe("Foto.JPG");
+    expect(safeExportName("karte.html")).toBeNull();
+    expect(safeExportName("karte.ico")).toBeNull();
     expect(safeExportName("karte.exe")).toBeNull();
     expect(safeExportName("karte")).toBeNull();
     expect(safeExportName("")).toBeNull();

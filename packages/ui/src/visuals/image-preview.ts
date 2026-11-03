@@ -12,8 +12,13 @@ export const PREVIEW_RESOURCE_EVENT = "bloommd:preview-resource";
 
 export interface ResourcePreviewDetail {
   kind: "file";
-  /** Path relative to the workspace root, already resolved against the note. */
+  /** Path relative to the workspace root, already resolved against the note (absolute for notes the shell opens by absolute path). */
   file: string;
+  /**
+   * The path names exactly this file. Without it a shell may also match by file name (the way Obsidian
+   * finds `![[a.png]]`); a Markdown image path is explicit and must not be matched loosely.
+   */
+  exact?: boolean;
   respond: (result: { url: string; revokeOnCleanup?: boolean } | { error: string }) => void;
 }
 
@@ -36,7 +41,7 @@ export interface ImageReference {
 
 const REQUEST_TIMEOUT_MS = 8000;
 
-function requestResource(file: string, timeoutMs: number): Promise<{ url: string; release: () => void } | { error: string }> {
+function requestResource(file: string, exact: boolean, timeoutMs: number): Promise<{ url: string; release: () => void } | { error: string }> {
   return new Promise((resolve) => {
     let settled = false;
     const timeout = window.setTimeout(() => {
@@ -46,6 +51,7 @@ function requestResource(file: string, timeoutMs: number): Promise<{ url: string
     const detail: ResourcePreviewDetail = {
       kind: "file",
       file,
+      exact,
       respond: (result) => {
         if (settled) {
           // Answered after giving up: nobody will use the object URL, so free it.
@@ -69,7 +75,7 @@ export async function loadImagePreview(notePath: string, reference: ImageReferen
 
   let message = "";
   for (const candidate of assetPathCandidates(notePath, reference.target, reference.syntax)) {
-    const answer = await requestResource(candidate, timeoutMs);
+    const answer = await requestResource(candidate, reference.syntax === "markdown", timeoutMs);
     if ("url" in answer) return { status: "ready", url: answer.url, path: candidate, release: answer.release };
     message = answer.error;
   }

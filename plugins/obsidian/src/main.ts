@@ -55,6 +55,7 @@ import { livePreviewCommentsExtension } from "./live-preview-comments";
 import { conflictFileName, linkDrawingIntoNode, saveDrawing } from "./drawing-save";
 import { linkTargetsPath, parseInkSvg, retargetInkLinks, serializeInkSvg } from "./ink-document";
 import { appendSvgEmbed, ensureWikiLink, inkFileName } from "./ink-embeds";
+import { unresolvedImages } from "./vault-images";
 import { BLOOMMD_DOWNLOAD_URL, desktopNodeId, desktopOpenUrl, mobileOpenUrl } from "./open-app";
 import { desktopDeps, openNoteInDesktop } from "./desktop-handoff";
 import { MAP_INK_PROPERTY, createLinkedMapInk, mapInkLink, retargetLinkedNotes, withLinkedNote } from "./concept-map";
@@ -704,6 +705,25 @@ class BloomMDView extends ItemView {
     });
   }
 
+  /**
+   * Obsidian draws a broken icon for an image it cannot find. Names the path next to it, resolved by
+   * the rule the web and desktop apps share, so the same reference reads the same on every platform.
+   */
+  private showUnresolvedImages(element: HTMLElement, markdown: string, sourceFile: TFile | null): void {
+    if (!sourceFile) return;
+    const embeds = this.app.metadataCache.getFileCache(sourceFile)?.embeds ?? [];
+    const missing = unresolvedImages(
+      {
+        hasFile: (path) => this.app.vault.getAbstractFileByPath(path) instanceof TFile,
+        resolveLink: (link, sourcePath) => this.app.metadataCache.getFirstLinkpathDest(link, sourcePath)?.path ?? null,
+      },
+      sourceFile.path,
+      markdown,
+      embeds.map((embed) => ({ link: embed.link, original: embed.original })),
+    );
+    for (const image of missing) element.createDiv({ cls: "bloommd-image-hint", text: `Image not found: ${image.path}` });
+  }
+
   private mapInkPath(sourceFile: TFile | null): string | null {
     if (!sourceFile) return null;
     const link = mapInkLink(this.app.metadataCache.getFileCache(sourceFile)?.frontmatter?.[MAP_INK_PROPERTY]);
@@ -892,6 +912,7 @@ class BloomMDView extends ItemView {
           component.load();
           element.empty();
           MarkdownRenderer.render(this.app, markdown, element, sourceFile?.path ?? "", component)
+            .then(() => this.showUnresolvedImages(element, markdown, sourceFile))
             .catch((error: unknown) => console.error("BloomMD could not render node content", error));
           return () => component.unload();
         },

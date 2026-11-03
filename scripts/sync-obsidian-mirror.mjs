@@ -27,6 +27,10 @@ const generatedNoteTemplatesPath = "src/note-templates.ts";
 // OPML export/import (core) and the pure map-export helpers (ui) are shared with the BloomMD apps too.
 const opmlSource = join(root, "packages", "core", "src", "opml.ts");
 const generatedOpmlPath = "src/opml.ts";
+// Image path resolution (relative to the note, inside the workspace) is shared with the web and desktop apps.
+// It has no imports, so the snapshot is a verbatim copy.
+const assetPathSource = join(root, "packages", "core", "src", "asset-path.ts");
+const generatedAssetPathPath = "src/asset-path.ts";
 const mapExportSource = join(root, "packages", "ui", "src", "export", "map-export-core.ts");
 const generatedMapExportPath = "src/map-export.ts";
 const inkModules = ["ink-geometry.ts", "ink-document.ts", "ink-state.ts", "ink-preview.tsx", "ink-editor.tsx", "pen-gestures.ts", "ink.css"];
@@ -56,6 +60,7 @@ const excludedCanonicalPaths = new Set([
   generatedLearningPath,
   generatedNoteTemplatesPath,
   generatedOpmlPath,
+  generatedAssetPathPath,
   generatedMapExportPath,
   ...inkModules.map((file) => `src/${file}`),
 ]);
@@ -116,6 +121,7 @@ async function canonicalManifest() {
   entries.push({ path: "packages/core/src/note-templates.ts", bytes: await readBytes(noteTemplatesSource) });
   entries.push({ path: "packages/core/src/agent-ledger.ts", bytes: await readBytes(agentLedgerSource) });
   entries.push({ path: "packages/core/src/opml.ts", bytes: await readBytes(opmlSource) });
+  entries.push({ path: "packages/core/src/asset-path.ts", bytes: await readBytes(assetPathSource) });
   entries.push({ path: "packages/ui/src/export/map-export-core.ts", bytes: await readBytes(mapExportSource) });
   // The plugin's handwriting modules are re-exports of packages/ink: hash the shared sources.
   for (const file of inkModules) {
@@ -214,6 +220,16 @@ async function expectedFiles() {
     " */",
     opml.replaceAll('from "./types";', 'from "./core-types";'),
   ].join("\n");
+  const assetPath = await readFile(assetPathSource, "utf8");
+  const assetPathSha256 = await sha256(Buffer.from(assetPath));
+  const generatedAssetPath = [
+    "/**",
+    " * GENERATED FILE — DO NOT EDIT.",
+    " * Snapshot of packages/core/src/asset-path.ts by the BloomMD mirror sync.",
+    ` * Source SHA-256: ${assetPathSha256}`,
+    " */",
+    assetPath,
+  ].join("\n");
   const mapExport = await readFile(mapExportSource, "utf8");
   const mapExportSha256 = await sha256(Buffer.from(mapExport));
   const generatedMapExport = [
@@ -279,6 +295,7 @@ async function expectedFiles() {
     "packages/core/src/note-templates.ts",
     "packages/core/src/agent-ledger.ts",
     "packages/core/src/opml.ts",
+    "packages/core/src/asset-path.ts",
     "packages/ui/src/export/map-export-core.ts",
     "plugins/obsidian/src/shared-dependencies.ts",
     "scripts/obsidian-mirror-shared-runtime.ts",
@@ -292,6 +309,7 @@ async function expectedFiles() {
     [generatedNoteTemplatesPath, Buffer.from(generatedNoteTemplates)],
     [generatedAgentLedgerPath, Buffer.from(generatedAgentLedger)],
     [generatedOpmlPath, Buffer.from(generatedOpml)],
+    [generatedAssetPathPath, Buffer.from(generatedAssetPath)],
     [generatedMapExportPath, Buffer.from(generatedMapExport)],
     [generatedSharedDependenciesPath, Buffer.from(generatedSharedDependencies)],
     [generatedSharedRuntimePath, sharedRuntime],
@@ -357,6 +375,12 @@ async function expectedFiles() {
       sourceSha256: opmlSha256,
       generatedPath: generatedOpmlPath,
       generatedSha256: await sha256(Buffer.from(generatedOpml)),
+    },
+    assetPath: {
+      sourcePath: "packages/core/src/asset-path.ts",
+      sourceSha256: assetPathSha256,
+      generatedPath: generatedAssetPathPath,
+      generatedSha256: await sha256(Buffer.from(generatedAssetPath)),
     },
     mapExport: {
       sourcePath: "packages/ui/src/export/map-export-core.ts",

@@ -1,8 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 
-/** The export formats of the export menu; anything else is refused. */
-const EXPORT_EXTENSIONS = new Set([".md", ".opml", ".pdf", ".png", ".svg"]);
+/**
+ * The export formats of the export menu plus the image formats "Save image" keeps as they are
+ * (#53: the original file of an image in a note); anything else is refused.
+ */
+const EXPORT_EXTENSIONS = new Set([".md", ".opml", ".pdf", ".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".bmp"]);
 const MAX_EXPORT_BYTES = 64 * 1024 * 1024;
 const MAX_NAME_ATTEMPTS = 999;
 

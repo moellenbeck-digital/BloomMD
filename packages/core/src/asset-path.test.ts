@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assetPathCandidates, extractImageRefs, imageMimeType, isImagePath, resolveAssetPath } from "./asset-path";
+import { assetPathCandidates, imageMimeType, isImagePath, resolveAssetPath } from "./asset-path";
 
 const workspace = (notePath: string, target: string) => {
   const result = resolveAssetPath(notePath, target);
@@ -28,6 +28,17 @@ describe("resolveAssetPath", () => {
     expect(workspace("Reisen/Urlaub.md", "Bilder/%C3%9Cbersicht.png")).toBe("Reisen/Bilder/Übersicht.png");
     // A decomposed umlaut (a + combining diaeresis) ends up in the composed form.
     expect(workspace("a.md", "Ka\u0308se.png")).toBe("K\u00e4se.png");
+  });
+
+  test("a note known by its absolute path (desktop) resolves to an absolute path for the shell to check", () => {
+    const note = "/home/anna/bloommd/Reisen/Urlaub.md";
+    expect(workspace(note, "Bilder/Strand am Meer.png")).toBe("/home/anna/bloommd/Reisen/Bilder/Strand am Meer.png");
+    expect(workspace(note, "../Logo.png")).toBe("/home/anna/bloommd/Logo.png");
+    expect(workspace(note, "./a.png")).toBe("/home/anna/bloommd/Reisen/a.png");
+    // The root of the workspace is not known here, so a root-relative path cannot be placed.
+    expect(resolveAssetPath(note, "/Logo.png")).toEqual({ kind: "invalid", reason: "absolute-path" });
+    // Climbing past the file system root is refused; staying inside the workspace is the shell's check.
+    expect(resolveAssetPath("/a/b.md", "../../x.png")).toEqual({ kind: "invalid", reason: "escapes-workspace" });
   });
 
   test("keeps a literal % that is not an escape sequence", () => {
@@ -69,6 +80,10 @@ describe("assetPathCandidates", () => {
     expect(assetPathCandidates("a.md", "b.png", "wiki")).toEqual(["b.png"]);
   });
 
+  test("an Obsidian embed in a note with an absolute path only tries the note's folder", () => {
+    expect(assetPathCandidates("/home/anna/bloommd/Reisen/a.md", "b.png", "wiki")).toEqual(["/home/anna/bloommd/Reisen/b.png"]);
+  });
+
   test("offers the decomposed spelling of umlauts as a fallback", () => {
     expect(assetPathCandidates("a.md", "K\u00e4se.png")).toEqual(["K\u00e4se.png", "Ka\u0308se.png"]);
   });
@@ -76,31 +91,6 @@ describe("assetPathCandidates", () => {
   test("offers nothing for a path that leaves the workspace", () => {
     expect(assetPathCandidates("a.md", "../x.png")).toEqual([]);
     expect(assetPathCandidates("a.md", "../x.png", "wiki")).toEqual([]);
-  });
-});
-
-describe("extractImageRefs", () => {
-  test("finds Markdown images and Obsidian embeds in order with their lines", () => {
-    const refs = extractImageRefs(["Text", "![Strand](img/strand.png) und ![[Karte süd.jpg|300]]", "![[Notiz]] ![](<a b.webp> \"Titel\")"].join("\n"));
-    expect(refs).toEqual([
-      { syntax: "markdown", target: "img/strand.png", alt: "Strand", line: 2 },
-      { syntax: "wiki", target: "Karte süd.jpg", alt: "", width: 300, line: 2 },
-      { syntax: "markdown", target: "<a b.webp>", alt: "", line: 3 },
-    ]);
-  });
-
-  test("reads Obsidian alt text and width x height", () => {
-    expect(extractImageRefs("![[a.png|Ein Bild]]")[0]).toMatchObject({ alt: "Ein Bild" });
-    expect(extractImageRefs("![[a.png|120x80]]")[0]).toMatchObject({ width: 120, height: 80 });
-  });
-
-  test("accepts spaces in a path that is not bracketed", () => {
-    expect(extractImageRefs("![x](my image.png)")[0]).toMatchObject({ target: "my image.png" });
-  });
-
-  test("ignores examples in code and embeds of notes", () => {
-    const text = ["```md", "![x](a.png)", "```", "Inline `![[b.png]]` hier", "![[Andere Notiz]]", "![[doc.pdf]]"].join("\n");
-    expect(extractImageRefs(text)).toEqual([]);
   });
 });
 

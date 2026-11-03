@@ -72,6 +72,18 @@ describe("loadImagePreview", () => {
     expect(requested).toEqual([]);
   });
 
+  test("a Markdown image names exactly one file; an Obsidian embed may be matched by name", async () => {
+    const exact: boolean[] = [];
+    win.addEventListener(PREVIEW_RESOURCE_EVENT, (event) => {
+      const detail = (event as CustomEvent<ResourcePreviewDetail>).detail;
+      exact.push(detail.exact === true);
+      detail.respond({ error: "x" });
+    });
+    await loadImagePreview("a.md", { syntax: "markdown", target: "b.png" });
+    await loadImagePreview("a.md", { syntax: "wiki", target: "b.png" });
+    expect(exact).toEqual([true, false]);
+  });
+
   test("remote images need no shell", async () => {
     const result = await loadImagePreview("x.md", { syntax: "markdown", target: "https://example.com/a.png" });
     expect(requested).toEqual([]);

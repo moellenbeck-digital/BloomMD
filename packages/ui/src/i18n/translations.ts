@@ -249,7 +249,6 @@ export interface Translations {
   readingMode: string;
   readingModeHint: string;
   readingView: string;
-  readingEmpty: string;
   backToMap: string;
   codeBlockPlainText: string;
   readingTable: string;
@@ -776,7 +775,6 @@ export const translations: Record<Locale, Translations> = {
     readingMode: "Lesemodus",
     readingModeHint: "Dokument ruhig und nur lesend ansehen",
     readingView: "Lesemodus: Dokument",
-    readingEmpty: "Dieses Dokument hat noch keinen Inhalt.",
     backToMap: "Zurück zur Map",
     codeBlockPlainText: "Text",
     readingTable: "Tabelle",
@@ -1297,7 +1295,6 @@ export const translations: Record<Locale, Translations> = {
     readingMode: "Reading mode",
     readingModeHint: "View the document calmly, read-only",
     readingView: "Reading mode: document",
-    readingEmpty: "This document has no content yet.",
     backToMap: "Back to map",
     codeBlockPlainText: "Text",
     readingTable: "Table",

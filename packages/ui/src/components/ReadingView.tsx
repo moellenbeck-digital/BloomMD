@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
@@ -71,7 +72,6 @@ export function ReadingView() {
     >
       <article className="mx-auto w-full min-w-0 max-w-[70ch] text-base leading-8 sm:text-lg sm:leading-8" data-testid="reading-article">
         {preamble && <MarkdownReader markdown={preamble} />}
-        {nodes.length === 0 && <p className="mt-10 text-[var(--color-ink-muted)]">{t.readingEmpty}</p>}
         {nodes.map((node) => {
           const level = Math.min(Math.max(node.level, 1), 6);
           const Heading = `h${level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
@@ -83,6 +83,26 @@ export function ReadingView() {
           );
         })}
       </article>
+    </div>
+  );
+}
+
+/** The one control of the reading mode: always visible, at least 44 px high, returns to the previous view. */
+export function ReadingBackBar() {
+  const { t } = useLocale();
+  const exitReadingMode = useMindMapStore((state) => state.exitReadingMode);
+  return (
+    <div className="absolute left-3 top-3 z-20" data-testid="reading-toolbar">
+      <button
+        type="button"
+        onClick={exitReadingMode}
+        className="flex min-h-11 items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-surface-sunken)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-bloom)]"
+        title={`${t.backToMap} (Esc)`}
+        data-testid="reading-back"
+      >
+        <ArrowLeft size={16} aria-hidden="true" />
+        {t.backToMap}
+      </button>
     </div>
   );
 }

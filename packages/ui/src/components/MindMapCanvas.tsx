@@ -19,7 +19,6 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
-  ArrowLeft,
   BookmarkPlus,
   BookOpen,
   ChevronLeft,
@@ -40,7 +39,7 @@ import {
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { MindMapNode } from "./MindMapNode";
 import { MindMapEdge } from "./MindMapEdge";
-import { ReadingView } from "./ReadingView";
+import { ReadingBackBar, ReadingView } from "./ReadingView";
 import { useMindMapStore, type LocalViewState } from "../hooks/useMindMapStore";
 import type { RootRenameEvent } from "../hooks/useMindMapLayout";
 import { dropTargetToMoveIntent, findCanvasDropTarget, type CanvasDropTarget } from "../utils/canvas-drag";
@@ -196,7 +195,6 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const canvasMode = useMindMapStore((state) => state.canvasMode);
   const exportRenderAll = useMindMapStore((state) => state.exportRenderAll);
   const setCanvasMode = useMindMapStore((state) => state.setCanvasMode);
-  const exitReadingMode = useMindMapStore((state) => state.exitReadingMode);
   const setMapViewport = useMindMapStore((state) => state.setMapViewport);
   const restoreViewport = useMindMapStore((state) => state.restoreViewport);
   const focusNodeId = useMindMapStore((state) => state.focusNodeId);
@@ -371,18 +369,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
 
   // Back from the reading mode is always visible and is the only control there: no map, editor or node actions.
   const modeToolbar = canvasMode === "reading" ? (
-    <div className="absolute left-3 top-3 z-20" data-testid="reading-toolbar">
-      <button
-        type="button"
-        onClick={exitReadingMode}
-        className="flex min-h-11 items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 text-sm font-semibold text-[var(--color-ink)] shadow-sm hover:bg-[var(--color-surface-sunken)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-bloom)]"
-        title={`${t.backToMap} (Esc)`}
-        data-testid="reading-back"
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-        {t.backToMap}
-      </button>
-    </div>
+    <ReadingBackBar />
   ) : (
     <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-sm" aria-label={t.canvasModes} data-testid="view-mode-toggle">
       <button type="button" className={iconButton(canvasMode === "map")} onClick={() => setCanvasMode("map")} title={t.mindMap} aria-label={t.mindMap} data-testid="view-mode-map"><Network size={16} /></button>

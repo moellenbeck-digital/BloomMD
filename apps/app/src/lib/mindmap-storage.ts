@@ -6,6 +6,7 @@ import { FileStore } from "@bloommd/core/file-store";
 import { parseFile } from "@bloommd/core/parser";
 import { normalizeMarkdownFilename, normalizeMarkdownPath, resolveMarkdownPath } from "@bloommd/core/paths";
 import type { MindMapDocument, MindMapListEntry } from "@bloommd/core/types";
+import type { NoteRevision } from "@bloommd/core/note-history";
 import { getApiRequestIdentity, type ApiRequestIdentity } from "./auth";
 import { isAgentTokenIdentity } from "./agent-gate";
 import { isE2EAuthBypassEnabled } from "./e2e-mode";
@@ -14,8 +15,10 @@ import { workspaceForIdentity } from "./token-workspace";
 import {
   isDatabaseConfigured,
   listCloudDocuments,
+  listCloudRevisions,
   normalizeUuid,
   readCloudDocument,
+  readCloudRevisionMarkdown,
   type WorkspaceRecord,
 } from "./db";
 
@@ -27,6 +30,15 @@ export interface MindmapStorage {
   write(doc: MindMapDocument): Promise<MindMapDocument>;
   rename(filename: string, newFilename: string): Promise<{ filename: string; version?: number }>;
   delete(filename: string): Promise<void>;
+  /** The versions the saves of this note replaced, newest first. */
+  history(filename: string): Promise<NoteRevision[]>;
+  /** Markdown of one version of the note; null when `revisionId` is none of its versions. */
+  readRevision(filename: string, revisionId: string): Promise<string | null>;
+  /**
+   * Makes a version the note's current one, keeping the replaced one in the history. Folders only:
+   * a cloud note is restored like any other write, through the sync server.
+   */
+  restoreRevision(filename: string, revisionId: string): Promise<void>;
 }
 
 function workspaceIdFromRequest(request: Request) {
@@ -85,6 +97,11 @@ async function createFilesystemStorage(scope?: string): Promise<MindmapStorage> 
     async delete(filename) {
       await store.delete(filename);
     },
+    history: (filename) => store.listBackups(filename),
+    readRevision: (filename, revisionId) => store.readBackup(filename, revisionId),
+    async restoreRevision(filename, revisionId) {
+      await store.restoreBackup(filename, revisionId);
+    },
   };
 }
 
@@ -124,6 +141,21 @@ async function createDatabaseStorage(userId: string, workspaceId?: string | null
       throw new Error("CLOUD_MUTATION_REQUIRES_SYNC_SERVER");
     },
     async delete() {
+      throw new Error("CLOUD_MUTATION_REQUIRES_SYNC_SERVER");
+    },
+    async history(filename) {
+      const revisions = await listCloudRevisions(userId, normalizeMarkdownFilename(filename), workspace.id);
+      return revisions.map((revision) => ({
+        id: revision.id,
+        source: "cloud" as const,
+        replacedAt: revision.replacedAt,
+        size: revision.size,
+        version: revision.version,
+        author: revision.author,
+      }));
+    },
+    readRevision: (filename, revisionId) => readCloudRevisionMarkdown(userId, normalizeMarkdownFilename(filename), revisionId, workspace.id),
+    async restoreRevision() {
       throw new Error("CLOUD_MUTATION_REQUIRES_SYNC_SERVER");
     },
   };

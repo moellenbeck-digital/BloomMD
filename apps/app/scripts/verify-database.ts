@@ -16,10 +16,12 @@ import {
   getWorkspaceForUser,
   isSessionRecordActive,
   listCloudDocumentViews,
+  listCloudRevisions,
   markEmailVerified,
   migrateMarketSchema,
   recordStripeEvent,
   readCloudDocument,
+  readCloudRevisionMarkdown,
   releaseStripeEvent,
   revokeAccessToken,
   revokeSessionRecord,
@@ -89,6 +91,30 @@ try {
     expectedVersion: documentA.version,
   });
   if (versioned.version !== documentA.version + 1) throw new Error("Optimistic versioning failed.");
+
+  // Version history (#3): a revision is readable inside its own workspace and nowhere else, and the
+  // database refuses one that names a document of another workspace.
+  const revisionSql = createSqlClient(process.env.DATABASE_URL!);
+  const [revisionA] = await revisionSql`
+    insert into bloom_document_revisions (workspace_id, document_id, version, markdown, saved_by, saved_at)
+    values (${workspaceA.id}, ${documentA.id}, ${documentA.version}, ${markdownA}, ${userA.id}, now())
+    returning id
+  `;
+  const ownRevisions = await listCloudRevisions(userA.id, documentA.filename, workspaceA.id);
+  if (ownRevisions.length !== 1 || ownRevisions[0]?.id !== (revisionA as { id: string }).id) throw new Error("Cloud revisions were not listed for their own workspace.");
+  if ((await readCloudRevisionMarkdown(userA.id, documentA.filename, (revisionA as { id: string }).id, workspaceA.id)) !== markdownA) throw new Error("Cloud revision could not be read.");
+  if ((await listCloudRevisions(userB.id, documentB.filename, workspaceB.id)).length !== 0) throw new Error("Cloud revisions leaked into another workspace.");
+  if ((await readCloudRevisionMarkdown(userB.id, documentB.filename, (revisionA as { id: string }).id, workspaceB.id)) !== null) throw new Error("A cloud revision was readable through another workspace.");
+  let crossWorkspaceRevisionDenied = false;
+  try {
+    await revisionSql`
+      insert into bloom_document_revisions (workspace_id, document_id, version, markdown, saved_at)
+      values (${workspaceA.id}, ${documentB.id}, 1, 'x', now())
+    `;
+  } catch {
+    crossWorkspaceRevisionDenied = true;
+  }
+  if (!crossWorkspaceRevisionDenied) throw new Error("Database accepted a document revision from another workspace.");
 
   await saveCloudDocumentView({
     userId: userA.id,
@@ -182,6 +208,7 @@ try {
     workspaceIsolation: true,
     sameFilenameIsolated: true,
     tenantViewConstraint: true,
+    cloudRevisionIsolation: true,
     optimisticVersioning: true,
     savedViews: true,
     sessionRevocation: true,

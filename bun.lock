@@ -526,6 +526,8 @@
         "yjs": "^13.6.32",
       },
       "devDependencies": {
+        "@codemirror/state": "^6.5.0",
+        "@codemirror/view": "^6.38.6",
         "@types/node": "^26.2.0",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.4",

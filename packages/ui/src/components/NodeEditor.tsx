@@ -68,10 +68,9 @@ import {
   workspaceReferencesForNode,
   type ResourcePreviewKind,
 } from "./node-panel-model";
-import { mermaidCodeBlockDescriptor } from "../visuals/MermaidCodeBlock";
-import { NodeImageGallery } from "../visuals/NodeImageGallery";
-import { VisualViewer, type VisualViewerAction } from "../visuals/VisualViewer";
-import { canSaveOriginal, deliverExportFile, imageExportFile } from "../visuals/visual-export";
+import { LazyNodeImageGallery, LazyVisualViewer, mermaidCodeBlockDescriptor } from "../visuals/lazy";
+import { canSaveOriginal } from "../visuals/save-policy";
+import type { VisualViewerAction } from "../visuals/VisualViewer";
 import { useEditorImageZoom, useInlineImagePreview } from "../visuals/useInlineImages";
 import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "../visuals/visuals-context";
 
@@ -207,7 +206,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     (image: { src: string; alt: string }) => {
       const original = imageSourceFor(image.src);
       const actions: VisualViewerAction[] = original && canSaveOriginal(original.path)
-        ? [{ id: "image-original", label: t.visualSaveImage, run: async () => deliverExportFile(await imageExportFile(original.source, original.path)) }]
+        ? [{ id: "image-original", label: t.visualSaveImage, run: async () => { const { deliverExportFile, imageExportFile } = await import("../visuals/visual-export"); await deliverExportFile(await imageExportFile(original.source, original.path)); } }]
         : [];
       setViewer({ kind: "image", src: image.src, alt: image.alt, actions });
     },
@@ -1178,7 +1177,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
               ]}
               contentEditableClassName={`bloommd-markdown-editor prose prose-sm max-w-none ${embedded ? "px-4 py-2" : "px-5 py-3"} min-h-[120px] focus:outline-none text-[var(--color-ink)]`}
             />
-            <NodeImageGallery content={selectedNode.content} />
+            <LazyNodeImageGallery content={selectedNode.content} />
             </VisualsContext.Provider>
           </div>
         </details>
@@ -1194,7 +1193,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     </>
   );
 
-  const viewerDialog = viewer ? <VisualViewer kind={viewer.kind} src={viewer.src} alt={viewer.alt} actions={viewer.actions} onClose={() => setViewer(null)} /> : null;
+  const viewerDialog = viewer ? <LazyVisualViewer kind={viewer.kind} src={viewer.src} alt={viewer.alt} actions={viewer.actions} onClose={() => setViewer(null)} /> : null;
 
   if (embedded) {
     return <div className="flex flex-col overflow-hidden h-full">{content}{viewerDialog}</div>;

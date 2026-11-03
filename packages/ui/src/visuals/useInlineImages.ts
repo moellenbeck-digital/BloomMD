@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
-import { imageProblemText, loadImagePreview, problemImageUrl } from "./image-preview";
 
 interface Loaded {
   path: string;
@@ -34,7 +33,9 @@ export function useInlineImagePreview(notePath: string, copy: { notFound: string
     (src: string): Promise<string> => {
       const cached = urls.current.get(src);
       if (cached) return cached;
-      const pending = loadImagePreview(notePath, { syntax: "markdown", target: src }).then((result) => {
+      // The preview code is loaded with the first image, not with the node editor.
+      const pending = import("./image-preview").then(async ({ imageProblemText, loadImagePreview, problemImageUrl }) => {
+        const result = await loadImagePreview(notePath, { syntax: "markdown", target: src });
         if (result.status === "ready") {
           loaded.current.set(result.url, { path: result.path, blob: result.blob, release: result.release });
           return result.url;

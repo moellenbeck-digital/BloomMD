@@ -2,6 +2,8 @@ import { imageMimeType } from "@bloommd/core/browser";
 import { dataUrlToBytes, exportSize } from "../export/map-export-core";
 import { buildExportFile, downloadExportFile, type ExportFile } from "../export/export-file";
 
+export { canSaveOriginal } from "./save-policy";
+
 /**
  * Saving what the enlarged view shows.
  *
@@ -110,15 +112,6 @@ function escapeLoneSurrogatesAndPercent(value: string): string {
 export interface ImageSource {
   url: string;
   blob?: Blob;
-}
-
-/**
- * Whether "Save image" is offered. Only for files of the workspace: the bytes of an address on the web
- * (`https:`, `data:`, `blob:`) cannot be requested from the page under its content security policy, and
- * such an image is not the user's file to save from here.
- */
-export function canSaveOriginal(path: string): boolean {
-  return !/^(https?:|data:|blob:)/i.test(path);
 }
 
 /** The original bytes of the image, named after `path`. Nothing is converted. */

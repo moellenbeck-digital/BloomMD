@@ -12,6 +12,10 @@
       "import": "./src/browser.ts",
       "types": "./src/browser.ts"
     },
+    "./asset-path": {
+      "import": "./src/asset-path.ts",
+      "types": "./src/asset-path.ts"
+    },
     "./obsidian-markdown": {
       "import": "./src/obsidian-markdown.ts",
       "types": "./src/obsidian-markdown.ts"

@@ -160,6 +160,20 @@ export {
   type WorkspaceAgentToolName,
   type WorkspaceAgentResult,
 } from "./workspace-agent";
+export {
+  IMAGE_EXTENSIONS,
+  assetPathCandidates,
+  describeAssetRejection,
+  extractImageRefs,
+  imageExtension,
+  imageMimeType,
+  isImagePath,
+  resolveAssetPath,
+  type AssetPathRejection,
+  type AssetPathResult,
+  type ImageRef,
+  type ImageRefSyntax,
+} from "./asset-path";
 // The pure path rules; `paths.ts` stays out of the browser bundle because it needs `node:path`.
 export { filenameForTitle, filenameForTitleInPath, normalizeMarkdownPath, normalizeFolderPath } from "./path-rules";
 export {

@@ -14,7 +14,7 @@ import { copyFile, mkdir, readFile, rename, access, stat } from "node:fs/promise
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { arch, homedir, platform, release, tmpdir, userInfo } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type {
   BloomMDRPC,
   DesktopConnectionProfile,
@@ -139,6 +139,11 @@ const RESOURCE_MIME_TYPES: Record<string, string> = {
 
 function isRemote(): boolean {
   return mode.type === "remote";
+}
+
+/** The note's name relative to the local folder: the webview knows it by path, the store by name. */
+function localNoteName(filePath: string): string {
+  return isAbsolute(filePath) ? relative(bloommdDir, filePath) : filePath;
 }
 
 function resourceMimeType(path: string): string | null {
@@ -887,6 +892,34 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
           await localStore.delete(filename);
         }
         return { success: true };
+      },
+
+      listNoteHistory: async ({ filePath }) => {
+        try {
+          if (isRemote()) {
+            return await remoteStore!.listHistory(filePath.split("/").pop() ?? "");
+          }
+          return { revisions: await localStore.listBackups(localNoteName(filePath)), canRestore: true };
+        } catch (err) {
+          console.error("[BloomMD] listNoteHistory error:", err);
+          return { revisions: [], canRestore: false, error: "HISTORY_FAILED" };
+        }
+      },
+
+      restoreNoteVersion: async ({ filePath, revisionId }) => {
+        try {
+          if (isRemote()) {
+            await remoteStore!.restoreVersion(filePath.split("/").pop() ?? "", revisionId);
+          } else {
+            await localStore.restoreBackup(localNoteName(filePath), revisionId);
+          }
+          return { success: true };
+        } catch (err) {
+          console.error("[BloomMD] restoreNoteVersion error:", err);
+          const message = err instanceof Error ? err.message : "";
+          const error = message === "VERSION_CONFLICT" || message === "SYNC_ROOM_ACTIVE" || message === "SYNC_ROOM_PENDING" || message === "READ_ONLY" ? message : "RESTORE_FAILED";
+          return { success: false, error };
+        }
       },
 
       chooseDirectory: ({ dialogId }) =>

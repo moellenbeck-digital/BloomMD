@@ -1,6 +1,7 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
+import { NOTE_HISTORY_LIMIT } from "@bloommd/core/note-history";
 import { AGENT_ACCESS, areaKey, normalizeAreaPath, type AgentAccess, type AgentAccessConfig } from "@bloommd/core/agent-ledger";
 import {
   hashSecret,
@@ -190,7 +191,8 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_documents') as documents,
       to_regclass('public.bloom_document_views') as document_views,
       to_regclass('public.bloom_mail_budget') as mail_budget,
-      to_regclass('public.bloom_waitlist_transfers') as waitlist_transfers
+      to_regclass('public.bloom_waitlist_transfers') as waitlist_transfers,
+      to_regclass('public.bloom_document_revisions') as document_revisions
   `;
   const row = rows[0] as Record<string, string | null> | undefined;
   const missing = Object.entries(row ?? {})
@@ -931,6 +933,29 @@ async function createMarketSchema() {
       on delete cascade
     `;
   }
+
+  // Version history of cloud documents, written by the sync server; see db/012_document_revisions.sql.
+  await sql`
+    create table if not exists bloom_document_revisions (
+      id uuid primary key default gen_random_uuid(),
+      workspace_id uuid not null references bloom_workspaces(id) on delete cascade,
+      document_id uuid not null,
+      version bigint not null,
+      markdown text not null,
+      saved_by uuid references bloom_users(id) on delete set null,
+      saved_at timestamptz not null,
+      replaced_at timestamptz not null default now(),
+      unique (document_id, version),
+      constraint bloom_document_revisions_document_workspace_fk
+        foreign key (document_id, workspace_id)
+        references bloom_documents (id, workspace_id)
+        on delete cascade
+    )
+  `;
+  await sql`
+    create index if not exists bloom_document_revisions_document_idx
+      on bloom_document_revisions(document_id, version desc)
+  `;
 }
 
 export interface WorkspaceRecord {
@@ -2377,6 +2402,74 @@ export async function readCloudDocument(
     version: Number(row.version),
     updatedAt: row.updated_at,
   };
+}
+
+export interface CloudRevisionSummary {
+  id: string;
+  version: number;
+  /** When this version was replaced by the next save. */
+  replacedAt: string;
+  size: number;
+  author: string | null;
+}
+
+/**
+ * The version history of one cloud document, newest first, at most `NOTE_HISTORY_LIMIT` entries
+ * (the sync server prunes when it writes). Any member of the workspace may read it, like the
+ * document itself; the workspace is resolved from the caller's membership and every row is
+ * matched against it, so another tenant's revisions are never reachable by id or file name.
+ */
+export async function listCloudRevisions(
+  userId: string,
+  filename: string,
+  workspaceId?: string | null,
+): Promise<CloudRevisionSummary[]> {
+  const workspace = await getWorkspaceForUser(userId, workspaceId);
+  const rows = await getSql()`
+    select r.id, r.version, r.replaced_at, octet_length(r.markdown) as size,
+           coalesce(nullif(u.name, ''), u.email) as author
+    from bloom_documents d
+    join bloom_document_revisions r on r.document_id = d.id and r.workspace_id = d.workspace_id
+    left join bloom_users u on u.id = r.saved_by
+    where d.workspace_id = ${workspace.id}
+      and lower(d.filename) = lower(${filename})
+      and d.deleted_at is null
+    order by r.version desc
+    limit ${NOTE_HISTORY_LIMIT}
+  `;
+  return rows.map((row) => {
+    const item = row as { id: string; version: string | number; replaced_at: string | Date; size: string | number; author: string | null };
+    return {
+      id: item.id,
+      version: Number(item.version),
+      replacedAt: new Date(item.replaced_at).toISOString(),
+      size: Number(item.size),
+      author: item.author,
+    };
+  });
+}
+
+/** The Markdown of one revision of the named document, or null when it is not one of its revisions. */
+export async function readCloudRevisionMarkdown(
+  userId: string,
+  filename: string,
+  revisionId: string,
+  workspaceId?: string | null,
+): Promise<string | null> {
+  const dbRevisionId = normalizeUuid(revisionId);
+  if (!dbRevisionId) return null;
+  const workspace = await getWorkspaceForUser(userId, workspaceId);
+  const rows = await getSql()`
+    select r.markdown
+    from bloom_documents d
+    join bloom_document_revisions r on r.document_id = d.id and r.workspace_id = d.workspace_id
+    where d.workspace_id = ${workspace.id}
+      and lower(d.filename) = lower(${filename})
+      and d.deleted_at is null
+      and r.id = ${dbRevisionId}
+    limit 1
+  `;
+  return (rows[0] as { markdown: string } | undefined)?.markdown ?? null;
 }
 
 /**

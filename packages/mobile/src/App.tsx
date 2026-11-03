@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Menu, FilePlus, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search } from "lucide-react";
 import {
+  ConflictCopyBadge,
+  ConflictCopyBanner,
   MindMapCanvas,
   LazyNodeEditor,
   HelpModal,
@@ -9,7 +11,7 @@ import {
   useMindMapStore,
   useLocale,
 } from "@bloommd/ui";
-import { parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { findConflictCopyOriginal, parseConflictCopy, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import { BloomFolder } from "@bloommd/capacitor-folder";
 import { BloomKeychain } from "@bloommd/capacitor-keychain";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -546,6 +548,9 @@ export function App() {
     return store.kind === "folder" ? folderInkAttachments(BloomFolder, { pickNote, openNote }) : appInkAttachments({ pickNote, openNote });
   }, [files, loadFile, remoteClient, store]);
 
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && parseConflictCopy(document.filePath));
+
   const visibleFiles = filter.trim()
     ? files.filter((entry) => `${entry.folder}/${entry.title}`.toLowerCase().includes(filter.trim().toLowerCase()))
     : files;
@@ -705,6 +710,7 @@ export function App() {
                       <div className={`flex items-center gap-1.5 truncate text-sm font-semibold ${isActive ? "text-[#FF6B35]" : "text-[#1A1A1A]"}`}>
                         {!entry.local && <CloudDownload size={14} className="shrink-0" aria-label={text.downloadingFromICloud} />}
                         <span className="truncate">{entry.title}</span>
+                        <ConflictCopyBadge filename={entry.path} />
                       </div>
                       <div className="mt-0.5 truncate font-mono text-[11px] text-[#999]">{entry.folder || entry.path}</div>
                     </button>
@@ -722,7 +728,15 @@ export function App() {
 
       {/* Canvas */}
       <div className="flex-1 min-h-0 relative lg:flex">
-        <div className="relative h-full min-w-0 lg:flex-1">
+        <div className={`relative h-full min-w-0 lg:flex-1 ${showConflictBanner ? "flex flex-col" : ""}`}>
+        {document && showConflictBanner && (
+          <ConflictCopyBanner
+            filename={document.filePath}
+            originalFilename={findConflictCopyOriginal(document.filePath, files.map((entry) => ({ filename: entry.path })))}
+            onOpenOriginal={(path) => void loadFile(path).catch(() => undefined)}
+          />
+        )}
+        <div className={showConflictBanner ? "relative min-h-0 flex-1" : "relative h-full"}>
         {document ? <MindMapCanvas /> : (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>
@@ -735,6 +749,7 @@ export function App() {
             </div>
           </div>
         )}
+        </div>
         </div>
 
         {/* Mobile bottom sheet editor */}

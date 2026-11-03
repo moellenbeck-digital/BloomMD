@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2 } from "lucide-react";
+import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2, History } from "lucide-react";
 import { parseFile, serializeToMarkdown, type MindMapDocument, type MindMapListEntry, type MindMapNode } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
 import { extractLinksFromMarkdown } from "../utils/links";
+import { ConflictCopyBadge } from "./ConflictCopyBadge";
 
 interface ApiListResponse {
   files: MindMapListEntry[];
@@ -28,6 +29,8 @@ interface CommandPaletteProps {
   onImport: () => void;
   onExport: () => void;
   onReload: () => void;
+  /** Opens the version history of the open note; the action is only listed when it is given. */
+  onOpenHistory?: () => void;
   onOpenMindmap?: (filename: string) => void | Promise<void>;
 }
 
@@ -52,6 +55,7 @@ export function CommandPalette({
   onImport,
   onExport,
   onReload,
+  onOpenHistory,
   onOpenMindmap,
 }: CommandPaletteProps) {
   const { t } = useLocale();
@@ -165,6 +169,9 @@ export function CommandPalette({
       { id: "action-import", category: t.categoryCommands, title: t.importMd, subtitle: "Cmd/Ctrl+I", kind: "action", icon: Upload, run: onImport },
       { id: "action-export", category: t.categoryCommands, title: t.exportMd, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
       { id: "action-reload", category: t.categoryCommands, title: t.reload, subtitle: "Cmd/Ctrl+R", kind: "action", icon: RefreshCw, run: onReload },
+      ...(onOpenHistory && document
+        ? [{ id: "action-history", category: t.categoryCommands, title: t.historyAction, subtitle: document.frontmatter.title, kind: "action" as const, icon: History, run: onOpenHistory }]
+        : []),
       { id: "action-template-research", category: t.categoryCommands, title: t.researchTemplate, subtitle: t.template, kind: "action", icon: FileText, run: () => createTemplateMindmap("research") },
       { id: "action-template-project", category: t.categoryCommands, title: t.projectTemplate, subtitle: t.template, kind: "action", icon: FileText, run: () => createTemplateMindmap("project") },
     ];
@@ -194,7 +201,7 @@ export function CommandPalette({
       : [];
 
     return [...actions, ...mindmaps, ...nodes];
-  }, [createTemplateMindmap, document, files, onExport, onImport, onNew, onReload, onSave, t]);
+  }, [createTemplateMindmap, document, files, onExport, onImport, onNew, onOpenHistory, onReload, onSave, t]);
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -309,7 +316,10 @@ export function CommandPalette({
                     <Icon size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{item.title}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="block min-w-0 truncate text-sm font-semibold text-[var(--color-ink)]">{item.title}</span>
+                      {item.kind === "mindmap" && <ConflictCopyBadge filename={item.filename} />}
+                    </span>
                     <span className="block truncate text-xs text-[var(--color-ink-faint)]">
                       {item.category} · {item.subtitle}
                     </span>

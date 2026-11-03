@@ -72,3 +72,26 @@ test("@t19 workspace save hint disappears when a file is opened and the file sta
   expect(useMindMapStore.getState().statusMessage).toBeNull();
   expect(container.querySelector(".lucide-check")).not.toBeNull();
 });
+
+test("#3 the history button is offered only when the host supports it, and needs an open note", () => {
+  const win = new Window({ url: "https://bloommd.test/desktop" });
+  globalThis.window = win as unknown as Window & typeof globalThis.window;
+  globalThis.document = win.document as unknown as Document;
+  globalThis.localStorage = win.localStorage;
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  let opened = 0;
+
+  flushSync(() => root!.render(<Toolbar />));
+  expect(container.querySelector("[data-testid='toolbar-history']")).toBeNull();
+
+  flushSync(() => root!.render(<Toolbar onOpenHistory={() => { opened += 1; }} />));
+  const button = container.querySelector<HTMLButtonElement>("[data-testid='toolbar-history']")!;
+  expect(button.disabled).toBe(true);
+
+  flushSync(() => useMindMapStore.getState().setDocument(parseFile("note.md", "# Note\n")));
+  expect(button.disabled).toBe(false);
+  button.click();
+  expect(opened).toBe(1);
+});

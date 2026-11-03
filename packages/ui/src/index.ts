@@ -32,6 +32,9 @@ export {
 export { getPresenceInitials, getPresenceLabel } from "./sync/presence";
 export { type RemoteUser } from "./hooks/useMindMapStore";
 export { ConflictDialog, type ConflictResolution } from "./components/ConflictDialog";
+export { ConflictCopyBadge } from "./components/ConflictCopyBadge";
+export { ConflictCopyBanner, type ConflictCopyBannerProps } from "./components/ConflictCopyBanner";
+export { NoteHistoryDialog, type NoteHistoryDialogProps } from "./components/NoteHistoryDialog";
 export { WorkspaceMap, type WorkspaceMapProps } from "./components/WorkspaceMap";
 export { GraphLayerControls, type GraphLayerControlsProps } from "./components/GraphLayerControls";
 export { layoutWorkspaceMap, type WorkspaceMapNodeData } from "./hooks/useWorkspaceMapLayout";

@@ -92,6 +92,14 @@ export async function saveMindmap(filePath: string, markdown: string, storage?: 
   return electrobun.rpc!.request.saveMindmap({ filePath, markdown, storage });
 }
 
+export async function listNoteHistory(filePath: string) {
+  return electrobun.rpc!.request.listNoteHistory({ filePath });
+}
+
+export async function restoreNoteVersion(filePath: string, revisionId: string) {
+  return electrobun.rpc!.request.restoreNoteVersion({ filePath, revisionId });
+}
+
 export async function chooseDirectory() {
   return nativeDialogs.open("chooseDirectory");
 }

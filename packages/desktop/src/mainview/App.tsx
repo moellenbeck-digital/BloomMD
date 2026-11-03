@@ -11,6 +11,9 @@ import {
   AboutDialog,
   FileContextMenu,
   CommandPalette,
+  ConflictCopyBadge,
+  ConflictCopyBanner,
+  NoteHistoryDialog,
   SyncStatus,
   useMindMapStore,
   useKeyboardShortcuts,
@@ -23,12 +26,12 @@ import {
   requestNodeFocus,
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
-import type { MindMapDocument, MindMapListEntry, SharedDocumentBinding } from "@bloommd/core/browser";
-import { documentToYDoc, filenameForTitleInPath, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
+import type { MindMapDocument, MindMapListEntry, NoteRevision, SharedDocumentBinding } from "@bloommd/core/browser";
+import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
   chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
-  renameMindmap, deleteMindmap,
+  renameMindmap, deleteMindmap, listNoteHistory, restoreNoteVersion,
   listConnectionProfiles, saveConnectionProfile, connectProfile, useLocalConnection, deleteConnectionProfile, setConnectionProfileWorkspace,
   listRemoteWorkspaces, selectRemoteWorkspace,
   getConnectionMode, onConnectionModeChanged, getBuildInfo, onAboutRequested,
@@ -179,6 +182,8 @@ export function App() {
   const [feedbackDraft, setFeedbackDraft] = useState<DesktopFeedbackDraft>(readFeedbackDraft);
   const feedbackDraftPersistenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCanRestore, setHistoryCanRestore] = useState(true);
   const drawerListRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; filename: string; title: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ filename: string; title: string } | null>(null);
@@ -1225,6 +1230,55 @@ export function App() {
     }
   }, [assertRemoteWriteAccess, connectRemoteFileSync, connectionMode, deleteMindmap, loadFile, loadWorkspace, refreshFileList, reportE2EState, syncUrl, t.deleteFailed, t.documentConflict, t.filesLoadFailed, t.syncRoomActive]);
 
+  // Version history of the open note
+  const handleOpenHistory = useCallback(async () => {
+    const store = useMindMapStore.getState();
+    const doc = store.document;
+    if (!doc || isWorkspaceMindMap(doc)) return;
+    // A local note keeps its versions as backups of what was written: write what is still open first,
+    // so the history starts at what the user sees. A note in a live cloud session is persisted by the room.
+    if (connectionMode === "local") await toolbarRef.current?.triggerSave();
+    setHistoryCanRestore(true);
+    setHistoryOpen(true);
+  }, [connectionMode]);
+
+  const loadNoteHistory = useCallback(async (): Promise<NoteRevision[]> => {
+    const doc = useMindMapStore.getState().document;
+    if (!doc) return [];
+    const result = await listNoteHistory(doc.filePath);
+    if (result.error) throw new Error(result.error);
+    setHistoryCanRestore(result.canRestore);
+    return result.revisions;
+  }, []);
+
+  const restoreNoteHistoryVersion = useCallback(async (revision: NoteRevision) => {
+    const store = useMindMapStore.getState();
+    const doc = store.document;
+    const filename = currentFileRef.current;
+    if (!doc || !filename) throw new Error("RESTORE_FAILED");
+    const reconnectRemote = Boolean(
+      connectionMode === "remote" &&
+        syncUrl &&
+        (store.syncProvider !== null || store.syncStatus !== "disconnected"),
+    );
+    try {
+      // The sync server rejects document mutations while this client still occupies the room.
+      if (reconnectRemote) await store.disconnectSync();
+      const result = await restoreNoteVersion(doc.filePath, revision.id);
+      if (!result.success) throw new Error(result.error ?? "RESTORE_FAILED");
+    } catch (error) {
+      if (reconnectRemote && currentFileRef.current === filename) {
+        await connectRemoteFileSync(filename).catch((reconnectError) => {
+          console.error("[BloomMD] Failed to reconnect after a failed restore:", reconnectError);
+        });
+      }
+      throw error;
+    }
+    // Shows the restored note (and joins the cloud session again).
+    await loadFile(filename);
+    await refreshFileList();
+  }, [connectRemoteFileSync, connectionMode, loadFile, refreshFileList, syncUrl]);
+
   // Rename from sidebar
   const handleRenameFromSidebar = useCallback((filename: string, title: string) => {
     if (!assertRemoteWriteAccess()) return;
@@ -1714,6 +1768,8 @@ export function App() {
   const activeDocumentFilename = files.find((entry) => fileEntryIsActive(entry, document))?.filename
     ?? activeLocalFilename
     ?? null;
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && activeDocumentFilename && !isWorkspaceMindMap(document) && parseConflictCopy(activeDocumentFilename));
   const canForwardToFile = Boolean(
     document &&
     isWorkspaceMindMap(document) &&
@@ -1830,6 +1886,7 @@ export function App() {
             onSaveFile={handleSaveFile}
             onImportFile={handleImportFile}
             onExportFile={handleExportFile}
+            onOpenHistory={document && !isWorkspaceMindMap(document) ? () => void handleOpenHistory() : undefined}
           />
         </div>
       </header>
@@ -1886,8 +1943,18 @@ export function App() {
         onImport={() => toolbarRef.current?.triggerImport()}
         onExport={() => toolbarRef.current?.triggerExport()}
         onReload={() => void reload()}
+        onOpenHistory={document && !isWorkspaceMindMap(document) ? () => void handleOpenHistory() : undefined}
         onOpenMindmap={loadFile}
       />
+      {historyOpen && document && (
+        <NoteHistoryDialog
+          filename={activeDocumentFilename ?? document.filePath}
+          loadRevisions={loadNoteHistory}
+          onRestore={restoreNoteHistoryVersion}
+          canRestore={historyCanRestore}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
 
       {profileDialogOpen && (
         <ConnectionProfileDialog
@@ -2016,7 +2083,10 @@ export function App() {
                     <div className={`font-semibold font-[var(--font-display,Outfit,sans-serif)] truncate ${isActive ? "text-[#FF6B35]" : "text-[var(--color-ink)]"}`}>
                       {entry.frontmatter.title}
                     </div>
-                    <div className="text-[11px] text-[var(--color-ink-faint)] font-[var(--font-mono,monospace)] truncate mt-0.5">{entry.filename}</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="min-w-0 truncate text-[11px] text-[var(--color-ink-faint)] font-[var(--font-mono,monospace)]">{entry.filename}</span>
+                      <ConflictCopyBadge filename={entry.filename} />
+                    </div>
                   </button>
                 );
               })}
@@ -2134,7 +2204,15 @@ export function App() {
         )}
 
         {/* Canvas + Editor */}
-        <div className="flex-1 h-full">
+        <div className={`flex-1 h-full ${showConflictBanner ? "flex min-w-0 flex-col" : ""}`}>
+          {showConflictBanner && document && activeDocumentFilename && (
+            <ConflictCopyBanner
+              filename={activeDocumentFilename}
+              originalFilename={findConflictCopyOriginal(activeDocumentFilename, files)}
+              onOpenOriginal={(filename) => void loadFile(filename)}
+            />
+          )}
+          <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {document ? (
             <MindMapCanvas onlyRenderVisibleElements onRootRename={handleRootRename} />
           ) : (
@@ -2176,6 +2254,7 @@ export function App() {
               </div>
             </div>
           )}
+          </div>
         </div>
         {selectedNodeId && editorVisible && <ResizableEditor />}
       </div>

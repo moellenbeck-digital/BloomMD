@@ -16,6 +16,14 @@
       "import": "./src/obsidian-markdown.ts",
       "types": "./src/obsidian-markdown.ts"
     },
+    "./note-history": {
+      "import": "./src/note-history.ts",
+      "types": "./src/note-history.ts"
+    },
+    "./conflict-copy": {
+      "import": "./src/conflict-copy.ts",
+      "types": "./src/conflict-copy.ts"
+    },
     "./note-templates": {
       "import": "./src/note-templates.ts",
       "types": "./src/note-templates.ts"

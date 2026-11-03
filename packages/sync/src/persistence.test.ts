@@ -3,12 +3,14 @@ import { parseFile } from "@bloommd/core";
 
 let queryCount = 0;
 let queryTexts: string[] = [];
+let queryParams: unknown[][] = [];
 let queryResults: unknown[][] = [];
 
 mock.module("./sql-client", () => ({
-  createSqlClient: () => Object.assign(async (strings: TemplateStringsArray) => {
+  createSqlClient: () => Object.assign(async (strings: TemplateStringsArray, ...params: unknown[]) => {
     queryCount += 1;
     queryTexts.push(strings.join("?"));
+    queryParams.push(params);
     return queryResults.shift() ?? [];
   }, { json: (value: unknown) => value }),
 }));
@@ -34,6 +36,39 @@ describe("database persistence conflict handling", () => {
     })).rejects.toBeInstanceOf(SyncDocumentVersionConflictError);
 
     expect(queryCount).toBe(1);
+  });
+
+  test("a save stores the version it replaces and keeps the newest 20, in the same statement (#3)", async () => {
+    queryCount = 0;
+    queryTexts = [];
+    queryParams = [];
+    queryResults = [[{ version: 5 }]];
+    const persistence = createDatabasePersistence("postgres://test.invalid/bloommd");
+
+    const saved = await persistence.save({
+      key: "doc-1",
+      filename: "test.md",
+      documentId: "doc-1",
+      workspaceId: "workspace-1",
+      userId: "user-1",
+    }, {
+      ...parseFile("test.md", "# Local change"),
+      storage: { mode: "database", documentId: "doc-1", workspaceId: "workspace-1", version: 4 },
+    });
+
+    expect(saved.storage?.version).toBe(5);
+    // One statement: the revision exists exactly when the save went through.
+    expect(queryCount).toBe(1);
+    const statement = queryTexts[0]!.replace(/\s+/g, " ");
+    expect(statement).toContain("for update of d");
+    expect(statement).toContain("insert into bloom_document_revisions");
+    expect(statement).toContain("delete from bloom_document_revisions");
+    // Only writers of the workspace save, and the replaced row is the one the version check matched.
+    expect(statement).toContain("m.role in ('owner', 'editor')");
+    expect(statement).toContain("and d.version = ?");
+    // 19 older revisions plus the one just made are 20; the pruning is skipped when the save did not happen.
+    expect(statement).toContain("and exists (select 1 from prev)");
+    expect(queryParams[0]).toContain(19);
   });
 
   test("confirms a named durable operation only at its next expected version", async () => {

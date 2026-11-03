@@ -12,6 +12,16 @@ export type {
 
 export { HeadingDepthError, MAX_HEADING_LEVEL } from "./types";
 export { parseFile, serializeToMarkdown } from "./parser";
+export {
+  CONFLICT_COPY_LABELS,
+  conflictCopyPath,
+  parseConflictCopy,
+  isConflictCopy,
+  findConflictCopyOriginal,
+  type ConflictCopyInfo,
+  type ConflictCopyLabel,
+} from "./conflict-copy";
+export { NOTE_HISTORY_LIMIT, sortRevisionsNewestFirst, type NoteHistorySource, type NoteRevision } from "./note-history";
 export { collapseUnchanged, diffLines, diffStats, type DiffKind, type DiffLine, type DiffStats } from "./diff";
 export { addNode, deleteNode, moveNode, renameNode } from "./operations";
 export { FileStore } from "./fileStore";

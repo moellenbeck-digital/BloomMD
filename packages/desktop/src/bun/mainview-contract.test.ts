@@ -148,19 +148,21 @@ describe("desktop mainview contract", () => {
     const renderer = compact(await readFile(APP_SOURCE, "utf8"));
     const main = compact(await readFile(BUN_SOURCE, "utf8"));
 
-    expect(renderer).toContain("const result = await importFile(); if (!(\"frontmatter\" in result)) return;");
+    expect(renderer).toContain("const result = await importFile(); if (!(\"frontmatter\" in result)) { if (result.error)");
     expect(renderer).toContain("setDocument(doc); const importedFilename = result.filePath.split(\"/\").pop() || \"\"; currentFileRef.current = importedFilename;");
     expect(renderer).toContain("await refreshFileList();");
     expect(renderer).toContain("const { markdown } = await serializeMindmap(serializedDoc);");
-    expect(renderer).toContain("a.download = `${doc.frontmatter.title || \"mindmap\"}.md`; a.click(); URL.revokeObjectURL(url);");
+    expect(renderer).toContain("const result = await saveExport(file.filename, bytesToBase64(file.data)); if (\"error\" in result) throw new Error(result.error);");
     expect(renderer).toContain("const updatedFiles = await refreshFileList(); if (!navigationStillCurrent()) return;");
     expect(renderer).toContain("const activeSharedMirror = sharedMirrorRef.current;");
     expect(renderer).toContain("activeSharedMirror.mirror.handleLocalMarkdown(markdown)");
     expect(renderer).toContain("await loadFile(filename);");
     expect(renderer).toContain("else if (currentFileRef.current === null && connectionMode === \"local\") { await loadWorkspace(\"fileChanged\"); }");
 
-    expect(main).toContain("const content = await readFile(srcPath, \"utf-8\");");
-    expect(main).toContain("const filename = sanitizeMarkdownFilename(srcPath.split(\"/\").pop() || \"imported.md\");");
+    expect(main).toContain("let content = await readFile(srcPath, \"utf-8\");");
+    expect(main).toContain("content = importOpml(content).markdown;");
+    expect(main).toContain("const filename = sanitizeMarkdownFilename(sourceName);");
+    expect(main).toContain("await saveExportFile(Utils.paths.downloads, filename, dataBase64)");
     expect(main).toContain("const destPath = resolveMarkdownPath(bloommdDir, filename); const doc = parseFile(destPath, content); await localStore.write(doc);");
     expect(main).toContain("const nextWatcher = watchWorkspace(bloommdDir,");
     expect(main).toContain("if (watcher !== nextWatcher) return;");

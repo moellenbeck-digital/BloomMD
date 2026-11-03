@@ -11,6 +11,7 @@
 
 import { diffLines } from "./diff";
 import { parseFile, serializeToMarkdown } from "./parser";
+import { checkPdfLinks, type PdfLinkProblem } from "./pdf-links";
 import { buildWorkspaceGraph, type WorkspaceFileInput } from "./workspace-graph";
 
 export type LintSeverity = "error" | "warning" | "info";
@@ -20,6 +21,8 @@ export type LintCode =
   | "broken-link"
   /** A bare name matches several pages, so the target is undecidable. */
   | "ambiguous-link"
+  /** A `[[file.pdf#page=n]]` link names a PDF that is not in the workspace. */
+  | "missing-resource"
   /** Nothing links to this page and it links nowhere. */
   | "orphan-page"
   /** Two pages share a filename, which makes bare links to either of them ambiguous. */
@@ -64,6 +67,33 @@ export interface LintOptions {
    * link checks and is opt-in for that reason alone — its findings are the most serious ones here.
    */
   checkRoundtrip?: boolean;
+  /**
+   * Workspace-relative paths of the non-Markdown files (PDFs, images). Without the list the
+   * existence of a PDF cannot be known, so PDF links are then not checked at all.
+   */
+  resources?: string[];
+}
+
+/** The finding for a PDF link whose file is missing or not unique; shared with the workspace index. */
+export function pdfLinkFinding(problem: PdfLinkProblem): LintFinding & { code: "missing-resource" | "ambiguous-link" } {
+  if (problem.kind === "ambiguous") {
+    return {
+      code: "ambiguous-link",
+      severity: "warning",
+      path: problem.path,
+      line: problem.line,
+      message: `Mehrdeutiger PDF-Verweis: ${problem.raw}`,
+      detail: `Mögliche Dateien: ${problem.candidates.join(", ")}`,
+    };
+  }
+  return {
+    code: "missing-resource",
+    severity: "warning",
+    path: problem.path,
+    line: problem.line,
+    message: `PDF-Datei nicht im Workspace: ${problem.file} (${problem.raw})`,
+    detail: null,
+  };
 }
 
 /** Node id comments BloomMD adds on save. Their presence is expected and not a change. */
@@ -234,6 +264,10 @@ export function lintWorkspace(files: WorkspaceFileInput[], options: LintOptions 
         detail: edge.candidates ? `Mögliche Ziele: ${edge.candidates.join(", ")}` : null,
       });
     }
+  }
+
+  if (options.resources) {
+    for (const problem of checkPdfLinks(files, options.resources)) findings.push(pdfLinkFinding(problem));
   }
 
   for (const [name, paths] of nameCounts) {

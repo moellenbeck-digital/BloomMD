@@ -277,3 +277,29 @@ describe("path safety", () => {
     expect(() => graphOf({ "../escape.md": "# E" })).toThrow();
   });
 });
+
+describe("PDF links", () => {
+  const files = {
+    "paper.md": "# Paper\n\n[[smith.pdf#page=3]]\n\n> A quote\n\n[[smith.pdf#page=4|Chapter]] and [[other]]\n",
+    "other.md": "# Other\n",
+  };
+
+  test("are recognised with file and page and are not page links", () => {
+    const links = extractLinks(files["paper.md"]);
+    expect(links.filter((link) => link.pdf).map((link) => link.pdf)).toEqual([
+      { file: "smith.pdf", page: 3 },
+      { file: "smith.pdf", page: 4 },
+    ]);
+  });
+
+  test("do not become edges, neither broken nor with a #page anchor", () => {
+    const references = referencesFrom(files, "paper.md");
+    expect(references.map((edge) => edge.raw)).toEqual(["[[other]]"]);
+    expect(references.every((edge) => edge.anchor === null)).toBe(true);
+  });
+
+  test("a link to a map with a similar anchor still works", () => {
+    const [edge] = referencesFrom({ "a.md": "[[b#page=3]]", "b.md": "# B" }, "a.md");
+    expect(edge).toMatchObject({ resolution: "resolved", anchor: "page=3" });
+  });
+});

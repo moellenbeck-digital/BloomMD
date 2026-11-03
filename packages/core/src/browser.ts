@@ -100,6 +100,30 @@ export {
   type WorkspaceMindMapOptions,
 } from "./workspace-document";
 export {
+  parsePdfLinkTarget,
+  extractPdfLinks,
+  extractPdfCitations,
+  formatPdfLink,
+  pdfPageUrl,
+  buildPdfCitationNode,
+  checkPdfLinks,
+  resolvePdfResource,
+  type PdfLink,
+  type PdfCitation,
+  type PdfCitationInput,
+  type PdfCitationNode,
+  type PdfLinkProblem,
+} from "./pdf-links";
+export {
+  buildBibliography,
+  readCitation,
+  formatBibtex,
+  formatBibliographyMarkdown,
+  type Bibliography,
+  type BibliographyEntry,
+  type BibliographySkip,
+} from "./bibliography";
+export {
   lintWorkspace,
   checkRoundtrip,
   type LintFinding,

@@ -157,3 +157,23 @@ describe("result shape", () => {
     expect(result.summary.filesChecked).toBe(0);
   });
 });
+
+describe("PDF link findings", () => {
+  const entries = { "paper.md": "# Paper\n\n[[smith.pdf#page=3]]\n\n[[gone.pdf#page=2|Gone]]\n" };
+
+  test("are not reported without the list of workspace files", () => {
+    expect(codes(entries)).toEqual([]);
+  });
+
+  test("a present PDF is fine, a missing one is a missing-resource warning", () => {
+    const result = lintWorkspace(filesOf(entries), { resources: ["smith.pdf"] });
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ code: "missing-resource", severity: "warning", path: "paper.md", line: 5 });
+    expect(result.summary.errors).toBe(0);
+  });
+
+  test("a PDF link is never a broken link or a duplicate anchor", () => {
+    const result = lintWorkspace(filesOf({ "a.md": "[[x.pdf#page=1]]\n[[x.pdf#page=1]]\n" }), { resources: ["x.pdf"] });
+    expect(result.findings).toEqual([]);
+  });
+});

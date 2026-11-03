@@ -36,8 +36,10 @@ import {
   CreateEntryDialog,
   type CreateEntryKind,
   CommandPalette,
+  ConflictCopyBanner,
   HelpModal,
   AboutDialog,
+  NoteHistoryDialog,
   RenameMindmapDialog,
   SyncStatus,
   useMindMapStore,
@@ -53,12 +55,15 @@ import {
 import {
   buildWorkspaceMindMap,
   filenameForTitleInPath,
+  findConflictCopyOriginal,
   isWorkspaceMindMap,
+  parseConflictCopy,
   parseFile,
   serializeToMarkdown,
   type MindMapDocument,
   type MindMapListEntry,
   type MindMapNode,
+  type NoteRevision,
   type WorkspaceFileInput,
 } from "@bloommd/core/browser";
 import {
@@ -373,6 +378,9 @@ export default function Home() {
   const [notice, setNotice] = useState<AppNotice | null>(null);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCanRestore, setHistoryCanRestore] = useState(true);
+  const [conflictCopyOriginal, setConflictCopyOriginal] = useState<{ filename: string; original: string | null } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutBuildInfo, setAboutBuildInfo] = useState<AboutBuildInfo>(() =>
@@ -1498,6 +1506,121 @@ export default function Home() {
     [renameFileForTitle],
   );
 
+  // Version history of the open note (local folder or cloud; notes of a browser-local workspace have none)
+  const historyAvailable = Boolean(
+    document && !isWorkspaceMindMap(document) && !localWorkspaceActive,
+  );
+
+  const historyUrl = useCallback(() => {
+    const current = useMindMapStore.getState().document;
+    const filename = currentFileRef.current || current?.filePath || "";
+    return `/api/mindmaps/${encodeURIComponent(filename)}/history${workspaceQuery(current?.storage?.mode === "database" ? current.storage.workspaceId : null)}`;
+  }, []);
+
+  const openHistory = useCallback(async () => {
+    const store = useMindMapStore.getState();
+    const current = store.document;
+    if (!current || isWorkspaceMindMap(current)) return;
+    // A save is what puts the previous version into the history: write what is still open first.
+    // A note in a connected cloud session is persisted by its room.
+    if (current.storage?.mode !== "database" || store.syncStatus !== "connected") {
+      await toolbarRef.current?.triggerSave();
+    }
+    setHistoryCanRestore(true);
+    setHistoryOpen(true);
+  }, []);
+
+  const loadHistory = useCallback(async (): Promise<NoteRevision[]> => {
+    const response = await fetch(historyUrl());
+    if (!response.ok) throw new Error(`History request failed with HTTP ${response.status}`);
+    const data = (await response.json()) as { revisions?: NoteRevision[]; canRestore?: boolean };
+    setHistoryCanRestore(data.canRestore === true);
+    return data.revisions ?? [];
+  }, [historyUrl]);
+
+  const restoreHistoryVersion = useCallback(
+    async (revision: NoteRevision) => {
+      const store = useMindMapStore.getState();
+      const activeDocument = store.document;
+      const filename = currentFileRef.current;
+      if (!activeDocument || !filename) throw new Error("RESTORE_FAILED");
+      const activeStorage =
+        activeDocument.storage?.mode === "database" ? activeDocument.storage : null;
+      const reconnect = Boolean(
+        syncUrl &&
+        (store.syncProvider !== null || store.syncStatus !== "disconnected"),
+      );
+      const stillCurrent = () => currentFileRef.current === filename;
+      try {
+        // The sync server rejects document mutations while this client still occupies the room.
+        if (reconnect) await store.disconnectSync();
+        const response = await fetch(historyUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revisionId: revision.id }),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            code?: string;
+          } | null;
+          throw new Error(payload?.code ?? "RESTORE_FAILED");
+        }
+      } catch (error) {
+        if (reconnect && stillCurrent()) {
+          await connectDocumentSync(activeDocument, stillCurrent).catch(
+            (reconnectError: unknown) => {
+              console.error(
+                "[BloomMD] Failed to reconnect after a failed restore:",
+                reconnectError,
+              );
+            },
+          );
+        }
+        throw error;
+      }
+      // Show the restored note, then join the session again.
+      const restored = await loadMindmap(
+        filename,
+        activeStorage?.workspaceId ?? cloudWorkspace?.id,
+      );
+      setDocument(restored);
+      if (reconnect && stillCurrent()) {
+        await connectDocumentSync(restored, stillCurrent).catch(
+          (reconnectError: unknown) => {
+            console.error(
+              "[BloomMD] Failed to reconnect after a restore:",
+              reconnectError,
+            );
+          },
+        );
+      }
+    },
+    [cloudWorkspace?.id, connectDocumentSync, historyUrl, setDocument, syncUrl],
+  );
+
+  // Conflict copies point to their original, when it still exists.
+  useEffect(() => {
+    const filename = currentFileRef.current;
+    if (!document || isWorkspaceMindMap(document) || localWorkspaceActive || !parseConflictCopy(filename)) {
+      setConflictCopyOriginal(null);
+      return;
+    }
+    let cancelled = false;
+    const workspaceId = document.storage?.mode === "database" ? document.storage.workspaceId : cloudWorkspace?.id;
+    void fetch(`/api/mindmaps${workspaceQuery(workspaceId)}`)
+      .then(async (response) => (response.ok ? ((await response.json()) as { files?: Array<{ filename: string }> }) : null))
+      .then((data) => {
+        if (!cancelled) setConflictCopyOriginal({ filename, original: data?.files ? findConflictCopyOriginal(filename, data.files) : null });
+      })
+      .catch((error: unknown) => {
+        console.error("[BloomMD] Looking up the original of a conflict copy failed:", error);
+        if (!cancelled) setConflictCopyOriginal({ filename, original: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudWorkspace?.id, document?.filePath, document?.storage?.mode, localWorkspaceActive]);
+
   const handleRenameFromSidebar = useCallback(
     (filename: string, title: string) => {
       if (cloudWorkspace?.role === "viewer") {
@@ -2282,6 +2405,7 @@ export default function Home() {
               docsHref={localizedDocsUrl}
               accountHref={`/account?lang=${locale}`}
               onShareLink={document?.storage?.mode === "database" && !localWorkspaceActive ? shareReadOnlyLink : undefined}
+              onOpenHistory={historyAvailable ? () => void openHistory() : undefined}
             />
           </div>
         </div>
@@ -2346,8 +2470,18 @@ export default function Home() {
         onImport={() => toolbarRef.current?.triggerImport()}
         onExport={() => toolbarRef.current?.triggerExport()}
         onReload={() => void reload()}
+        onOpenHistory={historyAvailable ? () => void openHistory() : undefined}
         onOpenMindmap={openMindmap}
       />
+      {historyOpen && document && (
+        <NoteHistoryDialog
+          filename={currentFileRef.current || document.filePath}
+          loadRevisions={loadHistory}
+          onRestore={restoreHistoryVersion}
+          canRestore={historyCanRestore}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
       <HelpModal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
@@ -2833,7 +2967,17 @@ export default function Home() {
 
       {/* Main area */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 h-full">
+        <div className="flex h-full min-w-0 flex-1 flex-col">
+          {mapView === "document" &&
+            conflictCopyOriginal &&
+            conflictCopyOriginal.filename === currentFileRef.current && (
+              <ConflictCopyBanner
+                filename={conflictCopyOriginal.filename}
+                originalFilename={conflictCopyOriginal.original}
+                onOpenOriginal={(original) => void openMindmap(original)}
+              />
+            )}
+          <div className="min-h-0 flex-1">
           {mapView === "workspace" ? (
             <div className="relative h-full w-full">
               {workspaceMapError && (
@@ -2871,6 +3015,7 @@ export default function Home() {
               agentActivity={selectedAgentActivity}
             />
           )}
+          </div>
         </div>
         {healthOpen && (
           <div className="w-80 shrink-0">

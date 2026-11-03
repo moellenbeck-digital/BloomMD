@@ -1,5 +1,5 @@
 import type { RPCSchema } from "electrobun/bun";
-import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, SharedDocumentBinding } from "@bloommd/core";
+import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, NoteRevision, SharedDocumentBinding } from "@bloommd/core";
 
 export interface SerializedDocument {
   filePath: string;
@@ -214,6 +214,16 @@ export type BloomMDRPC = {
       deleteMindmap: {
         params: { filename: string };
         response: { success: boolean };
+      };
+      /** Version history of the open note: backups in the local folder, revisions in a cloud workspace. */
+      listNoteHistory: {
+        params: { filePath: string };
+        response: { revisions: NoteRevision[]; canRestore: boolean; error?: string };
+      };
+      /** Makes one entry of `listNoteHistory` the current version; the replaced one stays in the history. */
+      restoreNoteVersion: {
+        params: { filePath: string; revisionId: string };
+        response: { success: boolean; error?: string };
       };
       chooseDirectory: {
         params: { dialogId: string };

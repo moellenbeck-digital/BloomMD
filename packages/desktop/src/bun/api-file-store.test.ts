@@ -316,3 +316,40 @@ describe("ApiFileStore workspace context", () => {
     await expect(store.delete("shared.md")).rejects.toThrow("SYNC_ROOM_ACTIVE");
   });
 });
+
+describe("ApiFileStore version history (#3)", () => {
+  test("lists the versions of a note and whether this user may restore one", async () => {
+    const requests: Array<{ url: string; auth: string | null }> = [];
+    globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
+      requests.push({ url: String(input), auth: new Headers(init?.headers).get("Authorization") });
+      return Response.json({ source: "cloud", canRestore: false, revisions: [{ id: "r1", source: "cloud", replacedAt: "2026-11-03T09:00:00.000Z", size: 10, version: 4 }] });
+    }) as unknown as typeof fetch;
+
+    const store = new ApiFileStore({ baseUrl: "https://bloommd.app/", accessToken: "bloom_pat_test" });
+    const history = await store.listHistory("Mein Heft.md");
+
+    expect(history.canRestore).toBe(false);
+    expect(history.revisions.map((revision) => revision.id)).toEqual(["r1"]);
+    expect(requests).toEqual([{ url: "https://bloommd.app/api/mindmaps/Mein%20Heft.md/history", auth: "Bearer bloom_pat_test" }]);
+  });
+
+  test("restores a version with a POST to the history route", async () => {
+    const sent: Array<{ url: string; method?: string; body?: unknown }> = [];
+    globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
+      sent.push({ url: String(input), method: init?.method, body: JSON.parse(String(init?.body)) });
+      return Response.json({ storage: { mode: "database", documentId: "d", workspaceId: "w", version: 8 } });
+    }) as unknown as typeof fetch;
+
+    const store = new ApiFileStore({ baseUrl: "https://bloommd.app", accessToken: "bloom_pat_test" });
+    await store.restoreVersion("shared.md", "r1");
+
+    expect(sent).toEqual([{ url: "https://bloommd.app/api/mindmaps/shared.md/history", method: "POST", body: { revisionId: "r1" } }]);
+  });
+
+  test("keeps the reason of a refused restore as a typed error", async () => {
+    globalThis.fetch = (async () => Response.json({ code: "VERSION_CONFLICT", error: "Document changed on the server." }, { status: 409 })) as unknown as typeof fetch;
+
+    const store = new ApiFileStore({ baseUrl: "https://bloommd.app", accessToken: "bloom_pat_test" });
+    await expect(store.restoreVersion("shared.md", "r1")).rejects.toThrow("VERSION_CONFLICT");
+  });
+});

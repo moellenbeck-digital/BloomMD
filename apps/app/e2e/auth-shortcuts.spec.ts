@@ -699,6 +699,7 @@ test.describe("discoverable workflows", () => {
 
     const exportDownload = page.waitForEvent("download");
     await page.getByTestId("toolbar-export").click();
+    await page.getByTestId("export-markdown").click();
     expect((await exportDownload).suggestedFilename()).toBe(`${renamedTitle}.md`);
 
     const newResponse = page.waitForResponse((response) => {

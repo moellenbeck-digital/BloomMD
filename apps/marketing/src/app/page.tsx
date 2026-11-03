@@ -901,7 +901,7 @@ function DesktopSection() {
     {
       icon: HardDrive,
       title: "Deine Dateien, dein Rechner",
-      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund.",
+      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund. Deine Dateien gehören dir: Alle Exporte (Markdown, OPML, PDF, PNG, SVG) sind für jeden frei.",
     },
     {
       icon: RefreshCw,

@@ -148,6 +148,36 @@ export interface Translations {
   conflictLoadStored: string;
   conflictSaveCopy: string;
   conflictKeepMine: string;
+  conflictCopyBadge: string;
+  conflictCopyTooltip: string;
+  conflictCopyBannerTitle: string;
+  conflictCopyBannerBody: string;
+  conflictCopyOriginal: string;
+  conflictCopyOpenOriginal: string;
+  conflictCopyOriginalMissing: string;
+  historyAction: string;
+  historyAriaLabel: string;
+  historyTitle: string;
+  historyDescription: string;
+  historyLoading: string;
+  historyLoadFailed: string;
+  historyEmptyTitle: string;
+  historyEmpty: string;
+  historySourceLocal: string;
+  historySourceCloud: string;
+  historyReplacedAt: string;
+  historyVersion: string;
+  historyAuthor: string;
+  historyRestore: string;
+  historyRestoreConfirmTitle: string;
+  historyRestoreConfirm: string;
+  historyRestoreConfirmAction: string;
+  historyRestoring: string;
+  historyRestoreFailed: string;
+  historyRestoreConflict: string;
+  historyRestoreRoomActive: string;
+  historyRestoreReadOnly: string;
+  historyRestored: string;
   syncOffline: string;
   syncConnecting: string;
   syncReconnecting: string;
@@ -600,6 +630,36 @@ export const translations: Record<Locale, Translations> = {
     conflictLoadStored: "Gespeicherte Fassung laden",
     conflictSaveCopy: "Als Kopie speichern",
     conflictKeepMine: "Meine Fassung behalten",
+    conflictCopyBadge: "Konfliktkopie",
+    conflictCopyTooltip: "Diese Notiz entstand, weil sie auf zwei Geräten gleichzeitig geändert wurde. Sie enthält die Änderungen, die sich nicht in das Original übernehmen ließen.",
+    conflictCopyBannerTitle: "Das ist eine Konfliktkopie",
+    conflictCopyBannerBody: "Die Notiz wurde auf zwei Geräten gleichzeitig geändert. Diese Kopie enthält die Änderungen, die sich nicht übernehmen ließen. Vergleiche sie mit dem Original und lösche sie, wenn du sie nicht mehr brauchst.",
+    conflictCopyOriginal: "Original: %filename%",
+    conflictCopyOpenOriginal: "Original öffnen",
+    conflictCopyOriginalMissing: "Die Originalnotiz „%filename%“ gibt es nicht mehr.",
+    historyAction: "Verlauf",
+    historyAriaLabel: "Versionsverlauf",
+    historyTitle: "Verlauf: %filename%",
+    historyDescription: "Die letzten Fassungen dieser Notiz, die neueste zuerst. Beim Wiederherstellen bleibt die aktuelle Fassung im Verlauf erhalten.",
+    historyLoading: "Verlauf wird geladen …",
+    historyLoadFailed: "Der Verlauf konnte nicht geladen werden.",
+    historyEmptyTitle: "Noch kein Verlauf",
+    historyEmpty: "Sobald sich diese Notiz beim Speichern ändert, erscheint hier die jeweils vorherige Fassung.",
+    historySourceLocal: "Lokal",
+    historySourceCloud: "Cloud",
+    historyReplacedAt: "Fassung bis %time%",
+    historyVersion: "Version %version%",
+    historyAuthor: "von %author%",
+    historyRestore: "Wiederherstellen",
+    historyRestoreConfirmTitle: "Diese Fassung wiederherstellen?",
+    historyRestoreConfirm: "Die Notiz wird auf die Fassung bis %time% zurückgesetzt. Die aktuelle Fassung bleibt im Verlauf erhalten.",
+    historyRestoreConfirmAction: "Ja, wiederherstellen",
+    historyRestoring: "Wird wiederhergestellt …",
+    historyRestoreFailed: "Die Fassung konnte nicht wiederhergestellt werden.",
+    historyRestoreConflict: "Die Notiz wurde zwischenzeitlich geändert. Öffne den Verlauf noch einmal und versuche es erneut.",
+    historyRestoreRoomActive: "Die Notiz ist gerade in einer Sitzung geöffnet. Versuche es in einem Moment noch einmal.",
+    historyRestoreReadOnly: "Du darfst diese Notiz nur lesen und deshalb keine Fassung wiederherstellen.",
+    historyRestored: "Fassung wiederhergestellt.",
     syncOffline: "Offline",
     syncConnecting: "Verbinde...",
     syncReconnecting: "Verbinde erneut...",
@@ -1046,6 +1106,36 @@ export const translations: Record<Locale, Translations> = {
     conflictLoadStored: "Load stored version",
     conflictSaveCopy: "Save as copy",
     conflictKeepMine: "Keep my version",
+    conflictCopyBadge: "Conflict copy",
+    conflictCopyTooltip: "This note was created because it was changed on two devices at the same time. It holds the changes that could not be merged into the original.",
+    conflictCopyBannerTitle: "This is a conflict copy",
+    conflictCopyBannerBody: "The note was changed on two devices at the same time. This copy holds the changes that could not be merged. Compare it with the original and delete it when you no longer need it.",
+    conflictCopyOriginal: "Original: %filename%",
+    conflictCopyOpenOriginal: "Open original",
+    conflictCopyOriginalMissing: "The original note “%filename%” no longer exists.",
+    historyAction: "History",
+    historyAriaLabel: "Version history",
+    historyTitle: "History: %filename%",
+    historyDescription: "The latest versions of this note, newest first. Restoring keeps the current version in the history.",
+    historyLoading: "Loading history …",
+    historyLoadFailed: "The history could not be loaded.",
+    historyEmptyTitle: "No history yet",
+    historyEmpty: "Once this note changes on save, the version it replaced appears here.",
+    historySourceLocal: "Local",
+    historySourceCloud: "Cloud",
+    historyReplacedAt: "Version until %time%",
+    historyVersion: "Version %version%",
+    historyAuthor: "by %author%",
+    historyRestore: "Restore",
+    historyRestoreConfirmTitle: "Restore this version?",
+    historyRestoreConfirm: "The note is reset to the version until %time%. The current version stays in the history.",
+    historyRestoreConfirmAction: "Yes, restore",
+    historyRestoring: "Restoring …",
+    historyRestoreFailed: "The version could not be restored.",
+    historyRestoreConflict: "The note changed in the meantime. Open the history again and retry.",
+    historyRestoreRoomActive: "The note is open in a session right now. Try again in a moment.",
+    historyRestoreReadOnly: "You can only read this note, so you cannot restore a version.",
+    historyRestored: "Version restored.",
     syncOffline: "Offline",
     syncConnecting: "Connecting...",
     syncReconnecting: "Reconnecting...",

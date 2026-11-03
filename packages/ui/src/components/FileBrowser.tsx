@@ -5,6 +5,7 @@ import { Search, Star } from "lucide-react";
 import type { MindMapListEntry, MindMapDocument, MindMapNode } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { ConflictCopyBadge } from "./ConflictCopyBadge";
 import { FileContextMenu } from "./FileContextMenu";
 
 interface ApiListResponse {
@@ -441,6 +442,7 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
                     {title}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
+                    <ConflictCopyBadge filename={entry.filename} />
                     <span className="text-[11px] text-[var(--color-ink-faint)] font-[var(--font-mono,monospace)]">{entry.filename}</span>
                     {tags.length > 0 && (
                       <span className="text-[11px] text-[var(--color-ink-faint)] truncate">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, FilePlus, FilePlus2, FolderPlus, Upload, Download, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
+import { AlertTriangle, FilePlus, History, FilePlus2, FolderPlus, Upload, Download, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
 import { isWorkspaceMindMap, parseFile, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
@@ -27,6 +27,8 @@ interface ToolbarProps {
   onExportFile?: () => Promise<void>;
   /** Creates a read-only link for colleagues without an account (cloud maps only). */
   onShareLink?: () => void | Promise<void>;
+  /** Opens the version history of the open note (notes in a local folder or the cloud). */
+  onOpenHistory?: () => void;
 }
 
 export interface ToolbarHandle {
@@ -113,7 +115,7 @@ function ToolbarMenu({ label, Icon, testId, children }: ToolbarMenuProps) {
 
 const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
 
-export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onExportFile, onShareLink }, ref) {
+export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onExportFile, onShareLink, onOpenHistory }, ref) {
   const { t, locale, toggleLocale } = useLocale();
   const { theme, toggleTheme } = useTheme();
   const document = useMindMapStore((s) => s.document);
@@ -342,6 +344,19 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           aria-label={t.shareReadOnlyLink}
         >
           <Link2 size={18} />
+        </button>
+      )}
+      {onOpenHistory && (
+        <button
+          type="button"
+          data-testid="toolbar-history"
+          onClick={onOpenHistory}
+          disabled={!document}
+          className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          title={t.historyAction}
+          aria-label={t.historyAction}
+        >
+          <History size={18} />
         </button>
       )}
       {onReload && (

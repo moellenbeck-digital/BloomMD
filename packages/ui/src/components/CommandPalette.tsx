@@ -69,6 +69,7 @@ export function CommandPalette({
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
   const document = useMindMapStore((s) => s.document);
   const readOnly = useMindMapStore((s) => s.readOnly);
+  const enterReadingMode = useMindMapStore((s) => s.enterReadingMode);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const addChildNode = useMindMapStore((s) => s.addChildNode);
   const updateNodeContent = useMindMapStore((s) => s.updateNodeContent);
@@ -217,6 +218,9 @@ export function CommandPalette({
       { id: "action-import", category: t.categoryCommands, title: t.importMd, subtitle: "Cmd/Ctrl+I", kind: "action", icon: Upload, run: onImport },
       { id: "action-export", category: t.categoryCommands, title: t.exportMenu, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
       { id: "action-reload", category: t.categoryCommands, title: t.reload, subtitle: "Cmd/Ctrl+R", kind: "action", icon: RefreshCw, run: onReload },
+      ...(document
+        ? [{ id: "action-reading-mode", category: t.categoryCommands, title: t.readingMode, subtitle: `${t.readingModeHint} · Alt+L`, kind: "action" as const, icon: BookOpen, run: enterReadingMode }]
+        : []),
       ...(onOpenHistory && document
         ? [{ id: "action-history", category: t.categoryCommands, title: t.historyAction, subtitle: document.frontmatter.title, kind: "action" as const, icon: History, run: onOpenHistory }]
         : []),
@@ -258,7 +262,7 @@ export function CommandPalette({
       : [];
 
     return [...actions, ...mindmaps, ...nodes];
-  }, [createTemplateMindmap, document, exportBibliography, files, onClose, onExport, onImport, onNew, onOpenHistory, onReload, onSave, readOnly, t]);
+  }, [createTemplateMindmap, document, enterReadingMode, exportBibliography, files, onClose, onExport, onImport, onNew, onOpenHistory, onReload, onSave, readOnly, t]);
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();

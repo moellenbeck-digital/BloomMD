@@ -35,6 +35,9 @@
     "dagre": "^0.8.5",
     "html-to-image": "^1.11.13",
     "lib0": "^0.2.117",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.32"
   },
@@ -56,6 +59,7 @@
     "happy-dom": "^21.0.4",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "@types/mdast": "^4.0.4"
   }
 }

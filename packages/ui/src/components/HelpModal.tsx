@@ -38,6 +38,9 @@ function getShortcuts(t: Translations, showWorkspaceNavigationShortcut: boolean)
           ]
         : []),
       { keys: "Escape", action: t.shortcutBackToCanvas },
+      { keys: "Alt+L", action: t.shortcutReadingMode },
+      { keys: "Escape", action: t.shortcutExitReading },
+      { keys: "↑ ↓ / Page Up / Page Down", action: t.shortcutReadingScroll },
       { keys: t.shortcutClick, action: t.shortcutSelectNode },
       { keys: "ArrowRight", action: t.shortcutSelectChild },
       { keys: "ArrowLeft", action: t.shortcutSelectParent },

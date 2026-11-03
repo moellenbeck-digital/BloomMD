@@ -75,6 +75,7 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
         target.closest(".mdxeditor");
 
       const isInlineRename = target.matches("[data-testid='node-rename-input']");
+      const readingMode = useMindMapStore.getState().canvasMode === "reading";
 
       // isInRichEditor: only the MDXEditor (has its own undo/redo)
       const isInRichEditor =
@@ -93,6 +94,31 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
         (primaryKey && (key === "z" || key === "y"))
       )) {
         return;
+      }
+
+      // Reading mode: Esc leaves it (unless a text field has the focus or the help dialog is open), and
+      // Alt+L enters or leaves it. Every node shortcut below stays off so nothing changes behind the text.
+      const isTextField =
+        isEditing || target.tagName === "SELECT" || Boolean(target.closest("select"));
+      if (!isTextField && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        const helpOpen = Boolean(window.document.querySelector("[data-testid='shortcut-help']"));
+        if (readingMode && e.key === "Escape" && !e.altKey && !helpOpen) {
+          e.preventDefault();
+          useMindMapStore.getState().exitReadingMode();
+          focusCanvas();
+          return;
+        }
+        if (e.altKey && e.code === "KeyL" && !helpOpen) {
+          e.preventDefault();
+          const store = useMindMapStore.getState();
+          if (readingMode) {
+            store.exitReadingMode();
+            focusCanvas();
+          } else if (store.document) {
+            store.enterReadingMode();
+          }
+          return;
+        }
       }
 
       // Cmd/Ctrl+ArrowLeft/ArrowRight → Navigate between the workspace overview and the
@@ -129,14 +155,14 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
       }
 
       // Cmd/Ctrl+Z → Undo. Text inputs and the MDXEditor retain native/editor undo behavior.
-      if (primaryKey && !e.shiftKey && key === "z" && !isEditing && !isInRichEditor) {
+      if (primaryKey && !e.shiftKey && key === "z" && !isEditing && !isInRichEditor && !readingMode) {
         e.preventDefault();
         undo();
         return;
       }
 
       // Cmd/Ctrl+Shift+Z → Redo. Text inputs and the MDXEditor retain native/editor redo behavior.
-      if (primaryKey && e.shiftKey && key === "z" && !isEditing && !isInRichEditor) {
+      if (primaryKey && e.shiftKey && key === "z" && !isEditing && !isInRichEditor && !readingMode) {
         e.preventDefault();
         redo();
         return;
@@ -192,7 +218,7 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
       }
 
       // Cmd/Ctrl+Enter or Alt+Enter -> Toggle editor/panel everywhere, including inside MDXEditor.
-      if ((primaryKey || e.altKey) && e.key === "Enter") {
+      if (!readingMode && (primaryKey || e.altKey) && e.key === "Enter") {
         e.preventDefault();
         if (editorVisible) {
           setEditorVisible(false);
@@ -224,6 +250,8 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
       }
 
       // ── Canvas-only shortcuts (only when NOT editing text) ──
+      // The reading mode is read-only: arrows scroll the text, and no node shortcut may act in the background.
+      if (readingMode) return;
       if (isEditing || isInteractiveControl(target)) return;
       const currentState = useMindMapStore.getState();
       const activeDocument = currentState.document;

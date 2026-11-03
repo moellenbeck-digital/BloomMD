@@ -31,7 +31,30 @@ export interface RemoteUser {
   selectedNodeId: string | null;
 }
 
-export type CanvasMode = "map" | "outline" | "presentation";
+export type CanvasMode = "map" | "outline" | "presentation" | "reading";
+
+/** Pan/zoom of the map canvas, mirrors the React Flow viewport. */
+export interface MapViewport {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+/** What "Back to map" restores after the read-only reading mode. */
+export interface ReadingReturnState {
+  mode: Exclude<CanvasMode, "reading">;
+  /** Identifies the document the state belongs to; selection and position only apply to that document. */
+  documentKey: string | null;
+  selectedNodeId: string | null;
+  selectedNodeIds: string[];
+  focusNodeId: string | null;
+  editorVisible: boolean;
+  viewport: MapViewport | null;
+}
+
+function documentKeyOf(doc: MindMapDocument | null): string | null {
+  return doc ? `${doc.frontmatter.id}:${doc.filePath}` : null;
+}
 
 export interface BranchSnapshot {
   title: string;
@@ -69,6 +92,12 @@ interface MindMapState {
   remoteUsers: RemoteUser[];
   edgeMode: EdgeMode;
   canvasMode: CanvasMode;
+  /** Set while the reading mode is open; "Back to map" restores it. */
+  readingReturn: ReadingReturnState | null;
+  /** Last pan/zoom of the map canvas of the open document. */
+  mapViewport: MapViewport | null;
+  /** One-shot: the map canvas mounts with this viewport instead of fitting the whole map. */
+  restoreViewport: MapViewport | null;
   /** While a map export runs, the canvas mounts every node instead of only those in view. */
   exportRenderAll: boolean;
   focusNodeId: string | null;
@@ -115,6 +144,11 @@ interface MindMapState {
   relayout: () => void;
   setEdgeMode: (mode: EdgeMode) => void;
   setCanvasMode: (mode: CanvasMode) => void;
+  /** Opens the read-only reading mode and remembers where "Back to map" returns to. */
+  enterReadingMode: () => void;
+  /** Leaves the reading mode and restores the previous mode, selection and map position. */
+  exitReadingMode: () => void;
+  setMapViewport: (viewport: MapViewport) => void;
   setExportRenderAll: (renderAll: boolean) => void;
   setFocusNodeId: (nodeId: string | null) => void;
   copyBranches: (nodeIds?: string[]) => BranchSnapshot[];
@@ -279,6 +313,9 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   remoteUsers: [],
   edgeMode: "hierarchy",
   canvasMode: "map",
+  readingReturn: null,
+  mapViewport: null,
+  restoreViewport: null,
   exportRenderAll: false,
   focusNodeId: null,
   copiedBranches: [],
@@ -293,7 +330,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     cancelPendingNodeFocus();
     cancelLayout();
     // A status message belongs to the document it was raised for; never carry it across navigation.
-    set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0 });
+    set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0, mapViewport: null, restoreViewport: null });
     // Cleanup previous sync provider FIRST (before destroying Y.Doc)
     const prevProvider = get().syncProvider;
     if (prevProvider) prevProvider.destroy();
@@ -633,10 +670,11 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       editWhenVisible();
     });
   },
-  setEditorVisible: (visible) => set({ editorVisible: visible }),
+  // The reading mode shows no editor panel; nothing opens it while reading.
+  setEditorVisible: (visible) => set((state) => ({ editorVisible: visible && state.canvasMode !== "reading" })),
   toggleEditor: () => {
-    const { selectedNodeId, editorVisible } = get();
-    if (!selectedNodeId) return;
+    const { selectedNodeId, editorVisible, canvasMode } = get();
+    if (!selectedNodeId || canvasMode === "reading") return;
     set({ editorVisible: !editorVisible });
   },
 
@@ -850,7 +888,64 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     set({ edgeMode, nodes, edges });
   },
 
-  setCanvasMode: (canvasMode) => set({ canvasMode }),
+  setCanvasMode: (canvasMode) => {
+    const current = get().canvasMode;
+    if (canvasMode === current) return;
+    if (canvasMode === "reading") {
+      get().enterReadingMode();
+      return;
+    }
+    if (current === "reading") {
+      get().exitReadingMode();
+      // A host that asks for a specific mode (e.g. the export, which needs the map) wins over the remembered one.
+      if (get().canvasMode !== canvasMode) set({ canvasMode, restoreViewport: null });
+      return;
+    }
+    set({ canvasMode, restoreViewport: null });
+  },
+  setMapViewport: (mapViewport) => set({ mapViewport }),
+  enterReadingMode: () => {
+    const state = get();
+    if (state.canvasMode === "reading") return;
+    const readingReturn: ReadingReturnState = {
+      mode: state.canvasMode,
+      documentKey: documentKeyOf(state.document),
+      selectedNodeId: state.selectedNodeId,
+      selectedNodeIds: state.selectedNodeIds,
+      focusNodeId: state.focusNodeId,
+      editorVisible: state.editorVisible,
+      viewport: state.canvasMode === "map" ? state.mapViewport : null,
+    };
+    set({ canvasMode: "reading", readingReturn, editorVisible: false, restoreViewport: null });
+  },
+  exitReadingMode: () => {
+    const state = get();
+    if (state.canvasMode !== "reading") return;
+    const saved = state.readingReturn;
+    if (!saved) {
+      set({ canvasMode: "map", restoreViewport: null });
+      return;
+    }
+    const doc = state.document;
+    const sameDocument = doc !== null && saved.documentKey === documentKeyOf(doc);
+    if (!sameDocument || !doc) {
+      // The document was switched while reading (tab, link, file browser): only the mode returns.
+      set({ canvasMode: saved.mode, readingReturn: null, restoreViewport: null });
+      return;
+    }
+    const selectedNodeIds = saved.selectedNodeIds.filter((id) => doc.nodes.has(id));
+    const selectedNodeId = saved.selectedNodeId && doc.nodes.has(saved.selectedNodeId) ? saved.selectedNodeId : null;
+    const focusNodeId = saved.focusNodeId && doc.nodes.has(saved.focusNodeId) ? saved.focusNodeId : null;
+    set({
+      canvasMode: saved.mode,
+      readingReturn: null,
+      selectedNodeId,
+      selectedNodeIds,
+      editorVisible: saved.editorVisible && selectedNodeId !== null,
+      restoreViewport: saved.mode === "map" ? saved.viewport : null,
+    });
+    if (focusNodeId !== state.focusNodeId) get().setFocusNodeId(focusNodeId);
+  },
   setExportRenderAll: (exportRenderAll) => set({ exportRenderAll }),
 
   setFocusNodeId: (focusNodeId) => {

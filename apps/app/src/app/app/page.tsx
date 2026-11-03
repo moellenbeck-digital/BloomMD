@@ -396,6 +396,7 @@ export default function Home() {
   const setDocumentFilePath = useMindMapStore((s) => s.setDocumentFilePath);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const editorVisible = useMindMapStore((s) => s.editorVisible);
+  const readingMode = useMindMapStore((s) => s.canvasMode === "reading");
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
   const document = useMindMapStore((s) => s.document);
   const [loading, setLoading] = useState(true);
@@ -3418,6 +3419,7 @@ export default function Home() {
         )}
         {mapView === "document" &&
           !healthOpen &&
+          !readingMode &&
           selectedNodeId &&
           (editorVisible || nodeAgentOpen) && (
             <ResizableEditor

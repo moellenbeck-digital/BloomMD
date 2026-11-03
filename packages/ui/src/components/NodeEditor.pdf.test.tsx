@@ -1,10 +1,12 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { Root } from "react-dom/client";
 import { parseFile } from "@bloommd/core/browser";
 
 const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
+const DOM_GLOBALS = ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLTextAreaElement", "KeyboardEvent", "localStorage", "Event", "CustomEvent", "requestAnimationFrame"];
+const globalsBefore = Object.fromEntries(DOM_GLOBALS.map((key) => [key, (globalThis as Record<string, unknown>)[key]]));
 const win = new Window({ url: "https://bloommd.test/app" });
 globalThis.window = win as unknown as Window & typeof globalThis.window;
 globalThis.document = win.document as unknown as Document;
@@ -126,4 +128,13 @@ describe("node panel: PDF source link", () => {
     await act(async () => { query<HTMLButtonElement>("pdf-link-open")!.click(); });
     expect(query("pdf-link-error")?.textContent).toContain("konnte nicht geöffnet werden");
   });
+});
+
+// The DOM globals above are this file's own; put the originals back so later test files in the same
+// process do not see a happy-dom `Event` or `window` they did not ask for.
+afterAll(() => {
+  for (const key of DOM_GLOBALS) {
+    if (globalsBefore[key] === undefined) delete (globalThis as Record<string, unknown>)[key];
+    else (globalThis as Record<string, unknown>)[key] = globalsBefore[key];
+  }
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { Root } from "react-dom/client";
 import { extractPdfCitations, parseFile } from "@bloommd/core/browser";
@@ -7,6 +7,8 @@ const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
 // React DOM decides at import time whether the browser supports `input` events, so the DOM has to
 // exist before react-dom is loaded; hence the dynamic imports below.
+const DOM_GLOBALS = ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLTextAreaElement", "KeyboardEvent", "localStorage", "Event", "CustomEvent", "requestAnimationFrame"];
+const globalsBefore = Object.fromEntries(DOM_GLOBALS.map((key) => [key, (globalThis as Record<string, unknown>)[key]]));
 const win = new Window({ url: "https://bloommd.test/app" });
 globalThis.window = win as unknown as Window & typeof globalThis.window;
 globalThis.document = win.document as unknown as Document;
@@ -109,6 +111,9 @@ describe("command palette: PDF citation and bibliography", () => {
 
   async function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
     await act(async () => {
+      // When another test file loaded react-dom before any DOM existed, React falls back to
+      // watching only the focused field for changes, so the field has to be focused first.
+      element.dispatchEvent(new window.Event("focusin", { bubbles: true }) as unknown as Event);
       const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
       Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(element, value);
       for (const type of ["input", "keyup"]) element.dispatchEvent(new window.Event(type, { bubbles: true }) as unknown as Event);
@@ -194,4 +199,13 @@ describe("command palette: PDF citation and bibliography", () => {
     expect(query("command-palette-notice")?.textContent).toContain("Keine Zitierschlüssel");
     expect(closed).toBe(0);
   });
+});
+
+// The DOM globals above are this file's own; put the originals back so later test files in the same
+// process do not see a happy-dom `Event` or `window` they did not ask for.
+afterAll(() => {
+  for (const key of DOM_GLOBALS) {
+    if (globalsBefore[key] === undefined) delete (globalThis as Record<string, unknown>)[key];
+    else (globalThis as Record<string, unknown>)[key] = globalsBefore[key];
+  }
 });

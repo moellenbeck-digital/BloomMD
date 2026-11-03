@@ -7,6 +7,7 @@ export { ResizableEditor } from "./components/ResizableEditor";
 export { Toolbar, type ToolbarHandle } from "./components/Toolbar";
 export { buildExportFile, bytesToBase64, downloadExportFile, EXPORT_FORMATS, exportFilename, type ExportFile, type ExportFormat } from "./export/export-file";
 export { buildTextExport } from "./export/export-file";
+export { DELIVER_EXPORT_EVENT, type DeliverExportDetail } from "./visuals/visual-export";
 export { exportMapFile } from "./export/run-map-export";
 export { MapExportError } from "./export/capture-map";
 export { FileBrowser, fileEntryIsActive } from "./components/FileBrowser";

@@ -25,6 +25,8 @@ import {
   fileEntryIsActive,
   requestNodeFocus,
   bytesToBase64,
+  DELIVER_EXPORT_EVENT,
+  type DeliverExportDetail,
   type ExportFile,
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
@@ -1167,6 +1169,16 @@ export function App() {
     if ("error" in result) throw new Error(result.error);
     useMindMapStore.getState().setStatusMessage(`${t.exportSavedTo} ${result.path}`);
   }, [t]);
+
+  // "Save image" and "Save diagram" in the enlarged view hand their file over the same way.
+  useEffect(() => {
+    const deliver = (event: Event) => {
+      const detail = (event as CustomEvent<DeliverExportDetail>).detail;
+      detail.handle(handleDeliverExport(detail.file));
+    };
+    window.addEventListener(DELIVER_EXPORT_EVENT, deliver);
+    return () => window.removeEventListener(DELIVER_EXPORT_EVENT, deliver);
+  }, [handleDeliverExport]);
 
   // Delete
   const handleDeleteMindmap = useCallback(async (filename: string) => {

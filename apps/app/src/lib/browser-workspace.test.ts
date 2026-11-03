@@ -166,6 +166,21 @@ describe("local handoff stays local", () => {
     expect(networkCalls).toEqual([]);
   });
 
+  test("the attachment itself is available for saving the original, again without a network request", async () => {
+    const image = fileHandle("diagram.png", "PNG");
+    const root = directoryHandle("vault", [
+      ["note.md", fileHandle("note.md", "# Note")],
+      ["bilder/diagram.png", image],
+    ]);
+    const workspace = new BrowserWorkspace(root as never);
+    await workspace.refresh();
+
+    const file = await workspace.resourceFile("bilder/diagram.png");
+    expect(await file.text()).toBe("PNG");
+    await expect(workspace.resourceFile("../../etc/passwd")).rejects.toThrow(/not part of this workspace/);
+    expect(networkCalls).toEqual([]);
+  });
+
   test("preview URLs refuse files outside the workspace", async () => {
     const root = directoryHandle("vault", [["note.md", fileHandle("note.md", "# Note")]]);
     const workspace = new BrowserWorkspace(root as never);

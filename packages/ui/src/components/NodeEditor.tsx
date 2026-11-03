@@ -1,7 +1,7 @@
 "use client";
 
 import { workspaceSourceFile, openWorkspaceSource } from "../utils/workspaceSource";
-import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -68,6 +68,9 @@ import {
   workspaceReferencesForNode,
   type ResourcePreviewKind,
 } from "./node-panel-model";
+import { LazyNodeImageGallery, LazyVisualViewer, mermaidCodeBlockDescriptor } from "../visuals/lazy";
+import { useInlineImagePreview } from "../visuals/useInlineImages";
+import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "../visuals/visuals-context";
 
 interface NodeEditorProps {
   /** When true, renders without the aside wrapper (for embedding in bottom sheets etc.) */
@@ -192,6 +195,10 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
   const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
+  const [viewer, setViewer] = useState<ViewerRequest | null>(null);
+  const notePath = document?.filePath ?? "";
+  const imageCopy = useMemo(() => ({ notFound: t.visualImageNotFound, rejected: t.visualImagePathRejected }), [t.visualImageNotFound, t.visualImagePathRejected]);
+  const { handler: imagePreviewHandler } = useInlineImagePreview(notePath, imageCopy);
 
   const selectedNode = selectedNodeId
     ? document?.nodes.get(selectedNodeId)
@@ -577,6 +584,11 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [kind, resourcePath, t.localPreviewUnavailable, t.previewUnavailable]);
+
+  const visualsContext = useMemo<VisualsContextValue>(
+    () => ({ notePath, title: selectedNode?.title ?? "", readOnly, openViewer: setViewer }),
+    [notePath, readOnly, selectedNode?.title],
+  );
 
   if (!selectedNode) return null;
 
@@ -1117,6 +1129,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
         <details open className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="node-content-panel">
           <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
           <div className="min-h-0 flex-1 overflow-y-auto">
+            <VisualsContext.Provider value={visualsContext}>
             <MDXEditor
               ref={editorRef}
               markdown={selectedNode.content}
@@ -1129,9 +1142,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 thematicBreakPlugin(),
                 markdownShortcutPlugin(),
                 tablePlugin(),
-                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript" }),
-                codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", "": "Plain Text" } }),
-                imagePlugin(),
+                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript", codeBlockEditorDescriptors: [mermaidCodeBlockDescriptor] }),
+                codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", mermaid: "Mermaid", "": "Plain Text" } }),
+                imagePlugin({ imagePreviewHandler }),
                 linkPlugin(),
                 linkDialogPlugin(),
                 toolbarPlugin({
@@ -1150,6 +1163,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
               ]}
               contentEditableClassName={`bloommd-markdown-editor prose prose-sm max-w-none ${embedded ? "px-4 py-2" : "px-5 py-3"} min-h-[120px] focus:outline-none text-[var(--color-ink)]`}
             />
+            <LazyNodeImageGallery content={selectedNode.content} />
+            </VisualsContext.Provider>
           </div>
         </details>
       ) : (
@@ -1164,13 +1179,16 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     </>
   );
 
+  const viewerDialog = viewer ? <LazyVisualViewer kind={viewer.kind} src={viewer.src} alt={viewer.alt} actions={viewer.actions} onClose={() => setViewer(null)} /> : null;
+
   if (embedded) {
-    return <div className="flex flex-col overflow-hidden h-full">{content}</div>;
+    return <div className="flex flex-col overflow-hidden h-full">{content}{viewerDialog}</div>;
   }
 
   return (
     <aside className="h-full bg-[var(--color-surface-raised)] flex flex-col overflow-hidden">
       {content}
+      {viewerDialog}
     </aside>
   );
 }

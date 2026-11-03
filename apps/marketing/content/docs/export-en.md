@@ -33,6 +33,22 @@ for that.
 - **Mobile:** the device's share sheet, e.g. "Save to Files", AirDrop or Mail.
 - **Obsidian plugin:** the export icon on the map; the file lands in the note's attachment folder.
 
+## Saving images and diagrams
+
+Images and Mermaid diagrams in a node can be enlarged: click (or press Enter on) the diagram, or a preview under "Images in this node", to open the enlarged view (zoom with +/−, the mouse wheel or the buttons, 0 resets, drag or the arrow keys pan, Esc closes). The save actions are there:
+
+| Action | Result |
+| --- | --- |
+| **Save image** | the original image, unchanged: the same bytes, file name and format (PNG, JPG, GIF, WebP, AVIF, BMP or SVG) |
+| **Save diagram as SVG** | `<node title>-diagram.svg` – a vector file with a fixed size and white background, labels as text |
+| **Save diagram as PNG** | `<node title>-diagram.png` – twice the diagram's size, at most 4096 pixels on the long side, white background |
+
+The files land like the exports above: a browser download in the web app, the Downloads folder on desktop (existing files are never overwritten). In the Obsidian plugin Obsidian shows images and Mermaid blocks itself; its own tools apply for saving there. On mobile, saving from the enlarged view is not connected to the share sheet yet. Opening, zooming and saving never change the note.
+
+## Relative image paths
+
+`![](images/beach.png)` and `![[beach.png]]` (Obsidian) are resolved relative to the note, in the web app (local folder), on desktop and in the Obsidian plugin by the same rule: `./` and `../` are allowed, and so are spaces and umlauts (`<images/Beach day.png>` or `%20`). Paths that would leave the workspace are never read; a hint with the path appears instead of a broken image icon.
+
 ## Import OPML
 
 If you are switching from MindNode, Xmind or another outliner, import the OPML file: choose

@@ -295,8 +295,10 @@ type RenameResult =
 interface ResourcePreviewRequest {
   kind?: string;
   file?: string;
+  /** Inline Markdown images name exactly one file; file nodes and Obsidian embeds may match by name. */
+  exact?: boolean;
   respond: (
-    result: { url: string; revokeOnCleanup?: boolean } | { error: string },
+    result: { url: string; revokeOnCleanup?: boolean; blob?: Blob } | { error: string },
   ) => void;
 }
 
@@ -1415,7 +1417,11 @@ export default function Home() {
         return;
       }
 
-      const resolvedPath = workspace.resolvePath(detail.file);
+      const resolvedPath = detail.exact
+        ? workspace.resourcePaths().includes(detail.file)
+          ? detail.file
+          : null
+        : workspace.resolvePath(detail.file);
       if (!resolvedPath) {
         detail.respond({
           error: `„${detail.file}“ wurde im geöffneten Ordner nicht gefunden — oder der Name kommt mehrfach vor.`,
@@ -1423,9 +1429,13 @@ export default function Home() {
         return;
       }
 
+      // The file goes along with its URL: "Save image" reads the bytes from it, since the page's
+      // content security policy does not let `fetch` request a blob: URL.
       void workspace
-        .resourceObjectUrl(resolvedPath)
-        .then((url) => detail.respond({ url, revokeOnCleanup: true }))
+        .resourceFile(resolvedPath)
+        .then((file) =>
+          detail.respond({ url: URL.createObjectURL(file), revokeOnCleanup: true, blob: file }),
+        )
         .catch((previewError) =>
           detail.respond({ error: String(previewError) }),
         );

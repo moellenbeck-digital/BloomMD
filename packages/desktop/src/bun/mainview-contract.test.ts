@@ -153,6 +153,9 @@ describe("desktop mainview contract", () => {
     expect(renderer).toContain("await refreshFileList();");
     expect(renderer).toContain("const { markdown } = await serializeMindmap(serializedDoc);");
     expect(renderer).toContain("const result = await saveExport(file.filename, bytesToBase64(file.data)); if (\"error\" in result) throw new Error(result.error);");
+    // "Save image" / "Save diagram" in the enlarged view (#53) take the same route into the Downloads folder.
+    expect(renderer).toContain("const detail = (event as CustomEvent<DeliverExportDetail>).detail; detail.handle(handleDeliverExport(detail.file));");
+    expect(renderer).toContain("window.addEventListener(DELIVER_EXPORT_EVENT, deliver);");
     expect(renderer).toContain("const updatedFiles = await refreshFileList(); if (!navigationStillCurrent()) return;");
     expect(renderer).toContain("const activeSharedMirror = sharedMirrorRef.current;");
     expect(renderer).toContain("activeSharedMirror.mirror.handleLocalMarkdown(markdown)");

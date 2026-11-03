@@ -215,7 +215,7 @@ export function CommandPalette({
       { id: "action-new", category: t.categoryCommands, title: t.newMindmap, subtitle: "Cmd/Ctrl+N", kind: "action", icon: Plus, run: onNew },
       { id: "action-save", category: t.categoryCommands, title: t.save, subtitle: "Cmd/Ctrl+S", kind: "action", icon: Save, run: onSave },
       { id: "action-import", category: t.categoryCommands, title: t.importMd, subtitle: "Cmd/Ctrl+I", kind: "action", icon: Upload, run: onImport },
-      { id: "action-export", category: t.categoryCommands, title: t.exportMd, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
+      { id: "action-export", category: t.categoryCommands, title: t.exportMenu, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
       { id: "action-reload", category: t.categoryCommands, title: t.reload, subtitle: "Cmd/Ctrl+R", kind: "action", icon: RefreshCw, run: onReload },
       ...(onOpenHistory && document
         ? [{ id: "action-history", category: t.categoryCommands, title: t.historyAction, subtitle: document.frontmatter.title, kind: "action" as const, icon: History, run: onOpenHistory }]

@@ -16,6 +16,10 @@
       "import": "./src/sync/SyncProvider.ts",
       "types": "./src/sync/SyncProvider.ts"
     },
+    "./map-export-core": {
+      "import": "./src/export/map-export-core.ts",
+      "types": "./src/export/map-export-core.ts"
+    },
     "./visible-layout": {
       "import": "./src/hooks/visible-layout.ts",
       "types": "./src/hooks/visible-layout.ts"
@@ -29,6 +33,7 @@
     "@bloommd/core": "workspace:*",
     "@bloommd/ink": "workspace:*",
     "dagre": "^0.8.5",
+    "html-to-image": "^1.11.13",
     "lib0": "^0.2.117",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.32"

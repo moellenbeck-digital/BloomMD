@@ -14,6 +14,15 @@ export interface Translations {
   reload: string;
   importMd: string;
   exportMd: string;
+  exportMenu: string;
+  exportMarkdown: string;
+  exportOpml: string;
+  exportPdf: string;
+  exportPng: string;
+  exportSvg: string;
+  exportFailed: string;
+  exportNoMap: string;
+  importOpmlFailed: string;
   shareReadOnlyLink: string;
   documentActions: string;
   fileActions: string;
@@ -519,8 +528,17 @@ export const translations: Record<Locale, Translations> = {
     saved: "Gespeichert",
     saveFailed: "Speichern fehlgeschlagen",
     reload: "Neu laden (von Festplatte)",
-    importMd: "Markdown importieren",
+    importMd: "Markdown oder OPML importieren",
     exportMd: "Markdown exportieren",
+    exportMenu: "Exportieren",
+    exportMarkdown: "Markdown (.md)",
+    exportOpml: "OPML (.opml)",
+    exportPdf: "PDF (.pdf)",
+    exportPng: "PNG (.png)",
+    exportSvg: "SVG (.svg)",
+    exportFailed: "Der Export ist fehlgeschlagen.",
+    exportNoMap: "Die Karte ist nicht sichtbar. Wechsle in die Kartenansicht und exportiere erneut.",
+    importOpmlFailed: "OPML konnte nicht importiert werden:",
     shareReadOnlyLink: "Lese-Links für Kolleg:innen",
     documentActions: "Dokumentaktionen",
     fileActions: "Dateiaktionen",
@@ -1017,8 +1035,17 @@ export const translations: Record<Locale, Translations> = {
     saved: "Saved",
     saveFailed: "Save failed",
     reload: "Reload from disk",
-    importMd: "Import Markdown",
+    importMd: "Import Markdown or OPML",
     exportMd: "Export Markdown",
+    exportMenu: "Export",
+    exportMarkdown: "Markdown (.md)",
+    exportOpml: "OPML (.opml)",
+    exportPdf: "PDF (.pdf)",
+    exportPng: "PNG (.png)",
+    exportSvg: "SVG (.svg)",
+    exportFailed: "The export failed.",
+    exportNoMap: "The map is not visible. Switch to the map view and export again.",
+    importOpmlFailed: "OPML could not be imported:",
     shareReadOnlyLink: "Read-only links for colleagues",
     documentActions: "Document actions",
     fileActions: "File actions",

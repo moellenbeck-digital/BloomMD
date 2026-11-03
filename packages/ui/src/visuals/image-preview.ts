@@ -19,7 +19,12 @@ export interface ResourcePreviewDetail {
    * finds `![[a.png]]`); a Markdown image path is explicit and must not be matched loosely.
    */
   exact?: boolean;
-  respond: (result: { url: string; revokeOnCleanup?: boolean } | { error: string }) => void;
+  /**
+   * `blob` is the file itself, when the shell has it at hand (the web workspace does). "Save image"
+   * then needs no request for the URL, which the page's content security policy would not allow for
+   * `blob:` URLs.
+   */
+  respond: (result: { url: string; revokeOnCleanup?: boolean; blob?: Blob } | { error: string }) => void;
 }
 
 export type ImagePreviewResult =
@@ -28,6 +33,8 @@ export type ImagePreviewResult =
       url: string;
       /** Workspace path of the file, or the URL for remote images; names the file when it is saved. */
       path: string;
+      /** The image file, when the shell handed it over along with the URL. */
+      blob?: Blob;
       /** Frees the object URL the shell created for this preview. */
       release: () => void;
     }
@@ -41,7 +48,7 @@ export interface ImageReference {
 
 const REQUEST_TIMEOUT_MS = 8000;
 
-function requestResource(file: string, exact: boolean, timeoutMs: number): Promise<{ url: string; release: () => void } | { error: string }> {
+function requestResource(file: string, exact: boolean, timeoutMs: number): Promise<{ url: string; blob?: Blob; release: () => void } | { error: string }> {
   return new Promise((resolve) => {
     let settled = false;
     const timeout = window.setTimeout(() => {
@@ -61,7 +68,7 @@ function requestResource(file: string, exact: boolean, timeoutMs: number): Promi
         settled = true;
         window.clearTimeout(timeout);
         if ("error" in result) resolve({ error: result.error });
-        else resolve({ url: result.url, release: () => { if (result.revokeOnCleanup) URL.revokeObjectURL(result.url); } });
+        else resolve({ url: result.url, blob: result.blob, release: () => { if (result.revokeOnCleanup) URL.revokeObjectURL(result.url); } });
       },
     };
     window.dispatchEvent(new CustomEvent<ResourcePreviewDetail>(PREVIEW_RESOURCE_EVENT, { detail }));
@@ -76,7 +83,7 @@ export async function loadImagePreview(notePath: string, reference: ImageReferen
   let message = "";
   for (const candidate of assetPathCandidates(notePath, reference.target, reference.syntax)) {
     const answer = await requestResource(candidate, reference.syntax === "markdown", timeoutMs);
-    if ("url" in answer) return { status: "ready", url: answer.url, path: candidate, release: answer.release };
+    if ("url" in answer) return { status: "ready", url: answer.url, blob: answer.blob, path: candidate, release: answer.release };
     message = answer.error;
   }
   return { status: "unavailable", reason: "not-found", path: resolved.path, message };

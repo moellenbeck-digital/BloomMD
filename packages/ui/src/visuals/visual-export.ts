@@ -106,17 +106,36 @@ function escapeLoneSurrogatesAndPercent(value: string): string {
   return value.replace(/%(?![0-9a-fA-F]{2})/g, "%25");
 }
 
-/** The original bytes of the image behind `url`, named after `path`. Nothing is converted. */
-export async function imageExportFile(url: string, path: string, fetchImage: typeof fetch = fetch): Promise<ExportFile> {
-  const response = await fetchImage(url);
-  if (!response.ok) throw new Error(`The image could not be read (${response.status}).`);
-  const data = new Uint8Array(await response.arrayBuffer());
+/** Where the bytes of an image come from: the file itself if the shell handed it over, else its URL. */
+export interface ImageSource {
+  url: string;
+  blob?: Blob;
+}
+
+/**
+ * Whether "Save image" is offered. Only for files of the workspace: the bytes of an address on the web
+ * (`https:`, `data:`, `blob:`) cannot be requested from the page under its content security policy, and
+ * such an image is not the user's file to save from here.
+ */
+export function canSaveOriginal(path: string): boolean {
+  return !/^(https?:|data:|blob:)/i.test(path);
+}
+
+/** The original bytes of the image, named after `path`. Nothing is converted. */
+export async function imageExportFile(source: ImageSource, path: string, fetchImage: typeof fetch = fetch): Promise<ExportFile> {
+  let data: Uint8Array;
+  let declaredType = "";
+  if (source.blob) {
+    data = new Uint8Array(await source.blob.arrayBuffer());
+    declaredType = source.blob.type;
+  } else {
+    const response = await fetchImage(source.url);
+    if (!response.ok) throw new Error(`The image could not be read (${response.status}).`);
+    data = new Uint8Array(await response.arrayBuffer());
+    declaredType = response.headers.get("content-type") ?? "";
+  }
   const filename = originalImageFilename(path);
-  return {
-    filename,
-    mimeType: imageMimeType(filename) ?? (response.headers.get("content-type") || "application/octet-stream"),
-    data,
-  };
+  return { filename, mimeType: imageMimeType(filename) ?? (declaredType || "application/octet-stream"), data };
 }
 
 /**

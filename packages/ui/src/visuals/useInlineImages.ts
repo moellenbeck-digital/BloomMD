@@ -5,6 +5,7 @@ import { imageProblemText, loadImagePreview, problemImageUrl } from "./image-pre
 
 interface Loaded {
   path: string;
+  blob?: Blob;
   release: () => void;
 }
 
@@ -35,7 +36,7 @@ export function useInlineImagePreview(notePath: string, copy: { notFound: string
       if (cached) return cached;
       const pending = loadImagePreview(notePath, { syntax: "markdown", target: src }).then((result) => {
         if (result.status === "ready") {
-          loaded.current.set(result.url, { path: result.path, release: result.release });
+          loaded.current.set(result.url, { path: result.path, blob: result.blob, release: result.release });
           return result.url;
         }
         // A hint is not cached: the next render looks again, in case the file has appeared meanwhile.
@@ -48,10 +49,13 @@ export function useInlineImagePreview(notePath: string, copy: { notFound: string
     [notePath, copy.notFound, copy.rejected], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  /** Workspace path behind a URL this hook returned, to name the file when the image is saved. */
-  const pathFor = useCallback((url: string) => loaded.current.get(url)?.path ?? null, []);
+  /** Path and file behind a URL this hook returned, to name and save the original image. */
+  const sourceFor = useCallback((url: string) => {
+    const entry = loaded.current.get(url);
+    return entry ? { path: entry.path, source: { url, blob: entry.blob } } : null;
+  }, []);
 
-  return { handler, pathFor };
+  return { handler, sourceFor };
 }
 
 const IMAGE_SELECTOR = "[data-editor-block-type='image'] img";

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { extractImageRefs, type ImageRef } from "@bloommd/core/browser";
 import { ImageOff, Maximize2 } from "lucide-react";
 import { useLocale } from "../i18n/LocaleContext";
-import { deliverExportFile, imageExportFile } from "./visual-export";
+import { canSaveOriginal, deliverExportFile, imageExportFile } from "./visual-export";
 import { imageProblemText, loadImagePreview, type ImagePreviewResult } from "./image-preview";
 import { useVisuals } from "./visuals-context";
 
@@ -47,7 +47,7 @@ function ImageThumb({ imageRef, notePath }: { imageRef: ImageRef; notePath: stri
     );
   }
 
-  const { url, path } = state;
+  const { url, path, blob } = state;
   return (
     <li>
       <button
@@ -62,7 +62,7 @@ function ImageThumb({ imageRef, notePath }: { imageRef: ImageRef; notePath: stri
             kind: "image",
             src: url,
             alt: imageRef.alt || label,
-            actions: [{ id: "image-original", label: t.visualSaveImage, run: async () => deliverExportFile(await imageExportFile(url, path)) }],
+            actions: canSaveOriginal(path) ? [{ id: "image-original", label: t.visualSaveImage, run: async () => deliverExportFile(await imageExportFile({ url, blob }, path)) }] : [],
           })
         }
       >

@@ -127,10 +127,15 @@ export class BrowserWorkspace {
   }
 
   async resourceObjectUrl(path: string): Promise<string> {
+    return URL.createObjectURL(await this.resourceFile(path));
+  }
+
+  /** The file itself, for callers that need its bytes as well as a URL to show it. */
+  async resourceFile(path: string): Promise<File> {
     const resolved = this.resolvePath(path);
     const handle = resolved ? this.resources.get(resolved) : null;
     if (!handle) throw new Error(`File is not part of this workspace: ${path}`);
-    return URL.createObjectURL(await handle.getFile());
+    return handle.getFile();
   }
 
   /**

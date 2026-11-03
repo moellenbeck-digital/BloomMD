@@ -71,7 +71,7 @@ import {
 import { mermaidCodeBlockDescriptor } from "../visuals/MermaidCodeBlock";
 import { NodeImageGallery } from "../visuals/NodeImageGallery";
 import { VisualViewer, type VisualViewerAction } from "../visuals/VisualViewer";
-import { deliverExportFile, imageExportFile } from "../visuals/visual-export";
+import { canSaveOriginal, deliverExportFile, imageExportFile } from "../visuals/visual-export";
 import { useEditorImageZoom, useInlineImagePreview } from "../visuals/useInlineImages";
 import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "../visuals/visuals-context";
 
@@ -202,16 +202,16 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const notePath = document?.filePath ?? "";
   const imageCopy = useMemo(() => ({ notFound: t.visualImageNotFound, rejected: t.visualImagePathRejected }), [t.visualImageNotFound, t.visualImagePathRejected]);
-  const { handler: imagePreviewHandler, pathFor: imagePathFor } = useInlineImagePreview(notePath, imageCopy);
+  const { handler: imagePreviewHandler, sourceFor: imageSourceFor } = useInlineImagePreview(notePath, imageCopy);
   const openEditorImage = useCallback(
     (image: { src: string; alt: string }) => {
-      const path = imagePathFor(image.src);
-      const actions: VisualViewerAction[] = path
-        ? [{ id: "image-original", label: t.visualSaveImage, run: async () => deliverExportFile(await imageExportFile(image.src, path)) }]
+      const original = imageSourceFor(image.src);
+      const actions: VisualViewerAction[] = original && canSaveOriginal(original.path)
+        ? [{ id: "image-original", label: t.visualSaveImage, run: async () => deliverExportFile(await imageExportFile(original.source, original.path)) }]
         : [];
       setViewer({ kind: "image", src: image.src, alt: image.alt, actions });
     },
-    [imagePathFor, t.visualSaveImage],
+    [imageSourceFor, t.visualSaveImage],
   );
   useEditorImageZoom(editorContainerRef, openEditorImage, t.visualEnlarge);
 

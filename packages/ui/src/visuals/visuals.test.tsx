@@ -330,9 +330,10 @@ describe("display only: preview and enlarged view never change the note", () => 
       const detail = (event as CustomEvent<DeliverExportDetail>).detail;
       detail.handle(Promise.resolve().then(() => void delivered.push(detail.file.filename)));
     });
-    on(PREVIEW_RESOURCE_EVENT, (event) => (event as CustomEvent<ResourcePreviewDetail>).detail.respond({ url: "blob:strand" }));
+    // Like the web workspace: the answer carries the file itself, so saving never has to fetch a blob: URL.
+    on(PREVIEW_RESOURCE_EVENT, (event) => (event as CustomEvent<ResourcePreviewDetail>).detail.respond({ url: "blob:strand", blob: new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: "image/png" }) }));
     const realFetch = globalThis.fetch;
-    globalThis.fetch = (async () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), { status: 200 })) as unknown as typeof fetch;
+    globalThis.fetch = (async () => { throw new Error("blob: URLs must not be fetched"); }) as unknown as typeof fetch;
     cleanups.push(() => { globalThis.fetch = realFetch; });
 
     let request: ViewerRequest | null = null;

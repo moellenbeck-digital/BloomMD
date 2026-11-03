@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
-import { DELIVER_EXPORT_EVENT, deliverExportFile, diagramExportFile, imageExportFile, originalImageFilename, parseSvgSize, pngSize, standaloneSvg, type DeliverExportDetail } from "./visual-export";
+import { canSaveOriginal, DELIVER_EXPORT_EVENT, deliverExportFile, diagramExportFile, imageExportFile, originalImageFilename, parseSvgSize, pngSize, standaloneSvg, type DeliverExportDetail } from "./visual-export";
 
 const MERMAID_SVG = '<svg id="m1" width="100%" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120.5 80" style="max-width: 120.5px;" role="graphics-document document"><g><text>A</text></g></svg>';
 
@@ -48,20 +48,35 @@ describe("original image files", () => {
   const fakeFetch = (async () => new Response(png, { status: 200, headers: { "content-type": "image/png" } })) as unknown as typeof fetch;
 
   test("saves the original bytes under the original file name", async () => {
-    const file = await imageExportFile("blob:https://bloommd.test/1", "Reisen/Bilder/Strand am Meer.png", fakeFetch);
+    const file = await imageExportFile({ url: "blob:https://bloommd.test/1" }, "Reisen/Bilder/Strand am Meer.png", fakeFetch);
     expect(file.filename).toBe("Strand am Meer.png");
     expect(file.mimeType).toBe("image/png");
     expect(Array.from(file.data)).toEqual(Array.from(png));
   });
 
   test("takes the MIME type from the extension, not from what the server claims", async () => {
-    const jpeg = await imageExportFile("blob:x", "a/foto.JPG", fakeFetch);
+    const jpeg = await imageExportFile({ url: "blob:x" }, "a/foto.JPG", fakeFetch);
     expect(jpeg.mimeType).toBe("image/jpeg");
+  });
+
+  test("with the file at hand nothing is requested by URL (the page's content security policy forbids it for blob: URLs)", async () => {
+    const neverFetch = (async () => { throw new Error("fetch must not be used"); }) as unknown as typeof fetch;
+    const blob = new Blob([png], { type: "application/x-whatever" });
+    const file = await imageExportFile({ url: "blob:x", blob }, "bilder/Strand.webp", neverFetch);
+    expect(file.filename).toBe("Strand.webp");
+    expect(file.mimeType).toBe("image/webp");
+    expect(Array.from(file.data)).toEqual(Array.from(png));
+  });
+
+  test("only files of the workspace can be saved, not addresses on the web", () => {
+    expect(canSaveOriginal("Reisen/Bilder/Strand.png")).toBe(true);
+    expect(canSaveOriginal("/home/anna/bloommd/a.png")).toBe(true);
+    for (const address of ["https://example.com/a.png", "HTTP://example.com/a.png", "data:image/png;base64,AAAA", "blob:https://x/1"]) expect(canSaveOriginal(address)).toBe(false);
   });
 
   test("a failed read is an error, not an empty file", async () => {
     const failing = (async () => new Response("", { status: 404 })) as unknown as typeof fetch;
-    await expect(imageExportFile("blob:x", "a.png", failing)).rejects.toThrow("404");
+    await expect(imageExportFile({ url: "blob:x" }, "a.png", failing)).rejects.toThrow("404");
   });
 
   test("file names are plain names: no folders, query, traversal or percent escapes", () => {

@@ -3,7 +3,7 @@
  * typically an Obsidian vault in iCloud Drive. Both are edited in place as plain Markdown.
  */
 import type { BloomFolderPlugin, FolderFile } from "@bloommd/capacitor-folder";
-import { parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { conflictCopyPath, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import type { MindMapDocument, MindMapFrontmatter } from "@bloommd/core/browser";
 import { deleteMindmap, listMindmaps, readMindmap, writeMindmap } from "./storage";
 
@@ -55,11 +55,8 @@ function errorCode(error: unknown): string | undefined {
   return (error as { code?: string } | null)?.code;
 }
 
-/** "Ordner/Physik.md" → "Ordner/Physik (iPad-Konflikt).md", then "… (iPad-Konflikt 2).md", … */
-export function copyPath(path: string, label: string, attempt: number): string {
-  const match = /^(.*?)(\.(?:md|markdown))?$/i.exec(path)!;
-  return `${match[1]} (${label}${attempt > 1 ? ` ${attempt}` : ""})${match[2] ?? ".md"}`;
-}
+/** The naming scheme of conflict copies lives in core (`conflictCopyPath`), where every list reads it back. */
+export const copyPath = conflictCopyPath;
 
 /** The copy is a note of its own: same content, its own id and file. */
 function copyOf(document: MindMapDocument, path: string): MindMapDocument {

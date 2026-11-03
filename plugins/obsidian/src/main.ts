@@ -60,6 +60,8 @@ import { migratePersistedPathState } from "./path-migration";
 import { LEARNING_FOLDER, emptyLearningFile, learningFilePath, learningKey, normalizeLearningSettings, rateEntry, type LearningFile, type LearningSettings } from "./learning";
 import { LearningStore } from "./learning-store";
 import { DEFAULT_TEMPLATE_FOLDER, noteNameProblem, planNoteFromTemplate, templateChoices } from "./template-note";
+import { OpmlError } from "./opml";
+import { planOpmlNote } from "./opml-note";
 import type { NoteTemplate } from "./note-templates";
 import { STUDY_ORDERS } from "./learning-panel";
 import { AgentHub, confirmAction } from "./agent-view";
@@ -853,6 +855,7 @@ class BloomMDView extends ItemView {
         pickNote: () => pickNote(this.app, sourceFile?.path ?? ""),
         // Bound to this note: a drawing still saving after the view switched notes stays with its own note.
         saveMapInk: (path, svg, expectedSvg, conflictOf) => sourceFile ? this.saveMapInk(sourceFile, path, svg, expectedSvg, conflictOf) : Promise.resolve(null),
+        readNote: () => (sourceFile ? this.app.vault.cachedRead(sourceFile) : Promise.resolve(null)),
         saveExport: async (extension, data) => {
           if (!sourceFile) return null;
           try {
@@ -1005,6 +1008,7 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
     this.addCommand({ id: "navigator-forward", name: "Navigator: go forward", checkCallback: (checking) => this.navigatorHistoryStep(1, checking) });
     this.addCommand({ id: "share-current-note", name: "Share current note with workspace", callback: () => void this.shareCurrentNote() });
     this.addCommand({ id: "new-note-from-template", name: "New note from template", callback: () => void this.newNoteFromTemplate() });
+    this.addCommand({ id: "import-opml", name: "Import OPML", callback: () => this.importOpml() });
     this.addCommand({ id: "unshare-current-note", name: "Stop sharing current note with workspace", callback: () => void this.unshareCurrentNote() });
 
     this.registerEvent(this.app.vault.on("modify", (file) => {
@@ -1191,6 +1195,36 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
       new NewFromTemplateModal(this.app, templates, folder, (template, name) => this.createNoteFromTemplate(folder, name, template)).open();
     } catch (error) {
       new Notice(`BloomMD: ${error instanceof Error ? error.message : "The templates could not be loaded."}`);
+    }
+  }
+
+  /** Asks for an OPML file (MindNode, Xmind, …) and turns it into a new note next to the active one. */
+  importOpml() {
+    const input = createEl("input", { type: "file" });
+    input.accept = ".opml,.xml,text/x-opml+xml,text/xml";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (file) void this.createNoteFromOpml(file);
+    });
+    input.click();
+  }
+
+  private async createNoteFromOpml(file: File): Promise<void> {
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("The file is larger than 10 MB and was not imported.");
+      const folder = this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? "").path;
+      const plan = planOpmlNote({
+        folder,
+        fileName: file.name,
+        xml: await file.text(),
+        exists: (path) => this.app.vault.getAbstractFileByPath(path) !== null,
+      });
+      const created = await this.app.vault.create(plan.path, plan.content);
+      await this.app.workspace.getLeaf(false).openFile(created);
+      new Notice(`BloomMD: Imported ${file.name} as ${created.path}`);
+    } catch (error) {
+      console.error("BloomMD: OPML import failed", error);
+      new Notice(error instanceof OpmlError ? `BloomMD: The OPML file could not be imported. ${error.message}` : `BloomMD: ${error instanceof Error ? error.message : "The OPML file could not be imported."}`);
     }
   }
 

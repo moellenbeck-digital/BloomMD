@@ -57,3 +57,21 @@ describe("composeMapSvg", () => {
     expect(() => composeMapSvg({ width: 1, height: 1, background: "#fff", view: { x: 0, y: 0, scale: 1 }, edges: [], nodesSvg: "<svg/>" })).toThrow();
   });
 });
+
+describe("composeMapSvg overlay", () => {
+  test("paints overlay paths (handwriting) above the nodes in flow coordinates", () => {
+    const svg = composeMapSvg({
+      width: 100,
+      height: 100,
+      background: "#fff",
+      view: { x: 4, y: 8, scale: 1.5 },
+      edges: [],
+      nodesSvg: `<svg><foreignObject width="100%" height="100%"></foreignObject></svg>`,
+      overlay: [{ d: "M0 0L1 1", fill: "#000", opacity: 0.5 }, { d: "M2 2L3 3", fill: "#f00" }],
+    });
+    expect(svg.indexOf("</foreignObject>")).toBeLessThan(svg.indexOf('<path d="M0 0L1 1"'));
+    expect(svg).toContain('<path d="M0 0L1 1" fill="#000" fill-opacity="0.5"/>');
+    expect(svg).toContain('<path d="M2 2L3 3" fill="#f00"/>');
+    expect((svg.match(/<g transform="translate\(4 8\) scale\(1.5\)"/g) ?? []).length).toBe(2);
+  });
+});

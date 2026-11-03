@@ -114,6 +114,13 @@ export interface MapExportEdge {
   lineCap?: string;
 }
 
+/** A filled path painted above the nodes, such as handwriting on the map. */
+export interface MapExportOverlayPath {
+  d: string;
+  fill: string;
+  opacity?: number;
+}
+
 export interface MapExportView {
   /** Pixel offset and scale that move flow coordinates into the exported image. */
   x: number;
@@ -147,6 +154,7 @@ export function composeMapSvg(options: {
   edges: readonly MapExportEdge[];
   /** SVG markup produced by html-to-image `toSvg` for the nodes layer. */
   nodesSvg: string;
+  overlay?: readonly MapExportOverlayPath[];
 }): string {
   const { width, height, background, view, edges, nodesSvg } = options;
   const start = nodesSvg.indexOf("<foreignObject");
@@ -168,6 +176,11 @@ export function composeMapSvg(options: {
     `<rect width="100%" height="100%" fill="${escapeAttribute(background)}"/>`,
     `<g transform="translate(${numberAttribute(view.x)} ${numberAttribute(view.y)}) scale(${numberAttribute(view.scale)})" fill="none">${paths}</g>`,
     nodes,
+    ...(options.overlay && options.overlay.length > 0
+      ? [`<g transform="translate(${numberAttribute(view.x)} ${numberAttribute(view.y)}) scale(${numberAttribute(view.scale)})">${options.overlay
+          .map((path) => `<path d="${escapeAttribute(path.d)}" fill="${escapeAttribute(path.fill)}"${path.opacity !== undefined && path.opacity !== 1 ? ` fill-opacity="${numberAttribute(path.opacity)}"` : ""}/>`)
+          .join("")}</g>`]
+      : []),
     `</svg>`,
     ``,
   ].join("\n");

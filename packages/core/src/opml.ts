@@ -67,21 +67,25 @@ function escapeXml(value: string, attribute: boolean): string {
   return escaped;
 }
 
-/**
- * Serializes a map as OPML 2.0. Every top-level heading becomes an `<outline text=…>`, nested
- * headings become nested outlines, and the node's Markdown content goes into `_note` (the attribute
- * MindNode and Xmind read). The map title is the `<head><title>`.
- */
-export function exportOpml(doc: MindMapDocument): string {
-  const lines: string[] = [];
-  const visited = new Set<string>();
+/** One outline of an OPML export: a heading with its note and nested outlines. */
+export interface OpmlOutlineNode {
+  text: string;
+  /** Markdown content of the node; written to `_note`. */
+  note?: string;
+  children?: readonly OpmlOutlineNode[];
+}
 
-  const writeNode = (node: MindMapNode, indent: string) => {
-    if (visited.has(node.id)) return;
-    visited.add(node.id);
-    const attributes = [`text="${escapeXml(node.title, true)}"`];
-    if (node.content.trim()) attributes.push(`_note="${escapeXml(node.content, true)}"`);
-    const children = node.children.map((id) => doc.nodes.get(id)).filter((child): child is MindMapNode => Boolean(child));
+/**
+ * Serializes outlines as OPML 2.0 under the given map title. Used directly by hosts that have the
+ * heading tree but no {@link MindMapDocument} (the Obsidian plugin).
+ */
+export function exportOpmlOutline(title: string, roots: readonly OpmlOutlineNode[]): string {
+  const lines: string[] = [];
+
+  const writeNode = (node: OpmlOutlineNode, indent: string) => {
+    const attributes = [`text="${escapeXml(node.text, true)}"`];
+    if (node.note?.trim()) attributes.push(`_note="${escapeXml(node.note, true)}"`);
+    const children = node.children ?? [];
     if (children.length === 0) {
       lines.push(`${indent}<outline ${attributes.join(" ")}/>`);
       return;
@@ -91,15 +95,13 @@ export function exportOpml(doc: MindMapDocument): string {
     lines.push(`${indent}</outline>`);
   };
 
-  const roots = Array.from(doc.nodes.values()).filter((node) => node.parentId === null);
   for (const root of roots) writeNode(root, "    ");
 
-  const title = doc.frontmatter.title || roots[0]?.title || "Untitled";
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<opml version="2.0">`,
     `  <head>`,
-    `    <title>${escapeXml(title, false)}</title>`,
+    `    <title>${escapeXml(title || roots[0]?.text || "Untitled", false)}</title>`,
     `  </head>`,
     `  <body>`,
     ...lines,
@@ -107,6 +109,25 @@ export function exportOpml(doc: MindMapDocument): string {
     `</opml>`,
     ``,
   ].join("\n");
+}
+
+/**
+ * Serializes a map as OPML 2.0. Every top-level heading becomes an `<outline text=…>`, nested
+ * headings become nested outlines, and the node's Markdown content goes into `_note` (the attribute
+ * MindNode and Xmind read). The map title is the `<head><title>`.
+ */
+export function exportOpml(doc: MindMapDocument): string {
+  const visited = new Set<string>();
+  const toOutline = (node: MindMapNode): OpmlOutlineNode => {
+    visited.add(node.id);
+    const children = node.children
+      .map((id) => doc.nodes.get(id))
+      .filter((child): child is MindMapNode => Boolean(child) && !visited.has(child!.id))
+      .map(toOutline);
+    return { text: node.title, note: node.content, children };
+  };
+  const roots = Array.from(doc.nodes.values()).filter((node) => node.parentId === null && !visited.has(node.id)).map(toOutline);
+  return exportOpmlOutline(doc.frontmatter.title, roots);
 }
 
 // ---------------------------------------------------------------------------------------------

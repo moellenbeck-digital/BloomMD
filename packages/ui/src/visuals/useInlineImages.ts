@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
 interface Loaded {
-  path: string;
-  blob?: Blob;
   release: () => void;
 }
 
@@ -37,7 +35,7 @@ export function useInlineImagePreview(notePath: string, copy: { notFound: string
       const pending = import("./image-preview").then(async ({ imageProblemText, loadImagePreview, problemImageUrl }) => {
         const result = await loadImagePreview(notePath, { syntax: "markdown", target: src });
         if (result.status === "ready") {
-          loaded.current.set(result.url, { path: result.path, blob: result.blob, release: result.release });
+          loaded.current.set(result.url, { release: result.release });
           return result.url;
         }
         // A hint is not cached: the next render looks again, in case the file has appeared meanwhile.
@@ -50,70 +48,5 @@ export function useInlineImagePreview(notePath: string, copy: { notFound: string
     [notePath, copy.notFound, copy.rejected], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  /** Path and file behind a URL this hook returned, to name and save the original image. */
-  const sourceFor = useCallback((url: string) => {
-    const entry = loaded.current.get(url);
-    return entry ? { path: entry.path, source: { url, blob: entry.blob } } : null;
-  }, []);
-
-  return { handler, sourceFor };
-}
-
-const IMAGE_SELECTOR = "[data-editor-block-type='image'] img";
-
-/**
- * Lets the images in the editor be enlarged: double-click, or Enter/Space on a focused image. The
- * rich-text editor does not make its images focusable, so they are marked up here (role, label,
- * tab stop); the single click stays with the editor, where it selects the image.
- */
-export function useEditorImageZoom(
-  root: HTMLElement | null,
-  onOpen: (image: { src: string; alt: string }) => void,
-  label: string,
-) {
-  const onOpenRef = useRef(onOpen);
-  onOpenRef.current = onOpen;
-
-  // `root` is the element itself, not a ref: the editor panel mounts after this hook first runs (there is
-  // no panel until a node is selected), and the effect has to run again once it is there.
-  useEffect(() => {
-    if (!root) return;
-
-    const mark = () => {
-      for (const image of root.querySelectorAll<HTMLImageElement>(IMAGE_SELECTOR)) {
-        // Only child-list changes are observed, so setting attributes here cannot retrigger this.
-        image.tabIndex = 0;
-        image.setAttribute("role", "button");
-        image.setAttribute("aria-label", image.alt ? `${label}: ${image.alt}` : label);
-      }
-    };
-    mark();
-    const observer = typeof window.MutationObserver === "function" ? new window.MutationObserver(mark) : null;
-    observer?.observe(root, { childList: true, subtree: true });
-
-    const open = (target: EventTarget | null) => {
-      const image = (target as HTMLElement | null)?.closest?.(IMAGE_SELECTOR) as HTMLImageElement | null;
-      if (!image?.src) return false;
-      onOpenRef.current({ src: image.src, alt: image.alt });
-      return true;
-    };
-    const onDoubleClick = (event: MouseEvent) => {
-      if (open(event.target)) event.preventDefault();
-    };
-    // Capture phase: the editor must not also act on the same Enter or Space.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.key !== "Enter" && event.key !== " ") || event.ctrlKey || event.metaKey || event.altKey) return;
-      if ((event.target as HTMLElement | null)?.matches?.(IMAGE_SELECTOR) && open(event.target)) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    root.addEventListener("dblclick", onDoubleClick);
-    root.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      observer?.disconnect();
-      root.removeEventListener("dblclick", onDoubleClick);
-      root.removeEventListener("keydown", onKeyDown, true);
-    };
-  }, [root, label]);
+  return { handler };
 }

@@ -17,8 +17,8 @@ describe("node editor keeps the visuals out of its chunk", () => {
       .filter((match) => !match[1])
       .map((match) => match[2])
       .sort();
-    // `useInlineImages`, `visuals-context` and `save-policy` are tiny; `lazy` holds the lazy() wrappers.
-    expect(statics).toEqual(["lazy", "save-policy", "useInlineImages", "visuals-context"]);
+    // `useInlineImages` and `visuals-context` are tiny; `lazy` holds the lazy() wrappers.
+    expect(statics).toEqual(["lazy", "useInlineImages", "visuals-context"]);
   });
 
   test("the lazy wrappers and the hooks load the heavy modules on demand", async () => {

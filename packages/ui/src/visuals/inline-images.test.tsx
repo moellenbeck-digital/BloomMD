@@ -21,9 +21,9 @@ function installDom() {
 installDom();
 
 const React = await import("react");
-const { act, useState } = React;
+const { act } = React;
 const { createRoot } = await import("react-dom/client");
-const { useEditorImageZoom, useInlineImagePreview } = await import("./useInlineImages");
+const { useInlineImagePreview } = await import("./useInlineImages");
 const { PREVIEW_RESOURCE_EVENT } = await import("./image-preview");
 type ResourcePreviewDetail = import("./image-preview").ResourcePreviewDetail;
 
@@ -52,63 +52,9 @@ afterEach(() => {
   actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
 });
 
-const key = (name: string, target: Element) =>
-  act(async () => {
-    target.dispatchEvent(new win.KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }) as unknown as Event);
-  });
-
-describe("zooming the images of the editor", () => {
-  function Harness({ show, onOpen }: { show: boolean; onOpen: (image: { src: string; alt: string }) => void }) {
-    const [element, setElement] = useState<HTMLDivElement | null>(null);
-    useEditorImageZoom(element, onOpen, "Vergrößern");
-    return show ? (
-      <div ref={setElement} data-testid="panel">
-        <p data-testid="text">Text</p>
-        <div data-editor-block-type="image">
-          <img src="blob:strand" alt="Strand" />
-        </div>
-      </div>
-    ) : null;
-  }
-
-  test("works although the panel mounts after the hook first ran (no node selected yet)", async () => {
-    const opened: Array<{ src: string; alt: string }> = [];
-    await act(async () => { root!.render(<Harness show={false} onOpen={(image) => opened.push(image)} />); });
-    await act(async () => { root!.render(<Harness show onOpen={(image) => opened.push(image)} />); });
-    const image = container.querySelector("img")!;
-
-    await act(async () => { image.dispatchEvent(new win.Event("dblclick", { bubbles: true, cancelable: true }) as unknown as Event); });
-    expect(opened).toEqual([{ src: "blob:strand", alt: "Strand" }]);
-  });
-
-  test("makes the image a focusable, labelled button and opens it with Enter or Space, nothing else", async () => {
-    const opened: string[] = [];
-    await act(async () => { root!.render(<Harness show onOpen={(image) => opened.push(image.src)} />); });
-    const image = container.querySelector("img")!;
-    expect(image.tabIndex).toBe(0);
-    expect(image.getAttribute("role")).toBe("button");
-    expect(image.getAttribute("aria-label")).toBe("Vergrößern: Strand");
-
-    await key("Enter", image);
-    await key(" ", image);
-    expect(opened).toEqual(["blob:strand", "blob:strand"]);
-    await key("a", image);
-    await key("Enter", container.querySelector("[data-testid='text']")!);
-    expect(opened).toHaveLength(2);
-  });
-
-  test("a single click leaves the image to the editor", async () => {
-    const opened: string[] = [];
-    await act(async () => { root!.render(<Harness show onOpen={(image) => opened.push(image.src)} />); });
-    await act(async () => { container.querySelector("img")!.click(); });
-    expect(opened).toEqual([]);
-  });
-});
-
 describe("previews for the images of the editor", () => {
   interface Api {
     handler: (src: string) => Promise<string>;
-    sourceFor: (url: string) => { path: string; source: { url: string; blob?: Blob } } | null;
   }
 
   function Probe({ notePath, api }: { notePath: string; api: { current: Api | null } }) {
@@ -124,13 +70,13 @@ describe("previews for the images of the editor", () => {
     on(PREVIEW_RESOURCE_EVENT, (event) => {
       const detail = (event as CustomEvent<ResourcePreviewDetail>).detail;
       asked.push(detail.file);
-      if (files.includes(detail.file)) detail.respond({ url: `blob:${detail.file}`, revokeOnCleanup: true, blob: new Blob(["x"], { type: "image/png" }) });
+      if (files.includes(detail.file)) detail.respond({ url: `blob:${detail.file}`, revokeOnCleanup: true });
       else detail.respond({ error: "nicht gefunden" });
     });
     return revoked;
   }
 
-  test("resolves relative to the note, remembers where the file came from and loads each path once", async () => {
+  test("resolves relative to the note and loads each path once", async () => {
     const asked: string[] = [];
     shell(["notes/Bilder/Strand am Meer.png"], asked);
     const api: { current: Api | null } = { current: null };
@@ -140,10 +86,6 @@ describe("previews for the images of the editor", () => {
     expect(url).toBe("blob:notes/Bilder/Strand am Meer.png");
     await api.current!.handler("Bilder/Strand%20am%20Meer.png");
     expect(asked).toEqual(["notes/Bilder/Strand am Meer.png"]);
-    const original = api.current!.sourceFor(url)!;
-    expect(original.path).toBe("notes/Bilder/Strand am Meer.png");
-    expect(original.source.blob?.size).toBe(1);
-    expect(api.current!.sourceFor("blob:unknown")).toBeNull();
   });
 
   test("a missing or forbidden path becomes an image that names the path, and is looked up again next time", async () => {

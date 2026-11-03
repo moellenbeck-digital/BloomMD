@@ -35,7 +35,7 @@ Datei exportiert; öffne dafür eine Datei.
 
 ## Bilder und Diagramme speichern
 
-Bilder und Mermaid-Diagramme in einem Knoten lassen sich vergrößern: Klick auf das Diagramm, Klick auf eine Vorschau unter „Bilder in diesem Knoten“, Doppelklick auf ein Bild im Editor oder Enter bzw. Leertaste auf einem fokussierten Bild öffnen die Großansicht (Zoom mit +/−, Mausrad oder den Knöpfen, 0 setzt zurück, Ziehen oder Pfeiltasten verschieben, Esc schließt). Dort stehen die Speichern-Aktionen:
+Bilder und Mermaid-Diagramme in einem Knoten lassen sich vergrößern: Klick (oder Enter) auf das Diagramm und Klick (oder Enter) auf eine Vorschau unter „Bilder in diesem Knoten“ öffnen die Großansicht (Zoom mit +/−, Mausrad oder den Knöpfen, 0 setzt zurück, Ziehen oder Pfeiltasten verschieben, Esc schließt). Dort stehen die Speichern-Aktionen:
 
 | Aktion | Ergebnis |
 | --- | --- |

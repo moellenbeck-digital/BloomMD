@@ -35,7 +35,7 @@ for that.
 
 ## Saving images and diagrams
 
-Images and Mermaid diagrams in a node can be enlarged: click the diagram, click a preview under "Images in this node", double-click an image in the editor, or press Enter or Space on a focused image to open the enlarged view (zoom with +/−, the mouse wheel or the buttons, 0 resets, drag or the arrow keys pan, Esc closes). The save actions are there:
+Images and Mermaid diagrams in a node can be enlarged: click (or press Enter on) the diagram, or a preview under "Images in this node", to open the enlarged view (zoom with +/−, the mouse wheel or the buttons, 0 resets, drag or the arrow keys pan, Esc closes). The save actions are there:
 
 | Action | Result |
 | --- | --- |

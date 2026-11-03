@@ -27,7 +27,7 @@ import {
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
 import type { MindMapDocument, MindMapListEntry, NoteRevision, SharedDocumentBinding } from "@bloommd/core/browser";
-import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
+import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
   chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
@@ -1768,6 +1768,8 @@ export function App() {
   const activeDocumentFilename = files.find((entry) => fileEntryIsActive(entry, document))?.filename
     ?? activeLocalFilename
     ?? null;
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && activeDocumentFilename && !isWorkspaceMindMap(document) && parseConflictCopy(activeDocumentFilename));
   const canForwardToFile = Boolean(
     document &&
     isWorkspaceMindMap(document) &&
@@ -2202,15 +2204,15 @@ export function App() {
         )}
 
         {/* Canvas + Editor */}
-        <div className="flex h-full min-w-0 flex-1 flex-col">
-          {document && activeDocumentFilename && !isWorkspaceMindMap(document) && (
+        <div className={`flex-1 h-full ${showConflictBanner ? "flex min-w-0 flex-col" : ""}`}>
+          {showConflictBanner && document && activeDocumentFilename && (
             <ConflictCopyBanner
               filename={activeDocumentFilename}
               originalFilename={findConflictCopyOriginal(activeDocumentFilename, files)}
               onOpenOriginal={(filename) => void loadFile(filename)}
             />
           )}
-          <div className="min-h-0 flex-1">
+          <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {document ? (
             <MindMapCanvas onlyRenderVisibleElements onRootRename={handleRootRename} />
           ) : (

@@ -1510,6 +1510,12 @@ export default function Home() {
   const historyAvailable = Boolean(
     document && !isWorkspaceMindMap(document) && !localWorkspaceActive,
   );
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(
+    mapView === "document" &&
+      conflictCopyOriginal &&
+      conflictCopyOriginal.filename === currentFileRef.current,
+  );
 
   const historyUrl = useCallback(() => {
     const current = useMindMapStore.getState().document;
@@ -2967,17 +2973,15 @@ export default function Home() {
 
       {/* Main area */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex h-full min-w-0 flex-1 flex-col">
-          {mapView === "document" &&
-            conflictCopyOriginal &&
-            conflictCopyOriginal.filename === currentFileRef.current && (
-              <ConflictCopyBanner
-                filename={conflictCopyOriginal.filename}
-                originalFilename={conflictCopyOriginal.original}
-                onOpenOriginal={(original) => void openMindmap(original)}
-              />
-            )}
-          <div className="min-h-0 flex-1">
+        <div className={`flex-1 h-full ${showConflictBanner ? "flex min-w-0 flex-col" : ""}`}>
+          {showConflictBanner && conflictCopyOriginal && (
+            <ConflictCopyBanner
+              filename={conflictCopyOriginal.filename}
+              originalFilename={conflictCopyOriginal.original}
+              onOpenOriginal={(original) => void openMindmap(original)}
+            />
+          )}
+          <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {mapView === "workspace" ? (
             <div className="relative h-full w-full">
               {workspaceMapError && (

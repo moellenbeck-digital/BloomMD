@@ -11,7 +11,7 @@ import {
   useMindMapStore,
   useLocale,
 } from "@bloommd/ui";
-import { findConflictCopyOriginal, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { findConflictCopyOriginal, parseConflictCopy, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import { BloomFolder } from "@bloommd/capacitor-folder";
 import { BloomKeychain } from "@bloommd/capacitor-keychain";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -548,6 +548,9 @@ export function App() {
     return store.kind === "folder" ? folderInkAttachments(BloomFolder, { pickNote, openNote }) : appInkAttachments({ pickNote, openNote });
   }, [files, loadFile, remoteClient, store]);
 
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && parseConflictCopy(document.filePath));
+
   const visibleFiles = filter.trim()
     ? files.filter((entry) => `${entry.folder}/${entry.title}`.toLowerCase().includes(filter.trim().toLowerCase()))
     : files;
@@ -725,15 +728,15 @@ export function App() {
 
       {/* Canvas */}
       <div className="flex-1 min-h-0 relative lg:flex">
-        <div className="relative flex h-full min-w-0 flex-col lg:flex-1">
-        {document && (
+        <div className={`relative h-full min-w-0 lg:flex-1 ${showConflictBanner ? "flex flex-col" : ""}`}>
+        {document && showConflictBanner && (
           <ConflictCopyBanner
             filename={document.filePath}
             originalFilename={findConflictCopyOriginal(document.filePath, files.map((entry) => ({ filename: entry.path })))}
             onOpenOriginal={(path) => void loadFile(path).catch(() => undefined)}
           />
         )}
-        <div className="relative min-h-0 flex-1">
+        <div className={showConflictBanner ? "relative min-h-0 flex-1" : "relative h-full"}>
         {document ? <MindMapCanvas /> : (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>

@@ -41,6 +41,7 @@ mock.module("@mdxeditor/editor", () => {
     InsertTable: nothing,
     InsertCodeBlock: nothing,
     InsertImage: nothing,
+    useCodeBlockEditorContext: () => ({ setCode: () => {} }),
   };
 });
 

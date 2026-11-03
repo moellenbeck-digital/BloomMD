@@ -75,9 +75,11 @@ describe("original image files", () => {
 
 describe("delivery", () => {
   let win: Window;
-  const globalsBefore = { window: globalThis.window, document: globalThis.document, CustomEvent: globalThis.CustomEvent };
+  let globalsBefore: Record<string, unknown> = {};
 
   beforeEach(() => {
+    // What this test file finds is restored afterwards; other files in the same run install their own DOM.
+    globalsBefore = { window: globalThis.window, document: globalThis.document, CustomEvent: globalThis.CustomEvent };
     win = new Window({ url: "https://bloommd.test/app" });
     globalThis.window = win as unknown as Window & typeof globalThis.window;
     globalThis.document = win.document as unknown as Document;

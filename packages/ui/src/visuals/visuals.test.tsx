@@ -59,7 +59,20 @@ function on(type: string, listener: (event: Event) => void) {
   cleanups.push(() => win.removeEventListener(type, listener as EventListener));
 }
 
+function installDom() {
+  globalThis.window = win as unknown as Window & typeof globalThis.window;
+  globalThis.document = win.document as unknown as Document;
+  globalThis.navigator = win.navigator as unknown as Navigator;
+  globalThis.HTMLElement = win.HTMLElement as unknown as typeof HTMLElement;
+  globalThis.KeyboardEvent = win.KeyboardEvent as unknown as typeof KeyboardEvent;
+  globalThis.localStorage = win.localStorage as unknown as Storage;
+  globalThis.Event = win.Event as unknown as typeof Event;
+  globalThis.CustomEvent = win.CustomEvent as unknown as typeof CustomEvent;
+}
+
 beforeEach(() => {
+  // Other test files in the same run put their own DOM back or away; this file's tests need theirs.
+  installDom();
   actEnvironment.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -157,9 +170,16 @@ describe("Mermaid block", () => {
     await act(async () => { query<HTMLButtonElement>("mermaid-edit")!.click(); });
     const source = query<HTMLTextAreaElement>("mermaid-source")!;
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, "value")!.set!;
+      // React DOM decides at import time whether `input` events exist. When another test file loaded it
+      // before any DOM did, it ignores them but still notices a changed value on `keyup`, so both are sent.
+      // The value is written through the prototype setter, which is what a keystroke does and what React's
+      // own value tracking cannot see.
+      // Without `input` events React only watches the field that has just been focused.
+      source.focus();
+      source.dispatchEvent(new win.Event("focusin", { bubbles: true }) as unknown as Event);
+      const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(source), "value")!.set!;
       setter.call(source, `${VALID}\n  B --> C`);
-      source.dispatchEvent(new win.Event("input", { bubbles: true }) as unknown as Event);
+      for (const type of ["input", "keyup"]) source.dispatchEvent(new win.Event(type, { bubbles: true }) as unknown as Event);
     });
     expect(changes).toEqual([`${VALID}\n  B --> C`]);
   });

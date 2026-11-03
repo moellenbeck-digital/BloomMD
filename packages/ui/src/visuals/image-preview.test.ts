@@ -4,7 +4,7 @@ import { imageProblemText, loadImagePreview, PREVIEW_RESOURCE_EVENT, problemImag
 
 describe("loadImagePreview", () => {
   let win: Window;
-  const globalsBefore = { window: globalThis.window, CustomEvent: globalThis.CustomEvent };
+  let globalsBefore: Record<string, unknown> = {};
   let requested: string[];
   let revoked: string[];
   const originalRevoke = URL.revokeObjectURL;
@@ -20,6 +20,8 @@ describe("loadImagePreview", () => {
   }
 
   beforeEach(() => {
+    // What this test file finds is restored afterwards; other files in the same run install their own DOM.
+    globalsBefore = { window: globalThis.window, CustomEvent: globalThis.CustomEvent };
     win = new Window({ url: "https://bloommd.test/app" });
     globalThis.window = win as unknown as Window & typeof globalThis.window;
     globalThis.CustomEvent = win.CustomEvent as unknown as typeof CustomEvent;

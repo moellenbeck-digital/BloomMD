@@ -70,13 +70,13 @@ export function upsertTab(
       (tab) => scopeOf(tab) === scope && tab.key !== key && tab.key !== options.activeKey && !options.unsavedKeys.has(tab.key),
     );
     if (!victim) break;
-    next = removeKey(next, victim.key);
+    next = removeTab(next, victim.key);
   }
   return next;
 }
 
 /** Removes a tab; tabs that were opened from it inherit its own origin so "back" never dangles. */
-function removeKey(tabs: readonly OpenTab[], key: string): OpenTab[] {
+export function removeTab(tabs: readonly OpenTab[], key: string): OpenTab[] {
   const removed = tabs.find((tab) => tab.key === key);
   return tabs
     .filter((tab) => tab.key !== key)
@@ -97,7 +97,7 @@ export interface CloseResult {
 export function closeTab(tabs: readonly OpenTab[], visible: readonly OpenTab[], key: string): CloseResult {
   const index = visible.findIndex((tab) => tab.key === key);
   const neighbour = index < 0 ? null : (visible[index + 1] ?? visible[index - 1] ?? null);
-  return { tabs: removeKey(tabs, key), neighbour };
+  return { tabs: removeTab(tabs, key), neighbour };
 }
 
 /** Follows a cloud file rename: identity and filename change, order and origin links stay. */

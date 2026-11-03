@@ -1,6 +1,6 @@
 "use client";
 
-import { DEFAULT_TEMPLATE_FOLDER, normalizeFolderPath, normalizeMarkdownPath, selectTemplatePaths, type CustomNoteTemplate } from "@bloommd/core/browser";
+import { DEFAULT_TEMPLATE_FOLDER, normalizeFolderPath, normalizeMarkdownPath, pdfPageUrl, selectTemplatePaths, type CustomNoteTemplate } from "@bloommd/core/browser";
 
 interface DirectoryPickerOptions {
   id?: string;
@@ -95,6 +95,11 @@ export class BrowserWorkspace {
     return (await handle.getFile()).text();
   }
 
+  /** Paths of every non-hidden file in the folder, Markdown or not; used to check links to attachments. */
+  resourcePaths(): string[] {
+    return [...this.resources.keys()].sort((a, b) => a.localeCompare(b));
+  }
+
   resolvePath(path: string): string | null {
     if (this.resources.has(path)) return path;
     const normalized = path.replace(/^\.\//, "");
@@ -111,12 +116,13 @@ export class BrowserWorkspace {
    * them. That property is the whole point of local handoff, so it is asserted by a test rather
    * than left as an implementation detail someone could quietly change.
    */
-  async openResource(path: string): Promise<void> {
+  async openResource(path: string, page?: number): Promise<void> {
     const resolved = this.resolvePath(path);
     const handle = resolved ? this.resources.get(resolved) : null;
     if (!handle) throw new Error(`File is not part of this workspace: ${path}`);
     const url = await this.resourceObjectUrl(resolved ?? path);
-    window.open(url, "_blank", "noopener,noreferrer");
+    // `#page=n` is read by the browser's PDF viewer; other viewers ignore it and show the file.
+    window.open(page ? pdfPageUrl(url, page) : url, "_blank", "noopener,noreferrer");
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 

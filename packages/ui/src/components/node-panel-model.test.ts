@@ -4,6 +4,7 @@ import {
   NODE_KIND_COPY,
   countChildKinds,
   directResourcePreviewUrl,
+  pdfLinkOpenDetail,
   metadataForKindChange,
   nodeResourceIssue,
   resourcePreviewKind,
@@ -67,6 +68,19 @@ describe("node panel model", () => {
     expect(directResourcePreviewUrl("https://example.com/paper.pdf")).toBe("https://example.com/paper.pdf");
     expect(directResourcePreviewUrl("blob:mock/0")).toBe("blob:mock/0");
     expect(directResourcePreviewUrl("assets/diagram.png")).toBeNull();
+  });
+
+  test("keeps the page fragment of a direct PDF URL for the iframe", () => {
+    expect(directResourcePreviewUrl("https://example.com/paper.pdf#page=7")).toBe("https://example.com/paper.pdf#page=7");
+  });
+
+  test("a click on a PDF link asks the shell to open the file at the page", () => {
+    expect(pdfLinkOpenDetail("n1", { file: "papers/a.pdf", page: 12 })).toEqual({
+      nodeId: "n1",
+      kind: "pdf",
+      file: "papers/a.pdf",
+      page: 12,
+    });
   });
 
   test("reports missing resource targets for resource nodes", () => {

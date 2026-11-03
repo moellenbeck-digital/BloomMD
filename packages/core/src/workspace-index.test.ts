@@ -282,3 +282,27 @@ describe("result", () => {
     expect(indexOf({})).toMatchObject({ documents: [], headings: [], findings: [], summary: { documents: 0, headings: 0, links: 0 } });
   });
 });
+
+describe("PDF links", () => {
+  const entries = {
+    "paper.md": "# Paper\n\n[[smith.pdf#page=3]]\n\n> A quote\n\n[[smith.pdf#page=3]]\n[[gone.pdf#page=2]]\n",
+  };
+
+  test("without a file list they are not checked and are never broken or stale-anchor findings", () => {
+    const index = indexOf(entries);
+    expect(index.findings).toEqual([]);
+    expect(index.summary.links).toBe(0);
+  });
+
+  test("a present PDF is no finding, even for the same page twice", () => {
+    const index = buildWorkspaceIndex(filesOf(entries), { today: TODAY, resources: ["smith.pdf", "gone.pdf"] });
+    expect(index.findings).toEqual([]);
+  });
+
+  test("a missing PDF is reported once, with its line, as missing-resource", () => {
+    const index = buildWorkspaceIndex(filesOf(entries), { today: TODAY, resources: ["smith.pdf"] });
+    expect(index.findings).toHaveLength(1);
+    expect(index.findings[0]).toMatchObject({ code: "missing-resource", path: "paper.md", line: 8 });
+    expect(index.findings[0]!.message).toContain("gone.pdf");
+  });
+});

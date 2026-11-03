@@ -15,6 +15,11 @@ const SKIP_DIRECTORIES = new Set(["node_modules", ".git", ".obsidian", ".trash",
 export interface ReadWorkspaceResult {
   root: string;
   files: WorkspaceFileInput[];
+  /**
+   * Workspace-relative paths of the PDFs found, so PDF links can be checked. Undefined when a single
+   * file was given: its neighbours were not looked at, so a PDF cannot be called missing.
+   */
+  pdfFiles?: string[];
   /** Files that could not be read, with the reason. */
   unreadable: Array<{ path: string; reason: string }>;
 }
@@ -34,6 +39,7 @@ export async function readWorkspace(inputPath: string): Promise<ReadWorkspaceRes
   }
 
   const files: WorkspaceFileInput[] = [];
+  const pdfFiles: string[] = [];
   const unreadable: Array<{ path: string; reason: string }> = [];
   // Compared against the *real* root, so a workspace that is itself reached through a symlink
   // still recognises its own contents.
@@ -63,6 +69,7 @@ export async function readWorkspace(inputPath: string): Promise<ReadWorkspaceRes
         continue;
       }
 
+      if (/\.pdf$/i.test(entry.name)) pdfFiles.push(relative(root, absolute).split(sep).join("/"));
       if (!/\.(md|markdown)$/i.test(entry.name)) continue;
       const relativePath = relative(root, absolute).split(sep).join("/");
       try {
@@ -75,5 +82,6 @@ export async function readWorkspace(inputPath: string): Promise<ReadWorkspaceRes
 
   await walk(root);
   files.sort((a, b) => a.path.localeCompare(b.path));
-  return { root, files, unreadable };
+  pdfFiles.sort();
+  return { root, files, pdfFiles, unreadable };
 }

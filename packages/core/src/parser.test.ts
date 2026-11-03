@@ -185,6 +185,37 @@ Just some plain text without headings.
     expect(roundtrip).toContain("owner: Ada");
   });
 
+  test("keeps PDF source nodes and the citekey byte-stable through a roundtrip", () => {
+    const md = `---
+title: Smith 2020
+id: smith20
+created: "2026-04-06T10:00:00Z"
+updated: "2026-04-06T10:00:00Z"
+citekey: smith2020
+author: Smith, A.
+year: 2020
+---
+
+# Smith 2020
+
+## Introduction page
+
+[[papers/smith.pdf#page=3]]
+
+> First sentence of the quote.
+>
+> Second paragraph with *emphasis* and a [link](https://example.org).
+`;
+    const doc = parseFile("smith.md", md);
+    expect((doc.frontmatter as unknown as Record<string, unknown>).citekey).toBe("smith2020");
+    const node = [...doc.nodes.values()].find((entry) => entry.title === "Introduction page");
+    expect(node?.content).toContain("[[papers/smith.pdf#page=3]]");
+    expect(node?.content).toContain("> First sentence of the quote.");
+    const again = parseFile("smith.md", serializeToMarkdown(doc));
+    expect([...again.nodes.values()].find((entry) => entry.title === "Introduction page")?.content).toBe(node?.content);
+    expect(again.frontmatter).toMatchObject({ citekey: "smith2020", author: "Smith, A.", year: 2020 });
+  });
+
   test("handles level jumps (## directly under #, then ####)", () => {
     const md = `---
 title: Jump Test

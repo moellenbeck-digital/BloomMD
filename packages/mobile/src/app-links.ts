@@ -43,7 +43,7 @@ function parseWebLink(url: URL): AppLink | null {
   const segments = url.pathname.split("/");
   if (segments[1] !== "open") return null;
   if (segments.length === 2 || (segments.length === 3 && segments[2] === "")) return noteLink(url.searchParams);
-  if (segments.length === 3) return docLink(segments[2], url.searchParams);
+  if (segments.length === 3) return docLink(segments[2] ?? "", url.searchParams);
   return null;
 }
 

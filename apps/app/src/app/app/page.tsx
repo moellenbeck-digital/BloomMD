@@ -2282,6 +2282,11 @@ export default function Home() {
       ),
     ) && !workspaceNavigationPending;
 
+  // The active tab keeps full-contrast text: the brand orange on the light tint misses WCAG AA.
+  const tabShell = (active: boolean) =>
+    active
+      ? "border-[#FF6B35]/50 bg-[var(--color-bloom-light)] text-[var(--color-ink)]"
+      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
   const tabBack =
     mapView === "document" && !workspaceNavigationPending
       ? backTarget(openTabs, activeTabKey, canNavigateBack)
@@ -2549,29 +2554,23 @@ export default function Home() {
                 <ArrowLeft size={14} aria-hidden="true" />
               </button>
             )}
-            <div
-              role="tablist"
-              aria-label={copy.documentTabs}
-              className="flex min-w-0 items-center gap-1 overflow-x-auto"
-            >
-              {visibleTabs.map((tab) => {
-                const active = tab.key === activeTabKey;
-                const unsaved = active && hasUnsavedChanges;
-                const closable = visibleTabs.length > 1;
-                return (
-                  <div
-                    key={tab.key}
-                    role="presentation"
-                    className={`flex shrink-0 items-center rounded-md border text-xs font-medium transition-colors ${
-                      active
-                        ? "border-[#FF6B35]/40 bg-[var(--color-bloom-light)] text-[#FF6B35]"
-                        : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                    }`}
-                  >
+            {/*
+              Tabs and their close buttons are siblings in one grid, not nested: a tablist may only own
+              tabs, and a button inside a tab is a nested control. `contents` keeps both groups in the
+              grid so each close button still sits right behind its tab.
+            */}
+            <div className="grid min-w-0 auto-cols-max grid-flow-col items-stretch overflow-x-auto">
+              <div role="tablist" aria-label={copy.documentTabs} className="contents">
+                {visibleTabs.map((tab, index) => {
+                  const active = tab.key === activeTabKey;
+                  const unsaved = active && hasUnsavedChanges;
+                  return (
                     <button
+                      key={tab.key}
                       type="button"
                       role="tab"
                       aria-selected={active}
+                      style={{ gridColumn: index * 2 + 1, gridRow: 1 }}
                       onClick={() => void openTab(tab)}
                       onMouseDown={(event) => {
                         // Keeps the browser from starting autoscroll on a middle click.
@@ -2582,7 +2581,7 @@ export default function Home() {
                         event.preventDefault();
                         requestTabClose(tab.key);
                       }}
-                      className="flex min-w-0 max-w-40 items-center gap-1.5 py-1 pl-2.5 pr-1"
+                      className={`flex max-w-40 items-center gap-1.5 rounded-l-md border border-r-0 py-1 pl-2.5 pr-1 text-xs font-medium transition-colors ${tabShell(active)}`}
                       title={`${tab.title} — ${tab.filename}`}
                       data-testid="mindmap-tab"
                       data-filename={tab.filename}
@@ -2598,21 +2597,27 @@ export default function Home() {
                       <span className="truncate">{tab.title}</span>
                       {unsaved && <span className="sr-only">{copy.tabUnsaved}</span>}
                     </button>
-                    <button
-                      type="button"
-                      data-testid="mindmap-tab-close"
-                      data-filename={tab.filename}
-                      disabled={!closable}
-                      onClick={() => requestTabClose(tab.key)}
-                      aria-label={`${copy.closeTab}: ${tab.title}`}
-                      title={`${copy.closeTab}: ${tab.title}`}
-                      className="mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
-                    >
-                      <X size={12} aria-hidden="true" />
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+              <div className="contents">
+                {visibleTabs.map((tab, index) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    data-testid="mindmap-tab-close"
+                    data-filename={tab.filename}
+                    disabled={visibleTabs.length <= 1}
+                    style={{ gridColumn: index * 2 + 2, gridRow: 1 }}
+                    onClick={() => requestTabClose(tab.key)}
+                    aria-label={`${copy.closeTab}: ${tab.title}`}
+                    title={`${copy.closeTab}: ${tab.title}`}
+                    className={`mr-1 flex w-6 items-center justify-center rounded-r-md border border-l-0 text-xs transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${tabShell(tab.key === activeTabKey)}`}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

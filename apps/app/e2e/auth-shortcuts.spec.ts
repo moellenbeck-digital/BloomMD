@@ -421,6 +421,8 @@ test.describe("discoverable workflows", () => {
     await page.keyboard.press("Control+K");
     const download = page.waitForEvent("download");
     await page.locator('[data-command-id="action-export"]').click();
+    // The command opens the export menu, like Cmd/Ctrl+E.
+    await page.getByTestId("export-markdown").click();
     expect((await download).suggestedFilename()).toBe(`${title}.md`);
 
     await page.keyboard.press("Control+K");

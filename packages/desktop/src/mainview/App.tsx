@@ -27,7 +27,7 @@ import {
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
 import type { MindMapDocument, MindMapListEntry, NoteRevision, SharedDocumentBinding } from "@bloommd/core/browser";
-import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
+import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, pdfPageUrl, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
   chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
@@ -742,7 +742,15 @@ export function App() {
     };
 
     const openResource = (event: Event) => {
-      const detail = (event as CustomEvent<{ kind?: string; file?: string; targetNodeId?: string }>).detail;
+      const detail = (event as CustomEvent<{
+        kind?: string;
+        file?: string;
+        targetNodeId?: string;
+        /** 1-based PDF page of a clicked `[[file.pdf#page=n]]` link. */
+        page?: number;
+        /** Lets the panel show why a file did not open instead of the click doing nothing. */
+        respond?: (result: { error: string }) => void;
+      }>).detail;
       if (!detail.file) return;
       if ((detail.kind === "portal" || detail.kind === "file") && isMarkdownResource(detail.file)) {
         void loadFile(detail.file).then(() => {
@@ -753,13 +761,19 @@ export function App() {
         return;
       }
       if (detail.kind !== "file" && detail.kind !== "pdf") return;
-      void readResource(detail.file).then((result) => {
+      const file = detail.file;
+      const failed = (cause: unknown) => {
+        console.error("[BloomMD] Resource open failed:", cause);
+        detail.respond?.({ error: t.pdfOpenFailed.replace("%file%", file) });
+      };
+      void readResource(file).then((result) => {
         if ("error" in result) {
-          console.error("[BloomMD] Resource open failed:", result.error);
+          failed(result.error);
           return;
         }
-        window.open(result.dataUrl, "_blank", "noopener,noreferrer");
-      }).catch((error) => console.error("[BloomMD] Resource open failed:", error));
+        // The viewer reads `#page=n` where it can; the page also stays visible in the node panel.
+        window.open(detail.kind === "pdf" && detail.page ? pdfPageUrl(result.dataUrl, detail.page) : result.dataUrl, "_blank", "noopener,noreferrer");
+      }).catch(failed);
     };
     window.addEventListener("bloommd:open-url", openUrl);
     window.addEventListener("bloommd:load-link-preview", loadLinkPreview);

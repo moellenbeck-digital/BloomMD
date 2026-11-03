@@ -109,6 +109,19 @@ export function resourcePreviewKind(nodeKind: MindMapNodeKind, path: string): Re
   return extension && IMAGE_FILE_EXTENSIONS.has(extension) ? "image" : "unsupported";
 }
 
+/**
+ * Detail of the `bloommd:open-resource` event for a click on a PDF link.
+ *
+ * `page` is 1-based; shells that cannot jump to a page open the file and leave the page to the
+ * visible label in the panel.
+ */
+export function pdfLinkOpenDetail(
+  nodeId: string,
+  link: { file: string; page: number },
+): { nodeId: string; kind: "pdf"; file: string; page: number } {
+  return { nodeId, kind: "pdf", file: link.file, page: link.page };
+}
+
 export function directResourcePreviewUrl(path: string): string | null {
   if (/^(https?:|blob:|data:)/i.test(path)) return path;
   return null;

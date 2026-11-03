@@ -104,6 +104,14 @@ export function formatBibliographyMarkdown(entries: BibliographyEntry[]): string
     .concat(entries.length > 0 ? "\n" : "");
 }
 
+export interface BibliographyOptions {
+  /**
+   * Frontmatter already parsed by the caller, by path. Used instead of reading it from the text, so
+   * a caller that only has a list of maps with their frontmatter (the app) need not load every map.
+   */
+  frontmatter?: Record<string, Record<string, unknown>>;
+}
+
 /**
  * The literature list for the map at `rootPath`.
  *
@@ -112,7 +120,11 @@ export function formatBibliographyMarkdown(entries: BibliographyEntry[]): string
  * result is sorted by key and holds each key once; when two maps share a key with different
  * contents, the first (by path) wins and the other is reported in `skipped`.
  */
-export function buildBibliography(rootPath: string, files: WorkspaceFileInput[]): Bibliography {
+export function buildBibliography(
+  rootPath: string,
+  files: WorkspaceFileInput[],
+  options: BibliographyOptions = {},
+): Bibliography {
   const root = normalizeMarkdownPath(rootPath);
   const inputs = files.map((file) => ({ path: normalizeMarkdownPath(file.path), markdown: file.markdown }));
   const byPath = new Map(inputs.map((file) => [file.path, file.markdown]));
@@ -136,7 +148,7 @@ export function buildBibliography(rootPath: string, files: WorkspaceFileInput[])
     if (markdown === undefined) continue;
     let data: Record<string, unknown>;
     try {
-      data = parseFrontmatter(markdown).data;
+      data = options.frontmatter?.[path] ?? parseFrontmatter(markdown).data;
     } catch {
       skipped.push({ path, reason: "Frontmatter nicht lesbar" });
       continue;

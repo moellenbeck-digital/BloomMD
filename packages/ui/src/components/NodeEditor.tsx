@@ -18,6 +18,7 @@ import {
   LoaderCircle,
   Music2,
   Network,
+  Quote,
   Scale,
   Signpost,
   Trash2,
@@ -55,12 +56,13 @@ import { requestNodeFocus } from "../utils/nodeFocus";
 import { InkAttachmentsContext } from "../ink/attachments";
 import { restoreWikiLinks } from "../utils/wiki-links-escape";
 import type { Translations } from "../i18n/translations";
-import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, resolveMapLinkInDocument, type MapLinkResource, type MapLinkResolution } from "../utils/links";
+import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown, resolveMapLinkInDocument, type MapLinkResource, type MapLinkResolution, type PdfLink } from "../utils/links";
 import {
   countChildKinds,
   directResourcePreviewUrl,
   metadataForKindChange,
   nodeResourceIssue,
+  pdfLinkOpenDetail,
   resourcePreviewKind,
   shouldShowPrimaryMarkdownEditor,
   workspaceReferencesForNode,
@@ -189,6 +191,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
+  const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
 
   const selectedNode = selectedNodeId
     ? document?.nodes.get(selectedNodeId)
@@ -197,6 +200,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const sourceFile = selectedNodeId ? workspaceSourceFile(document, selectedNodeId) : undefined;
   const linkResources = selectedNode ? extractLinksFromMarkdown(selectedNode.content) : [];
   const mapLinkResources = selectedNode && !isWorkspaceDocument ? extractMapLinksFromMarkdown(selectedNode.content) : [];
+  const pdfLinkResources = selectedNode && !isWorkspaceDocument ? extractPdfLinksFromMarkdown(selectedNode.content) : [];
   const workspaceReferences = document && selectedNode ? workspaceReferencesForNode(document, selectedNode.id) : [];
 
   useEffect(() => {
@@ -211,6 +215,10 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       assignee: metadata?.assignee ?? "",
     });
   }, [document?.filePath, selectedNodeId]);
+
+  useEffect(() => {
+    setPdfLinkError(null);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (editorRef.current && selectedNode) {
@@ -352,6 +360,23 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       }
     },
     [document, focusMapNode, loadMapDocument, setDocument],
+  );
+
+  const openPdfLink = useCallback(
+    (link: PdfLink) => {
+      if (!selectedNodeId) return;
+      const key = `${link.line}:${link.raw}`;
+      setPdfLinkError(null);
+      // The shell opens the file at the page and reports back when it cannot, so a missing file is
+      // said out loud instead of the click doing nothing.
+      window.dispatchEvent(new CustomEvent("bloommd:open-resource", {
+        detail: {
+          ...pdfLinkOpenDetail(selectedNodeId, link),
+          respond: (result: { error: string }) => setPdfLinkError({ key, message: result.error }),
+        },
+      }));
+    },
+    [selectedNodeId],
   );
 
   const openBacklink = useCallback(
@@ -907,7 +932,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
         </Suspense>
       )}
 
-      {(linkResources.length > 0 || mapLinkResources.length > 0 || backlinks.length > 0 || workspaceReferences.length > 0) && (
+      {(linkResources.length > 0 || mapLinkResources.length > 0 || pdfLinkResources.length > 0 || backlinks.length > 0 || workspaceReferences.length > 0) && (
         <details open className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
           <summary className="cursor-pointer list-none px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.linksAndReferences}</summary>
           <div
@@ -961,6 +986,56 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   </button>
                 </div>
               ))}
+              {pdfLinkResources.map(({ link, quote }) => {
+                const key = `${link.line}:${link.raw}`;
+                const failure = pdfLinkError?.key === key ? pdfLinkError.message : null;
+                return (
+                  <div
+                    key={key}
+                    className="min-w-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)]"
+                    data-testid="pdf-link-resource"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openPdfLink(link)}
+                      className="flex w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
+                      title={t.openPdfAtPage}
+                      aria-label={`${t.openPdfAtPage}: ${link.file}, ${t.pdfPage} ${link.page}`}
+                      data-testid="pdf-link-open"
+                      data-pdf-file={link.file}
+                      data-pdf-page={link.page}
+                    >
+                      <FileText size={16} className="shrink-0 text-[#FF6B35]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">
+                          {link.label === link.raw ? link.file : link.label}
+                        </span>
+                        <span className="block truncate text-xs text-[var(--color-ink-faint)]" data-testid="pdf-link-page">
+                          {t.pdfSource} · {t.pdfPage} {link.page}
+                        </span>
+                      </span>
+                      <ExternalLink size={15} className="shrink-0 text-[var(--color-ink-muted)]" />
+                    </button>
+                    {quote && (
+                      <blockquote
+                        className="mx-3 mb-3 border-l-2 border-[#FF6B35] pl-3 text-sm italic leading-6 text-[var(--color-ink-muted)] whitespace-pre-wrap"
+                        data-testid="pdf-quote"
+                      >
+                        <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase not-italic tracking-wide text-[var(--color-ink-faint)]">
+                          <Quote size={11} />
+                          {t.pdfQuote}
+                        </span>
+                        {quote}
+                      </blockquote>
+                    )}
+                    {failure && (
+                      <p role="alert" className="mx-3 mb-3 text-xs text-red-600" data-testid="pdf-link-error">
+                        {failure}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               {mapLinkResources.map((resource) => {
                 const resolution = mapLinkResolutions.get(resource.raw);
                 const broken = brokenMapLinks.has(resource.raw);

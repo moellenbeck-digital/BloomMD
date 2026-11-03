@@ -126,6 +126,7 @@ export {
   type Bibliography,
   type BibliographyEntry,
   type BibliographySkip,
+  type BibliographyOptions,
 } from "./bibliography";
 export {
   lintWorkspace,

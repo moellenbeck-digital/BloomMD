@@ -4,10 +4,6 @@ export interface MindMapFrontmatter {
   created: string;
   updated: string;
   tags?: string[];
-  /** BibTeX/Zotero key of the source this map stands for; see `buildBibliography`. */
-  citekey?: string;
-  author?: string;
-  year?: string | number;
   layout?: {
     direction?: "LR" | "TB";
     collapsed?: string[];

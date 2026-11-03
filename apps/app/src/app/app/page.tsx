@@ -1086,6 +1086,8 @@ export default function Home() {
           kind?: string;
           file?: string;
           targetNodeId?: string;
+          /** 1-based PDF page, set when a `[[file.pdf#page=n]]` link was clicked. */
+          page?: number;
         }>
       ).detail;
       const workspace = browserWorkspaceRef.current;
@@ -1122,7 +1124,7 @@ export default function Home() {
           return;
         }
         void workspace
-          .openResource(resolvedPath)
+          .openResource(resolvedPath, detail.kind === "pdf" ? detail.page : undefined)
           .catch((openError) => showNotice(String(openError), detail.nodeId));
         return;
       }
@@ -3025,6 +3027,7 @@ export default function Home() {
           <div className="w-80 shrink-0">
             <WorkspaceHealth
               files={workspaceGraphFiles}
+              resources={browserWorkspaceRef.current?.resourcePaths()}
               onClose={() => setHealthOpen(false)}
               onOpenFile={(path) => {
                 setMapView("document");

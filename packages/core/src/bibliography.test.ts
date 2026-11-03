@@ -75,6 +75,25 @@ describe("buildBibliography", () => {
   });
 });
 
+describe("buildBibliography with frontmatter from the caller", () => {
+  test("uses the given frontmatter instead of parsing every map", () => {
+    const result = buildBibliography(
+      "root.md",
+      [
+        { path: "root.md", markdown: "# R\n\n[[smith]]\n" },
+        { path: "smith.md", markdown: "" },
+      ],
+      {
+        frontmatter: {
+          "root.md": { title: "Root", citekey: "root1" },
+          "smith.md": { title: "Smith", citekey: "smith2020", year: 2020 },
+        },
+      },
+    );
+    expect(result.entries.map((entry) => [entry.citekey, entry.year])).toEqual([["root1", undefined], ["smith2020", "2020"]]);
+  });
+});
+
 describe("formatBibtex", () => {
   test("escapes characters that BibTeX reads as syntax", () => {
     const out = formatBibtex([{ citekey: "k", path: "k.md", title: "R&D {50%} a_b" }]);

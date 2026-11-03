@@ -207,7 +207,7 @@ year: 2020
 > Second paragraph with *emphasis* and a [link](https://example.org).
 `;
     const doc = parseFile("smith.md", md);
-    expect(doc.frontmatter.citekey).toBe("smith2020");
+    expect((doc.frontmatter as unknown as Record<string, unknown>).citekey).toBe("smith2020");
     const node = [...doc.nodes.values()].find((entry) => entry.title === "Introduction page");
     expect(node?.content).toContain("[[papers/smith.pdf#page=3]]");
     expect(node?.content).toContain("> First sentence of the quote.");

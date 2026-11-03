@@ -106,6 +106,28 @@ export interface Translations {
   targetNode: string;
   ambiguousReference: string;
   targetNotFound: string;
+  pdfSource: string;
+  pdfPage: string;
+  pdfQuote: string;
+  openPdfAtPage: string;
+  pdfOpenFailed: string;
+  insertPdfCitation: string;
+  pdfCitationHint: string;
+  pdfCitationFile: string;
+  pdfCitationFilePlaceholder: string;
+  pdfCitationPage: string;
+  pdfCitationQuote: string;
+  pdfCitationInsert: string;
+  pdfCitationCancel: string;
+  pdfCitationErrorFile: string;
+  pdfCitationErrorPage: string;
+  pdfCitationNoMap: string;
+  pdfCitationFailed: string;
+  bibliographyFailed: string;
+  exportBibtex: string;
+  exportBibliographyMd: string;
+  bibliographyHint: string;
+  bibliographyEmpty: string;
   backlinkFrom: string;
   workspaceReference: string;
   content: string;
@@ -589,6 +611,28 @@ export const translations: Record<Locale, Translations> = {
     targetNode: "Ziel-Node-ID",
     ambiguousReference: "Mehrdeutiger Verweis",
     targetNotFound: "Ziel nicht gefunden",
+    pdfSource: "PDF-Quelle",
+    pdfPage: "Seite",
+    pdfQuote: "Zitat",
+    openPdfAtPage: "PDF an dieser Seite öffnen",
+    pdfOpenFailed: "Das PDF „%file%“ konnte nicht geöffnet werden.",
+    insertPdfCitation: "PDF-Zitat einfügen",
+    pdfCitationHint: "Legt einen Quell-Knoten mit Link zur PDF-Seite und Zitat an.",
+    pdfCitationFile: "PDF-Datei",
+    pdfCitationFilePlaceholder: "papers/quelle.pdf",
+    pdfCitationPage: "Seite",
+    pdfCitationQuote: "Zitat",
+    pdfCitationInsert: "Einfügen",
+    pdfCitationCancel: "Abbrechen",
+    pdfCitationErrorFile: "Gib den Pfad einer PDF-Datei an (endet auf .pdf, ohne ] | #).",
+    pdfCitationErrorPage: "Die Seite muss eine ganze Zahl ab 1 sein.",
+    pdfCitationNoMap: "Öffne zuerst eine Map, in die das Zitat eingefügt werden soll.",
+    pdfCitationFailed: "Das Zitat konnte nicht eingefügt werden. Ist die Map schreibgeschützt?",
+    bibliographyFailed: "Die Literaturliste konnte nicht erstellt werden.",
+    exportBibtex: "Literaturliste exportieren (BibTeX)",
+    exportBibliographyMd: "Literaturliste exportieren (Markdown)",
+    bibliographyHint: "citekey dieser Map und der verlinkten Maps",
+    bibliographyEmpty: "Keine Zitierschlüssel (citekey im Frontmatter) in dieser Map und den verlinkten Maps gefunden.",
     backlinkFrom: "Backlink von %title%",
     workspaceReference: "Workspace-Referenz",
     content: "Inhalt",
@@ -1065,6 +1109,28 @@ export const translations: Record<Locale, Translations> = {
     targetNode: "Target node ID",
     ambiguousReference: "Ambiguous reference",
     targetNotFound: "Target not found",
+    pdfSource: "PDF source",
+    pdfPage: "Page",
+    pdfQuote: "Quote",
+    openPdfAtPage: "Open PDF at this page",
+    pdfOpenFailed: "The PDF “%file%” could not be opened.",
+    insertPdfCitation: "Insert PDF citation",
+    pdfCitationHint: "Creates a source node with a link to the PDF page and the quote.",
+    pdfCitationFile: "PDF file",
+    pdfCitationFilePlaceholder: "papers/source.pdf",
+    pdfCitationPage: "Page",
+    pdfCitationQuote: "Quote",
+    pdfCitationInsert: "Insert",
+    pdfCitationCancel: "Cancel",
+    pdfCitationErrorFile: "Enter the path of a PDF file (ends in .pdf, without ] | #).",
+    pdfCitationErrorPage: "The page must be a whole number from 1.",
+    pdfCitationNoMap: "Open a map first to insert the citation into.",
+    pdfCitationFailed: "The citation could not be inserted. Is the map read-only?",
+    bibliographyFailed: "The bibliography could not be created.",
+    exportBibtex: "Export bibliography (BibTeX)",
+    exportBibliographyMd: "Export bibliography (Markdown)",
+    bibliographyHint: "citekey of this map and the maps it links to",
+    bibliographyEmpty: "No citation keys (citekey in the frontmatter) found in this map or the maps it links to.",
     backlinkFrom: "Backlink from %title%",
     workspaceReference: "Workspace reference",
     content: "Content",

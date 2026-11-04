@@ -8,7 +8,7 @@ Config `playwright.docs-screenshots.config.ts`, eigene Specs (`*.capture.ts`) in
 ```bash
 bun run --cwd apps/marketing docs:screenshots            # alle Bilder
 bun run --cwd apps/marketing docs:screenshots:app        # Web-App, Registrierung, Vorlagen, Sync
-bun run --cwd apps/marketing docs:screenshots:marketing  # Browser-Demo
+bun run --cwd apps/marketing docs:screenshots:marketing  # Browser-Demo und Wiki-Ansicht (Bundle `test-wiki/`)
 bun run --cwd apps/marketing docs:screenshots:gate       # Registrierung bei aktivem Zugangsschalter
 ```
 

@@ -82,6 +82,9 @@ const marketingServers = [
       NEXT_PUBLIC_SITE_URL: marketingURL,
       NEXT_PUBLIC_MARKETING_URL: marketingURL,
       NEXT_PUBLIC_APP_URL: appURL,
+      // The public Wiki view is off by default; for the OKF picture it reads the checked-in `test-wiki/` bundle.
+      BLOOMMD_WIKI_PUBLIC: "1",
+      BLOOMMD_WIKI_DIR: `${repoRoot}test-wiki`,
     },
   },
 ];

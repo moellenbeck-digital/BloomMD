@@ -6,7 +6,8 @@ order: 3
 
 # Web app
 
-The Web app at `/app` has two deliberately different modes.
+The Web app at `/app` has two deliberately different modes. If folder permissions, sync, or an
+invitation get stuck, see [Troubleshooting](/docs/fehlerbehebung?lang=en).
 
 ## Local folder and cloud at a glance
 
@@ -76,6 +77,8 @@ Do not upload credentials, secrets, third-party personal data, or production-cri
 the beta. A reduced Markdown example is enough for an error report.
 
 ## Feedback and views
+
+First have a look at [Troubleshooting](/docs/fehlerbehebung?lang=en), which covers the common cases.
 
 Signed-in beta testers use the Feedback button. A screenshot is required; a short video is optional.
 Do not upload private Markdown, credentials, or third-party personal data. The Document view shows

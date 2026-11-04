@@ -277,6 +277,8 @@ Markdown-Beispiel reicht meistens.
 
 ## Typische Fehler
 
+Einladungs-, Sync- und Ordnerprobleme sind außerdem auf einer Seite gebündelt: [Fehlerbehebung](/docs/fehlerbehebung).
+
 - **Die zweite Person sieht den Workspace nicht.** Der Account ist nicht für denselben Workspace
   freigeschaltet. Sende Feedback oder antworte auf die Beta-Mail.
 - **Die Desktop-App zeigt nur lokale Dateien.** Sie ist nicht im Server-Modus verbunden. Öffne

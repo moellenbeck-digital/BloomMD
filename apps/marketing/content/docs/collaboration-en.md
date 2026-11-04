@@ -13,7 +13,9 @@ personal workspace.
 ## Share one local Desktop file deliberately
 
 A local Markdown file remains on your device first. You decide per file whether it should be
-mirrored into a workspace. BloomMD never uploads an entire folder or additional local files.
+mirrored into a workspace. This single-file share never uploads an entire folder or additional
+local files; for a whole folder there is a separate flow, "Publish a local folder deliberately",
+below.
 
 ![Illustration: a shared BloomMD map with Markdown as the visible source](/blog/collaboration-sync.png)
 
@@ -66,6 +68,67 @@ The selection transmits workspace and cloud-document data only; the vault path i
 server. If the local note differs from the cloud version, BloomMD shows a conflict instead of
 silently overwriting either side. A server-side revocation also ends the Obsidian connection; the
 last local note remains available but cannot write back.
+
+## Publish a local folder deliberately
+
+For several Markdown files there is a second, separate way: publish the whole local folder as a
+shared workspace. It is named differently from **Share this local file** and lives at a different
+entry point (the sidebar in local Desktop mode). A folder is never shared as a side effect: nothing
+is read or uploaded until you confirm in the preview.
+
+### Flow
+
+1. Choose **Publish folder as a shared workspace** in the sidebar. BloomMD proposes the folder that
+   is open now; **Choose another folder …** opens the native picker. Choosing alone changes and
+   transmits nothing.
+2. Select a saved server profile and the target workspace. Workspaces where you are only a viewer
+   cannot be selected.
+3. Review the preview: target workspace, number of Markdown files, total size, conflict strategy,
+   and the list of all files and sub-folders. Untick single files or whole sub-folders to leave
+   them out.
+4. Confirm with **Publish**. Only now are exactly the ticked files created as cloud documents.
+
+### What is transferred
+
+- Markdown files only (`.md`, `.markdown`). Images, PDFs and other file types are not offered and
+  never uploaded. Hidden folders (`.git`, `.obsidian` …), `node_modules` and symbolic links are
+  skipped.
+- Your local files stay the source and are not changed.
+- The server receives the workspace ID, cloud document IDs and cloud filenames. The folder path and
+  local sub-folders stay on the device. Each document's binding is recorded in the workspace audit
+  trail.
+- Nothing is overwritten and nothing is deleted, neither locally nor in the cloud.
+
+### How local paths become cloud names
+
+A cloud workspace has no sub-folders, only filenames. BloomMD therefore joins the relative path
+with `__` by a fixed rule, and the preview shows every name up front:
+
+| Local | In the workspace |
+| --- | --- |
+| `idea.md` | `idea.md` |
+| `notes/2026/idea.md` | `notes__2026__idea.md` |
+
+Files that do not fit are listed with a reason and cannot be included: names with characters the
+workspace would change (for example `: * ? " < > |`, a leading dot or repeated spaces), files whose
+cloud name equals that of another local file after joining (`a/b.md` and `a__b.md`), and files
+over 1 MB.
+
+### When the name already exists in the workspace
+
+You pick the conflict strategy in the preview. Neither option overwrites an existing file.
+
+- **Leave the existing cloud file alone and report a conflict** (default): the local file is not
+  uploaded and is marked as a conflict in the preview.
+- **Upload the local file under another name (suffix):** the file is created as `name-local.md`
+  (`name-local-2.md` … if needed); the existing file stays untouched.
+
+Files you already shared one by one, or already published from this folder to the same workspace,
+are not offered again.
+
+> **Beta status:** **Publish** uploads the confirmed files once and remembers the mapping locally.
+> Continuous syncing of the folder (new, renamed or deleted files, an activity list, disconnecting
+> the folder share) is not part of this feature yet; until then later local changes stay local.
 
 ## First shared document
 

@@ -1,0 +1,14 @@
+Mitschrift: Physik 8b, Geschwindigkeit und Beschleunigung, 30.10.2026 (Beispieltext, frei erfunden)
+
+Die Geschwindigkeit sagt, wie schnell sich ein Körper bewegt. Sie ist der Weg geteilt durch die Zeit: v = s / t. Einheit: Meter pro Sekunde (m/s).
+Beispiel: Ein Radfahrer fährt in 20 Sekunden 100 Meter. Dann ist v = 100 m / 20 s = 5 m/s.
+
+Die Beschleunigung sagt, wie schnell sich die Geschwindigkeit ändert: a = Δv / t. Einheit: Meter pro Sekunde zum Quadrat (m/s²).
+Beispiel: Ein Auto wird in 4 Sekunden von 0 auf 20 m/s schneller. Dann ist a = 20 m/s / 4 s = 5 m/s².
+
+Wichtig: Ist die Beschleunigung null, bleibt die Geschwindigkeit gleich (gleichförmige Bewegung).
+
+Lernfragen aus dem Unterricht:
+1. Was ist der Unterschied zwischen Geschwindigkeit und Beschleunigung?
+2. Wie rechnet man 36 km/h in m/s um? Antwort der Lehrerin: durch 3,6 teilen, also 10 m/s.
+Hausaufgabe bis Montag: Aufgaben 4 bis 6 auf Seite 52.

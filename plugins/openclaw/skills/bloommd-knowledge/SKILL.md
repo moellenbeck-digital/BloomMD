@@ -20,7 +20,11 @@ apps (cloud) right away and are meant to be read, presented and explained by peo
    `template` and nodes whose `parent` is a skeleton ref (e.g. `aufgaben`, `begriffe`, `themen`).
    For raw text (transcript, chat, note) use `bloommd_ingest` instead: you pass the text word for
    word plus the sections you structured; it files the text as a `source` node. Never put credentials
-   or personal data in the text.
+   or personal data in the text. A photo is no input: read it yourself, copy it word for word
+   (`[unleserlich]` for illegible parts), structure it and pass that text as `text`, the photo as
+   `source`. Ingest also keeps the area hub (a map named like the area, node "Maps") up with a
+   `[[link]]` to the new map and reports it as `hub`; do not edit it for that. Sections go at most 5
+   levels below the map title.
 5. Always pass `source` (what you filed from) and a one-sentence `reason`.
 
 ## Quality rules

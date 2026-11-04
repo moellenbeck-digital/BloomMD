@@ -8,6 +8,8 @@ const APP_SOURCE = join(ROOT, "mainview", "App.tsx");
 const BUN_SOURCE = join(ROOT, "bun", "index.ts");
 const FOLDER_DIALOG_SOURCE = join(ROOT, "mainview", "FolderPublicationDialog.tsx");
 const FOLDER_PUBLISH_SOURCE = join(ROOT, "bun", "folder-publish.ts");
+const FOLDER_SHARE_SOURCE = join(ROOT, "bun", "folder-share.ts");
+const FOLDER_SHARES_DIALOG_SOURCE = join(ROOT, "mainview", "FolderSharesDialog.tsx");
 const FILE_CONTEXT_MENU_SOURCE = join(ROOT, "..", "..", "ui", "src", "components", "FileContextMenu.tsx");
 
 function compact(source: string): string {
@@ -295,6 +297,43 @@ describe("desktop mainview contract", () => {
     expect(folderPublish).not.toMatch(/input\.cloud\.\w+\([^)]*(relativePath|folderPath)/);
     expect(main).not.toContain("apiStore.create(prepared.folderPath");
     expect(main).not.toMatch(/recordSharedFolderBinding\([^)]*(folderPath|relativePath)/);
+  });
+
+  test("a published folder changes the cloud only through an explicit decision and never deletes on its own", async () => {
+    const renderer = compact(await readFile(APP_SOURCE, "utf8"));
+    const sharesDialog = compact(await readFile(FOLDER_SHARES_DIALOG_SOURCE, "utf8"));
+    const main = compact(await readFile(BUN_SOURCE, "utf8"));
+    const folderShare = compact(await readFile(FOLDER_SHARE_SOURCE, "utf8"));
+
+    // Entry point and labels.
+    expect(renderer).toContain("data-testid=\"folder-shares\"");
+    expect(renderer).toContain("<FolderSharesDialog");
+    for (const text of ["neu, noch nicht geteilt", "lokal entfernt", "lokal umbenannt", "Zugriff entzogen", "Ordnerfreigabe trennen", "Cloud-Dokument behalten", "Cloud-Dokument entfernen"]) {
+      expect(sharesDialog).toContain(text);
+    }
+
+    // The cloud is deleted in exactly one place: the explicit remove-cloud decision, after its audit.
+    expect(folderShare.match(/cloud\.delete\(/g)).toHaveLength(1);
+    expect(folderShare).toContain("if (decision.action === \"remove-cloud\") {");
+    expect(folderShare.indexOf("cloud.recordFolderUnbinding([file.binding.documentId]);")).toBeLessThan(folderShare.indexOf("await cloud.delete(file.binding.cloudFilename);"));
+    expect(sharesDialog).toContain("data-testid=\"folder-activity-remove-cloud-confirm\"");
+    expect(sharesDialog).toContain("setConfirming(key)");
+
+    // Reading the activity list never uploads or deletes.
+    const activityHandler = main.slice(main.indexOf("getFolderActivity: async"), main.indexOf("resolveFolderActivity: async"));
+    expect(activityHandler).toContain("computeFolderActivity(");
+    for (const forbidden of ["applyFolderDecision", ".create(", ".delete(", "publishFolderPlan"]) expect(activityHandler).not.toContain(forbidden);
+
+    // A refusal by the server stops the share and keeps local files.
+    expect(main).toContain("stopRevokedFolderShare");
+    expect(folderShare).toContain("if (folder.state === \"revoked\") throw new Error(\"FOLDER_ACCESS_REVOKED\");");
+    expect(folderShare).toContain("{ type: \"access_revoked\" }");
+
+    // Disconnecting ends the local binding first, audits afterwards and deletes nothing.
+    const disconnectHandler = main.slice(main.indexOf("disconnectFolderShare: async"), main.indexOf("createFolder: async"));
+    expect(disconnectHandler.indexOf("persistDesktopSettings(")).toBeLessThan(disconnectHandler.indexOf("auditFolderUnbinding("));
+    for (const forbidden of [".delete(", ".create(", "rm(", "unlink("]) expect(disconnectHandler).not.toContain(forbidden);
+    expect(main).toContain("PART_OF_FOLDER_SHARE");
   });
 
   test("keeps one shared file on its Yjs provider while mirroring local watcher changes", async () => {

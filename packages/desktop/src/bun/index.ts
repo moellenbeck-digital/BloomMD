@@ -1294,9 +1294,11 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
 
       listFolderShares: async ({ withActivity }) => {
         const shares: DesktopFolderShareInfo[] = [];
-        for (const folder of desktopSettings.sharedFolderBindings ?? []) {
+        for (let folder of desktopSettings.sharedFolderBindings ?? []) {
           let pendingCount: number | null = null;
           if (withActivity) {
+            // The status shown next to the folder must not wait for the dialog: ask the server once per refresh.
+            if (folder.state === "connected" && (await checkFolderShareAccess(folder)).state === "revoked") folder = await stopRevokedFolderShare(folder);
             try {
               const local = await scanFolderForPublication(folder.folderPath);
               pendingCount = (await computeFolderActivity({ folder, local, hashOf: createFolderFileHasher(folder.folderPath), cloudFilenames: [] })).length;

@@ -155,6 +155,26 @@ test("a rename is reassigned or treated as a new file by explicit choice", async
   expect(calls.decisions[0]).toEqual({ kind: "renamed", from: "old.md", to: "docs/new.md", action: "reassign" });
 });
 
+test("a removed file can be assigned by hand to a new file when the rename was not certain", async () => {
+  await mount();
+  const row = entry("removed", "gone.md");
+  expect(within(row, "folder-activity-assign")?.disabled).toBe(true);
+  const select = row.querySelector<HTMLSelectElement>('[data-testid="folder-activity-assign-target"]')!;
+  expect([...select.options].map((option) => option.value)).toEqual(["", "fresh.md", "taken.md", "bad?.md"]);
+  select.value = "fresh.md";
+  flushSync(() => select.dispatchEvent(new win.Event("change", { bubbles: true }) as unknown as Event));
+  expect(within(row, "folder-activity-assign")?.disabled).toBe(false);
+  click(within(row, "folder-activity-assign"));
+  await waitFor(() => calls.decisions.length === 1);
+  expect(calls.decisions).toEqual([{ kind: "renamed", from: "gone.md", to: "fresh.md", action: "reassign" }]);
+});
+
+test("a revoked share offers no manual assignment", async () => {
+  current = { share: share({ state: "revoked" }), entries: [...entries] };
+  await mount();
+  expect(entry("removed", "gone.md").querySelector('[data-testid="folder-activity-assign-target"]')).toBeNull();
+});
+
 test("a rejected decision shows its reason and the list is reloaded", async () => {
   resolveResult = { success: false, error: "FOLDER_FILE_STILL_PRESENT" };
   await mount();

@@ -66,6 +66,7 @@ export function FolderSharesDialog({
   const [loaded, setLoaded] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [assignTargets, setAssignTargets] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
 
   const patchShare = useCallback((id: string, patch: Partial<ShareState>) => {
@@ -164,6 +165,8 @@ export function FolderSharesDialog({
     const key = entryKey(entry);
     const revoked = state.share.state === "revoked";
     const busy = busyKey !== null;
+    // Not every rename is certain; any new file can be named by hand as the new place of a removed one.
+    const newCandidates = entry.kind === "removed" && !revoked ? (state.entries ?? []).flatMap((candidate) => candidate.kind === "new" ? [candidate] : []) : [];
     const label = entry.kind === "new" ? (de ? "neu, noch nicht geteilt" : "new, not shared yet")
       : entry.kind === "removed" ? (de ? "lokal entfernt" : "removed locally")
         : (de ? "lokal umbenannt" : "renamed locally");
@@ -209,6 +212,21 @@ export function FolderSharesDialog({
                   </span>
                 )
                 : <button type="button" className={danger} disabled={revoked || busy} onClick={() => setConfirming(key)} data-testid="folder-activity-remove-cloud">{de ? "Cloud-Dokument entfernen …" : "Remove cloud document …"}</button>}
+              {newCandidates.length > 0 && (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <select
+                    value={assignTargets[key] ?? ""}
+                    onChange={(event) => setAssignTargets((current) => ({ ...current, [key]: event.target.value }))}
+                    aria-label={de ? "Neuer Name dieser Datei" : "New name of this file"}
+                    data-testid="folder-activity-assign-target"
+                    className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs text-[var(--color-ink)]"
+                  >
+                    <option value="">{de ? "Wurde umbenannt in …" : "Was renamed to …"}</option>
+                    {newCandidates.map((candidate) => <option key={candidate.relativePath} value={candidate.relativePath}>{candidate.relativePath}</option>)}
+                  </select>
+                  <button type="button" className={button} disabled={busy || !assignTargets[key]} onClick={() => void decide(id, { kind: "renamed", from: entry.relativePath, to: assignTargets[key] ?? "", action: "reassign" }, key)} data-testid="folder-activity-assign">{de ? "Neu zuordnen" : "Reassign"}</button>
+                </span>
+              )}
             </>
           )}
           {entry.kind === "renamed" && (

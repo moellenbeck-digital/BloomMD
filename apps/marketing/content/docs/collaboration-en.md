@@ -126,9 +126,39 @@ You pick the conflict strategy in the preview. Neither option overwrites an exis
 Files you already shared one by one, or already published from this folder to the same workspace,
 are not offered again.
 
-> **Beta status:** **Publish** uploads the confirmed files once and remembers the mapping locally.
-> Continuous syncing of the folder (new, renamed or deleted files, an activity list, disconnecting
-> the folder share) is not part of this feature yet; until then later local changes stay local.
+### The folder afterwards: folder shares and activity
+
+**Publish** uploads the confirmed files and remembers the mapping locally. Afterwards the sidebar
+shows **Folder shares**; a counter says how many changes wait for your decision. BloomMD only lists
+changes in the folder. It never uploads or deletes anything by itself, in either direction.
+
+An open file of a folder share is mirrored with its cloud document like a single shared file. It has
+no "Disconnect share" button of its own; only the whole folder share is disconnected.
+
+The activity list of a folder share has three kinds of entries:
+
+- **new, not shared yet:** a Markdown file that did not exist when you published. It is created only
+  after **Upload**, under the cloud name from the scheme above and with the conflict strategy you
+  chose when publishing. **Do not share** removes the entry without uploading anything. Files with a
+  name conflict or an unsuitable name can only be ignored.
+- **removed locally:** a published file is missing from the folder. You decide per entry: **Keep
+  cloud document** (only the local mapping ends) or **Remove cloud document** (after a second,
+  explicit confirmation). A cloud document is never deleted automatically.
+- **renamed locally:** a file is missing under its old name and exactly one new file has the same
+  content. **Reassign** connects the existing cloud document (cloud name unchanged) with the new
+  local path; **Treat as a new file** turns it into "removed locally" plus "new". A rename is only
+  recognised if the content has not changed since publishing. Otherwise it shows up as "removed
+  locally", and you can assign the file to the new file yourself there.
+
+**Access revoked:** if the server ends the access, or your role in the workspace becomes viewer,
+syncing of that folder share stops. The folder share shows **Access revoked**, local files stay
+unchanged (nothing is deleted or written back), and uploading and removing are blocked. BloomMD
+checks this at start, when you open the folder shares, and when you open a file of the folder
+share. A server that cannot be reached does not count as a revocation.
+
+**Disconnect folder share:** ends the local binding only. Neither local files nor cloud documents
+are deleted. The disconnect is recorded in the workspace audit trail while the server is reachable
+and the access still exists; with revoked access it stays local.
 
 ## First shared document
 

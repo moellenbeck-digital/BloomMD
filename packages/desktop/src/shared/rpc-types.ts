@@ -321,7 +321,7 @@ export type BloomMDRPC = {
         params: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[] };
         response: { success: boolean; preview?: DesktopFolderPublicationPreview; error?: string };
       };
-      /** The published folders from local settings; with `withActivity` also the number of open changes (reads the folder, no network). */
+      /** The published folders from local settings; with `withActivity` also the number of open changes and a check of the access (a refusal by the server stops the share). */
       listFolderShares: {
         params: { withActivity: boolean };
         response: { shares: DesktopFolderShareInfo[] };

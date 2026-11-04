@@ -26,8 +26,18 @@ export interface BloomFolderPlugin {
   /** The folder opened earlier (kept across app restarts), or null. */
   current(): Promise<{ name: string | null }>;
   forget(): Promise<void>;
-  /** `truncated` is true when the folder holds more files than one listing returns (5000). */
-  list(options?: { extensions?: string[] }): Promise<{ files: FolderFile[]; truncated?: boolean }>;
+  /**
+   * `folders` are all subfolders as paths relative to the folder ("A", "A/B"), empty ones included,
+   * without hidden folders (dot folders such as `.obsidian`) and `node_modules`. `truncated` is true
+   * when the folder holds more files than one listing returns (5000).
+   */
+  list(options?: { extensions?: string[] }): Promise<{ files: FolderFile[]; folders: string[]; truncated?: boolean }>;
+  /**
+   * Creates a folder with its missing parents inside the open folder, never a placeholder file in it.
+   * A folder that already exists is not an error. Fails with code BAD_PATH for a path that would leave
+   * the open folder and with code EXISTS when a file already has that name.
+   */
+  mkdir(options: { path: string }): Promise<void>;
   /** Fails with code CONFLICT while iCloud holds unresolved conflicting versions of the file. */
   read(options: { path: string }): Promise<{ data: string; modified: number }>;
   /**

@@ -158,7 +158,18 @@ class BloomFolderPlugin : Plugin() {
                         .put("local", file.local),
                 )
             }
-            JSObject().put("files", files).put("truncated", listing.truncated)
+            val folders = JSArray()
+            for (folder in listing.folders) folders.put(folder)
+            JSObject().put("files", files).put("folders", folders).put("truncated", listing.truncated)
+        }
+    }
+
+    @PluginMethod
+    fun mkdir(call: PluginCall) {
+        val path = call.getString("path")
+        run(call) {
+            backend().mkdir(FolderRules.segments(path))
+            null
         }
     }
 

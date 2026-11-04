@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { existingFolder, folderLevel, folderOf, parentFolder, pathSteps, searchEntries } from "./folder-levels";
-import { folderEntries } from "./stores";
+import { folderEntries, folderPaths } from "./stores";
 
 const entries = folderEntries([
   { path: "Heimsuchung.md", size: 1, modified: 1, local: true },
@@ -117,6 +117,82 @@ describe("walking the path", () => {
     expect(existingFolder(entries, "")).toBe("");
     // A folder that only has sub-folders is still a level to walk through.
     expect(existingFolder(entries, "Uni/Physik")).toBe("Uni/Physik");
+  });
+});
+
+describe("empty folders", () => {
+  // What the folder list of a store returns: every folder, with or without notes.
+  const folders = ["Arbeit", "Leer", "Physik", "Uni", "Uni/Leer", "Uni/Physik", "Uni/Physik/Optik", "Uni/Physik/Leer & Co"];
+
+  test("an empty folder is a row of its level, with 0 notes", () => {
+    const top = folderLevel(entries, "", folders);
+    expect(top.folders).toEqual([
+      { name: "Arbeit", path: "Arbeit", notes: 1 },
+      { name: "Leer", path: "Leer", notes: 0 },
+      { name: "Physik", path: "Physik", notes: 1 },
+      { name: "Uni", path: "Uni", notes: 4 },
+    ]);
+    const empty = folderLevel(entries, "Leer", folders);
+    expect(empty.folders).toEqual([]);
+    expect(empty.notes).toEqual([]);
+    expect(empty.parent).toBe("");
+  });
+
+  test("an empty subfolder shows next to the folders that hold notes", () => {
+    const uni = folderLevel(entries, "Uni", folders);
+    expect(uni.folders).toEqual([
+      { name: "Leer", path: "Uni/Leer", notes: 0 },
+      { name: "Physik", path: "Uni/Physik", notes: 2 },
+    ]);
+    const physik = folderLevel(entries, "Uni/Physik", folders);
+    expect(physik.folders).toEqual([
+      { name: "Leer & Co", path: "Uni/Physik/Leer & Co", notes: 0 },
+      { name: "Optik", path: "Uni/Physik/Optik", notes: 1 },
+    ]);
+  });
+
+  test("a folder that holds only empty folders is a level with those, and counts no notes itself", () => {
+    const level = folderLevel([], "", ["A", "A/B", "A/B/C"]);
+    expect(level.folders).toEqual([{ name: "A", path: "A", notes: 0 }]);
+    expect(folderLevel([], "A/B", ["A", "A/B", "A/B/C"]).folders).toEqual([{ name: "C", path: "A/B/C", notes: 0 }]);
+  });
+
+  test("an empty folder stays the folder shown, one that is gone falls back to its nearest ancestor", () => {
+    expect(existingFolder(entries, "Leer", folders)).toBe("Leer");
+    expect(existingFolder(entries, "Uni/Leer", folders)).toBe("Uni/Leer");
+    expect(existingFolder(entries, "Uni/Leer/Tiefer", folders)).toBe("Uni/Leer");
+    expect(existingFolder(entries, "Uni/Weg", folders)).toBe("Uni");
+    expect(existingFolder(entries, "Leer", [])).toBe("");
+  });
+
+  test("a folder named like another one's prefix is not mistaken for it", () => {
+    expect(folderLevel([], "Uni", ["Universum", "Uni/Physik"]).folders).toEqual([{ name: "Physik", path: "Uni/Physik", notes: 0 }]);
+    expect(existingFolder([], "Uni", ["Universum"])).toBe("");
+  });
+
+  test("a vault with three levels, spaces and special characters, without Obsidian's own folders", () => {
+    const vault = folderEntries([
+      { path: "Projekte/Büro & Co/2026 Q1/Plan (neu).md", size: 1, modified: 1, local: true },
+      { path: "Projekte/Büro & Co/Notiz.md", size: 1, modified: 1, local: true },
+      { path: ".obsidian/plugins/x/readme.md", size: 1, modified: 1, local: true },
+      { path: ".trash/Alt.md", size: 1, modified: 1, local: true },
+    ]);
+    const vaultFolders = folderPaths([".obsidian", ".obsidian/plugins", ".trash", "Projekte", "Projekte/Büro & Co", "Projekte/Büro & Co/2026 Q1", "Projekte/Büro & Co/Ideen für später", "Projekte/Büro & Co/.git"]);
+    expect(vaultFolders).toEqual(["Projekte", "Projekte/Büro & Co", "Projekte/Büro & Co/2026 Q1", "Projekte/Büro & Co/Ideen für später"]);
+
+    expect(folderLevel(vault, "", vaultFolders).folders).toEqual([{ name: "Projekte", path: "Projekte", notes: 2 }]);
+    const buero = folderLevel(vault, "Projekte/Büro & Co", vaultFolders);
+    expect(buero.folders).toEqual([
+      { name: "2026 Q1", path: "Projekte/Büro & Co/2026 Q1", notes: 1 },
+      { name: "Ideen für später", path: "Projekte/Büro & Co/Ideen für später", notes: 0 },
+    ]);
+    expect(buero.notes.map((entry) => entry.path)).toEqual(["Projekte/Büro & Co/Notiz.md"]);
+    expect(buero.parent).toBe("Projekte");
+    expect(pathSteps("Projekte/Büro & Co/2026 Q1")).toHaveLength(3);
+    expect(folderLevel(vault, "Projekte/Büro & Co/2026 Q1", vaultFolders).notes.map((entry) => entry.title)).toEqual(["Plan (neu)"]);
+    // Neither Obsidian's folders nor the hidden ones turn up at any level.
+    const names = [...folderLevel(vault, "", vaultFolders).folders, ...buero.folders].map((row) => row.name);
+    expect(names.some((name) => name.startsWith("."))).toBe(false);
   });
 });
 

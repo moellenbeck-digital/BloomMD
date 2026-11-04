@@ -563,6 +563,23 @@ be used — the product claim is that Markdown stays intact, so the demo has to 
 
 BloomMD's long-term direction is an open, locally usable knowledge and action layer built on portable Markdown. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) describes this direction without making release commitments.
 
+The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) gives the complete German and English scope, dependencies, and open decisions for all ten themes. Each theme now has a [planning issue](https://github.com/moellenbeck-digital/BloomMD/issues/256) in the BloomMD project and a planning milestone. These milestones commit to testable scope decisions, not to shipping every proposed capability or to a date.
+
+| Theme | What we need to prove before implementation | Planning issue |
+| --- | --- | --- |
+| Knowledge model and provenance | Portable Markdown records sources, owners, validity, relationships, and trust signals that survive review. | [#259](https://github.com/moellenbeck-digital/BloomMD/issues/259) |
+| Search and agentic RAG | A bounded use case returns cited answers from permitted sources and passes reference questions. | [#260](https://github.com/moellenbeck-digital/BloomMD/issues/260) |
+| Sync and offline | Local Markdown changes survive offline work, reconnection, and a visible conflict without cloud lock-in. | [#261](https://github.com/moellenbeck-digital/BloomMD/issues/261) |
+| Identity, roles, and delegation | Human and agent rights can be scoped, audited, revoked, and enforced for writes and search. | [#262](https://github.com/moellenbeck-digital/BloomMD/issues/262) |
+| Security and governance | A real scenario determines necessary isolation, privacy, retention, encryption, and organizational controls. | [#263](https://github.com/moellenbeck-digital/BloomMD/issues/263) |
+| Connectors and open interfaces | One useful external source has an explicit authority and read, mirror, or write mode. | [#264](https://github.com/moellenbeck-digital/BloomMD/issues/264) |
+| Knowledge lifecycle | Pilot evidence defines review, staleness, contradictions, archive, and recovery beyond learnings. | [#265](https://github.com/moellenbeck-digital/BloomMD/issues/265) |
+| Agent workflows | One action has clear triggers, limits, human approval, audit, and rollback. | [#266](https://github.com/moellenbeck-digital/BloomMD/issues/266) |
+| Transparency and trust | People can inspect sources, permissions, uncertainty, and external model use without leaking sensitive audit data. | [#267](https://github.com/moellenbeck-digital/BloomMD/issues/267) |
+| Operations and administration | A chosen pilot has measurable health, cost, limits, backup, and restore criteria. | [#268](https://github.com/moellenbeck-digital/BloomMD/issues/268) |
+
+The order follows dependencies: [W0: knowledge foundation and learnings pilot](https://github.com/moellenbeck-digital/BloomMD/milestone/4) first; [W1: sources and sync](https://github.com/moellenbeck-digital/BloomMD/milestone/5) next; [W2: identity, rights, and cited search](https://github.com/moellenbeck-digital/BloomMD/milestone/6) before cross-scope access; then [W3: lifecycle, workflows, governance, and operations](https://github.com/moellenbeck-digital/BloomMD/milestone/7). Work on the M1 macOS closed beta remains the priority. The [internal learnings pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116) is the first backend use case; it does not make cloud access a prerequisite for BloomMD's local editor.
+
 The [public roadmap](https://bloommd.io/roadmap) summarizes work that is ready to share. Browse and report concrete requests in [GitHub Issues](https://github.com/moellenbeck-digital/BloomMD/issues); maintainers plan them in the internal project board.
 
 ## Contributing

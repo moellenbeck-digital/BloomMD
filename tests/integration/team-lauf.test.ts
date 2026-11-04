@@ -79,7 +79,7 @@ describe("team-lauf script", () => {
   test("passes the exit code of the command through", async () => {
     const run = await start(["sh", "-c", "exit 7"]).done;
     expect(run.code).toBe(7);
-    expect(run.stderr).toContain("fertig nach 0 s, Exit 7");
+    expect(run.stderr).toMatch(/fertig nach \d+ s, Exit 7/);
     expect((await start(["sh", "-c", "exit 0"]).done).code).toBe(0);
     expect((await start(["no-such-command-for-team-lauf"]).done).code).toBe(127);
   });

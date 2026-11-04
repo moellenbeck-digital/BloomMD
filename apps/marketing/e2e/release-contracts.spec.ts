@@ -413,15 +413,22 @@ test.describe("marketing documentation and registration", () => {
     expect(body).toContain("feedback@bloommd.io");
     expect(body).toContain("Eine lokale Desktop-Datei bewusst teilen");
     expect(body).toContain("Zugriff entzogen");
+    expect(body).toContain("Einen lokalen Ordner bewusst veröffentlichen");
+    expect(body).toContain("Ordner als gemeinsamen Workspace veröffentlichen");
+    expect(body).toContain("Ordnerfreigabe trennen");
+    expect(body).toContain("lokal umbenannt");
     expect(body).toContain("/blog/collaboration-sync.png");
   });
 
-  test("explains explicit local sharing in English without promising a folder upload", async ({ request }) => {
+  test("explains explicit local sharing in English; a folder is only published through its own confirmed flow", async ({ request }) => {
     const response = await request.get("/docs/collaboration?lang=en");
     expect(response.ok()).toBe(true);
     const body = await response.text();
     expect(body).toContain("Share one local Desktop file deliberately");
     expect(body).toContain("never uploads an entire folder");
+    expect(body).toContain("Publish a local folder deliberately");
+    expect(body).toContain("Disconnect folder share");
+    expect(body).toContain("renamed locally");
     expect(body).toContain("Access revoked");
     expect(body).toContain("/blog/collaboration-sync.png");
   });

@@ -280,6 +280,26 @@ describe("ApiFileStore workspace context", () => {
     ]);
   });
 
+  test("audits a published folder with document IDs only", async () => {
+    const workspace = { id: "11111111-1111-4111-8111-111111111111", name: "Team", slug: "team", kind: "team", role: "editor" };
+    const requests: Array<{ url: string; body?: string }> = [];
+    globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = String(input);
+      requests.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
+      if (url.includes("/api/workspaces")) return Response.json({ workspace, workspaces: [workspace] });
+      if (url.endsWith("/api/shared-documents/audit")) return Response.json({ recorded: true, count: 2 });
+      return Response.json({ error: "unexpected" }, { status: 500 });
+    }) as typeof fetch;
+
+    const store = new ApiFileStore({ baseUrl: "https://bloommd.app", accessToken: "bloom_pat_test" });
+    await expect(store.recordSharedFolderBinding("bound", ["doc-1"])).rejects.toThrow("Workspace selection is required.");
+    await store.selectWorkspace(workspace.id);
+    await store.recordSharedFolderBinding("bound", ["doc-1", "doc-2"]);
+
+    const audit = requests.find((request) => request.url.endsWith("/api/shared-documents/audit"));
+    expect(JSON.parse(audit?.body ?? "{}")).toEqual({ action: "bound", documentIds: ["doc-1", "doc-2"], workspaceId: workspace.id });
+  });
+
   test("preserves sync-room save failures as a typed error", async () => {
     globalThis.fetch = (async (input: URL | RequestInfo, init?: RequestInit) => {
       const url = String(input);

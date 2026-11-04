@@ -166,7 +166,8 @@ test.describe("marketing release contracts", () => {
     expect(body).toContain("Register now");
     expect(body).not.toContain("Double opt-in");
     expect(body).toContain('src="/demo-branch-drag-markdown.webm"');
-    expect(body).toContain('src="/demo-obsidian-note-map.webm"');
+    expect(body).toContain("From files to verifiable knowledge.");
+    expect(body).toContain('href="/en/roadmap"');
   });
 
   test("publishes the BloomMD OG banner and its HTML preview", async ({ request }) => {
@@ -256,7 +257,7 @@ test.describe("marketing release contracts", () => {
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
     const menu = page.locator("#mobile-navigation");
     await expect(menu).toBeVisible();
-    for (const label of ["Produkt", "Demo", "Templates", "LLM Wiki", "Workflow", "Desktop", "Obsidian", "Local-first", "Testaccount", "FAQ", "Login", "Jetzt registrieren"]) {
+    for (const label of ["Produkt", "Demo", "Vision", "Roadmap", "Download", "Testaccount", "Hilfe", "Templates", "Obsidian", "FAQ", "Login", "Jetzt registrieren"]) {
       await expect(menu.getByText(label, { exact: true }).first()).toBeVisible();
     }
 
@@ -502,9 +503,10 @@ test.describe("marketing documentation and registration", () => {
     expect(body).toContain('data-testid="signup-cta"');
     expect(body).not.toContain('data-testid="waitlist-form"');
     expect(body).toContain('src="/demo-branch-drag-markdown.webm"');
-    expect(body).toContain('src="/demo-obsidian-note-map.webm"');
+    expect(body).toContain("Aus Dateien wird überprüfbares Wissen.");
+    expect(body).toContain('href="/roadmap"');
     expect(body).toContain("Normales Markdown · lokale Dateien · macOS und Omarchy/Linux");
-    expect(body).toContain("Ich habe Markdown-Dateien");
+    expect(body).toContain("Lokal ausprobieren");
     expect(body).toContain("Jetzt registrieren");
     expect(body).not.toContain("macOS · Windows · Linux");
     expect(body).toContain("BloomMD wird von");

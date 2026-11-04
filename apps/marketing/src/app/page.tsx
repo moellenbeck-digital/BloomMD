@@ -5,6 +5,7 @@ import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
+import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -37,10 +38,10 @@ import {
 const headerNavItems = [
   { label: "Produkt", href: "#produkt" },
   { label: "Demo", href: "/demo" },
-  { label: "Desktop", href: "#desktop" },
-  { label: "Downloads", href: "/download" },
+  { label: "Vision", href: "#vision" },
+  { label: "Roadmap", href: "/roadmap" },
+  { label: "Download", href: "/download" },
   { label: "Testaccount", href: "#beta" },
-  { label: "News", href: "/news" },
   { label: "Hilfe", href: "/docs" },
 ];
 
@@ -48,11 +49,7 @@ const secondaryNavItems = [
   { label: "Blog", href: "/blog" },
   { label: "News", href: "/news" },
   { label: "Templates", href: "/templates" },
-  { label: "LLM Wiki", href: "#llm-wiki" },
-  { label: "Roadmap", href: "/roadmap" },
-  { label: "Workflow", href: "#workflow" },
   { label: "Obsidian", href: "/obsidian" },
-  { label: "Local-first", href: "#local-first" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -88,11 +85,9 @@ const footerSections = [
   {
     title: "Arbeiten",
     links: [
-      { label: "Desktop", href: "#desktop" },
+      { label: "Desktop", href: "/download" },
       { label: "Obsidian", href: "/obsidian" },
-      { label: "LLM Wiki", href: "#llm-wiki" },
-      { label: "Workflow", href: "#workflow" },
-      { label: "Local-first", href: "#local-first" },
+      { label: "Wissensplattform", href: "#vision" },
     ],
   },
   {
@@ -123,31 +118,24 @@ const markdownLines = [
 const audiencePaths = [
   {
     icon: FileText,
-    title: "Ich habe Markdown-Dateien",
-    text: "Teste eine echte Datei im Browser oder lade die Desktop-Beta für macOS und Omarchy/Linux herunter.",
+    title: "Lokal ausprobieren",
+    text: "Teste eine Markdown-Datei im Browser. Die Desktop-Beta gibt es für macOS und Omarchy/Linux.",
     href: "/demo",
-    cta: "Demo ohne Account testen",
-  },
-  {
-    icon: RefreshCw,
-    title: "Ich nutze Obsidian",
-    text: "Sieh dir an, wie lokale Obsidian-Notizen als BloomMD-Map sichtbar werden.",
-    href: "/obsidian",
-    cta: "Obsidian-Status ansehen",
+    cta: "Demo ohne Konto testen",
   },
   {
     icon: MonitorSmartphone,
-    title: "Ich will Team/Cloud testen",
-    text: "Die private App mit Auth, Sync und Collaboration kannst du dir mit einem Konto freischalten.",
+    title: "Web und Team nutzen",
+    text: "Teste Web-Workspaces, Sync und Zusammenarbeit 30 Tage kostenlos ab E-Mail-Bestätigung.",
     href: "#beta",
-    cta: "Jetzt registrieren",
+    cta: "Testaccount erstellen",
   },
   {
-    icon: LayoutTemplate,
-    title: "Ich will Vorlagen",
-    text: "Starte mit Markdown-Templates für Strategie, Architektur, Research oder Obsidian.",
-    href: "/templates",
-    cta: "Templates ansehen",
+    icon: GitBranch,
+    title: "Richtung mitgestalten",
+    text: "Sieh dir den Stand der Wissensplattform-Roadmap an und teile deine Idee.",
+    href: "/roadmap",
+    cta: "Roadmap ansehen",
   },
 ];
 
@@ -529,7 +517,7 @@ function AudiencePathSection() {
   return (
     <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]" data-testid="landing-paths">
       <div className="mx-auto max-w-7xl px-5 py-8 lg:py-10">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3">
           {audiencePaths.map((path) => {
             const Icon = path.icon;
             return (
@@ -571,7 +559,7 @@ function WhatIsNewSection() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Der Agent arbeitet nur auf ausdrücklichen Auftrag und nur mit dem Kontext des gewählten Knotens. Er schlägt vor – du entscheidest.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-          <Link href="/docs/openclaw-agent" className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link href="/docs/openclaw-agent" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
           <Link href="/blog/openclaw-lokale-workspace-agenten" className="inline-flex h-10 items-center justify-center rounded-md border border-white/18 px-4 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">Was daran neu ist</Link>
         </div>
       </div>
@@ -712,8 +700,8 @@ function UseCasesSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Anwendungsfälle</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Für Wissen, das zu komplex für eine lineare Liste wird.</h2>
         </div>
-        <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
-          <div className="grid gap-2" role="tablist" aria-label="Anwendungsfälle">
+        <div className="space-y-5">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Anwendungsfälle">
             {useCases.map((item) => (
               <button
                 key={item.id}
@@ -723,7 +711,7 @@ function UseCasesSection() {
                 aria-selected={active.id === item.id}
                 aria-controls={`usecase-panel-${item.id}`}
                 onClick={() => setActiveId(item.id)}
-                className={`rounded-md border px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
+                className={`min-h-11 rounded-md border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
                   active.id === item.id ? "border-[#FF6B35] bg-[#FFF4EE] text-[#1A1A1A]" : "border-[#E8E4DF] bg-[#FCFBFA] text-[#666666] hover:bg-white"
                 }`}
               >
@@ -735,16 +723,16 @@ function UseCasesSection() {
             id={`usecase-panel-${active.id}`}
             role="tabpanel"
             aria-labelledby={`usecase-tab-${active.id}`}
-            className="grid gap-4 rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4 lg:grid-cols-[0.8fr_1.2fr]"
+            className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4"
           >
-            <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
-              <div className="mb-3 text-sm font-semibold">{active.file}</div>
-              <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
-            </div>
-            <div>
+            <h3 className="text-xl font-semibold">{active.heading}</h3>
+            <p className="mt-2 max-w-3xl leading-7 text-[#555555]">{active.text}</p>
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+              <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
+                <div className="mb-3 text-sm font-semibold">{active.file}</div>
+                <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
+              </div>
               <MindMapPreview document={previewDocument} className="min-h-[250px]" ariaLabel={`${active.label} Markdown mind map preview`} />
-              <h3 className="mt-4 text-xl font-semibold">{active.heading}</h3>
-              <p className="mt-2 leading-7 text-[#666666]">{active.text}</p>
             </div>
           </div>
         </div>
@@ -771,7 +759,7 @@ function TemplatesSection() {
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templateCards.map((template) => (
+          {templateCards.slice(0, 3).map((template) => (
             <article key={template.href} className="rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="rounded-md border border-[#FFD4BF] bg-[#FFF4EE] px-2.5 py-1 text-xs font-semibold text-[#B64A1F]">{template.category}</span>
@@ -779,14 +767,9 @@ function TemplatesSection() {
               </div>
               <h3 className="text-lg font-semibold">{template.title}</h3>
               <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#666666]">{template.text}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link href={`/demo?template=${template.href.split("/").pop()}`} className="inline-flex h-9 items-center justify-center rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
-                  In BloomMD öffnen
-                </Link>
-                <Link href={template.href} className="inline-flex h-9 items-center justify-center rounded-md border border-[#D4CFC8] px-3 text-sm font-semibold text-[#1A1A1A] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                  Vorschau
-                </Link>
-              </div>
+              <Link href={`/demo?template=${template.href.split("/").pop()}`} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
+                In der Demo öffnen <ArrowRight size={16} aria-hidden="true" />
+              </Link>
             </article>
           ))}
         </div>
@@ -806,7 +789,7 @@ function ObsidianSection() {
             Das Plugin ist für Obsidian auf Desktop, iPad, iPhone und Android als Beta über BRAT oder GitHub-Releases verfügbar. Die Aufnahme zeigt eine echte lokale Notiz.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
+            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
               Status ansehen
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
@@ -946,7 +929,7 @@ function DesktopSection() {
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white hover:bg-[#963311]">
               Desktop-Builds herunterladen
             </Link>
             <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
@@ -1103,13 +1086,13 @@ export default function LandingPage() {
               Ebene — lokal, portabel und ohne neues Dateiformat.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white transition hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Demo ohne Account testen
+              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+                Demo ohne Konto testen
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <a href={appSignupUrl} className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Jetzt registrieren
-              </a>
+              <Link href="/download" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+                Desktop herunterladen
+              </Link>
             </div>
             <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
           </div>
@@ -1121,38 +1104,10 @@ export default function LandingPage() {
         <SplitDemo />
       </section>
 
+      <KnowledgeVisionSection locale="de" />
       <AudiencePathSection />
-      <WhatIsNewSection />
-
-      <section className="mx-auto grid max-w-7xl gap-8 px-5 py-16 motion-safe:animate-[sectionIn_.45s_ease-out_both] lg:grid-cols-[0.75fr_1.25fr] lg:py-20">
-        <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Positionierung</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Markdown ist offen und langlebig. Aber große Dokumente sind schwer zu überblicken.</h2>
-          <p className="mt-5 text-lg leading-8 text-[#666666]">
-            BloomMD behält die offene Datei und ergänzt genau die räumliche Sicht, die linearem Text fehlt.
-          </p>
-        </div>
-        <div className="grid gap-4">
-          {problemItems.map((item, index) => (
-            <article key={item.title} className="grid gap-4 rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm sm:grid-cols-[44px_1fr]">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[#FFF4EE] text-sm font-semibold text-[#B64A1F]">{index + 1}</div>
-              <div>
-                <h3 className="font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#666666]">{item.text}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <WorkflowSection />
       <UseCasesSection />
       <TemplatesSection />
-      <ObsidianSection />
-      <DesktopSection />
-      <LocalFirstSection />
-      <WikiSection />
-      <FeatureBento />
       <AvailabilityOverview locale="de" />
       <FAQSection />
 
@@ -1176,24 +1131,6 @@ export default function LandingPage() {
               Jetzt registrieren
               <ArrowRight size={17} aria-hidden="true" />
             </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-[#E8E4DF] bg-[#1F1D1B] text-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-12 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-3xl font-semibold">Deine Dateien sind bereits da. BloomMD macht sie sichtbar.</h2>
-            <p className="mt-3 text-white/68">Starte mit einem Template oder teste eine echte Markdown-Datei direkt im Browser.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-              Demo öffnen
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-            <Link href="/templates" className="inline-flex h-12 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">
-              Templates ansehen
-            </Link>
           </div>
         </div>
       </section>

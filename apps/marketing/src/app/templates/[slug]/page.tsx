@@ -52,7 +52,7 @@ export default async function TemplatePage({ params, searchParams }: TemplatePag
             <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">{template.title}</h1>
             <p className="mt-4 text-lg leading-8 text-[var(--color-ink-muted)]">{template.description}</p>
             <div className="mt-6 flex flex-wrap gap-2">
-              <Link href={withMarketingLocale(`/demo?template=${template.slug}`, locale)} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+              <Link href={withMarketingLocale(`/demo?template=${template.slug}`, locale)} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311]">
                 {copy.demo}
                 <ArrowRight size={16} />
               </Link>

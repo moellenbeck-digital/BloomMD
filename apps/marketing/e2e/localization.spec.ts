@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const routeMatrix = [
   { path: "/en", text: "Markdown files. Visual maps." },
-  { path: "/en/roadmap", text: "What beta feedback is turning into." },
+  { path: "/en/roadmap", text: "What BloomMD is exploring next." },
   { path: "/en/blog", text: "Read the latest thinking" },
   { path: "/en/news", text: "The latest changes" },
   { path: "/demo?lang=en", text: "Try your own Markdown" },
@@ -10,7 +10,7 @@ const routeMatrix = [
   { path: "/templates/software-architecture?lang=en", text: "Software Architecture Map" },
   { path: "/docs?lang=en", text: "Getting started" },
   { path: "/download?lang=en", text: "Download desktop apps" },
-  { path: "/obsidian?lang=en", text: "Your Obsidian notes as BloomMD maps." },
+  { path: "/obsidian?lang=en", text: "Install BloomMD in Obsidian" },
   { path: "/waitlist/abgemeldet?lang=en", text: "Unsubscribed" },
   { path: "/waitlist/abgemeldet?status=ungueltig&lang=en", text: "This unsubscribe link no longer works" },
   { path: "/datenschutz?lang=en", text: "Privacy policy" },

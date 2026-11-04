@@ -125,7 +125,7 @@ function SiteHeader({ locale, kind, copy }: { locale: MarketingLocale; kind: Mar
           <Link href={demoPath} className="hidden rounded-md px-3 py-2 text-white/72 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/40 md:inline-flex">
             {copy.demoLabel}
           </Link>
-          <Link href={downloadPath} className="inline-flex rounded-md bg-[#FF6B35] px-3 py-2 text-white transition hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/40">
+          <Link href={downloadPath} className="inline-flex rounded-md bg-[#B94316] px-3 py-2 text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/40">
             {copy.downloadLabel}
           </Link>
           <Link href={languagePath} hrefLang={locale === "en" ? "de" : "en"} className="rounded-md border border-white/15 px-3 py-2 text-white/68 transition hover:border-white/30 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/40">
@@ -152,7 +152,7 @@ export function MarketingContentIndex({ kind, locale, posts }: { kind: Marketing
             <p className="mt-4 max-w-2xl text-base leading-7 text-white/66 sm:text-xl sm:leading-8">{copy.description}</p>
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-3 text-sm font-semibold">
-            <Link href={locale === "en" ? "/demo?lang=en" : "/demo"} className="inline-flex items-center gap-2 rounded-md bg-[#FF6B35] px-4 py-3 text-white transition hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/50">
+            <Link href={locale === "en" ? "/demo?lang=en" : "/demo"} className="inline-flex items-center gap-2 rounded-md bg-[#B94316] px-4 py-3 text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/50">
               {copy.demoLabel}<ArrowRight size={16} aria-hidden="true" />
             </Link>
             <Link href={locale === "en" ? "/download?lang=en" : "/download"} className="inline-flex items-center gap-2 rounded-md border border-white/18 px-4 py-3 text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/50">

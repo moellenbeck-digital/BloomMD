@@ -580,7 +580,10 @@ export function App() {
         if (node && selected !== node) throw new Error(`selected ${selected ?? "nothing"} instead of ${node}`);
       }, async (url) => {
         await openExternalFile(url, true);
-        return { path: useMindMapStore.getState().document?.filePath ?? null, store: storeRef.current.kind, folder: folderPathRef.current };
+        const path = useMindMapStore.getState().document?.filePath ?? null;
+        // The folder shown follows after the next render.
+        for (let waited = 0; path && folderPathRef.current !== folderOf(path) && waited < 3000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+        return { path, store: storeRef.current.kind, folder: folderPathRef.current };
       });
       return;
     }

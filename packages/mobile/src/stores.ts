@@ -1,8 +1,9 @@
 /**
- * Where the app keeps maps: its own folder (default) or a folder the user opened from the Files app,
- * typically an Obsidian vault in iCloud Drive. Both are edited in place as plain Markdown.
+ * Where the app keeps maps: its own folder (default), a folder the user opened from the Files app,
+ * typically an Obsidian vault in iCloud Drive, or one single Markdown file the Files app handed over
+ * ("Open in BloomMD"). Folder and file are edited in place as plain Markdown.
  */
-import type { BloomFolderPlugin, FolderFile } from "@bloommd/capacitor-folder";
+import type { BloomFolderPlugin, FolderFile, OpenedFile } from "@bloommd/capacitor-folder";
 import { conflictCopyPath, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import type { MindMapDocument, MindMapFrontmatter } from "@bloommd/core/browser";
 import { deleteMindmap, listMindmaps, readMindmap, writeMindmap } from "./storage";
@@ -27,7 +28,7 @@ export interface LoadedDocument {
 }
 
 export interface MobileStore {
-  readonly kind: "app" | "folder";
+  readonly kind: "app" | "folder" | "file";
   readonly name: string;
   /** `truncated`: the folder holds more notes than one listing returns. */
   list(): Promise<{ entries: StoreEntry[]; unreadable: string[]; truncated?: boolean }>;
@@ -48,6 +49,27 @@ export class StoreConflictError extends Error {
   constructor(readonly path: string) {
     super(`„${path}“ wurde auf einem anderen Gerät geändert oder gelöscht.`);
   }
+}
+
+/** A path that would leave the folder: absolute, with `..` or `.` parts, empty parts or control characters. */
+export class UnsafePathError extends Error {
+  readonly code = "BAD_PATH";
+  constructor(readonly path: string) {
+    super(`„${path}“ liegt nicht im geöffneten Ordner.`);
+  }
+}
+
+/** The path inside the open folder, "/"-separated; throws {@link UnsafePathError} for anything that could leave it. */
+export function safePath(path: string): string {
+  const parts = path.split("/");
+  const unsafe = !path
+    || path.startsWith("/")
+    || /^[A-Za-z]:/.test(path)
+    // eslint-disable-next-line no-control-regex
+    || /[\u0000-\u001f]/.test(path)
+    || parts.some((part) => part === "" || part === "." || part === "..");
+  if (unsafe) throw new UnsafePathError(path);
+  return path;
 }
 
 /** Error code of a rejected plugin call (CONFLICT, EXISTS, …). */
@@ -118,9 +140,14 @@ export function createAppStore(): MobileStore {
 
 const SKIPPED_FOLDERS = /(^|\/)(\.|node_modules\/|\.obsidian\/|\.trash\/)/;
 
+/** Obsidian's own folders, dot folders and `node_modules` are never part of the note list. */
+export function isSkippedPath(path: string): boolean {
+  return SKIPPED_FOLDERS.test(path);
+}
+
 export function folderEntries(files: FolderFile[]): StoreEntry[] {
   return files
-    .filter((file) => !SKIPPED_FOLDERS.test(file.path))
+    .filter((file) => !isSkippedPath(file.path))
     .map((file) => {
       const slash = file.path.lastIndexOf("/");
       return {
@@ -142,14 +169,14 @@ export function createFolderStore(plugin: BloomFolderPlugin, name: string): Mobi
       return { entries: folderEntries(files), unreadable: [], ...(truncated ? { truncated } : {}) };
     },
     async read(path) {
-      const { data, modified } = await plugin.read({ path });
+      const { data, modified } = await plugin.read({ path: safePath(path) });
       return loaded(path, data, modified);
     },
     async save(current, document) {
       // Opening a note must never rewrite it: only real edits are written back.
       if (!hasChanges(current, document)) return null;
       const markdown = serializeToMarkdown(document);
-      const path = current.document.filePath;
+      const path = safePath(current.document.filePath);
       try {
         const { modified } = await plugin.write({ path, data: markdown, ...(current.modified ? { expectedModified: current.modified } : {}) });
         return { document, baseline: markdown, modified };
@@ -158,10 +185,10 @@ export function createFolderStore(plugin: BloomFolderPlugin, name: string): Mobi
         throw error;
       }
     },
-    remove: (path) => plugin.remove({ path }),
+    remove: async (path) => plugin.remove({ path: safePath(path) }),
     async saveCopy(document, label) {
       for (let attempt = 1; attempt <= COPY_ATTEMPTS; attempt += 1) {
-        const path = copyPath(document.filePath, label, attempt);
+        const path = safePath(copyPath(document.filePath, label, attempt));
         try {
           // Exclusive: an existing note, also one iCloud has not downloaded yet, is never replaced.
           await plugin.write({ path, data: serializeToMarkdown(copyOf(document, path)), exclusive: true });
@@ -172,6 +199,47 @@ export function createFolderStore(plugin: BloomFolderPlugin, name: string): Mobi
       }
       throw new Error("No free file name for the copy.");
     },
-    pathFor: (filename, folder) => (folder ? `${folder.replace(/\/+$/, "")}/${filename}` : filename),
+    pathFor: (filename, folder) => safePath(folder ? `${folder.replace(/\/+$/, "")}/${filename}` : filename),
+  };
+}
+
+/**
+ * One Markdown file opened in place from the Files app. It is listed as the only note, saved with
+ * the same conflict and atomic-write rules as a note of a folder, and never deleted or replaced by
+ * another note. A conflict copy of this device's edits goes to `copyTo` (the app folder by default),
+ * because only the file itself, not its folder, is reachable.
+ */
+export function createFileStore(plugin: BloomFolderPlugin, file: Pick<OpenedFile, "token" | "name">, copyTo: MobileStore = createAppStore()): MobileStore {
+  const own = (path: string) => {
+    if (path !== file.name) throw new UnsafePathError(path);
+    return path;
+  };
+  return {
+    kind: "file",
+    name: file.name,
+    async list() {
+      return { entries: [{ path: file.name, title: file.name.replace(/\.(md|markdown)$/i, ""), folder: "", local: true }], unreadable: [] };
+    },
+    async read(path) {
+      const { data, modified } = await plugin.readFile({ token: file.token });
+      return loaded(own(path), data, modified);
+    },
+    async save(current, document) {
+      if (!hasChanges(current, document)) return null;
+      const markdown = serializeToMarkdown(document);
+      const path = own(current.document.filePath);
+      try {
+        const { modified } = await plugin.writeFile({ token: file.token, data: markdown, ...(current.modified ? { expectedModified: current.modified } : {}) });
+        return { document, baseline: markdown, modified };
+      } catch (error) {
+        if (errorCode(error) === "CONFLICT" || /changed on another device/.test(String((error as Error).message))) throw new StoreConflictError(path);
+        throw error;
+      }
+    },
+    async remove() {
+      throw new Error("A file opened from the Files app is not deleted from here.");
+    },
+    saveCopy: (document, label) => copyTo.saveCopy(document, label),
+    pathFor: (filename) => filename,
   };
 }

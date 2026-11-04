@@ -85,13 +85,13 @@ describe("signup gate", () => {
   test("refuses an uninvited address with no code", () => {
     const env = gate({ BLOOMMD_BETA_ALLOWED_EMAILS: "tester@example.com" });
     expect(() => assertBetaSignupAllowed({ email: "stranger@example.com" }, env)).toThrow(BetaAccessError);
-    expect(() => assertBetaSignupAllowed({ email: "stranger@example.com" }, env)).toThrow("Diese E-Mail ist noch nicht für die Beta freigeschaltet.");
+    expect(() => assertBetaSignupAllowed({ email: "stranger@example.com" }, env)).toThrow("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.");
   });
 
   test("refuses a wrong code", () => {
     const env = gate({ BLOOMMD_BETA_INVITE_CODES: "bloom-alpha-1" });
     expect(() => assertBetaSignupAllowed({ email: "stranger@example.com", inviteCode: "guess" }, env)).toThrow(BetaAccessError);
-    expect(() => assertBetaSignupAllowed({ email: "stranger@example.com", inviteCode: "guess" }, env)).toThrow("Der Einladungscode ist ungültig.");
+    expect(() => assertBetaSignupAllowed({ email: "stranger@example.com", inviteCode: "guess" }, env)).toThrow("Der Zugangscode ist ungültig.");
   });
 
   test("closes the door completely when the gate is on but nothing is configured", () => {

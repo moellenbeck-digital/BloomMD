@@ -39,7 +39,7 @@ const headerNavItems = [
   { label: "Demo", href: "/demo" },
   { label: "Desktop", href: "#desktop" },
   { label: "Downloads", href: "/download" },
-  { label: "Beta", href: "#beta" },
+  { label: "Testaccount", href: "#beta" },
   { label: "News", href: "/news" },
   { label: "Hilfe", href: "/docs" },
 ];
@@ -96,7 +96,7 @@ const footerSections = [
     ],
   },
   {
-    title: "Beta",
+    title: "Testaccount",
     links: [
       { label: "Registrierung", href: "#beta" },
       { label: "Login", href: appLoginUrl },
@@ -339,8 +339,8 @@ const faqItems = [
     answer: "Deine Inhalte bleiben als Markdown-Dateien erhalten. Du verlierst nicht den Zugriff auf dein Wissen, nur weil du das Tool wechselst.",
   },
   {
-    question: "Wie lange läuft die Beta?",
-    answer: "Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin sind ohne Konto verfügbar. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich mit einem Konto. Preise veröffentlichen wir erst nach der Beta.",
+    question: "Wie lange gilt der kostenlose Testaccount?",
+    answer: "Der kostenlose Testaccount für BloomMD Web, Cloud, Sync und Zusammenarbeit gilt 30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste. Nach 15 und 23 Tagen erinnern wir dich per E-Mail. Danach ist dein Konto nur noch lesbar, der Export bleibt möglich und nichts geht verloren. Für bestehende Konten zählt der Testzeitraum ab dem 15.11.2026. Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin (Beta) sind ohne Konto verfügbar. Preise und Leistungsumfang werden vor Einführung veröffentlicht.",
   },
   {
     question: "Ist Sync erforderlich?",
@@ -1161,8 +1161,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-5 py-14">
           <h2 className="text-3xl font-semibold text-[#1A1A1A]">Jetzt registrieren</h2>
           <p className="mt-3 max-w-2xl text-[#514C46]">
-            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir ein Konto an. Die Warteliste
-            gibt es nicht mehr. Demo, lokale Desktop-Builds und das Obsidian-Plugin brauchen kein Konto.
+            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an,
+            ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto
+            lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin
+            brauchen kein Konto.
           </p>
           <div className="mt-6">
             <a
@@ -1211,7 +1213,7 @@ export default function LandingPage() {
                 zur Verfügung gestellt.
               </p>
               <p className="mt-5 inline-flex rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/58">
-                Closed Beta · macOS + Omarchy/Linux
+                Beta · macOS + Omarchy/Linux
               </p>
             </div>
 

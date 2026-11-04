@@ -15,7 +15,7 @@ Auf dieser Seite:
 - macOS blockiert BloomMD (Gatekeeper, DMG)
 - Ordner lässt sich nicht öffnen oder speichern
 - Der Sync-Status zeigt nicht „Synchronisiert“
-- Einladung oder Zugang funktioniert nicht
+- Freischaltung oder Zugang funktioniert nicht
 - Browser-Demo
 
 ## macOS blockiert BloomMD (Gatekeeper, DMG)
@@ -42,7 +42,7 @@ unerwartet und ein Fall für uns.
 ![DMG-Fenster von BloomMD 0.5.7 mit App und Verknüpfung zum Programme-Ordner](/releases/desktop-0.5.7-installer.png)
 
 Omarchy/Linux kennt kein Gatekeeper: Das Pacman-Paket installierst du mit `sudo pacman -U`, siehe
-[Desktop-App](/docs/desktop). Windows gehört nicht zur Closed Beta.
+[Desktop-App](/docs/desktop). Windows gehört nicht zur Beta.
 
 ## Ordner lässt sich nicht öffnen oder speichern
 
@@ -144,23 +144,23 @@ In der Desktop-App heißen die Zustände einer geteilten lokalen Datei **Verbund
 **Konflikt** und **Zugriff entzogen**. Die Bedeutung ist dieselbe; mehr dazu unter
 [Zusammenarbeit](/docs/collaboration).
 
-## Einladung oder Zugang funktioniert nicht
+## Freischaltung oder Zugang funktioniert nicht
 
-![Echter Screenshot: Die Registrierungsseite bei aktivem Zugangsschalter mit dem Hinweis, dass der Cloud-Zugang noch nicht freigeschaltet ist, und einem Feld für die eingeladene E-Mail-Adresse](/docs/signup-gate.png)
+![Echter Screenshot: Die Registrierungsseite bei aktivem Zugangsschalter mit dem Hinweis, dass der kostenlose Testaccount noch nicht freigeschaltet ist, und einem Feld für die E-Mail-Adresse](/docs/signup-gate.png)
 
 ### Registrierung
 
-Normalerweise ist die Registrierung offen, ohne Einladung. Nur wenn der Betreiber den Zugangsschalter
-aktiviert hat, siehst du „Dein Cloud-Zugang ist noch nicht freigeschaltet.“ statt des Formulars.
+Normalerweise legst du den kostenlosen Testaccount selbst an, ohne Einladung und ohne Warteliste. Nur wenn der Betreiber den Zugangsschalter
+aktiviert hat, siehst du „Dein kostenloser Testaccount ist noch nicht freigeschaltet.“ statt des Formulars.
 
-- **„Diese E-Mail ist noch nicht für die Beta freigeschaltet.“** Nimm genau die Adresse, an die die
-  Einladung ging. Hast du noch keine Einladung, wende dich an das BloomMD-Team.
-- **„Der Einladungscode ist ungültig.“** Den Code prüfen. Das Feld **Beta-Code (optional)** ist nur
+- **„Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.“** Nimm genau die Adresse, für die
+  der Testaccount freigeschaltet wurde. Ist sie noch nicht freigeschaltet, wende dich an das BloomMD-Team.
+- **„Der Zugangscode ist ungültig.“** Den Code prüfen. Das Feld **Zugangscode (optional)** ist nur
   nötig, wenn du einen Code erhalten hast.
-- **Einladungsmail nicht angekommen:** Spam- und Promotions-Ordner prüfen; ein Admin kann sie erneut
+- **E-Mail zur Freischaltung nicht angekommen:** Spam- und Promotions-Ordner prüfen; ein Admin kann sie erneut
   senden.
 
-![Echter Screenshot: Die Registrierungsseite, geöffnet über einen Einladungslink, mit schon eingetragener E-Mail-Adresse](/docs/signup-invited.png)
+![Echter Screenshot: Die Registrierungsseite, geöffnet über den Link aus der Freischaltungs-E-Mail, mit schon eingetragener E-Mail-Adresse](/docs/signup-invited.png)
 
 ### E-Mail-Bestätigung
 
@@ -185,7 +185,7 @@ Nach der Anmeldung bestätigst du den Beitritt ausdrücklich mit **Workspace bei
 - **Die zweite Person sieht den Workspace nicht:** Prüfen, ob die Einladung angenommen wurde und ob sie mit
   genau der eingeladenen Adresse angemeldet ist. Ein Konto allein gibt keinen Zugriff.
 
-Der vollständige Ablauf steht unter [Closed-Beta Zugang](/docs/closed-beta-zugang) und
+Der vollständige Ablauf steht unter [Kostenloser Testaccount](/docs/closed-beta-zugang) und
 [Zusammenarbeit](/docs/collaboration).
 
 ## Browser-Demo

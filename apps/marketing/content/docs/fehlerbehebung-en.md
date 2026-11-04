@@ -15,7 +15,7 @@ On this page:
 - macOS blocks BloomMD (Gatekeeper, DMG)
 - A folder will not open or save
 - The sync status does not say "Synced"
-- An invitation or access does not work
+- Enablement or access does not work
 - Browser demo
 
 ## macOS blocks BloomMD (Gatekeeper, DMG)
@@ -42,7 +42,7 @@ hear about.
 ![BloomMD 0.5.7 DMG window with the BloomMD app and the Applications shortcut](/releases/desktop-0.5.7-installer.png)
 
 Omarchy/Linux has no Gatekeeper: install the Pacman package with `sudo pacman -U`, see
-[Desktop app](/docs/desktop?lang=en). Windows is not part of the closed beta.
+[Desktop app](/docs/desktop?lang=en). Windows is not part of the beta.
 
 ## A folder will not open or save
 
@@ -138,23 +138,23 @@ In the desktop app the states of a shared local file are called **Connected**, *
 **Conflict**, and **Access revoked**. The meaning is the same; more under
 [Collaboration](/docs/collaboration?lang=en).
 
-## An invitation or access does not work
+## Enablement or access does not work
 
-![Real screenshot: the signup page while the access switch is on, with the notice that cloud access is not enabled yet and a field for the invited email address](/docs/signup-gate-en.png)
+![Real screenshot: the signup page while the access switch is on, with the notice that the free trial account is not enabled yet and a field for the email address](/docs/signup-gate-en.png)
 
 ### Registration
 
-Registration is normally open, without an invitation. Only if the operator has turned on the access
-switch do you see "Your cloud access is not enabled yet." instead of the form.
+Normally you create the free trial account yourself, without an invitation and without a waitlist. Only if the operator has turned on the access
+switch do you see "Your free trial account is not enabled yet." instead of the form.
 
-- **"This email is not enabled for the beta yet."** Use exactly the address the invitation went to. If
-  you have no invitation yet, contact the BloomMD team.
-- **"The beta code is invalid."** Check the code. The **Beta code (optional)** field is only needed if
+- **"Your free trial account is not enabled for this email address yet."** Use exactly the address that was enabled. If
+  it is not enabled yet, contact the BloomMD team.
+- **"The access code is invalid."** Check the code. The **Access code (optional)** field is only needed if
   you received a code.
-- **Invitation email did not arrive:** Check your spam and promotions folders; an admin can send it
+- **Enablement email did not arrive:** Check your spam and promotions folders; an admin can send it
   again.
 
-![Real screenshot: the signup page opened from an invitation link, with the invited email address already filled in](/docs/signup-invited-en.png)
+![Real screenshot: the signup page opened from the enablement email link, with the email address already filled in](/docs/signup-invited-en.png)
 
 ### Email confirmation
 
@@ -179,7 +179,7 @@ After signing in, you confirm joining explicitly with **Join workspace**.
 - **The second person does not see the workspace:** Check that the invitation was accepted and that they
   are signed in with exactly the invited address. An account alone does not give access.
 
-The full flow is in [Closed beta access](/docs/closed-beta-zugang?lang=en) and
+The full flow is in [Free trial account](/docs/closed-beta-zugang?lang=en) and
 [Collaboration](/docs/collaboration?lang=en).
 
 ## Browser demo

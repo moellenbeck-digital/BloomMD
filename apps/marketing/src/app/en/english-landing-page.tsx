@@ -38,7 +38,7 @@ const headerNavItems = [
   { label: "Demo", href: "/demo?lang=en" },
   { label: "Desktop", href: "#desktop" },
   { label: "Downloads", href: "/download?lang=en" },
-  { label: "Beta", href: "#beta" },
+  { label: "Free trial", href: "#beta" },
   { label: "News", href: "/en/news" },
   { label: "Help", href: "/docs?lang=en" },
 ] as const;
@@ -197,8 +197,8 @@ const faqItems = [
     answer: "Yes. Because the source remains Markdown, the same notes keep working in Git, VS Code, Obsidian and any text editor.",
   },
   {
-    question: "What is included in the beta?",
-    answer: "The browser demo, macOS and Omarchy/Linux desktop builds, and Obsidian plugin are available without an account. For BloomMD Web, cloud workspaces, sync and collaboration you register with an account.",
+    question: "What is included in the free trial account and the beta?",
+    answer: "The free trial account for BloomMD Web, cloud workspaces, sync and collaboration is valid for 30 days from email confirmation, with no invitation and no waitlist. We remind you by email after 15 and 23 days. After it ends, your account is read-only, export remains possible and nothing is lost. For existing accounts the trial period counts from November 15, 2026. The browser demo, macOS and Omarchy/Linux desktop builds, and the Obsidian plugin (beta) are available without an account. Pricing and scope will be published before launch.",
   },
   {
     question: "Can I give feedback with screenshots?",
@@ -724,10 +724,10 @@ function BetaSection() {
     <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">
       <div className="mx-auto max-w-7xl px-5 py-14">
         <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Free trial account</p>
           <h2 className="text-3xl font-semibold text-[#1A1A1A] sm:text-4xl">Register now</h2>
           <p className="mt-3 text-[#514C46]">
-            For BloomMD Web, cloud workspaces, sync and collaboration you create an account. The waitlist no longer exists. The demo, local desktop builds and Obsidian plugin need no account.
+            For BloomMD Web, cloud workspaces, sync and collaboration you create a free trial account, with no invitation and no waitlist. It is valid for 30 days from email confirmation; after that your account stays readable and export remains possible, nothing is lost. The demo, local desktop builds and Obsidian plugin need no account.
           </p>
         </div>
         <div className="mt-6">
@@ -753,7 +753,7 @@ function FAQSection() {
     <section id="faq" className="mx-auto max-w-4xl px-5 py-16 lg:py-20">
       <div className="mb-8 text-center">
         <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">FAQ</p>
-        <h2 className="text-3xl font-semibold sm:text-4xl">Short answers about files, sync and beta access.</h2>
+        <h2 className="text-3xl font-semibold sm:text-4xl">Short answers about files, sync and your trial account.</h2>
       </div>
       <div className="divide-y divide-[#E8E4DF] rounded-xl border border-[#E8E4DF] bg-white">
         {faqItems.map((item, index) => {
@@ -804,7 +804,7 @@ function Footer() {
       ],
     },
     {
-      title: "Beta",
+      title: "Free trial account",
       links: [
         { label: "Registration", href: "#beta" },
         { label: "Login", href: appLoginUrl },
@@ -831,7 +831,7 @@ function Footer() {
               </a>.
             </p>
             <p className="mt-5 inline-flex rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/58">
-              Closed beta / macOS + Omarchy/Linux
+              Beta / macOS + Omarchy/Linux
             </p>
           </div>
           <nav className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4" aria-label="Footer navigation">
@@ -900,7 +900,7 @@ export function EnglishLandingPage() {
     name: "BloomMD",
     applicationCategory: "ProductivityApplication",
     operatingSystem: "Web, macOS, Linux",
-    description: "BloomMD turns open Markdown files into interactive visual maps without introducing a new file format. Local-first, portable and built for the closed beta.",
+    description: "BloomMD turns open Markdown files into interactive visual maps without introducing a new file format. Local-first, portable and available as a beta.",
   };
 
   return (

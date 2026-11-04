@@ -20,6 +20,6 @@ test.describe("auth and workspace invitation handoff", () => {
 
     await page.goto("/signup");
     await expect(page.getByTestId("beta-access-gate")).toHaveCount(0);
-    await expect(page.getByText("Beta-Zugang")).toHaveCount(0);
+    await expect(page.getByText("noch nicht freigeschaltet")).toHaveCount(0);
   });
 });

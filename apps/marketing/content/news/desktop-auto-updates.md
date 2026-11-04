@@ -16,6 +16,6 @@ Die macOS-App kann stabile Updates jetzt selbst prüfen und den Download im Abou
 
 Der Downloadpfad läuft über BloomMD, während die Release-Artefakte im CI gebaut, geprüft und veröffentlicht werden. Dadurch kann die App auf neue Builds hinweisen, ohne die GitHub-Release-Adresse in der Oberfläche offenzulegen.
 
-Für die Closed Beta bleibt die Vertrauenskette separat: Der damalige Build ist ad-hoc signiert und noch nicht notarisiert.
+Für die Beta bleibt die Vertrauenskette separat: Der damalige Build ist ad-hoc signiert und noch nicht notarisiert.
 
 **Commit-Datum:** 23. August 2026

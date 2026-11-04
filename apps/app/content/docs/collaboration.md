@@ -6,8 +6,7 @@ order: 4
 
 # Zusammenarbeit
 
-Mehrere Personen können dieselbe Markdown-Datei gleichzeitig in BloomMD bearbeiten. Für die Closed
-Beta passiert das über einen Cloud-Workspace: alle Beteiligten melden sich mit ihrem Beta-Account an
+Mehrere Personen können dieselbe Markdown-Datei gleichzeitig in BloomMD bearbeiten. Für die Beta passiert das über einen Cloud-Workspace: alle Beteiligten melden sich mit ihrem Testaccount an
 und öffnen dieselbe Datei.
 
 > **Kurz gesagt:** Zusammenarbeit heißt in BloomMD nicht „Datei per E-Mail weitergeben“, sondern
@@ -17,7 +16,7 @@ und öffnen dieselbe Datei.
 ## Welche Variante brauchst du?
 
 - **Zwei Personen arbeiten im Browser:** Web-App + Cloud-Workspace. Beide brauchen eigene
-  Beta-Accounts.
+  Testaccounts.
 - **Eine Person im Browser, eine in der Mac-App:** Web-App + Mac-App im Server-Modus. Die Mac-App
   braucht ein persönliches Token.
 - **Nur lokale Dateien auf deinem Rechner:** Lokaler Desktop-Modus. Keine automatische
@@ -29,7 +28,7 @@ und öffnen dieselbe Datei.
 
 1. Person A meldet sich auf `https://bloommd.app` an.
 2. Person A öffnet die App und legt im Cloud-Workspace eine Markdown-Datei an.
-3. Person B meldet sich mit einem eigenen Beta-Account auf `https://bloommd.app` an.
+3. Person B meldet sich mit einem eigenen Testaccount auf `https://bloommd.app` an.
 4. Beide wählen denselben Workspace und dieselbe Datei.
 5. Beide prüfen, ob farbige Präsenzpunkte an Nodes sichtbar sind und der Sync-Status verbunden ist.
 6. Beide bearbeiten unterschiedliche Nodes oder denselben Markdown-Text.
@@ -86,7 +85,7 @@ Markdown-Beispiel reicht meistens.
 ## Typische Fehler
 
 - **Die zweite Person sieht den Workspace nicht.** Der Account ist nicht für denselben Workspace
-  freigeschaltet. Sende Feedback oder antworte auf die Beta-Mail.
+  freigeschaltet. Sende Feedback oder antworte auf die E-Mail zu deinem Testaccount.
 - **Die Mac-App zeigt nur lokale Dateien.** Sie ist nicht im Server-Modus verbunden. Öffne
   **Mit Server verbinden** und trage `https://bloommd.app` plus Token ein.
 - **Präsenz fehlt nach Schlafmodus oder Netzwerkwechsel.** Die Verbindung wurde unterbrochen.

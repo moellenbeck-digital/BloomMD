@@ -26,16 +26,16 @@ async function signup(
   });
 }
 
-test.describe("closed beta gate enabled", () => {
+test.describe("access gate enabled (free trial account)", () => {
   test("renders the invite-code field and explains the gate", async ({ page }) => {
     await page.goto("/signup?next=/app");
 
     await expect(page.getByRole("heading", { name: "Account erstellen" })).toBeVisible();
-    await expect(page.getByText("Dein Cloud-Zugang ist noch nicht freigeschaltet.")).toBeVisible();
+    await expect(page.getByText("Dein kostenloser Testaccount ist noch nicht freigeschaltet.")).toBeVisible();
     await expect(page.getByRole("link", { name: /Warteliste/ })).toHaveCount(0);
-    await expect(page.getByLabel("Beta-Code (optional)")).toBeHidden();
-    await page.locator("summary").filter({ hasText: "Beta-Code (optional)" }).click();
-    await expect(page.getByLabel("Beta-Code (optional)")).toBeVisible();
+    await expect(page.getByLabel("Zugangscode (optional)")).toBeHidden();
+    await page.locator("summary").filter({ hasText: "Zugangscode (optional)" }).click();
+    await expect(page.getByLabel("Zugangscode (optional)")).toBeVisible();
     await expect(page.getByText("Nur nötig, wenn du einen Code erhalten hast.")).toBeVisible();
   });
 
@@ -45,7 +45,7 @@ test.describe("closed beta gate enabled", () => {
     await expect(page.getByRole("heading", { name: "Account erstellen" })).toBeVisible();
     await expect(page.getByLabel("E-Mail", { exact: true })).toHaveValue("invited@bloommd.local");
     await expect(page.getByTestId("beta-access-gate")).toHaveCount(0);
-    await expect(page.getByLabel("Beta-Code (optional)")).toHaveCount(0);
+    await expect(page.getByLabel("Zugangscode (optional)")).toHaveCount(0);
   });
 
   test("rejects an uninvited signup without a code", async ({ request, page }) => {
@@ -54,10 +54,10 @@ test.describe("closed beta gate enabled", () => {
     expect(response.status()).toBe(303);
     const location = response.headers().location ?? "";
     expect(location).toContain("/signup");
-    expect(decodeURIComponent(location)).toContain("Diese E-Mail ist noch nicht für die Beta freigeschaltet.");
+    expect(decodeURIComponent(location)).toContain("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.");
 
     await page.goto(location);
-    await expect(page.getByText("Diese E-Mail ist noch nicht für die Beta freigeschaltet.")).toBeVisible();
+    await expect(page.getByText("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.")).toBeVisible();
     await expect(page).not.toHaveURL((url) => url.pathname === "/app");
   });
 
@@ -66,10 +66,10 @@ test.describe("closed beta gate enabled", () => {
 
     expect(response.status()).toBe(303);
     const location = response.headers().location ?? "";
-    expect(decodeURIComponent(location)).toContain("Der Einladungscode ist ungültig.");
+    expect(decodeURIComponent(location)).toContain("Der Zugangscode ist ungültig.");
 
     await page.goto(location);
-    await expect(page.getByText("Der Einladungscode ist ungültig.")).toBeVisible();
+    await expect(page.getByText("Der Zugangscode ist ungültig.")).toBeVisible();
   });
 
   test("allows an allowlisted address without a code", async ({ request }) => {

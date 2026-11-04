@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Einheitlicher Wortlaut für den Cloud-Zugang (Ticket 271): Er heißt überall „kostenloser Testaccount“ (30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste; nach Ablauf nur lesbar, Export bleibt möglich; bestehende Konten zählen ab 15.11.2026). „Beta“ steht nur noch für die lokale Software, nie mehr mit „geschlossen“. Angepasst: Marketing (Landing, /leistungen, /download, /obsidian, Doku, News), Rechtstexte inkl. Hinweis-E-Mails nach 15 und 23 Tagen, App-Registrierung, Gate-Meldungen und Freischaltungs-E-Mail. Slug `closed-beta-zugang` und Zugangsschalter bleiben.
+- Consistent wording for cloud access (ticket 271): it is called the "free trial account" everywhere (30 days from email confirmation, no invitation and no waitlist; read-only after it ends with export still possible; existing accounts count from 15 Nov 2026). "Beta" now only refers to the local software and is never "closed". Updated: marketing (landing, /leistungen, /download, /obsidian, docs, news), legal pages including reminder emails after 15 and 23 days, app signup, access-gate messages and the enablement email. The `closed-beta-zugang` slug and the access switch stay.
+
 - Deutsche Landingpage (#275): Use-Case-Markdown, Map-Knoten und Template-Karten zeigen deutsche Beispieltexte. Vorlagen werden als normale, anpassbare Markdown-Dateien beschrieben; interne SEO-Formulierungen und englische Buttons entfallen. Verlinkte Beispieldateien enthalten keine unbelegten Preisstufen oder Nutzererkenntnisse mehr.
 - German landing page (#275): use-case Markdown, map nodes and template cards show German examples. Templates are described as ordinary, editable Markdown files; internal SEO wording and English buttons are removed. Linked examples no longer make unsupported pricing or user-research claims.
 

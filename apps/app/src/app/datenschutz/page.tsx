@@ -36,12 +36,12 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
       </LegalSection>
 
       <LegalSection title={en ? "What data does BloomMD process?" : "Welche Daten verarbeitet BloomMD?"}>
-        <p>{en ? "BloomMD processes account data such as email address, login and session data where required for registration, login and access to the closed beta." : "BloomMD verarbeitet Accountdaten wie E-Mail-Adresse, Login- und Sessiondaten, soweit diese für Registrierung, Login und Freischaltung der geschlossenen Beta erforderlich sind."}</p>
+        <p>{en ? "BloomMD processes account data such as email address, login and session data where required for registration, login and the free trial account." : "BloomMD verarbeitet Accountdaten wie E-Mail-Adresse, Login- und Sessiondaten, soweit diese für Registrierung, Login und den kostenlosen Testaccount erforderlich sind."}</p>
         <p>{en ? "Markdown files are processed locally by the local-first core. Data is transmitted to BloomMD only when an optional sync or cloud service is actively used." : "Markdown-Dateien werden im local-first Kern lokal verarbeitet. Eine Übertragung an BloomMD erfolgt nur, wenn ein optionaler Sync- oder Cloud-Dienst aktiv genutzt wird."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "No payments in M1" : "Keine Zahlungen in M1"}>
-        <p>{en ? "The closed M1 beta offers no paid plans, collects no payment data and provides no checkout. Payment providers become relevant only if BloomMD explicitly offers paid features later." : "In der geschlossenen M1-Beta werden keine kostenpflichtigen Pläne angeboten, keine Zahlungsdaten erhoben und kein Checkout bereitgestellt. Zahlungsdienstleister werden erst relevant, wenn BloomMD später kostenpflichtige Funktionen ausdrücklich anbietet."}</p>
+        <p>{en ? "The free trial account in M1 offers no paid plans, collects no payment data and provides no checkout. Payment providers become relevant only if BloomMD explicitly offers paid features later." : "Beim kostenlosen Testaccount in M1 werden keine kostenpflichtigen Pläne angeboten, keine Zahlungsdaten erhoben und kein Checkout bereitgestellt. Zahlungsdienstleister werden erst relevant, wenn BloomMD später kostenpflichtige Funktionen ausdrücklich anbietet."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Transactional email with Resend" : "Transaktions-E-Mails mit Resend"}>
@@ -66,6 +66,11 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
       <LegalSection title={en ? "Cookies and sessions" : "Cookies und Sessions"}>
         <p>{en ? "BloomMD uses technically necessary session cookies to recognise signed-in users and provide protected areas." : "BloomMD setzt technisch notwendige Session-Cookies ein, damit angemeldete Nutzer erkannt werden und geschützte Bereiche genutzt werden können."}</p>
         <p>{en ? <>Optional analytics consent is stored in the browser under `bloommd:analytics-consent:v1`.</> : <>Die optionale Analyse-Einwilligung wird im Browser unter `bloommd:analytics-consent:v1` gespeichert.</>}</p>
+      </LegalSection>
+
+      <LegalSection title={en ? "Reminder emails during the trial period" : "Hinweis-E-Mails zum Testzeitraum"}>
+        <p>{en ? "The free trial account is valid for 30 days from email confirmation. Before it ends, we send you a reminder email after 15 days and another after 23 days. Purpose: to remind you that the trial period is ending. After it ends, your account is read-only and export remains possible." : "Der kostenlose Testaccount gilt 30 Tage ab E-Mail-Bestätigung. Vor Ablauf senden wir dir eine Hinweis-E-Mail nach 15 Tagen und eine weitere nach 23 Tagen. Zweck: Erinnerung an das Ende des Testzeitraums. Nach Ablauf ist dein Konto nur noch lesbar, der Export bleibt möglich."}</p>
+        <p>{en ? "Processed data: your email address and the time of your email confirmation, from which the sending times follow. For existing accounts, the trial period counts from November 15, 2026. The emails are sent through our email provider (see transactional email). Legal basis: Art. 6(1)(b) GDPR, performance of the user relationship for the account." : "Verarbeitete Daten: deine E-Mail-Adresse und der Zeitpunkt deiner E-Mail-Bestätigung, aus dem sich die Versandzeitpunkte ergeben. Bei bestehenden Konten zählt der Testzeitraum ab dem 15.11.2026. Der Versand erfolgt über unseren E-Mail-Dienstleister (siehe Transaktions-E-Mails). Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Durchführung des Nutzungsverhältnisses zum Account)."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Waitlist (ended)" : "Warteliste (beendet)"}>

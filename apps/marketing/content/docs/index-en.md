@@ -1,6 +1,6 @@
 ---
 title: Getting started
-description: What BloomMD is, what the closed beta includes, and where to begin.
+description: What BloomMD is, what the beta includes, and where to begin.
 order: 1
 ---
 
@@ -17,7 +17,7 @@ Markdown renderer ignores them.
 
 ## Where to begin
 
-The closed beta starts with the **Desktop app**. It works locally, needs no account, and does not
+The beta starts with the **Desktop app**. It works locally, needs no account, and does not
 need an internet connection. The **Web app** at `/app` is the second path. What stays local and what
 goes to the cloud is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
 
@@ -38,7 +38,7 @@ goes to the cloud is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=e
 ### Getting started with the Web app
 
 1. Create an account, confirm your email address, and sign in. The steps are in
-   [Closed beta access](/docs/closed-beta-zugang?lang=en).
+   [Free trial account](/docs/closed-beta-zugang?lang=en).
 2. In `/app`, choose the folder icon (tooltip **Open local Markdown folder**) at the top and grant access to a
    folder. Chrome and Edge support this; nothing is uploaded.
 3. If the folder is read-only, a **Read only** notice appears. Click it to request write access.
@@ -51,20 +51,20 @@ and saves nothing.
 
 ![Real screenshot of the browser demo: a Markdown input on the left, the map of the Software Architecture Map template on the right](/docs/demo-en.png)
 
-The Web app, cloud workspaces, sync, and collaboration require an account. You
+The Web app, cloud workspaces, sync, and collaboration require the free trial account (30 days from email confirmation). You
 register yourself, without an invitation and without a waitlist. Registration, email confirmation,
-and sign-in are described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
+and sign-in are described in [Free trial account](/docs/closed-beta-zugang?lang=en).
 
 Something stuck with installation, folder permissions, sync, or an invitation? [Troubleshooting](/docs/fehlerbehebung?lang=en)
 lists symptom, cause, and steps.
 
 **Available without an invitation:** the [browser demo](/demo?lang=en), desktop
 builds on the [download page](/download?lang=en), and the [Obsidian plugin](/obsidian?lang=en)
-through BRAT or GitHub releases. Only while the access switch is on does an invitation apply, and then only to Web and cloud access.
+through BRAT or GitHub releases. Only while the access switch is on is enablement required, and then only for Web and cloud access.
 
 ## Not included in the beta
 
 - The standalone BloomMD app for iPad, iPhone and Android has no public app-store
   download yet. The Obsidian plugin is separate and is also available as a mobile beta.
 - There is no recovery promise for cloud data. Do not upload anything you do not have elsewhere.
-- Windows desktop builds are not part of this closed beta.
+- Windows desktop builds are not part of this beta.

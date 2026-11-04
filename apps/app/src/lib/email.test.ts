@@ -99,10 +99,10 @@ describe("account email links", () => {
 
     expect(body.text).toContain("https://bloommd.app/signup?email=max%40example.test&next=%2Fapp");
     expect(body.text).toContain("Account erstellen.");
-    expect(body.text).toContain("Der Link braucht keinen Einladungscode.");
+    expect(body.text).toContain("Der Link braucht keinen Zugangscode.");
     expect(body.html).not.toContain("localhost");
     expect(body.html).toContain("<strong>Account erstellen</strong>");
-    expect(body.html).toContain("Der Link braucht keinen Einladungscode.");
+    expect(body.html).toContain("Der Link braucht keinen Zugangscode.");
   });
 
   test("English beta invite mails keep the signup journey in English", async () => {
@@ -110,10 +110,11 @@ describe("account email links", () => {
 
     const body = await captureMail(() => sendBetaInviteEmail("max@example.test", { lang: "en" }));
 
-    expect(body.text).toContain("You are invited to the closed BloomMD beta.");
+    expect(body.text).toContain("Your free BloomMD trial account is enabled for you.");
     expect(body.text).toContain("https://bloommd.app/signup?email=max%40example.test&next=%2Fapp&lang=en");
-    expect(body.text).toContain("No invitation code is needed.");
-    expect(body.text).not.toContain("Du bist zur geschlossenen");
+    expect(body.text).toContain("No access code is needed.");
+    expect(body.text).not.toContain("Dein kostenloser BloomMD-Testaccount");
+    expect(body.text).not.toContain("geschlossen");
   });
 
   test("workspace invitation mails preserve the one-time token and invite context", async () => {

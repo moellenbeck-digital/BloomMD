@@ -1,6 +1,6 @@
 ---
 title: Desktop app
-description: The recommended closed-beta path — local and account-free on macOS and Omarchy/Linux.
+description: The recommended beta path — local and account-free on macOS and Omarchy/Linux.
 order: 2
 ---
 
@@ -15,14 +15,14 @@ builds for macOS arm64 and Omarchy/Linux x86_64 or aarch64, with platform status
 instructions.
 
 The desktop builds are publicly linked and can be downloaded without an invitation or BloomMD
-account. Closed-beta access applies only to the Web app, cloud, sync and collaboration. If a
+account. The free trial account applies only to the Web app, cloud, sync and collaboration. If a
 download link does not work, contact `feedback@bloommd.io`.
 
 ## Getting started: from download to your first map
 
 1. **Download:** Get the macOS arm64 build from [bloommd.io/download](/download?lang=en).
 2. **Open the DMG:** Drag BloomMD to the Applications folder and double-click it there (details in the
-   section “Installing the closed-beta build” below).
+   section “Installing the beta build” below).
 3. **Open a folder:** Open a folder with Markdown files from the menu, the file manager, or the command
    line (see the section “Opening files and folders”).
 4. **First map:** Select a file. Its headings become the map; the Markdown file stays unchanged.
@@ -68,9 +68,9 @@ results. If layout fails, use “Try again” to repeat the calculation. Externa
 including added and deleted `.markdown` files, refresh the view automatically.
 
 
-## Installing the closed-beta build
+## Installing the beta build
 
-The native client is available in the closed beta for **macOS and Omarchy/Linux**. The macOS build
+The native client is available in the beta for **macOS and Omarchy/Linux**. The macOS build
 targets arm64; Omarchy 4 and other Arch-based systems have Pacman packages for x86_64 and aarch64.
 Windows follows as a separate beta release.
 
@@ -126,5 +126,5 @@ Local work needs no account. To collaborate with someone in a cloud file, create
 under [Account](/account?lang=en), open **Connect to server** in the desktop app, enter
 `https://bloommd.app`, paste the token, and open the same cloud file.
 
-Windows is intentionally outside this closed beta. A separate release follows after installer, OS
+Windows is intentionally outside this beta. A separate release follows after installer, OS
 handoff, keyboard, and platform testing.

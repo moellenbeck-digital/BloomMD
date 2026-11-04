@@ -1,6 +1,6 @@
 ---
 title: "BloomMD Desktop is now available for Omarchy and Linux"
-description: "The closed beta brings native Pacman packages for Omarchy 4 and Arch-based Linux systems on x86_64 and ARM64."
+description: "The beta brings native Pacman packages for Omarchy 4 and Arch-based Linux systems on x86_64 and ARM64."
 date: 2026-09-05
 commitDate: 2026-09-05
 tags:
@@ -18,7 +18,7 @@ BloomMD is no longer only a macOS desktop beta. With `v0.5.0`, a separate Linux 
 
 ## Native Pacman packages
 
-The closed beta includes native packages for `x86_64` and `aarch64`. Install them with Pacman, then open files and folders directly from the Linux desktop.
+The beta includes native packages for `x86_64` and `aarch64`. Install them with Pacman, then open files and folders directly from the Linux desktop.
 
 The package registers Markdown files and the cross-platform `bloommd://` URI scheme. A file manager, link or another tool can therefore launch BloomMD directly with a file or folder.
 

@@ -73,3 +73,30 @@ describe("parseAppLink: universal links and documents", () => {
     expect(parseAppLink("bloommd://selftest")).toEqual({ kind: "selftest" });
   });
 });
+
+describe("parseAppLink: Markdown files from the Files app", () => {
+  test("a file URL of a Markdown file is a file link, the URL is kept as it came", () => {
+    const url = "file:///private/var/mobile/Library/Mobile%20Documents/com~apple~CloudDocs/Obsidian/Vault/Notiz.md";
+    expect(parseAppLink(url)).toEqual({ kind: "file", url });
+    expect(parseAppLink("file:///private/var/mobile/Containers/Shared/AppGroup/Ordner/Seite.MARKDOWN")).toEqual({ kind: "file", url: "file:///private/var/mobile/Containers/Shared/AppGroup/Ordner/Seite.MARKDOWN" });
+    expect(parseAppLink("file://localhost/private/var/x/Notiz.md")?.kind).toBe("file");
+    expect(parseAppLink("file:///private/var/x/Notiz%20mit%20Leerzeichen.md")?.kind).toBe("file");
+  });
+
+  test("anything but a Markdown file is ignored", () => {
+    for (const url of [
+      "file:///private/var/x/Bild.png",
+      "file:///private/var/x/Notiz.md.txt",
+      "file:///private/var/x/Ordner/",
+      "file:///private/var/x/notiz",
+      "file://evil.example/x/Notiz.md",
+      "file:///private/var/x/Notiz%2",
+      "file:///private/var/x/Notiz.md%00.png",
+    ]) expect(parseAppLink(url)).toBeNull();
+  });
+
+  test("other kinds of links are unchanged", () => {
+    expect(parseAppLink("bloommd://open?path=Notiz.md")).toEqual({ kind: "open", path: "Notiz.md", node: null });
+    expect(parseAppLink("ftp://example.com/Notiz.md")).toBeNull();
+  });
+});

@@ -20,7 +20,7 @@ function headers(host: string) {
 }
 
 const OPEN_SIGNUP_BODY = 'data-testid="signup-form" BloomMD Account erstellen Mindestens 10 Zeichen';
-const GATE_SIGNUP_BODY = 'data-testid="beta-access-gate" Account erstellen Dein Cloud-Zugang ist noch nicht freigeschaltet. Beta-Code (optional)';
+const GATE_SIGNUP_BODY = 'data-testid="beta-access-gate" Account erstellen Dein kostenloser Testaccount ist noch nicht freigeschaltet. Zugangscode (optional)';
 
 /** Fetcher for a deployment; `betaGate` mirrors BLOOMMD_BETA_ACCESS=1 on the app. */
 function fetcherFor(betaGate: boolean): SmokeFetcher {

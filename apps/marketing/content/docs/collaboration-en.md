@@ -7,7 +7,7 @@ order: 4
 # Collaboration
 
 BloomMD collaboration is workspace-based. A workspace owner creates a team workspace and invites
-people by email with an explicit role. A beta-product invitation alone does not grant access to a
+people by email with an explicit role. A free trial account alone does not grant access to a
 personal workspace.
 
 ## Share one local Desktop file deliberately

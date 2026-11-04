@@ -1,24 +1,34 @@
 ---
-title: Closed beta access
-description: Open registration without an invitation — account creation, email confirmation, sign-in, and password recovery.
+title: Free trial account
+description: Free trial account for web and cloud — 30 days from email confirmation, no invitation and no waitlist; registration, sign-in, and password recovery.
 order: 2
 ---
 
-# Closed beta access
+# Free trial account
 
-Registration for web access to BloomMD (bloommd.app) is open: you create your own account, without
-an invitation and without a waitlist. Only if the operator has turned on the access switch does an
-invitation apply for the time being (see below). The signup page shows which one applies: if you see
-the form right away, you can register. If you see a notice that your cloud access is not enabled
-yet, the access switch is on.
+Cloud access to BloomMD (bloommd.app) is called the **free trial account**. You create it yourself,
+without an invitation and without a waitlist. Only if the operator has turned on the access switch is
+it created, for the time being, only for enabled email addresses (see below). The signup page shows
+which one applies: if you see the form right away, you can register. If you see a notice that your
+free trial account is not enabled yet, the access switch is on.
 
 **Even with the access switch on, only Web, cloud workspaces, sync and collaboration are
 restricted.** The [browser demo](/demo?lang=en), [desktop builds](/download?lang=en) and
 [Obsidian plugin](/obsidian?lang=en) are always available without an account and without an invitation.
 
+## Trial period
+
+- The trial account is valid for **30 days from email confirmation**.
+- Before it ends you receive reminder emails after **15 and 23 days**.
+- After it ends, your account is read-only. Export remains possible, and a notice is shown. Nothing
+  is lost.
+- Existing accounts, including former waitlist participants: because of their beta participation,
+  the trial period counts from **November 15, 2026**.
+- Pricing and scope will be published before launch.
+
 ## Registration (normal case)
 
-You need neither an invitation nor a code.
+You need neither an invitation nor a code. Your trial period starts with the email confirmation (step 5).
 
 1. Open the signup page at bloommd.app.
 2. Enter your email address and a password of at least 10 characters containing letters and numbers.
@@ -49,41 +59,41 @@ again later.
 Use "Forgot password?" on the sign-in page. You receive a link that is valid for 60 minutes. After a
 reset, existing sign-ins are ended.
 
-## Only with the access switch on: invitation
+## Only with the access switch on: enablement
 
-The beta waitlist at bloommd.io has ended; nobody can join it any more. The access switch stays
-available for operations. While it is on, an account is only enabled for invited email addresses or
-with an invitation code. A beta invitation does not create a password. The steps are intentionally
-separate so that every stage is clear.
+The waitlist has ended; nobody can join it any more. The access switch stays available for
+operations. While it is on, a trial account is only created for enabled email addresses or with an
+access code. Enabling an address does not create a password. The steps are intentionally separate so
+that every stage is clear.
 
-1. An admin or staff member invites you.
-2. You receive a personal beta invitation with an account-creation link.
-3. Open the link. The invited email address is already filled in.
+1. An admin or staff member enables your email address.
+2. You receive an email "Your free BloomMD trial account" with an account-creation link.
+3. Open the link. Your email address is already filled in.
 4. Choose your own password, accept the privacy policy and the terms, then confirm the account
    email.
 5. Sign in at bloommd.app with your email and password.
 
-![Real screenshot: the signup page while the access switch is on, with the notice that cloud access is not enabled yet and a field for the invited email address](/docs/signup-gate-en.png)
+![Real screenshot: the signup page while the access switch is on, with the notice that the free trial account is not enabled yet and a field for the email address](/docs/signup-gate-en.png)
 
-### No invitation yet
+### Not enabled yet
 
-Contact the BloomMD team. With the access switch on, an account is not enabled without an
-invitation or invitation code.
+Contact the BloomMD team. With the access switch on, an account is not created without enablement
+or an access code.
 
-### You received an invitation
+### You received the enablement email
 
-The invitation email links directly to account creation. Personal invitations normally do not need
-a separate code. A code field may be shown as a fallback when an admin sent a code separately.
+The email links directly to account creation. Normally you do not need a separate code. A code field
+may be shown as a fallback when an admin sent a code separately.
 
-![Real screenshot: the signup page opened from an invitation link, with the invited email address already filled in](/docs/signup-invited-en.png)
+![Real screenshot: the signup page opened from the enablement email link, with the email address already filled in](/docs/signup-invited-en.png)
 
-### Resending an invitation
+### Resending the email
 
-If a beta invitation did not arrive, an admin can resend it. Check your spam and promotions folders
+If the enablement email did not arrive, an admin can resend it. Check your spam and promotions folders
 first.
 
-Messages such as "This invitation has expired." or a wrong address are explained in
-[Troubleshooting](/docs/fehlerbehebung?lang=en).
+Messages such as "Your free trial account is not enabled for this email address yet." or a wrong
+address are explained in [Troubleshooting](/docs/fehlerbehebung?lang=en).
 
 ## You already created an account
 

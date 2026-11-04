@@ -22,7 +22,7 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
       </LegalSection>
 
       <LegalSection title={en ? "Right of withdrawal" : "Widerrufsrecht"}>
-        <p>{en ? "The closed M1 beta sells no paid plans and collects no payment data. If a user no longer wants beta access, they can request account deletion or, if an entry of the ended waitlist still exists, remove it through the unsubscribe link." : "In der geschlossenen M1-Beta werden keine kostenpflichtigen Pläne verkauft und keine Zahlungsdaten erhoben. Soweit ein Nutzer den Beta-Zugang nicht mehr nutzen möchte, kann er die Account-Löschung verlangen oder einen noch bestehenden Eintrag der beendeten Warteliste über den Abmeldelink entfernen."}</p>
+        <p>{en ? "The free trial account in M1 sells no paid plans and collects no payment data. If a user no longer wants the trial account, they can request account deletion or, if an entry of the ended waitlist still exists, remove it through the unsubscribe link." : "Beim kostenlosen Testaccount in M1 werden keine kostenpflichtigen Pläne verkauft und keine Zahlungsdaten erhoben. Soweit ein Nutzer den Testaccount nicht mehr nutzen möchte, kann er die Account-Löschung verlangen oder einen noch bestehenden Eintrag der beendeten Warteliste über den Abmeldelink entfernen."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Digital content and software" : "Digitale Inhalte und Software"}>

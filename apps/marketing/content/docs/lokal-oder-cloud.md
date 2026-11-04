@@ -44,7 +44,7 @@ Nur, was du ausdrücklich in einen Cloud-Workspace bringst:
   die du in der Vorschau angehakt lässt. Die lokalen Dateien bleiben die Quelle, der Ordnerpfad
   verlässt dein Gerät nicht.
 
-Lade in der Beta keine Zugangsdaten, Secrets, personenbezogenen Daten Dritter oder
+Lade im Testaccount keine Zugangsdaten, Secrets, personenbezogenen Daten Dritter oder
 produktionskritischen Inhalte hoch. Für Cloud-Daten gibt es keine Wiederherstellungszusage.
 
 ## Wann Zusammenarbeit greift
@@ -67,4 +67,4 @@ Ordnerrechte, Sync-Status und Einladungen sind unter [Fehlerbehebung](/docs/fehl
 - **Du willst nur mit eigenen Dateien arbeiten:** Desktop-App oder lokaler Ordner in der Web-App.
 - **Du willst BloomMD ausprobieren:** [Browser-Demo](/demo), ohne Konto.
 - **Du willst mit anderen an derselben Datei arbeiten:** Cloud-Workspace. Das Konto legst du unter
-  [Closed-Beta Zugang](/docs/closed-beta-zugang) an.
+  [Kostenloser Testaccount](/docs/closed-beta-zugang) an.

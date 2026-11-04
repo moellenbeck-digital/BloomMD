@@ -180,22 +180,22 @@ export async function sendBetaInviteEmail(email: string, options?: { lang?: Auth
   const url = `${accountLinkBase()}/signup?${urlParams.toString()}`;
   const copy = locale === "en"
     ? {
-        subject: "Your BloomMD beta invitation",
-        intro: "You are invited to the closed BloomMD beta.",
+        subject: "Your free BloomMD trial account",
+        intro: "Your free BloomMD trial account is enabled for you. It is valid for 30 days from email confirmation.",
         linkIntro: "This link takes you directly to the right page: create your account.",
         htmlLinkIntro: "This link takes you directly to the right page: <strong>create your account</strong>.",
         link: "Create your BloomMD account",
-        instructions: "Use this invited email address there and set your own password. Then confirm your email address. No invitation code is needed.",
-        footer: "If you were not expecting this invitation, you can ignore this message.",
+        instructions: "Use this email address there and set your own password. Then confirm your email address. No access code is needed.",
+        footer: "If you were not expecting this message, you can ignore it.",
       }
     : {
-        subject: "Dein BloomMD Beta-Zugang",
-        intro: "Du bist zur geschlossenen BloomMD Beta eingeladen.",
+        subject: "Dein kostenloser BloomMD-Testaccount",
+        intro: "Dein kostenloser BloomMD-Testaccount ist für dich freigeschaltet. Er gilt 30 Tage ab E-Mail-Bestätigung.",
         linkIntro: "Dieser Link führt dich direkt zur richtigen Seite: Account erstellen.",
         htmlLinkIntro: "Dieser Link führt dich direkt zur richtigen Seite: <strong>Account erstellen</strong>.",
         link: "BloomMD Account erstellen",
-        instructions: "Nutze dort diese eingeladene E-Mail-Adresse und lege dein eigenes Passwort fest. Danach bestätigst du deine E-Mail-Adresse. Der Link braucht keinen Einladungscode.",
-        footer: "Wenn du diese Einladung nicht erwartet hast, kannst du diese Nachricht ignorieren.",
+        instructions: "Nutze dort diese E-Mail-Adresse und lege dein eigenes Passwort fest. Danach bestätigst du deine E-Mail-Adresse. Der Link braucht keinen Zugangscode.",
+        footer: "Wenn du diese Nachricht nicht erwartet hast, kannst du sie ignorieren.",
       };
   return sendTransactionalEmail({
     to: email,

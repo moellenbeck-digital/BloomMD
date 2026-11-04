@@ -175,7 +175,7 @@ afterEach(() => {
   resetMemoryRateLimitsForTests();
 });
 
-describe("signup with the closed-beta gate off", () => {
+describe("signup with the access gate off", () => {
   test("registers without an invitation and sends the confirmation mail", async () => {
     const response = await signup(formRequest("/api/auth/signup", signupForm("new@example.test")));
 
@@ -196,7 +196,7 @@ describe("signup with the closed-beta gate off", () => {
   });
 });
 
-describe("signup with the closed-beta gate on", () => {
+describe("signup with the access gate on", () => {
   beforeEach(() => {
     mutableEnv.BLOOMMD_BETA_ACCESS = "1";
     mutableEnv.BLOOMMD_BETA_ALLOWED_EMAILS = "invited@example.test";
@@ -208,7 +208,7 @@ describe("signup with the closed-beta gate on", () => {
 
     expect(response.status).toBe(303);
     expect(decodedLocation(response)).toContain(`${ORIGIN}/signup?`);
-    expect(decodedLocation(response)).toContain("Diese E-Mail ist noch nicht für die Beta freigeschaltet.");
+    expect(decodedLocation(response)).toContain("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.");
     expect(users.size).toBe(0);
     expect(mails).toHaveLength(0);
   });
@@ -216,7 +216,7 @@ describe("signup with the closed-beta gate on", () => {
   test("rejects a wrong invite code", async () => {
     const response = await signup(formRequest("/api/auth/signup", signupForm("stranger@example.test", { inviteCode: "nope" })));
 
-    expect(decodedLocation(response)).toContain("Der Einladungscode ist ungültig.");
+    expect(decodedLocation(response)).toContain("Der Zugangscode ist ungültig.");
     expect(users.size).toBe(0);
   });
 

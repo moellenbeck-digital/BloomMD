@@ -62,7 +62,7 @@ in the browser unless you download it. Paste your own Markdown on the left or ch
 ## Cloud workspace
 
 Cloud workspaces require an account. Documents are stored in the database and collaboration uses the
-sync server. Registration (open, no invitation needed) is described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
+sync server. Registration (open, no invitation needed) is described in [Free trial account](/docs/closed-beta-zugang?lang=en).
 
 When a sync server is connected, the header shows the sync status next to the file title, for example
 **Synced**. It only appears in wide windows (1536 pixels and up).
@@ -73,13 +73,13 @@ To import a Markdown file, sign in, select the cloud workspace, choose **Import 
 toolbar or command palette, select a `.md` or `.markdown` file, and open it from the file list.
 From that point the file is stored in the cloud workspace and can use sync and collaboration.
 
-Do not upload credentials, secrets, third-party personal data, or production-critical content during
-the beta. A reduced Markdown example is enough for an error report.
+Do not upload credentials, secrets, third-party personal data, or production-critical content with the
+free trial account. A reduced Markdown example is enough for an error report.
 
 ## Feedback and views
 
 First have a look at [Troubleshooting](/docs/fehlerbehebung?lang=en), which covers the common cases.
 
-Signed-in beta testers use the Feedback button. A screenshot is required; a short video is optional.
+Signed-in free trial account users use the Feedback button. A screenshot is required; a short video is optional.
 Do not upload private Markdown, credentials, or third-party personal data. The Document view shows
 the opened file; the Workspace view shows folders, files, and references.

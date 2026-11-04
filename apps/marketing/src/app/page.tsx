@@ -109,15 +109,15 @@ const footerSections = [
 ];
 
 const markdownLines = [
-  "# Product Strategy",
-  "## North Star",
-  "- Visual thinking for real files",
-  "- No locked workspace format",
+  "# Produktstrategie",
+  "## Leitbild",
+  "- Visuell mit echten Dateien arbeiten",
+  "- Offenes Markdown-Format",
   "",
-  "## Initiatives",
-  "### Local-first editor",
-  "### Pro workflows",
-  "### Optional sync",
+  "## Initiativen",
+  "### Lokaler Editor",
+  "### Zusammenarbeit",
+  "### Optionaler Sync",
 ];
 
 const audiencePaths = [
@@ -197,76 +197,76 @@ const useCases = [
   {
     id: "strategy",
     label: "Produktstrategie",
-    file: "strategy.md",
+    file: "strategie.md",
     heading: "Ziele, Initiativen und Risiken zusammenführen",
     text: "Verbinde Ziele, Entscheidungen und offene Fragen in einer Map, während die Strategie als lesbares Markdown-Dokument erhalten bleibt.",
-    markdown: ["# Strategy", "## Goals", "## Initiatives", "### Retention", "### Launch risk"].join("\n"),
+    markdown: ["# Strategie", "## Ziele", "## Initiativen", "### Kundenbindung", "### Startrisiko"].join("\n"),
   },
   {
     id: "research",
     label: "Forschung",
-    file: "literature-review.md",
+    file: "literaturrecherche.md",
     heading: "Quellen und Argumente sichtbar machen",
     text: "Ordne Literatur, Beobachtungen und Hypothesen so, dass du Muster erkennst, ohne deine Notizen in ein geschlossenes System zu verschieben.",
-    markdown: ["# Literature Review", "## Sources", "## Claims", "### Open questions", "### Evidence"].join("\n"),
+    markdown: ["# Literaturrecherche", "## Quellen", "## Aussagen", "### Offene Fragen", "### Belege"].join("\n"),
   },
   {
     id: "architecture",
     label: "Softwarearchitektur",
-    file: "architecture.md",
+    file: "architektur.md",
     heading: "Systeme, Constraints und Entscheidungen ordnen",
     text: "Halte ADRs, Module und Abhängigkeiten in Markdown fest und nutze die Map, um technische Zusammenhänge schneller zu prüfen.",
-    markdown: ["# Architecture", "## Modules", "## ADRs", "### Sync", "### Storage"].join("\n"),
+    markdown: ["# Architektur", "## Module", "## Entscheidungen", "### Sync", "### Speicherung"].join("\n"),
   },
   {
     id: "docs",
     label: "Dokumentation",
-    file: "docs-outline.md",
+    file: "dokumentation.md",
     heading: "Dokumentationsstrukturen planen",
     text: "Baue Guides, Referenzen und Roadmaps visuell um, während die fertige Dokumentation weiter als Markdown bearbeitbar bleibt.",
-    markdown: ["# Docs", "## Guides", "## Reference", "### API", "### Tutorials"].join("\n"),
+    markdown: ["# Dokumentation", "## Anleitungen", "## Referenz", "### API", "### Beispiele"].join("\n"),
   },
 ];
 
 const heroPreviewDocument = parseFile("strategy.md", markdownLines.join("\n"));
-const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## MVP", "## Pro", "## Sync", "## Docs"].join("\n"));
+const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
   {
-    title: "Software Architecture Map",
-    category: "Development",
+    title: "Software-Architektur-Map",
+    category: "Entwicklung",
     href: "/templates/software-architecture",
-    text: "Systemziele, Frontend, Backend, Datenbank, Integrationen, Security und Roadmap in einer Map.",
+    text: "Systemziele, Frontend, Backend, Datenbank, Integrationen, Sicherheit und Roadmap in einer Map.",
   },
   {
-    title: "Startup Operating System",
-    category: "Business",
+    title: "Startup-Betriebssystem",
+    category: "Geschäft",
     href: "/templates/startup-operating-system",
-    text: "Vision, Produkt, Kunden, Positionierung, Marketing, Sales, Metriken, Entscheidungen und Risiken.",
+    text: "Vision, Produkt, Kunden, Positionierung, Marketing, Vertrieb, Metriken und Entscheidungen.",
   },
   {
-    title: "Obsidian Vault Starter",
-    category: "Knowledge Management",
+    title: "Obsidian-Vault-Starter",
+    category: "Wissensmanagement",
     href: "/templates/obsidian-vault-starter",
-    text: "Inbox, Projekte, Areas, Ressourcen, Personen, Meetings, Ideen und Archiv als startbare Vault-Struktur.",
+    text: "Posteingang, Projekte, Bereiche, Ressourcen, Personen, Treffen, Ideen und Archiv als Vault-Struktur.",
   },
   {
-    title: "Research Project Map",
-    category: "Research",
+    title: "Forschungsprojekt-Map",
+    category: "Forschung",
     href: "/templates/research-project",
-    text: "Research Question, Hypothesen, Literatur, Methoden, Evidenz, Findings, Quellen und nächste Schritte.",
+    text: "Forschungsfrage, Hypothesen, Literatur, Methoden, Belege, Ergebnisse und nächste Schritte.",
   },
   {
-    title: "Novel Writing Map",
-    category: "Writing",
+    title: "Roman-Map",
+    category: "Schreiben",
     href: "/templates/novel-writing",
-    text: "Premise, Worldbuilding, Characters, Plot, Acts, Chapters, Themes, Conflicts und offene Fragen.",
+    text: "Prämisse, Welt, Figuren, Handlung, Akte, Kapitel, Themen und offene Fragen.",
   },
   {
-    title: "Content Strategy Map",
+    title: "Content-Strategie-Map",
     category: "Marketing",
     href: "/templates/content-strategy",
-    text: "Audience, Positioning, Content Pillars, Channels, Campaigns, Produktion, Distribution und Metrics.",
+    text: "Zielgruppe, Positionierung, Themen, Kanäle, Kampagnen, Produktion und Metriken.",
   },
 ];
 
@@ -284,7 +284,7 @@ const featureModules = [
     icon: PenLine,
   },
   {
-    title: "Template Library",
+    title: "Vorlagenbibliothek",
     text: "Mit realistischen Markdown-Vorlagen starten, statt vor einer leeren Fläche zu stehen.",
     className: "",
     icon: LayoutTemplate,
@@ -402,7 +402,7 @@ function Header() {
           <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#F2F0ED] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
             Login
           </a>
-          <a href="#beta" className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+          <a href={appSignupUrl} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
             Jetzt registrieren
             <ArrowRight size={16} aria-hidden="true" />
           </a>
@@ -458,7 +458,7 @@ function Header() {
               <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-3 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
                 Login
               </a>
-              <a href="#beta" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+              <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
                 Jetzt registrieren
                 <ArrowRight size={16} aria-hidden="true" />
               </a>
@@ -709,7 +709,7 @@ function UseCasesSection() {
     <section className="border-y border-[#E8E4DF] bg-white">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
         <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Use Cases</p>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Anwendungsfälle</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Für Wissen, das zu komplex für eine lineare Liste wird.</h2>
         </div>
         <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
@@ -759,10 +759,10 @@ function TemplatesSection() {
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Template Library</p>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Vorlagen</p>
             <h2 className="text-3xl font-semibold sm:text-4xl">Nicht mit einer leeren Map starten.</h2>
             <p className="mt-4 text-lg leading-8 text-[#666666]">
-              Die ersten Templates sind echte Markdown-Dateien mit Beispielinhalten. Sie funktionieren als Onboarding, Demo, SEO-Seiten und Startpunkte für eigene Dateien.
+              Jede Vorlage ist eine normale Markdown-Datei. Öffne sie als Map und ersetze die Beispielinhalte durch deine eigenen.
             </p>
           </div>
           <Link href="/templates" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1A1A1A]/20">
@@ -781,7 +781,7 @@ function TemplatesSection() {
               <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#666666]">{template.text}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Link href={`/demo?template=${template.href.split("/").pop()}`} className="inline-flex h-9 items-center justify-center rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
-                  Open in BloomMD
+                  In BloomMD öffnen
                 </Link>
                 <Link href={template.href} className="inline-flex h-9 items-center justify-center rounded-md border border-[#D4CFC8] px-3 text-sm font-semibold text-[#1A1A1A] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
                   Vorschau
@@ -949,7 +949,7 @@ function DesktopSection() {
             <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">
               Desktop-Builds herunterladen
             </Link>
-            <a href="#beta" className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
+            <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
               Cloud-Zugang anfragen
             </a>
           </div>
@@ -1051,79 +1051,6 @@ function WikiSection() {
   );
 }
 
-function BetaProgramSection() {
-  return (
-    <section id="pricing" className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Kostenlos — und bewusst noch klein.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Demo und Templates kannst du sofort ausprobieren. Desktop-Builds und das Obsidian-Plugin
-            kannst du ohne Konto laden. Für BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
-            registrierst du dich; wir wachsen bewusst langsam, damit wir Rückmeldungen beantworten können.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              icon: Check,
-              title: "Was du bekommst",
-              items: [
-                "Voller Funktionsumfang ohne Limits",
-                "Demo und Templates ohne Einladung",
-                "Web, macOS-, Omarchy/Linux-Desktop und Obsidian-Kompatibilität",
-                "LLM-Wiki-Werkzeuge und OKF-Bundles",
-                "Direkter Draht zu uns bei Bugs und Wünschen",
-              ],
-            },
-            {
-              icon: ShieldCheck,
-              title: "Was wir zusagen",
-              items: [
-                "Deine Dateien bleiben normales Markdown",
-                "Kein Verkauf oder Training mit deinen Inhalten",
-                "Export und Löschung jederzeit möglich",
-                "Preise kündigen wir vorher an, nicht rückwirkend",
-              ],
-            },
-            {
-              icon: RefreshCw,
-              title: "Was noch fehlt",
-              items: [
-                "Cloud-Zugang nur mit Registrierung",
-                "Die eigenständige Mobile-App und Windows-Desktop sind noch nicht öffentlich verfügbar",
-                "Der Agent-Workflow ist bewusst review-pflichtig",
-                "Rechne mit Bugs — und melde sie uns",
-              ],
-            },
-          ].map((card) => (
-            <div key={card.title} className="rounded-xl border border-[#E8E4DF] bg-[#FCFBFA] p-6">
-              <card.icon size={20} className="text-[#B64A1F]" />
-              <h3 className="mt-4 text-lg font-semibold">{card.title}</h3>
-              <ul className="mt-4 grid gap-2.5 text-sm leading-6 text-[#666666]">
-                {card.items.map((item) => (
-                  <li key={item} className="flex gap-2.5">
-                    <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#FF6B35]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-8 max-w-3xl text-sm leading-6 text-[#666666]">
-          Nach der Beta wird es eine kostenlose Stufe für lokales Arbeiten geben und eine bezahlte für Cloud- und
-          Team-Funktionen. Beta-Teilnehmer informieren wir vorher und rechnen nichts rückwirkend ab. Wenn du
-          die Cloud-Beta nutzen willst, registriere dich einfach — eine Einladung brauchst du nicht.
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState(0);
 
@@ -1180,7 +1107,7 @@ export default function LandingPage() {
                 Demo ohne Account testen
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <a href="#beta" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+              <a href={appSignupUrl} className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
                 Jetzt registrieren
               </a>
             </div>
@@ -1226,39 +1153,7 @@ export default function LandingPage() {
       <LocalFirstSection />
       <WikiSection />
       <FeatureBento />
-      <BetaProgramSection />
       <AvailabilityOverview locale="de" />
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]">
-        <div className="mx-auto grid max-w-7xl gap-4 px-5 py-10 md:grid-cols-4">
-          {[
-            { icon: FileText, label: "Offene Markdown-Dateien" },
-            { icon: HardDrive, label: "Lokale Speicherung" },
-            { icon: Code2, label: "Git- und Editor-kompatibel" },
-            { icon: ShieldCheck, label: "Lokale Backups" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#E8E4DF] bg-white p-4">
-              <item.icon size={20} className="text-[#FF6B35]" aria-hidden="true" />
-              <span className="text-sm font-semibold">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFF4EE]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-5 py-14 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Jetzt testen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Registrieren, wenn du mehr willst.</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Konto nutzen. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <Link href="/demo" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">Demo testen <ArrowRight size={16} /></Link>
-            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Desktop herunterladen</Link>
-            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Obsidian-Status</Link>
-          </div>
-        </div>
-      </section>
       <FAQSection />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}

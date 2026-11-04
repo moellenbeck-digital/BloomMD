@@ -3,11 +3,37 @@ import { getPublicRoadmap } from "./roadmap";
 
 const originalFetch = globalThis.fetch;
 const originalToken = process.env.BLOOMMD_ROADMAP_GITHUB_TOKEN;
+const originalGithubToken = process.env.GITHUB_TOKEN;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
   if (originalToken === undefined) delete process.env.BLOOMMD_ROADMAP_GITHUB_TOKEN;
   else process.env.BLOOMMD_ROADMAP_GITHUB_TOKEN = originalToken;
+  if (originalGithubToken === undefined) delete process.env.GITHUB_TOKEN;
+  else process.env.GITHUB_TOKEN = originalGithubToken;
+});
+
+test("keeps the ten planning themes visible when GitHub is unavailable", async () => {
+  delete process.env.BLOOMMD_ROADMAP_GITHUB_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+
+  const result = await getPublicRoadmap();
+
+  expect(result.source).toBe("fallback");
+  expect(result.issues.map((issue) => issue.number)).toEqual([259, 260, 261, 262, 263, 264, 265, 266, 267, 268]);
+  expect(result.issues.every((issue) => issue.status === "Planned" && issue.url.endsWith(`/issues/${issue.number}`))).toBe(true);
+});
+
+test("shows the ten planning themes in their declared order", async () => {
+  process.env.BLOOMMD_ROADMAP_GITHUB_TOKEN = "test-token";
+  const later = { ...roadmapNode(268, "Todo"), title: "Roadmap 10/10: Betrieb" };
+  const earlier = { ...roadmapNode(259, "Todo"), title: "Roadmap 1/10: Wissensmodell" };
+  globalThis.fetch = Object.assign(
+    async () => Response.json({ data: { repository: { issues: { nodes: [later, earlier] } } } }),
+    { preconnect: originalFetch.preconnect },
+  );
+
+  expect((await getPublicRoadmap()).issues.map((issue) => issue.number)).toEqual([259, 268]);
 });
 
 function roadmapNode(number: number, boardStatus?: string, projectTitle = "BloomMD Roadmap") {

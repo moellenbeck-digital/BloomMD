@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Filter, GitPullRequestArrow, Languages, Map, ShieldCheck } from "lucide-react";
+import { ExternalLink, Filter, GitPullRequestArrow, Languages, Map } from "lucide-react";
 import type { RoadmapData, RoadmapIssue, RoadmapStatus, RoadmapTag } from "../../lib/roadmap";
 import { roadmapFilters, roadmapStatuses } from "../../lib/roadmap";
+import { getBuildInfo } from "../../lib/build-info";
 
 type RoadmapLocale = "de" | "en";
 
@@ -21,11 +22,11 @@ type RoadmapCopy = {
   live: string;
   githubLink: string;
   cardLabel: string;
-  privacyTitle: string;
-  privacyText: string;
+  demoHref: string;
+  demoCta: string;
+  feedbackCta: string;
   visionTitle: string;
   visionIntro: string;
-  visionThemes: string;
   visionPhaseLabels: [string, string, string, string];
   visionPhases: [string, string, string, string];
   visionNote: string;
@@ -37,24 +38,23 @@ type RoadmapCopy = {
 const copy: Record<RoadmapLocale, RoadmapCopy> = {
   de: {
     eyebrow: "Öffentliche Roadmap",
-    title: "Was gerade aus Beta-Feedback entsteht.",
+    title: "Was BloomMD als Nächstes prüft.",
     intro:
-      "Diese Seite zeigt kuratierte BloomMD-Tickets. Die verlinkten GitHub-Issues sind öffentlich, einschließlich ihrer Kommentare und Anhänge.",
+      "Heute: visuelle Arbeit mit eigenen Markdown-Dateien. Als Nächstes prüfen wir, wie daraus eine offene Wissensplattform wachsen kann.",
     languageLabel: "Sprache",
     switchLabel: "EN",
     switchHref: "/en/roadmap",
     all: "Alle",
     filteredEmpty: "Für diesen Filter sind aktuell keine öffentlichen Tickets freigegeben.",
-    fallback: "GitHub-Daten sind gerade nicht verfügbar. Du siehst eine gecachte, reduzierte Roadmap.",
-    live: "Live aus freigegebenen GitHub-Tickets",
+    fallback: "Statischer Planungsstand; aktuelle Ticket-Status auf GitHub prüfen.",
+    live: "Aktuelle Planungstickets aus GitHub",
     githubLink: "Issue öffnen",
     cardLabel: "Öffentliches Roadmap-Ticket",
-    privacyTitle: "Bewusst kuratiert",
-    privacyText:
-      "Ein Ticket erscheint hier nur mit dem Label public-roadmap. Ticket-Titel bleiben in der Originalsprache, UI und Orientierung sind Deutsch und Englisch gepflegt.",
+    demoHref: "/demo",
+    demoCta: "BloomMD ohne Konto testen",
+    feedbackCta: "Idee oder Problem melden",
     visionTitle: "Vom Markdown-Workspace zur offenen Wissensplattform",
-    visionIntro: "BloomMD bleibt lokal mit eigenen Markdown-Dateien nutzbar. Der interne Learnings-Pilot ist der erste Backend-Nutzungsfall. Die folgenden Themen sind eine Richtung für überprüfbare Ausbauschritte, keine bereits verfügbaren Funktionen.",
-    visionThemes: "Wissensmodell und Provenienz · belegte Suche · Sync und Offline · Identität und Delegation · Sicherheit und Governance · Konnektoren · Wissenslebenszyklus · Agenten-Workflows · Transparenz · Betrieb",
+    visionIntro: "Lokales Markdown bleibt der Kern. Der interne Learnings-Pilot ist der erste Backend-Nutzungsfall. Die nächsten Schritte sind Planung, keine bereits verfügbaren Funktionen.",
     visionPhaseLabels: ["W0 · Jetzt prüfen", "W1 · Danach eingrenzen", "W2 · Vor breiter Suche", "W3 · Nach Nachweis"],
     visionPhases: ["Learnings-Pilot und portable Quellen-/Trust-Felder", "Konfliktfester Sync und eine begrenzte lesende Quelle", "Widerrufbare Rechte, Audit und Suche mit Belegen", "Lebenszyklus, Agentenaktionen, Governance und Betrieb"],
     visionNote: "Die Meilensteine bündeln Scope-Entscheidungen ohne Termin oder Funktionszusage. Die macOS-Beta hat Vorrang.",
@@ -86,24 +86,23 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
   },
   en: {
     eyebrow: "Public roadmap",
-    title: "What beta feedback is turning into.",
+    title: "What BloomMD is exploring next.",
     intro:
-      "This page shows curated BloomMD tickets. Linked GitHub issues are public, including their comments and attachments.",
+      "Today: visual work with your own Markdown files. Next, we are exploring how this can grow into an open knowledge platform.",
     languageLabel: "Language",
     switchLabel: "DE",
     switchHref: "/roadmap",
     all: "All",
     filteredEmpty: "No public tickets are approved for this filter right now.",
-    fallback: "GitHub data is unavailable right now. You are seeing a cached, reduced roadmap.",
-    live: "Live from approved GitHub tickets",
+    fallback: "Static planning snapshot; check GitHub for current issue status.",
+    live: "Current planning issues from GitHub",
     githubLink: "Open issue",
     cardLabel: "Public roadmap ticket",
-    privacyTitle: "Deliberately curated",
-    privacyText:
-      "A ticket appears here only with the public-roadmap label. Ticket titles keep their original language; interface and orientation are maintained in German and English.",
+    demoHref: "/demo?lang=en",
+    demoCta: "Try BloomMD without an account",
+    feedbackCta: "Share an idea or report a problem",
     visionTitle: "From Markdown workspace to open knowledge platform",
-    visionIntro: "BloomMD remains usable locally with your own Markdown files. The internal learnings pilot is the first backend use case. The themes below guide verifiable steps; they do not describe features already available.",
-    visionThemes: "Knowledge model and provenance · cited search · sync and offline · identity and delegation · security and governance · connectors · knowledge lifecycle · agent workflows · transparency · operations",
+    visionIntro: "Local Markdown remains the core. The internal learnings pilot is the first backend use case. The next steps are plans, not features already available.",
     visionPhaseLabels: ["W0 · Validate now", "W1 · Scope next", "W2 · Before broader search", "W3 · After evidence"],
     visionPhases: ["Learnings pilot and portable source/trust fields", "Conflict-safe sync and one limited read-only source", "Revocable rights, audit, and cited search", "Lifecycle, agent actions, governance, and operations"],
     visionNote: "These milestones group scope decisions without dates or feature commitments. The macOS beta remains the priority.",
@@ -137,6 +136,7 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
 
 export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: RoadmapLocale }) {
   const text = copy[locale];
+  const version = getBuildInfo("marketing", { publicOnly: true }).displayVersion;
   const [activeFilter, setActiveFilter] = useState<RoadmapTag | "all">("all");
 
   const filteredIssues = useMemo(() => {
@@ -181,8 +181,8 @@ export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: Roadm
       </header>
 
       <section className="border-b border-[#E8E4DF] bg-[#1A1A1A] text-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-14 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)] lg:py-18">
-          <div>
+        <div className="mx-auto max-w-7xl px-5 py-12 lg:py-16">
+          <div className="max-w-4xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/6 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/68">
               <Map size={14} aria-hidden="true" />
               {text.eyebrow}
@@ -191,17 +191,11 @@ export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: Roadm
               {text.title}
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/68">{text.intro}</p>
-          </div>
-
-          <aside className="self-end border-l border-[#FF6B35] bg-white/[0.035] p-5">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className="mt-1 shrink-0 text-[#FF8A50]" size={22} aria-hidden="true" />
-              <div>
-                <h2 className="text-lg font-bold text-white">{text.privacyTitle}</h2>
-                <p className="mt-2 text-sm leading-6 text-white/62">{text.privacyText}</p>
-              </div>
+            <div className="mt-7 flex flex-wrap items-center gap-4">
+              <Link href={text.demoHref} className="inline-flex min-h-11 items-center rounded-md bg-[#FF6B35] px-5 text-sm font-bold text-[#1A1A1A] hover:bg-[#FF8A50] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/30">{text.demoCta}</Link>
+              <a href="https://github.com/moellenbeck-digital/BloomMD/issues/new/choose" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-white underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30">{text.feedbackCta}<ExternalLink size={14} aria-hidden="true" /></a>
             </div>
-          </aside>
+          </div>
         </div>
       </section>
 
@@ -217,7 +211,6 @@ export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: Roadm
               </div>
             ))}
           </div>
-          <p className="mt-6 max-w-5xl text-sm leading-7 text-[#68615C]">{text.visionThemes}</p>
           <p className="mt-3 text-sm leading-6 text-[#68615C]">{text.visionNote}</p>
           <a href="https://github.com/moellenbeck-digital/BloomMD/blob/main/docs/WISSENSPLATTFORM-ROADMAP.md" className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[#B94316] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
             {text.visionLink}<ExternalLink size={14} aria-hidden="true" />
@@ -264,6 +257,7 @@ export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: Roadm
           ))}
         </div>
       </section>
+      <footer className="border-t border-[#E8E4DF] bg-[#FFFDFB] px-5 py-6 text-center text-xs text-[#68615C]">{version}</footer>
     </main>
   );
 }

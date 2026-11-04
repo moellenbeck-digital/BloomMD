@@ -214,11 +214,17 @@ export async function getPublicRoadmap(): Promise<RoadmapData> {
 
     const nodes = json.data?.repository?.issues?.nodes ?? [];
     const issues = nodes.map(toRoadmapIssue).filter((issue): issue is RoadmapIssue => issue !== null);
+    issues.sort((a, b) => planningOrder(a.title) - planningOrder(b.title) || a.number - b.number);
     return { issues, source: "github", fetchedAt };
   } catch (error) {
     console.error("Failed to load public roadmap from GitHub", error);
     return { issues: fallbackRoadmapIssues, source: "fallback", fetchedAt };
   }
+}
+
+function planningOrder(title: string): number {
+  const match = /^Roadmap (\d+)\/10:/.exec(title);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
 function toRoadmapIssue(node: GitHubIssueNode): RoadmapIssue | null {

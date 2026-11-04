@@ -63,3 +63,5 @@ Einladungen **an** eine Adresse (Workspace-Einladung, Beta-Einladung) hängen an
 ## Testsysteme
 
 Der Bypass im Produktionsbuild braucht `BLOOMMD_E2E_AUTH_BYPASS=1`, `BLOOMMD_E2E_TEST_MODE=1` **und** `BLOOMMD_LOCAL_DEPLOYMENT=1`. Das gilt auch für die Mail-Outbox (`BLOOMMD_E2E_MAIL_OUTBOX`). Ein Testsystem mit Produktionsbuild (z. B. `bloommd-test`) muss `BLOOMMD_LOCAL_DEPLOYMENT=1` zusätzlich bekommen, sonst bleibt der Bypass aus. `BLOOMMD_LOCAL_DEPLOYMENT=1` lenkt außerdem Formular-Weiterleitungen auf `NEXT_PUBLIC_APP_URL`; dort muss die URL des Testsystems stehen.
+
+Die Hinweis-Mails des Testzeitraums zählen ebenfalls gegen dieses Mailbudget, siehe [TRIAL.md](TRIAL.md).

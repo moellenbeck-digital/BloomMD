@@ -500,6 +500,26 @@ describe("agent token rights, proposals and log", () => {
     expect(expected.length).toBe(2);
     for (const statement of expected) expect(statements).toContain(statement);
   });
+
+  test("the migration file and the schema db:migrate applies add the same trial columns and reminder table (#274)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/013_trial_period.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(7);
+    for (const statement of expected) expect(statements).toContain(statement);
+    // The backfill must come after the column that marks existing rows, and run after the waitlist table exists.
+    const order = expected.map((statement) => statements.indexOf(statement));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(statements.indexOf(expected[0]!)).toBeGreaterThan(statements.findIndex((statement) => statement.startsWith("create table if not exists bloom_waitlist_transfers")));
+  });
 });
 
 describe("cloud document revisions (#3)", () => {

@@ -203,3 +203,29 @@ describe("product app production config", () => {
   });
 
 });
+
+describe("trial switches in the production config (#274)", () => {
+  test("both are optional and accept exactly 1 or 0", () => {
+    for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING"] as const) {
+      for (const value of [undefined, "", "0", "1"]) {
+        const env = appEnv();
+        if (value !== undefined) env[key] = value;
+        expect(productionConfigErrors(env)).toEqual([]);
+      }
+      for (const invalid of ["true", "yes", "2", "on"]) {
+        const env = appEnv();
+        env[key] = invalid;
+        expect(productionConfigErrors(env)).toContain(`${key} must be exactly "1" or "0" when set.`);
+      }
+    }
+  });
+
+  test("the read-only switch on is reported as a warning, off is not", () => {
+    const off = appEnv();
+    off.BLOOMMD_TRIAL_READONLY = "0";
+    expect(productionConfigWarnings(off).some((warning) => warning.includes("BLOOMMD_TRIAL_READONLY"))).toBe(false);
+    const on = appEnv();
+    on.BLOOMMD_TRIAL_READONLY = "1";
+    expect(productionConfigWarnings(on).some((warning) => warning.includes("BLOOMMD_TRIAL_READONLY is 1"))).toBe(true);
+  });
+});

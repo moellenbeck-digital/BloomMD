@@ -46,6 +46,11 @@ function e2eMailOutboxPath() {
   return process.env.BLOOMMD_E2E_MAIL_OUTBOX?.trim() || null;
 }
 
+/** Whether a mail can leave this process: a configured provider, or the E2E outbox of a test system. */
+export function isMailDeliveryAvailable() {
+  return isEmailConfigured() || e2eMailOutboxPath() !== null;
+}
+
 export async function sendTransactionalEmail(input: EmailInput) {
   const outbox = e2eMailOutboxPath();
   if (outbox) {
@@ -170,6 +175,39 @@ export async function sendWaitlistActivationEmail(email: string, token: string, 
     subject: copy.subject,
     text: `${copy.intro}\n\n${copy.action}\n${url}\n\n${copy.footer}`,
     html: `<p>${copy.intro}</p><p>${copy.action}</p><p><a href="${url}">${copy.link}</a></p><p>${copy.footer}</p>`,
+  });
+}
+
+/**
+ * Reminder that the free trial ends (#274), sent after 15 and after 23 days. `daysLeft` and
+ * `endsAt` come from the trial calculation (`trial.ts`); the date is shown in UTC so it does not
+ * depend on the server's time zone.
+ */
+export async function sendTrialReminderEmail(email: string, options: { lang?: AuthLocale; daysLeft: number; endsAt: Date | string }) {
+  const locale = options.lang ?? "de";
+  const url = accountLinkBase();
+  const endDate = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(options.endsAt));
+  const days = options.daysLeft;
+  const copy = locale === "en"
+    ? {
+        subject: `Your BloomMD trial ends in ${days} ${days === 1 ? "day" : "days"}`,
+        intro: `Your free BloomMD trial account ends on ${endDate} (${days} ${days === 1 ? "day" : "days"} left).`,
+        after: "After that, your account is read-only and export remains possible. Nothing is deleted.",
+        link: "Open BloomMD",
+        footer: "This is a reminder about your account. We send it once per reminder; nothing else follows from it.",
+      }
+    : {
+        subject: `Dein BloomMD-Testzeitraum endet in ${days} ${days === 1 ? "Tag" : "Tagen"}`,
+        intro: `Dein kostenloser BloomMD-Testaccount endet am ${endDate} (noch ${days} ${days === 1 ? "Tag" : "Tage"}).`,
+        after: "Danach ist dein Konto nur noch lesbar, der Export bleibt möglich. Es wird nichts gelöscht.",
+        link: "BloomMD öffnen",
+        footer: "Das ist eine Erinnerung zu deinem Konto. Wir senden sie je Hinweis einmal; weitere Folgen hat sie nicht.",
+      };
+  return sendTransactionalEmail({
+    to: email,
+    subject: copy.subject,
+    text: `${copy.intro}\n\n${copy.after}\n\n${url}\n\n${copy.footer}`,
+    html: `<p>${escapeHtml(copy.intro)}</p><p>${escapeHtml(copy.after)}</p><p><a href="${url}">${copy.link}</a></p><p>${escapeHtml(copy.footer)}</p>`,
   });
 }
 

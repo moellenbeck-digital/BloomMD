@@ -5,6 +5,7 @@ const WORKSPACE_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const WORKSPACE_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 let tokenWorkspaceIds: string[] | null = [WORKSPACE_A];
 let requested: Array<string | null | undefined> = [];
+let trialEndsAt: string | null = null;
 let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 
 mock.module("../../../lib/auth", () => ({
@@ -22,6 +23,7 @@ mock.module("../../../lib/db", () => ({
   },
   readCloudDocument: async (_userId: string, filename: string, workspaceId: string) => ({ id: "doc-1", filename, workspaceId }),
   getAgentTokenRights: async () => rights,
+  getTrialEndsAt: async () => trialEndsAt,
 }));
 
 process.env.NEXT_PUBLIC_SYNC_URL = "wss://sync.bloommd.test";
@@ -39,6 +41,8 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
     tokenWorkspaceIds = [WORKSPACE_A];
     requested = [];
     rights = { access: "write", areas: {} };
+    trialEndsAt = null;
+    delete process.env.BLOOMMD_TRIAL_READONLY;
   });
 
   test("refuses a ticket for another workspace", async () => {
@@ -67,5 +71,17 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
     expect(await permission("Privat – Plan.md")).toBe("write");
     rights = { access: "propose", areas: {} };
     expect(await permission("Privat – Plan.md")).toBe("read");
+  });
+
+  test("an account whose trial has ended gets a read-only ticket, but only with the read-only switch on (#274)", async () => {
+    const permission = async () => ((await (await ticket({ filename: "plan.md" })).json()) as { permission: string }).permission;
+    trialEndsAt = new Date(Date.now() - 1000).toISOString();
+    expect(await permission()).toBe("write");
+    process.env.BLOOMMD_TRIAL_READONLY = "1";
+    expect(await permission()).toBe("read");
+    trialEndsAt = new Date(Date.now() + 86_400_000).toISOString();
+    expect(await permission()).toBe("write");
+    trialEndsAt = null;
+    expect(await permission()).toBe("write");
   });
 });

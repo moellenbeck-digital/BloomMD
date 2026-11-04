@@ -4,6 +4,12 @@ function legalEnv(key: string, fallback = "Noch einzutragen vor Live-Verkauf") {
   return process.env[key]?.trim() || fallback;
 }
 
+/** True when an optional legal value is really filled in: not empty, not a dash, not the "Nicht angegeben" default. */
+export function hasLegalValue(value: string) {
+  const trimmed = value.trim();
+  return trimmed !== "" && !/^[-–—]+$/.test(trimmed) && trimmed.toLowerCase() !== "nicht angegeben";
+}
+
 export function getLegalProfile() {
   return {
     businessName: legalEnv("BLOOMMD_LEGAL_BUSINESS_NAME"),

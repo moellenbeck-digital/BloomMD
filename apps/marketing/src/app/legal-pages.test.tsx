@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import DatenschutzPage from "./datenschutz/page";
 import ImpressumPage from "./impressum/page";
-import { LEGAL_STATUS } from "../lib/legal";
+import { hasLegalValue, LEGAL_STATUS } from "../lib/legal";
 
 const LEGAL_ENV = {
   BLOOMMD_LEGAL_BUSINESS_NAME: "Beispiel Digital GmbH",
@@ -50,6 +50,31 @@ describe("Impressum", () => {
   });
 });
 
+describe("Impressum phone line", () => {
+  test("is dropped when BLOOMMD_LEGAL_PHONE is unset, empty, a dash or \"Nicht angegeben\"", async () => {
+    Object.assign(process.env, LEGAL_ENV);
+    for (const phone of [undefined, "", "   ", "-", "–", "Nicht angegeben"]) {
+      if (phone === undefined) delete process.env.BLOOMMD_LEGAL_PHONE;
+      else process.env.BLOOMMD_LEGAL_PHONE = phone;
+      for (const html of [await render(ImpressumPage(page())), await render(ImpressumPage(page("en")))]) {
+        expect(html).not.toMatch(/Telefon|Phone/);
+        expect(html).toContain(LEGAL_ENV.BLOOMMD_LEGAL_EMAIL);
+      }
+    }
+  });
+
+  test("is shown when a number is set", async () => {
+    Object.assign(process.env, LEGAL_ENV);
+    expect(await render(ImpressumPage(page()))).toContain("Telefon");
+    expect(await render(ImpressumPage(page("en")))).toContain("Phone");
+  });
+
+  test("hasLegalValue treats empty, dash and the default as not filled in", () => {
+    for (const value of ["", "  ", "-", "—", "Nicht angegeben", "nicht angegeben"]) expect(hasLegalValue(value)).toBe(false);
+    for (const value of ["+49 123 456789", "0 12 3"]) expect(hasLegalValue(value)).toBe(true);
+  });
+});
+
 describe("Datenschutzerklärung", () => {
   test("has the app section, share links and agents in German and English", async () => {
     Object.assign(process.env, LEGAL_ENV);
@@ -68,6 +93,19 @@ describe("Datenschutzerklärung", () => {
     expect(en).toContain("Share links (read-only)");
     expect(en).toContain("Workspace agents");
     expect(en).toContain(LEGAL_STATUS);
+  });
+
+  test("names retention, deletion and the processors in German and English", async () => {
+    const de = await render(DatenschutzPage(page()));
+    expect(de).toContain("Speicherdauer und Löschung");
+    expect(de).toContain("Empfänger und Auftragsverarbeiter");
+    expect(de).toContain("Ein abgelaufener Testaccount wird derzeit nicht automatisch gelöscht");
+    for (const name of ["Resend", "Sentry", "Plausible", "GitHub"]) expect(de).toContain(name);
+    const en = await render(DatenschutzPage(page("en")));
+    expect(en).toContain("Retention and deletion");
+    expect(en).toContain("Recipients and processors");
+    expect(en).toContain("An expired trial account is currently not deleted automatically");
+    for (const name of ["Resend", "Sentry", "Plausible", "GitHub"]) expect(en).toContain(name);
   });
 
   test("does not leave placeholders for the owner in the public text", async () => {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage, LegalSection } from "../legal-page";
-import { getLegalProfile, LEGAL_STATUS } from "../../lib/legal";
+import { getLegalProfile, hasLegalValue, LEGAL_STATUS } from "../../lib/legal";
 import { getAppLocale, type AppLocale } from "../../lib/locale";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ lang?: string }> }): Promise<Metadata> {
@@ -29,7 +29,7 @@ export default async function ImpressumPage({ searchParams }: { searchParams: Pr
 
       <LegalSection title={en ? "Contact" : "Kontakt"}>
         <p>{en ? "Email" : "E-Mail"}: {legal.email}</p>
-        <p>{en ? "Phone" : "Telefon"}: {legal.phone}</p>
+        {hasLegalValue(legal.phone) ? <p>{en ? "Phone" : "Telefon"}: {legal.phone}</p> : null}
       </LegalSection>
 
       <LegalSection title={en ? "Commercial register" : "Registereintrag"}>

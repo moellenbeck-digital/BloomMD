@@ -12,12 +12,19 @@ Grundlage: Code-Stand `packages/mobile` und `apps/app` (Share-Links), siehe `PRI
 
 ## Was die bestehende Seite abdeckt
 
-- Verantwortlicher, Accountdaten, local-first, keine Zahlungen in M1, Resend, Sentry/Plausible/
-  PostHog (Marketing/Web), optionaler Sync, Cookies, Warteliste (beendet; Einträge werden 90 Tage nach der
-  Einladungs-E-Mail gelöscht), Rechtsgrundlagen, Betroffenenrechte.
-- **Fehlte (App, Share-Links, Agenten sind jetzt ergänzt; Hosting-Standort und Speicherdauer bleiben offen):** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Standort, Speicherdauer der
-  Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
-  kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen.
+- Verantwortlicher, Accountdaten, local-first, keine Zahlungen, Resend, Sentry/Plausible/
+  PostHog (Marketing/Web), optionaler Sync, Cookies, Hinweis-E-Mails zum Testzeitraum, Warteliste (beendet; Einträge werden 90 Tage nach der
+  Einladungs-E-Mail gelöscht), Empfänger und Auftragsverarbeiter, Speicherdauer und Löschung (Ticket #199,
+  Entwurf), Rechtsgrundlagen, Betroffenenrechte.
+- **Fehlte (App, Share-Links, Agenten, Speicherdauer sind jetzt ergänzt; Hosting-Anbieter und Serverstandort bleiben offen):** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Anbieter und -Standort,
+  Speicherdauer der Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
+  kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen. Die Speicherdauer steht seit Ticket #199 (Entwurf)
+  im Abschnitt „Speicherdauer und Löschung“ der Seite, die Empfänger im Abschnitt „Empfänger und Auftragsverarbeiter“. Der
+  Hosting-Anbieter fehlt dort weiterhin, bis der Owner ihn und den Standort bestätigt hat (die Hetzner-Angabe unten bleibt
+  deshalb ein Platzhalter und gehört nicht in die öffentliche Seite).
+- **Abgleich (Ticket #199):** Die App-Texte unten passen zur Seite: Konto löschen unter `https://bloommd.app/account`, Zugangs-Token
+  widerrufen beim Abmelden, Inhalte bleiben bis zur Löschung. Die Mobile-App hat keine Feedback-Funktion; Feedback entsteht in der
+  Web-App und bleibt nach der Konto-Löschung bestehen (siehe Seite).
 
 ## Impressum / Anbieterkennzeichnung (Owner-Todo)
 

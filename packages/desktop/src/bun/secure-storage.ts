@@ -1,4 +1,5 @@
 import { platform } from "node:os";
+import { dlopen, ptr, toArrayBuffer, type Pointer } from "bun:ffi";
 
 export interface SecureStorage {
   get(key: string): Promise<string | null>;
@@ -179,6 +180,184 @@ export class LinuxSecretServiceStorage implements SecureStorage {
   }
 }
 
+// Win32 constants (wincred.h / winerror.h).
+const CRED_TYPE_GENERIC = 1;
+const CRED_PERSIST_LOCAL_MACHINE = 2;
+const CRED_MAX_CREDENTIAL_BLOB_SIZE = 5 * 512;
+const ERROR_GEN_FAILURE = 31;
+/** `CredReadW`/`CredDeleteW` report a missing entry with this code. */
+export const ERROR_NOT_FOUND = 1168;
+
+/**
+ * Byte layout of CREDENTIALW with 8-byte pointers (x64 and arm64 Windows):
+ * Flags@0 Type@4 TargetName@8 Comment@16 LastWritten@24 CredentialBlobSize@32
+ * CredentialBlob@40 Persist@48 AttributeCount@52 Attributes@56 TargetAlias@64 UserName@72.
+ */
+const CREDENTIALW_SIZE = 80;
+
+/** The advapi32/kernel32 calls the Credential Manager backend needs, with their native signatures. */
+export interface WindowsCredentialLibrary {
+  CredWriteW(credential: Uint8Array, flags: number): number;
+  CredReadW(targetName: Uint8Array, type: number, flags: number, credential: BigUint64Array): number;
+  CredDeleteW(targetName: Uint8Array, type: number, flags: number): number;
+  CredFree(buffer: Pointer): void;
+  GetLastError(): number;
+}
+
+/** Credential Manager operations. A status of 0 means success, anything else is the Win32 error code. */
+export interface WindowsCredentialApi {
+  write(target: string, userName: string, secret: string): number;
+  read(target: string): { status: number; secret?: string };
+  delete(target: string): number;
+}
+
+function wideString(value: string): Buffer {
+  return Buffer.from(`${value}\0`, "utf16le");
+}
+
+function loadWindowsCredentialLibrary(): WindowsCredentialLibrary {
+  if (process.arch !== "x64" && process.arch !== "arm64") {
+    throw new Error("The Windows Credential Manager backend requires a 64-bit process.");
+  }
+  const advapi = dlopen("advapi32.dll", {
+    CredWriteW: { args: ["ptr", "u32"], returns: "i32" },
+    CredReadW: { args: ["ptr", "u32", "u32", "ptr"], returns: "i32" },
+    CredDeleteW: { args: ["ptr", "u32", "u32"], returns: "i32" },
+    CredFree: { args: ["ptr"], returns: "void" },
+  });
+  const kernel = dlopen("kernel32.dll", { GetLastError: { args: [], returns: "u32" } });
+  return {
+    CredWriteW: (credential, flags) => advapi.symbols.CredWriteW(credential, flags),
+    CredReadW: (targetName, type, flags, credential) => advapi.symbols.CredReadW(targetName, type, flags, credential),
+    CredDeleteW: (targetName, type, flags) => advapi.symbols.CredDeleteW(targetName, type, flags),
+    CredFree: (buffer) => { advapi.symbols.CredFree(buffer); },
+    GetLastError: () => kernel.symbols.GetLastError(),
+  };
+}
+
+/**
+ * Credential Manager access through in-process FFI: the token only lives in this process's memory
+ * and is handed to advapi32 as a CREDENTIALW blob, so it never appears in argv, environment or a file.
+ * The blob is UTF-16LE, the encoding Windows tools (cmdkey, the Credential Manager UI) use for secrets.
+ */
+export class NativeWindowsCredentialApi implements WindowsCredentialApi {
+  private library?: WindowsCredentialLibrary;
+  private readonly load: () => WindowsCredentialLibrary;
+
+  constructor(load: () => WindowsCredentialLibrary = loadWindowsCredentialLibrary) {
+    this.load = load;
+  }
+
+  private native(): WindowsCredentialLibrary {
+    this.library ??= this.load();
+    return this.library;
+  }
+
+  write(target: string, userName: string, secret: string): number {
+    const library = this.native();
+    const blob = Buffer.from(secret, "utf16le");
+    try {
+      const targetName = wideString(target);
+      const user = wideString(userName);
+      const credential = Buffer.alloc(CREDENTIALW_SIZE);
+      credential.writeUInt32LE(CRED_TYPE_GENERIC, 4);
+      credential.writeBigUInt64LE(BigInt(ptr(targetName)), 8);
+      credential.writeUInt32LE(blob.length, 32);
+      credential.writeBigUInt64LE(BigInt(ptr(blob)), 40);
+      credential.writeUInt32LE(CRED_PERSIST_LOCAL_MACHINE, 48);
+      credential.writeBigUInt64LE(BigInt(ptr(user)), 72);
+      if (library.CredWriteW(credential, 0) !== 0) return 0;
+      return library.GetLastError() || ERROR_GEN_FAILURE;
+    } finally {
+      blob.fill(0);
+    }
+  }
+
+  read(target: string): { status: number; secret?: string } {
+    const library = this.native();
+    const out = new BigUint64Array(1);
+    if (library.CredReadW(wideString(target), CRED_TYPE_GENERIC, 0, out) === 0) {
+      return { status: library.GetLastError() || ERROR_GEN_FAILURE };
+    }
+    const credential = Number(out[0]) as Pointer;
+    try {
+      const header = new DataView(toArrayBuffer(credential, 0, CREDENTIALW_SIZE));
+      const size = header.getUint32(32, true);
+      const blobPointer = Number(header.getBigUint64(40, true)) as Pointer;
+      if (size === 0 || blobPointer === 0) return { status: 0, secret: "" };
+      return { status: 0, secret: Buffer.from(toArrayBuffer(blobPointer, 0, size)).toString("utf16le") };
+    } finally {
+      library.CredFree(credential);
+    }
+  }
+
+  delete(target: string): number {
+    const library = this.native();
+    if (library.CredDeleteW(wideString(target), CRED_TYPE_GENERIC, 0) !== 0) return 0;
+    return library.GetLastError() || ERROR_GEN_FAILURE;
+  }
+}
+
+/**
+ * Windows Credential Manager-backed storage (the counterpart of Keychain and Secret Service).
+ * Entries are generic credentials in the signed-in user's own vault (`CRED_PERSIST_LOCAL_MACHINE`
+ * persists across logons on this machine only), so they are separate per Windows user and per profile key.
+ */
+export class WindowsCredentialStorage implements SecureStorage {
+  private readonly service = "io.moellenbeck-digital.bloommd.connection-profile";
+  private readonly account = process.env.USERNAME || "BloomMD";
+  private readonly api: WindowsCredentialApi;
+
+  constructor(api: WindowsCredentialApi = new NativeWindowsCredentialApi()) {
+    this.api = api;
+  }
+
+  private target(key: string): string {
+    assertKey(key);
+    return `${this.service}.${key}`;
+  }
+
+  /** Fixed message on purpose: neither the token nor the native error text is ever included. */
+  private unavailable(status?: number): never {
+    const code = status ? ` (Win32 error ${status})` : "";
+    throw new SecureStorageUnavailableError(
+      `The Windows Credential Manager is unavailable or denied access${code}. Sign in to Windows normally and try again.`,
+    );
+  }
+
+  private call<T>(operation: () => T): T {
+    try {
+      return operation();
+    } catch {
+      return this.unavailable();
+    }
+  }
+
+  async get(key: string): Promise<string | null> {
+    const target = this.target(key);
+    const result = this.call(() => this.api.read(target));
+    if (result.status === 0) return result.secret || null;
+    if (result.status === ERROR_NOT_FOUND) return null;
+    return this.unavailable(result.status);
+  }
+
+  async set(key: string, value: string): Promise<void> {
+    const target = this.target(key);
+    if (!value.startsWith("bloom_pat_")) throw new Error("A personal BloomMD access token is required.");
+    if (value.length * 2 > CRED_MAX_CREDENTIAL_BLOB_SIZE) {
+      throw new Error("The access token is too long for the Windows Credential Manager.");
+    }
+    const status = this.call(() => this.api.write(target, this.account, value));
+    if (status !== 0) this.unavailable(status);
+  }
+
+  async delete(key: string): Promise<void> {
+    const target = this.target(key);
+    const status = this.call(() => this.api.delete(target));
+    if (status !== 0 && status !== ERROR_NOT_FOUND) this.unavailable(status);
+  }
+}
+
 /** Unsupported platforms fail closed instead of storing a plaintext fallback. */
 export class UnavailableSecureStorage implements SecureStorage {
   async get(_key: string): Promise<string | null> { return null; }
@@ -188,8 +367,12 @@ export class UnavailableSecureStorage implements SecureStorage {
   async delete(_key: string): Promise<void> { return; }
 }
 
-export function createSecureStorage(): SecureStorage {
-  if (platform() === "darwin") return new MacKeychainStorage();
-  if (platform() === "linux") return new LinuxSecretServiceStorage();
+export function createSecureStorage(
+  options: { platform?: string; windowsApi?: WindowsCredentialApi } = {},
+): SecureStorage {
+  const current = options.platform ?? platform();
+  if (current === "darwin") return new MacKeychainStorage();
+  if (current === "linux") return new LinuxSecretServiceStorage();
+  if (current === "win32") return new WindowsCredentialStorage(options.windowsApi);
   return new UnavailableSecureStorage();
 }

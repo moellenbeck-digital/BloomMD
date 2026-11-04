@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Menu, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search } from "lucide-react";
+import { Menu, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search, Folder, ChevronRight, CornerLeftUp } from "lucide-react";
 import {
   ConflictCopyBadge,
   ConflictCopyBanner,
@@ -29,6 +29,8 @@ import { MobileRemoteClient, RemoteRequestError } from "./remote-client";
 import { DEFAULT_SERVER_URL, describeDevice, MobileAuth, MobileAuthError, normalizeServerUrl, type MobileSession } from "./mobile-auth";
 import { parseAppLink } from "./app-links";
 import { createAppStore, createFolderStore, type MobileStore, type StoreEntry } from "./stores";
+import { existingFolder, folderLevel, folderOf, pathSteps, searchEntries } from "./folder-levels";
+import { openFileUrl } from "./opened-file";
 import { NoteSaver } from "./note-saver";
 import { APP_DIRECTORY, IS_ANDROID } from "./platform";
 import { appInkAttachments, folderInkAttachments } from "./ink-attachments";
@@ -141,6 +143,12 @@ export function App() {
   const storeRef = useRef(store);
   storeRef.current = store;
   const [filter, setFilter] = useState("");
+  /** The folder of the open folder's notes shown in the list ("" at the top). */
+  const [folderPath, setFolderPath] = useState("");
+  // A folder whose last note is gone (deleted, moved elsewhere) falls back to the nearest one that has notes.
+  const shownFolder = useMemo(() => existingFolder(files, folderPath), [files, folderPath]);
+  const folderPathRef = useRef(shownFolder);
+  folderPathRef.current = shownFolder;
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -218,6 +226,7 @@ export function App() {
     await flushSave();
     storeRef.current = next;
     setStore(next);
+    setFolderPath("");
     saver.open(null, null);
     useMindMapStore.setState({ document: null, nodes: [], edges: [], selectedNodeId: null, selectedNodeIds: [] });
     const entries = await refreshFiles(next);
@@ -385,6 +394,8 @@ export function App() {
   }, [auth, authText, loadFile, refreshFiles]);
 
   const handleNew = useCallback(async () => {
+    // A single file from the Files app has no folder to add notes to.
+    if (storeRef.current.kind === "file") return;
     const title = prompt(t.newMindmapPrompt);
     if (!title) return;
     await flushSave();
@@ -393,18 +404,19 @@ export function App() {
     const now = new Date().toISOString();
 
     const markdown = `---\ntitle: ${title}\nid: ${id}\ncreated: "${now}"\nupdated: "${now}"\nlayout:\n  direction: LR\n---\n\n# ${title}\n`;
-    const filename = markdownFilename(title, id, files.map((file) => file.path.split("/").pop() ?? file.path));
-    const doc = parseFile(storeRef.current.pathFor(filename), markdown);
+    // The new note lands in the folder shown, so a name only has to be free there.
+    const filename = markdownFilename(title, id, files.filter((file) => file.folder === shownFolder).map((file) => file.path.split("/").pop() ?? file.path));
+    const doc = parseFile(storeRef.current.pathFor(filename, shownFolder), markdown);
     const saved = await storeRef.current.save({ document: doc, baseline: "" }, doc);
     saver.open(storeRef.current, saved);
     setDocument(doc);
     await refreshFiles();
-  }, [t, files, flushSave, saver, setDocument, refreshFiles]);
+  }, [t, files, shownFolder, flushSave, saver, setDocument, refreshFiles]);
 
   const handleImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || storeRef.current.kind === "file") return;
     if (file.size > 10 * 1024 * 1024) {
       setError(textRef.current.errors.tooLarge);
       return;
@@ -424,8 +436,8 @@ export function App() {
         }
       }
       const base = file.name.replace(/\.(md|markdown|opml)$/i, "") || "Import";
-      const filename = markdownFilename(base, crypto.randomUUID().slice(0, 8), files.map((entry) => entry.path.split("/").pop() ?? entry.path));
-      const doc = parseFile(storeRef.current.pathFor(filename), markdown);
+      const filename = markdownFilename(base, crypto.randomUUID().slice(0, 8), files.filter((entry) => entry.folder === shownFolder).map((entry) => entry.path.split("/").pop() ?? entry.path));
+      const doc = parseFile(storeRef.current.pathFor(filename, shownFolder), markdown);
       saver.open(storeRef.current, await storeRef.current.save({ document: doc, baseline: "" }, doc));
       setDocument(doc);
       await refreshFiles();
@@ -434,7 +446,7 @@ export function App() {
     } catch {
       setError(textRef.current.errors.importFailed);
     }
-  }, [files, flushSave, refreshFiles, saver, setDocument, t.importOpmlFailed]);
+  }, [files, shownFolder, flushSave, refreshFiles, saver, setDocument, t.importOpmlFailed]);
 
   const handleDelete = useCallback(async (path: string) => {
     if (!window.confirm(store.kind === "folder" ? textRef.current.confirmDeleteFromFolder(path, store.name) : textRef.current.confirmDeleteFromDevice(path))) return;
@@ -506,9 +518,50 @@ export function App() {
     return () => { void listener.then((handle) => handle.remove()).catch(() => undefined); };
   }, [drawerOpen, editorVisible, exportOpen, flushSave, helpOpen]);
 
+  const lastOpenedFile = useRef({ url: "", at: 0 });
+
+  /**
+   * "Open in BloomMD" from the Files app: the file is opened where it lies, as a note of the open
+   * folder when it is in it, else as a single file. Nothing is copied.
+   */
+  const openExternalFile = useCallback(async (url: string, force = false) => {
+    // A cold start delivers the URL twice: as launch URL and as the retained open event.
+    const now = Date.now();
+    if (!force && lastOpenedFile.current.url === url && now - lastOpenedFile.current.at < 3000) return;
+    lastOpenedFile.current = { url, at: now };
+    try {
+      setError(null);
+      await flushSave();
+      const opened = await openFileUrl(BloomFolder, url, storeRef.current);
+      const loaded = await opened.store.read(opened.path);
+      const listing = await opened.store.list();
+      if (remoteClient) {
+        useMindMapStore.getState().disconnectSync();
+        setRemoteClient(null);
+      }
+      if (opened.store !== storeRef.current) {
+        storeRef.current = opened.store;
+        setStore(opened.store);
+      }
+      setFiles(listing.entries);
+      setTruncated(Boolean(listing.truncated));
+      setFolderPath(folderOf(opened.path));
+      saver.open(opened.store, loaded);
+      setDocument(loaded.document);
+      setDrawerOpen(false);
+    } catch (openError) {
+      setError(textRef.current.errors.fileFailed);
+      throw openError;
+    }
+  }, [flushSave, remoteClient, saver, setDocument]);
+
   const handleLink = useCallback(async (raw: string) => {
     const link = parseAppLink(raw);
     if (!link) return;
+    if (link.kind === "file") {
+      await openExternalFile(link.url).catch(() => undefined);
+      return;
+    }
     if (link.kind === "auth") {
       await completeSignIn(link.url);
       return;
@@ -525,14 +578,18 @@ export function App() {
         await loadFile(path, node, folder);
         const selected = useMindMapStore.getState().selectedNodeId;
         if (node && selected !== node) throw new Error(`selected ${selected ?? "nothing"} instead of ${node}`);
+      }, async (url) => {
+        await openExternalFile(url, true);
+        return { path: useMindMapStore.getState().document?.filePath ?? null, store: storeRef.current.kind, folder: folderPathRef.current };
       });
       return;
     }
     // Cloud documents (`doc`) are parsed but not opened yet: the app has no lookup by document id.
     if (link.kind !== "open") return;
     setDrawerOpen(false);
+    setFolderPath(folderOf(link.path));
     await loadFile(link.path, link.node).catch(() => undefined);
-  }, [completeSignIn, flushSave, loadFile, refreshFiles]);
+  }, [completeSignIn, flushSave, loadFile, openExternalFile, refreshFiles]);
 
   useEffect(() => {
     const listener = CapacitorApp.addListener("appUrlOpen", ({ url }) => { void handleLink(url); });
@@ -591,15 +648,18 @@ export function App() {
       const match = files.find((entry) => entry.title.toLowerCase() === target.toLowerCase());
       if (match) void loadFile(match.path).catch(() => undefined);
     };
+    // A single file from the Files app has no attachment folder next to it that the app may use.
+    if (store.kind === "file") return null;
     return store.kind === "folder" ? folderInkAttachments(BloomFolder, { pickNote, openNote }) : appInkAttachments({ pickNote, openNote });
   }, [files, loadFile, remoteClient, store]);
 
   // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
   const showConflictBanner = Boolean(document && parseConflictCopy(document.filePath));
 
-  const visibleFiles = filter.trim()
-    ? files.filter((entry) => `${entry.folder}/${entry.title}`.toLowerCase().includes(filter.trim().toLowerCase()))
-    : files;
+  // While a filter is typed the list is flat across all folders; otherwise it is the level shown.
+  const searching = filter.trim() !== "";
+  const level = useMemo(() => folderLevel(files, shownFolder), [files, shownFolder]);
+  const visibleNotes = searching ? searchEntries(files, filter) : level.notes;
 
   if (loading) {
     return (
@@ -701,21 +761,21 @@ export function App() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-2 border-b border-[#E8E4DF] p-2">
-              <button type="button" onClick={() => void handleNew()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><FilePlus size={16} aria-hidden="true" />{text.newMap}</button>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><Upload size={16} aria-hidden="true" />{text.importMap}</button>
+              <button type="button" onClick={() => void handleNew()} disabled={store.kind === "file"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><FilePlus size={16} aria-hidden="true" />{text.newMap}</button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={store.kind === "file"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><Upload size={16} aria-hidden="true" />{text.importMap}</button>
               <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><CircleHelp size={16} aria-hidden="true" />{text.help}</button>
             </div>
             {!remoteClient && (
               <div className="grid gap-2 border-b border-[#E8E4DF] p-3" data-testid="mobile-store">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#666]">
-                  {store.kind === "folder" ? <FolderOpen size={15} className="text-[#FF6B35]" /> : <Tablet size={15} className="text-[#FF6B35]" />}
+                  {store.kind === "folder" ? <FolderOpen size={15} className="text-[#FF6B35]" /> : store.kind === "file" ? <FileText size={15} className="text-[#FF6B35]" /> : <Tablet size={15} className="text-[#FF6B35]" />}
                   <span className="min-w-0 truncate">{store.kind === "app" ? text.onThisDevice : store.name}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => void openFolder()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><FolderOpen size={15} aria-hidden="true" />{text.openFolder}</button>
                   <button type="button" onClick={() => void useAppFolder()} disabled={store.kind === "app"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><Tablet size={15} aria-hidden="true" />{text.appFolderOnly}</button>
                 </div>
-                <p className="text-[11px] leading-4 text-[#999]">{text.folderHint}</p>
+                <p className="text-[11px] leading-4 text-[#999]">{store.kind === "file" ? text.singleFileHint : text.folderHint}</p>
               </div>
             )}
             <div className="grid gap-2 border-b border-[#E8E4DF] p-3" data-testid="mobile-account">
@@ -764,11 +824,49 @@ export function App() {
                 {text.truncated(files.length)}
               </p>
             )}
-            <div className="flex-1 overflow-y-auto p-2">
-              {visibleFiles.map((entry) => {
+            {!searching && (shownFolder || level.folders.length > 0) && (
+              <nav aria-label={text.folderPath} data-testid="mobile-folder-path" className="flex items-center gap-1 border-b border-[#E8E4DF] px-2">
+                {shownFolder && (
+                  <button type="button" onClick={() => setFolderPath(level.parent ?? "")} aria-label={text.folderUp} title={text.folderUp} data-testid="mobile-folder-up" className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#666] active:bg-[#F5F3F0]"><CornerLeftUp size={16} aria-hidden="true" /></button>
+                )}
+                <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 py-1 font-mono text-[11px] text-[#666]">
+                  <li className="flex items-center">
+                    {shownFolder
+                      ? <button type="button" onClick={() => setFolderPath("")} className="min-h-9 rounded px-1 active:bg-[#F5F3F0]">{store.kind === "app" ? text.onThisDevice : store.name}</button>
+                      : <span aria-current="page" className="px-1 font-semibold text-[#1A1A1A]">{store.kind === "app" ? text.onThisDevice : store.name}</span>}
+                  </li>
+                  {pathSteps(shownFolder).map((step, index, steps) => (
+                    <li key={step.path} className="flex items-center gap-0.5">
+                      <ChevronRight size={11} className="shrink-0 text-[#999]" aria-hidden="true" />
+                      {index === steps.length - 1
+                        ? <span aria-current="page" className="truncate px-1 font-semibold text-[#1A1A1A]">{step.name}</span>
+                        : <button type="button" onClick={() => setFolderPath(step.path)} className="min-h-9 truncate rounded px-1 active:bg-[#F5F3F0]">{step.name}</button>}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            )}
+            <div className="flex-1 overflow-y-auto p-2" data-testid="mobile-note-list">
+              {!searching && level.folders.map((row) => (
+                <button
+                  key={`folder:${row.path}`}
+                  type="button"
+                  onClick={() => setFolderPath(row.path)}
+                  aria-label={text.openSubfolder(row.name)}
+                  title={row.path}
+                  data-testid="mobile-folder-row"
+                  className="mb-1 flex min-h-11 w-full items-center gap-2 rounded-md border border-transparent px-3 py-2 text-left active:bg-[#F5F3F0]"
+                >
+                  <Folder size={16} className="shrink-0 text-[#FF6B35]" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#1A1A1A]">{row.name}</span>
+                  <span className="shrink-0 text-[11px] text-[#999]">{text.noteCount(row.notes)}</span>
+                  <ChevronRight size={15} className="shrink-0 text-[#999]" aria-hidden="true" />
+                </button>
+              ))}
+              {visibleNotes.map((entry) => {
                 const isActive = document?.filePath === entry.path || (entry.frontmatter?.id !== undefined && document?.frontmatter.id === entry.frontmatter.id);
                 return (
-                  <div key={entry.path} className={`mb-1 flex items-center rounded-md border ${isActive ? "border-[#FFD4BF] bg-[#FFF4EE]" : "border-transparent"}`}>
+                  <div key={entry.path} data-testid="mobile-note-row" className={`mb-1 flex items-center rounded-md border ${isActive ? "border-[#FFD4BF] bg-[#FFF4EE]" : "border-transparent"}`}>
                     <button
                       onClick={() => { void loadFile(entry.path).catch(() => undefined); setDrawerOpen(false); }}
                       disabled={!entry.local}
@@ -780,12 +878,17 @@ export function App() {
                         <span className="truncate">{entry.title}</span>
                         <ConflictCopyBadge filename={entry.path} />
                       </div>
-                      <div className="mt-0.5 truncate font-mono text-[11px] text-[#999]">{entry.folder || entry.path}</div>
+                      {searching && <div className="mt-0.5 truncate font-mono text-[11px] text-[#999]">{entry.folder || entry.path}</div>}
                     </button>
-                    <button type="button" onClick={() => void handleDelete(entry.path)} aria-label={text.deleteNote(entry.title)} title={text.deleteFile} className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#999] active:bg-red-50 active:text-red-700"><Trash2 size={16} aria-hidden="true" /></button>
+                    {store.kind !== "file" && (
+                      <button type="button" onClick={() => void handleDelete(entry.path)} aria-label={text.deleteNote(entry.title)} title={text.deleteFile} className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#999] active:bg-red-50 active:text-red-700"><Trash2 size={16} aria-hidden="true" /></button>
+                    )}
                   </div>
                 );
               })}
+              {!searching && store.kind === "folder" && level.folders.length === 0 && level.notes.length === 0 && (
+                <p className="px-3 py-2 text-[11px] leading-4 text-[#999]">{text.emptyFolder}</p>
+              )}
             </div>
           </aside>
         </>
@@ -810,8 +913,8 @@ export function App() {
             <div>
               <h2 className="text-lg font-semibold text-[#1A1A1A]">{text.noMapOpen}</h2>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => void handleNew()} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white"><FilePlus size={17} aria-hidden="true" />{text.newMap}</button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold"><Upload size={17} aria-hidden="true" />{text.importMap}</button>
+                <button type="button" onClick={() => void handleNew()} disabled={store.kind === "file"} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white disabled:opacity-40"><FilePlus size={17} aria-hidden="true" />{text.newMap}</button>
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={store.kind === "file"} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold disabled:opacity-40"><Upload size={17} aria-hidden="true" />{text.importMap}</button>
                 <button type="button" onClick={() => (files.length > 0 ? setDrawerOpen(true) : void openFolder())} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold"><FolderOpen size={17} aria-hidden="true" />{files.length > 0 ? text.pickNote : text.openFolder}</button>
               </div>
             </div>

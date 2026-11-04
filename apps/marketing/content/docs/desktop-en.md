@@ -95,6 +95,17 @@ bloommd ./notes        # folder as workspace
 bloommd note.md        # single file
 ```
 
+## Publishing a folder as a shared workspace
+
+In local mode you can deliberately publish a whole folder to a cloud workspace. The sidebar entry
+**Publish folder as a shared workspace** is separate from **Share this local file**; neither path
+changes the other. You choose the folder, a server profile, and a writable workspace (viewer
+workspaces are locked), review the preview with file count, size, conflict strategy, and an exclude
+checkbox per file and subfolder, and only then confirm with **Publish**. Only the checked Markdown
+files are transferred; your local files stay the source, and the folder path never leaves your
+device. If the server withdraws access, syncing stops without changing or deleting any local file.
+The full flow is described under [Collaboration](/docs/collaboration?lang=en).
+
 ## Connecting to the Web app
 
 Local work needs no account. To collaborate with someone in a cloud file, create a personal token

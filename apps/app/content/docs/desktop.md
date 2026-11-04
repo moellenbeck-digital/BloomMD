@@ -40,6 +40,18 @@ bloommd ./notizen        # Ordner als Workspace
 bloommd notiz.md         # einzelne Datei
 ```
 
+## Ordner als gemeinsamen Workspace veröffentlichen
+
+Im lokalen Modus kannst du einen ganzen Ordner bewusst in einen Cloud-Workspace veröffentlichen.
+Der Einstieg **Ordner als gemeinsamen Workspace veröffentlichen** in der Seitenleiste ist getrennt
+von **Diese lokale Datei teilen**; keiner der beiden Wege ändert den anderen. Du wählst Ordner,
+Server-Profil und einen beschreibbaren Workspace (Viewer-Workspaces sind gesperrt), prüfst die
+Vorschau mit Dateianzahl, Größe, Konfliktstrategie und einem Ausschluss-Häkchen je Datei und
+Unterordner und bestätigst erst dann mit **Veröffentlichen**. Übertragen werden nur die angehakten
+Markdown-Dateien; die lokalen Dateien bleiben die Quelle, und der Ordnerpfad verlässt dein Gerät
+nicht. Entzieht der Server den Zugriff, stoppt der Abgleich, ohne dass lokale Dateien verändert
+oder gelöscht werden. Den vollständigen Ablauf beschreibt [Zusammenarbeit](/docs/collaboration).
+
 ## Mit der Web-App verbinden
 
 Lokales Arbeiten braucht keinen Account. Wenn du aber zusammen mit jemandem in der Web-App an einer

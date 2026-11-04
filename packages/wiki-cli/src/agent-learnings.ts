@@ -26,7 +26,7 @@ import {
   type KnowledgeNodeInput,
 } from "@bloommd/core/knowledge";
 import { addDays, LEARNING_STALE_AFTER_DAYS } from "@bloommd/core/knowledge-templates";
-import { IngestDuplicateError, IngestSourceDuplicateError, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, normalizeKnowledgeTitle, parseIngestNodes, type CommitResult, type KnowledgeService } from "./knowledge-service";
+import { IngestDuplicateError, IngestSourceDuplicateError, INGEST_MAX_DEPTH, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, normalizeKnowledgeTitle, parseIngestNodes, type CommitResult, type KnowledgeService } from "./knowledge-service";
 import { safeVaultPath } from "./knowledge-store";
 
 export const EXIT = { ok: 0, error: 1, usage: 2, duplicate: 3, limit: 4 } as const;
@@ -201,14 +201,23 @@ die Gliederung liefert der Aufrufer.
 ${TARGET_HELP}
 Nur ein Eingang (--text, --abschnitte) darf stdin ("-") sein.
 Grenzen: Originaltext höchstens ${INGEST_MAX_TEXT_CHARS} Zeichen, Abschnitte höchstens ${INGEST_MAX_NODES} Knoten (ohne Vorlagen-Skelett und
-Quellen-Knoten); darüber, bei fehlendem Text oder fehlender Quelle und bei unbekannter Vorlage: Exitcode 2, nichts wird geschrieben.
+Quellen-Knoten), Tiefe höchstens ${INGEST_MAX_DEPTH} Ebenen unter dem Maptitel (Skelett-Knoten = Ebene 1; mit --in-map zählt die Ebene des
+vorhandenen Elternknotens mit); darüber, bei fehlendem Text oder fehlender Quelle und bei unbekannter Vorlage: Exitcode 2, nichts wird
+geschrieben, die Meldung nennt Ist- und Grenzwert.
+Bereichs-Hub: Je Bereich (Schule, Arbeit, Projekte, Gespräche; bei --bereich der letzte Teil des Pfads) pflegt ingest eine Einstiegs-Map im
+Bereichsordner, die wie der Bereich heißt (Frontmatter type: hub). Fehlt sie, wird sie angelegt; sonst kommt unter dem festen Knoten
+„Maps“ ein Link [[Titel]] auf die Map dazu, ein zweiter Ingest in dieselbe Map ergänzt nichts doppelt. Der Hub ist kein Duplikat einer Map
+mit dem Titel des Bereichs, zählt nicht zu den ${INGEST_MAX_NODES} Knoten und folgt den Rechten wie die Map: bei propose ein zweiter
+Vorschlag, bei read passiert nichts, bei write steht er im Protokoll mit eigener Änderungs-ID (undo). Lässt er sich nicht schreiben, schlägt
+der Ingest nicht fehl, "hinweise" sagt es. Mit --in-map auf den Hub selbst gibt es keinen Hub-Eintrag.
 Gibt es im Zielbereich schon eine Map mit gleichem Titel (Groß-/Kleinschreibung und Satzzeichen zählen nicht), wird nichts
 angelegt: Exitcode 3 und {"fehler","duplicate":true,"pfad"}. Es gibt kein --force. Gleicher Titel in anderem Bereich ist kein Duplikat.
 Rechte wie bei agent mcp: read lehnt ab, propose legt einen Vorschlag an (nur ein Mensch gibt ihn frei: agent approve), write schreibt;
 die Änderung steht im Protokoll (agent log) und lässt sich mit agent undo zurücknehmen.
 Keine Zugangsdaten und keine Personendaten in Text oder Abschnitte (Passwörter, Tokens, private Angaben): das Werkzeug filtert nichts.
-Ausgabe: {"ok":true,"pfad","bereich","vorlage","modus":"geschrieben"|"vorgeschlagen","quellknoten","zeichen","abschnitte",…};
-mit --in-map ohne "vorlage", dafür "quellentitel","zugeordnet":[{"titel","id"}],"neu" (Anzahl neuer Knoten),"hinweise":[…].`,
+Ausgabe: {"ok":true,"pfad","bereich","vorlage","modus":"geschrieben"|"vorgeschlagen","quellknoten","zeichen","abschnitte",
+"hub":{"pfad","titel","modus","angelegt","verlinkt","aenderung"|"vorschlag"},"hinweise":[…],…}; mit --in-map ohne "vorlage", dafür
+"quellentitel","zugeordnet":[{"titel","id"}],"neu" (Anzahl neuer Knoten).`,
     values: ["--vorlage", "--titel", "--text", "--quelle", "--quelle-datum", "--abschnitte", "--bereich", "--in-map", ...TARGET_FLAGS],
     positional: { min: 0, max: 0 },
   },
@@ -857,7 +866,9 @@ async function ingest(service: KnowledgeService, parsed: Parsed, deps: LearningD
       quellknoten: result.sourceNode,
       zeichen: result.characters,
       abschnitte: result.sections,
-      ...(inMap ? { quellentitel: result.sourceTitle, zugeordnet: result.matched, neu: result.created.length, hinweise: result.hinweise } : {}),
+      ...(inMap ? { quellentitel: result.sourceTitle, zugeordnet: result.matched, neu: result.created.length } : {}),
+      ...(result.hub ? { hub: { pfad: result.hub.path, titel: result.hub.title, modus: result.hub.mode === "proposed" ? "vorgeschlagen" : "geschrieben", angelegt: result.hub.created, verlinkt: result.hub.linked, ...(result.hub.changeId ? { aenderung: result.hub.changeId } : {}), ...(result.hub.proposalId ? { vorschlag: result.hub.proposalId } : {}) } } : {}),
+      ...(inMap || result.hinweise?.length ? { hinweise: result.hinweise ?? [] } : {}),
       ids: result.ids,
     };
   } catch (error) {

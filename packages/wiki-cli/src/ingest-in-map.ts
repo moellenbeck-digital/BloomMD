@@ -10,6 +10,31 @@ import { KNOWLEDGE_TEMPLATES } from "@bloommd/core/knowledge-templates";
 /** A title as compared for duplicates: case, punctuation and spacing do not matter. */
 export const normalizeKnowledgeTitle = (title: string): string => title.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
+/**
+ * `ingest` takes section nodes at most this many levels below the map title (the template skeleton
+ * is level 1, so an agent section sits on level 2 or deeper). Markdown has six heading levels, which
+ * is the same limit: this check names both numbers before anything is written.
+ */
+export const INGEST_MAX_DEPTH = 5;
+
+/**
+ * Refuses nodes below `INGEST_MAX_DEPTH`. `parentDepth` gives the level of a parent that is not in
+ * the list (skeleton ref, node id of the target map); a parent it does not know is left unchecked
+ * (it fails later with its own message). Nothing has been written when this throws.
+ */
+export function assertIngestDepth(nodes: Array<{ ref?: string; parent?: string; title?: string }>, parentDepth: (handle: string) => number | undefined): void {
+  const depths = new Map<string, number>();
+  let deepest: { depth: number; title: string } | undefined;
+  for (const node of nodes) {
+    const base = node.parent === undefined || node.parent === "" ? 0 : (depths.get(node.parent) ?? parentDepth(node.parent));
+    if (base === undefined) continue;
+    const depth = base + 1;
+    if (node.ref) depths.set(node.ref, depth);
+    if (depth > INGEST_MAX_DEPTH && (!deepest || depth > deepest.depth)) deepest = { depth, title: node.title ?? "" };
+  }
+  if (deepest) throw new KnowledgeInputError(`Too deep: "${deepest.title}" would sit ${deepest.depth} levels below the map title, at most ${INGEST_MAX_DEPTH} are allowed. Nothing was written.`);
+}
+
 /** Ref of the source node an ingest adds; section nodes must not use it. */
 export const INGEST_SOURCE_REF = "originaltext";
 const SOURCES_TITLE = "Quellen";
@@ -178,6 +203,9 @@ export function planIngestInMap(input: InMapPlanInput): InMapPlan {
     if (relations.length > 0) node.relations = relations;
     else delete node.relations;
   }
+
+  // Level of an existing node is its heading level; the title (root) is level 0.
+  assertIngestDepth(nodes, (handle) => { const node = existing.get(handle); return node ? node.level - 1 : undefined; });
 
   const sourceParent = ensureSources();
   const taken = new Set([

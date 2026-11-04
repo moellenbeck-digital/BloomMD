@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { publicMarketingUrl } from "./lib/deployment";
 import { mobileCorsHeaders } from "./lib/mobile-cors";
+import { isTrialGuardedWrite, isTrialReadonlyEnabled } from "./lib/trial-readonly";
 
 function configuredOrigin(value: string | undefined) {
   if (!value) return null;
@@ -62,7 +63,7 @@ function contentSecurityPolicy() {
  * The product app is always private and noindex. Marketing and waitlist routes are not part of this
  * app root, so route separation is enforced by the build boundary rather than a runtime mode switch.
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-bloommd-locale", request.nextUrl.searchParams.get("lang") === "en" ? "en" : "de");
@@ -79,6 +80,18 @@ export function proxy(request: NextRequest) {
   const cors = mobileCorsHeaders(request.headers.get("Origin"), pathname);
   if (cors && request.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: { ...cors, "X-Robots-Tag": "noindex, nofollow" } });
+  }
+
+  // Read-only mode of expired trial accounts (#274), off unless BLOOMMD_TRIAL_READONLY=1. One check
+  // for every write to the API; the database is only asked for writes, and only with the switch on.
+  if (isTrialReadonlyEnabled() && isTrialGuardedWrite(request.method, pathname)) {
+    const { trialWriteBlock } = await import("./lib/trial-guard");
+    const refusal = await trialWriteBlock(request);
+    if (refusal) {
+      if (cors) for (const [key, value] of Object.entries(cors)) refusal.headers.set(key, value);
+      refusal.headers.set("X-Robots-Tag", "noindex, nofollow");
+      return refusal;
+    }
   }
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });

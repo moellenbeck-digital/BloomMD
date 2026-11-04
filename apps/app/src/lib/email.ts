@@ -46,6 +46,11 @@ function e2eMailOutboxPath() {
   return process.env.BLOOMMD_E2E_MAIL_OUTBOX?.trim() || null;
 }
 
+/** Whether a mail can leave this process: a configured provider, or the E2E outbox of a test system. */
+export function isMailDeliveryAvailable() {
+  return isEmailConfigured() || e2eMailOutboxPath() !== null;
+}
+
 export async function sendTransactionalEmail(input: EmailInput) {
   const outbox = e2eMailOutboxPath();
   if (outbox) {

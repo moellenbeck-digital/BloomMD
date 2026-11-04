@@ -112,6 +112,11 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
       errors.push(`${key} must be a positive integer when set.`);
     }
   }
+  // Trial switches (#274): off unless exactly "1"; a typo must not silently mean "off" in a release.
+  for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING"] as const) {
+    const value = env[key]?.trim();
+    if (value && value !== "0" && value !== "1") errors.push(`${key} must be exactly "1" or "0" when set.`);
+  }
   const siteOrigin = secureOrigin(env.NEXT_PUBLIC_SITE_URL, ["https:"]);
   if (!siteOrigin) errors.push("NEXT_PUBLIC_SITE_URL must be a valid HTTPS URL.");
   if (!hasSecretEntropy(env.BLOOMMD_AUTH_SECRET)) errors.push("BLOOMMD_AUTH_SECRET must be a non-placeholder secret with at least 32 characters and sufficient variety.");
@@ -194,6 +199,11 @@ export function productionConfigWarnings(env: NodeJS.ProcessEnv = process.env) {
   if (!env.BLOOMMD_TRUSTED_PROXY_HEADER?.trim()) {
     warnings.push(
       "BLOOMMD_TRUSTED_PROXY_HEADER is not set: rate limits per client address use the last x-forwarded-for entry, which is only right behind exactly one proxy.",
+    );
+  }
+  if (env.BLOOMMD_TRIAL_READONLY?.trim() === "1") {
+    warnings.push(
+      "BLOOMMD_TRIAL_READONLY is 1: accounts whose trial has ended are read-only (#274). It belongs on only after the admin's go and in agreement with Ops.",
     );
   }
   return warnings;

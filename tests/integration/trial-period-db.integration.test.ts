@@ -141,6 +141,14 @@ describe.skipIf(!url)("trial period (Postgres)", () => {
     expect((await db.listTrialReminderCandidates(new Date(now.getTime() + 15 * DAY))).some((candidate) => candidate.userId === user.id)).toBe(false);
   });
 
+  test("the trial end of an account can be read for the read-only mode", async () => {
+    const user = await db.createPasswordUser({ email: address("lock"), passwordHash: HASH });
+    expect(await db.getTrialEndsAt(user.id)).toBeNull();
+    await db.markEmailVerified(user.id);
+    expect(await db.getTrialEndsAt(user.id)).toBe((await userRow(user.email)).trial_ends_at!.toISOString());
+    expect(await db.getTrialEndsAt("33333333-3333-4333-8333-333333333333")).toBeNull();
+  });
+
   test("deleting the account removes its reminders", async () => {
     const user = await db.createPasswordUser({ email: address("gone"), passwordHash: HASH });
     await db.markEmailVerified(user.id);

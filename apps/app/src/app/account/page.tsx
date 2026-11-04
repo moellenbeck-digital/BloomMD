@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CreditCard, Download, LogOut, MailCheck, MoveLeft, ShieldCheck, Trash2 } from "lucide-react";
+import { Clock, CreditCard, Download, LogOut, MailCheck, MoveLeft, ShieldCheck, Trash2 } from "lucide-react";
 import { getSession } from "../../lib/auth";
 import { getBuildInfo } from "../../lib/build-info";
 import { getBillingPlan } from "../../lib/billing";
 import { getMarketAccountByEmail, isDatabaseConfigured, listAccessTokens, listWorkspacesForUser, normalizeUuid } from "../../lib/db";
 import { AccessTokens } from "./access-tokens";
+import { TrialReadonlyNotice, trialEndsAtForUser } from "../trial-notice";
+import { formatTrialEnd, isTrialOver } from "../../lib/trial";
 import { getAppLocale, otherAppLocale, withAppLocale } from "../../lib/locale";
 
 const billingMessages: Record<string, string> = {
@@ -36,12 +38,14 @@ export default async function AccountPage({
 
   const locale = getAppLocale(params.lang);
   const copy = locale === "de"
-    ? { back: "Zurück zur App", logout: "Abmelden", plan: "Plan und Abrechnung", signedIn: "Angemeldet als", status: "Aktueller Status", paid: "Kostenpflichtig aktiv", free: "Free / kein aktiver Kauf", verified: "E-Mail-Adresse bestätigt", unverified: "E-Mail-Adresse noch nicht bestätigt", features: "Freigeschaltete Funktionen", localFree: "Du nutzt aktuell den kostenlosen lokalen Einstieg.", activeUntil: "Aktiv bis", billing: "Abrechnung", latest: "Letzter Plan", cancellation: "Kündigung zum Periodenende vorgemerkt", noCancellation: "Keine geplante Kündigung hinterlegt", noStripe: "Noch keine Stripe-Buchung für diesen Account gespeichert.", manage: "Rechnungen und Abo verwalten", about: "Über BloomMD", deployment: "Deployment", data: "Deine Daten", exportText: "Der Export enthält Accountdaten, Berechtigungen, Workspace-Mitgliedschaften, Markdown-Dokumente und gespeicherte Cloud-Views.", export: "Accountdaten exportieren", deleteTitle: "Account dauerhaft löschen", deleteText: "Persönliche Workspaces, Cloud-Dokumente, Views, Sessions und Berechtigungen werden unwiderruflich gelöscht. Laufende Stripe-Abos werden vorher beendet.", prepare: "Löschung vorbereiten", confirmEmail: "Zur Bestätigung deine E-Mail eingeben", password: "Passwort", delete: "Account und Cloud-Daten löschen", language: "EN" }
-    : { back: "Back to the app", logout: "Sign out", plan: "Plan and billing", signedIn: "Signed in as", status: "Current status", paid: "Paid plan active", free: "Free / no active purchase", verified: "Email address confirmed", unverified: "Email address not confirmed yet", features: "Enabled features", localFree: "You are currently using the free local entry point.", activeUntil: "Active until", billing: "Billing", latest: "Latest plan", cancellation: "Cancellation scheduled for the end of the period", noCancellation: "No cancellation scheduled", noStripe: "No Stripe purchase is stored for this account yet.", manage: "Manage invoices and subscription", about: "About BloomMD", deployment: "Deployment", data: "Your data", exportText: "The export contains account data, permissions, workspace memberships, Markdown documents, and stored cloud views.", export: "Export account data", deleteTitle: "Delete account permanently", deleteText: "Personal workspaces, cloud documents, views, sessions, and permissions will be deleted permanently. Active Stripe subscriptions are cancelled first.", prepare: "Prepare deletion", confirmEmail: "Enter your email to confirm", password: "Password", delete: "Delete account and cloud data", language: "DE" };
+    ? { back: "Zurück zur App", logout: "Abmelden", plan: "Plan und Abrechnung", signedIn: "Angemeldet als", status: "Aktueller Status", paid: "Kostenpflichtig aktiv", free: "Free / kein aktiver Kauf", verified: "E-Mail-Adresse bestätigt", trialUntil: "Testzeitraum bis", unverified: "E-Mail-Adresse noch nicht bestätigt", features: "Freigeschaltete Funktionen", localFree: "Du nutzt aktuell den kostenlosen lokalen Einstieg.", activeUntil: "Aktiv bis", billing: "Abrechnung", latest: "Letzter Plan", cancellation: "Kündigung zum Periodenende vorgemerkt", noCancellation: "Keine geplante Kündigung hinterlegt", noStripe: "Noch keine Stripe-Buchung für diesen Account gespeichert.", manage: "Rechnungen und Abo verwalten", about: "Über BloomMD", deployment: "Deployment", data: "Deine Daten", exportText: "Der Export enthält Accountdaten, Berechtigungen, Workspace-Mitgliedschaften, Markdown-Dokumente und gespeicherte Cloud-Views.", export: "Accountdaten exportieren", deleteTitle: "Account dauerhaft löschen", deleteText: "Persönliche Workspaces, Cloud-Dokumente, Views, Sessions und Berechtigungen werden unwiderruflich gelöscht. Laufende Stripe-Abos werden vorher beendet.", prepare: "Löschung vorbereiten", confirmEmail: "Zur Bestätigung deine E-Mail eingeben", password: "Passwort", delete: "Account und Cloud-Daten löschen", language: "EN" }
+    : { back: "Back to the app", logout: "Sign out", plan: "Plan and billing", signedIn: "Signed in as", status: "Current status", paid: "Paid plan active", free: "Free / no active purchase", verified: "Email address confirmed", trialUntil: "Trial period until", unverified: "Email address not confirmed yet", features: "Enabled features", localFree: "You are currently using the free local entry point.", activeUntil: "Active until", billing: "Billing", latest: "Latest plan", cancellation: "Cancellation scheduled for the end of the period", noCancellation: "No cancellation scheduled", noStripe: "No Stripe purchase is stored for this account yet.", manage: "Manage invoices and subscription", about: "About BloomMD", deployment: "Deployment", data: "Your data", exportText: "The export contains account data, permissions, workspace memberships, Markdown documents, and stored cloud views.", export: "Export account data", deleteTitle: "Delete account permanently", deleteText: "Personal workspaces, cloud documents, views, sessions, and permissions will be deleted permanently. Active Stripe subscriptions are cancelled first.", prepare: "Prepare deletion", confirmEmail: "Enter your email to confirm", password: "Password", delete: "Delete account and cloud data", language: "DE" };
   const account = isDatabaseConfigured() ? await getMarketAccountByEmail(session.email) : null;
   const activeEntitlements = account?.entitlements.filter((item) => item.active) ?? [];
   const latestSubscription = account?.subscriptions[0];
   const userId = normalizeUuid(session.userId);
+  const trialEndsAt = await trialEndsAtForUser(session.userId);
+  const trialRunning = trialEndsAt != null && !isTrialOver(trialEndsAt, new Date());
   const accessTokens = userId ? await listAccessTokens(userId) : [];
   const workspaces = userId && isDatabaseConfigured() ? (await listWorkspacesForUser(userId).catch(() => [])).map(({ id, name, kind }) => ({ id, name, kind })) : [];
   const buildInfo = getBuildInfo("app");
@@ -99,6 +103,14 @@ export default async function AccountPage({
             <MailCheck size={18} className={account?.user.emailVerifiedAt ? "text-emerald-600" : "text-amber-600"} aria-hidden="true" />
             <span>{account?.user.emailVerifiedAt ? copy.verified : copy.unverified}</span>
           </div>
+
+          {trialRunning && (
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#E8E4DF] bg-[#FCFBFA] px-4 py-3 text-sm" data-testid="account-trial-end">
+              <Clock size={18} className="text-[#FF6B35]" aria-hidden="true" />
+              <span>{copy.trialUntil} <span className="font-semibold">{formatTrialEnd(trialEndsAt, locale)}</span></span>
+            </div>
+          )}
+          <TrialReadonlyNotice userId={session.userId} locale={locale} />
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <article className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4">

@@ -4055,6 +4055,16 @@ export async function claimWaitlistInvitation(userId: string): Promise<WaitlistL
   return locale === "en" ? "en" : locale === "de" ? "de" : null;
 }
 
+/** End of the account's trial; null without a database, an unknown account or before the address is confirmed. */
+export async function getTrialEndsAt(userId: string): Promise<string | null> {
+  if (!isDatabaseConfigured()) return null;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`select trial_ends_at from bloom_users where id = ${userId}`;
+  const endsAt = (rows[0] as { trial_ends_at: Date | string | null } | undefined)?.trial_ends_at;
+  return endsAt ? new Date(endsAt).toISOString() : null;
+}
+
 export interface TrialReminderCandidate {
   userId: string;
   email: string;

@@ -61,3 +61,8 @@ export function dueTrialReminder(
   }
   return null;
 }
+
+/** The end date as shown to people ("15.12.2026" / "15 Dec 2026"), in UTC like the mails. */
+export function formatTrialEnd(endsAt: Date | string | number, locale: "de" | "en"): string {
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "de-DE", locale === "en" ? { dateStyle: "medium", timeZone: "UTC" } : { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(endsAt));
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dueTrialReminder, isTrialOver, LEGACY_TRIAL_ENDS_AT, reminderDueAt, trialDaysLeft, trialEndsAt } from "./trial";
+import { dueTrialReminder, formatTrialEnd, isTrialOver, LEGACY_TRIAL_ENDS_AT, reminderDueAt, trialDaysLeft, trialEndsAt } from "./trial";
 
 const DAY = 24 * 60 * 60 * 1000;
 const verified = new Date("2026-11-20T10:30:00.000Z");
@@ -59,5 +59,12 @@ describe("trial period (#274)", () => {
     expect(trialDaysLeft(ends, at(29, 1))).toBe(1);
     expect(trialDaysLeft(ends, at(30))).toBe(0);
     expect(trialDaysLeft(ends, at(40))).toBe(0);
+  });
+
+  test("the end date is shown in UTC as 15.12.2026 / 15 Dec 2026", () => {
+    expect(formatTrialEnd(LEGACY_TRIAL_ENDS_AT, "de")).toBe("15.12.2026");
+    expect(formatTrialEnd(LEGACY_TRIAL_ENDS_AT, "en")).toBe("15 Dec 2026");
+    expect(formatTrialEnd("2026-12-20T23:59:59.000Z", "de")).toBe("20.12.2026");
+    expect(formatTrialEnd("2026-12-21T00:00:00.000Z", "de")).toBe("21.12.2026");
   });
 });

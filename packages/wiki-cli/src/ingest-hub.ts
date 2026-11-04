@@ -21,6 +21,16 @@ export function hubTitle(area: string): string {
   return area.split(/\/| › /).map((part) => part.trim()).filter(Boolean).pop() ?? "";
 }
 
+/**
+ * A map whose title may be that of the hub of `area`: the area's name, with the number `freePath`
+ * appends when a map of that name was there first ("Arbeit 2"). A vault lists maps by file name,
+ * so this is all the listing tells; `isHubMarkdown` decides after reading.
+ */
+export function mayBeHub(title: string, area: string): boolean {
+  const leaf = normalizeKnowledgeTitle(hubTitle(area));
+  return leaf !== "" && normalizeKnowledgeTitle(title).replace(/ \d+$/, "") === leaf;
+}
+
 /** `type: hub` in the frontmatter. */
 export function isHubMarkdown(markdown: string): boolean {
   const block = FRONTMATTER_RE.exec(markdown)?.[1];

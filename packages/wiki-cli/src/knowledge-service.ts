@@ -34,7 +34,7 @@ import { buildWorkspaceIndex } from "@bloommd/core/workspace-index";
 import { backlinksFor } from "@bloommd/core/workspace-search";
 import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeDocument, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
-import { HUB_TYPE, hubEntryNodes, hubTitle, isHubMarkdown, newHubNodes, type HubEntry } from "./ingest-hub";
+import { HUB_TYPE, hubEntryNodes, hubTitle, isHubMarkdown, mayBeHub, newHubNodes, type HubEntry } from "./ingest-hub";
 import { assertIngestDepth, INGEST_MAX_DEPTH, INGEST_SOURCE_REF, IngestSourceDuplicateError, normalizeKnowledgeTitle, planIngestInMap } from "./ingest-in-map";
 
 export interface ChangeMeta {
@@ -631,7 +631,7 @@ export class KnowledgeService {
         // The area hub carries the name of its area; it is no duplicate of a map with that title.
         for (const entry of await this.store.list()) {
           if (entry.available === false || foldName(entry.area) !== foldName(target) || !wanted.has(normalizeKnowledgeTitle(entry.title))) continue;
-          if (normalizeKnowledgeTitle(entry.title) === normalizeKnowledgeTitle(hubTitle(target)) && (await this.readIfHub(entry.path))) continue;
+          if (mayBeHub(entry.title, target) && (await this.readIfHub(entry.path))) continue;
           throw new IngestDuplicateError(entry.path, entry.title, target);
         }
       },
@@ -659,7 +659,7 @@ export class KnowledgeService {
     try {
       let hub: KnowledgeDocument | null = null;
       for (const candidate of await this.store.list()) {
-        if (candidate.available === false || foldName(candidate.area) !== foldName(area) || normalizeKnowledgeTitle(candidate.title) !== normalizeKnowledgeTitle(title)) continue;
+        if (candidate.available === false || foldName(candidate.area) !== foldName(area) || !mayBeHub(candidate.title, area)) continue;
         hub = await this.readIfHub(candidate.path);
         if (hub) break;
       }

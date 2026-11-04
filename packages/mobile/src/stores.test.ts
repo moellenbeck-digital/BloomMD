@@ -3,12 +3,14 @@ import type { BloomFolderPlugin, FolderFile } from "@bloommd/capacitor-folder";
 import { parseFile } from "@bloommd/core/browser";
 import { parseAppLink } from "./app-links";
 import { openFileUrl } from "./opened-file";
-import { createFileStore, createFolderStore, folderEntries, safePath, StoreConflictError, UnsafePathError, type MobileStore } from "./stores";
+import { createFileStore, createFolderStore, folderEntries, safePath, SkippedFolderError, StoreConflictError, UnsafePathError, type MobileStore } from "./stores";
 
-function fakeFolder(files: Record<string, { data: string; modified: number }>) {
+function fakeFolder(files: Record<string, { data: string; modified: number }>, folders: string[] = []) {
   const writes: Array<{ path: string; data: string }> = [];
+  const made: string[] = [];
   const plugin = {
-    list: async () => ({ files: Object.entries(files).map(([path, file]): FolderFile => ({ path, size: file.data.length, modified: file.modified, local: true })) }),
+    list: async () => ({ files: Object.entries(files).map(([path, file]): FolderFile => ({ path, size: file.data.length, modified: file.modified, local: true })), folders }),
+    mkdir: async ({ path }: { path: string }) => { made.push(path); folders.push(path); },
     read: async ({ path }: { path: string }) => ({ ...files[path]! }),
     write: async ({ path, data, expectedModified }: { path: string; data: string; expectedModified?: number }) => {
       if (expectedModified !== undefined && files[path] && files[path]!.modified !== expectedModified) throw Object.assign(new Error("The file changed on another device."), { code: "CONFLICT" });
@@ -19,7 +21,7 @@ function fakeFolder(files: Record<string, { data: string; modified: number }>) {
     },
     remove: async () => undefined,
   } as unknown as BloomFolderPlugin;
-  return { plugin, writes, files };
+  return { plugin, writes, files, made, folders };
 }
 
 const note = "# Physik\n\nEinleitung.\n\n## Thermodynamik\n\nWärme.\n";
@@ -160,7 +162,8 @@ describe("folder store: paths stay inside the folder", () => {
   function spy() {
     const calls: string[] = [];
     const plugin = {
-      list: async () => ({ files: [] }),
+      list: async () => ({ files: [], folders: [] }),
+      mkdir: async ({ path }: { path: string }) => { calls.push(`mkdir ${path}`); },
       read: async ({ path }: { path: string }) => { calls.push(`read ${path}`); return { data: note, modified: 1 }; },
       write: async ({ path }: { path: string }) => { calls.push(`write ${path}`); return { modified: 1 }; },
       remove: async ({ path }: { path: string }) => { calls.push(`remove ${path}`); },
@@ -213,6 +216,60 @@ describe("folder store: paths stay inside the folder", () => {
   test("ordinary nested paths and names with spaces, umlauts and dots are fine", () => {
     for (const path of ["Notiz.md", "Schule/Physik.md", "Uni/Physik/Optik/Linsen.md", "Über uns/Größe & Form.md", "a.b/c.d.md", "Ordner mit  Leerzeichen/x y.md"]) expect(safePath(path)).toBe(path);
   });
+
+  test("creating a folder with traversal, an absolute path or control characters is rejected before the plugin is called", async () => {
+    const { plugin, calls } = spy();
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of ["..", "../Draussen", "Uni/../../Draussen", "Uni/..", "/abs", "C:/Windows", "./x", "Uni/./x", "", "   ", "A\u0000B", "A\u001fB"]) {
+      await expect(store.createFolder(path)).rejects.toThrow();
+    }
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("folders in the folder store", () => {
+  test("lists empty folders and folders with notes, without Obsidian's own, dot folders and node_modules", async () => {
+    const { plugin } = fakeFolder(
+      { "Uni/Physik/Optik/Linsen.md": { data: note, modified: 1 } },
+      ["Leer", "Uni", "Uni/Physik", "Uni/Physik/Optik", "Uni/Leer & Co", ".obsidian", ".obsidian/plugins", ".trash", "Uni/.versteckt", "node_modules", "node_modules/x", "Über uns/Größe"],
+    );
+    const { entries, folders } = await createFolderStore(plugin, "Vault").list();
+    expect(entries.map((entry) => entry.path)).toEqual(["Uni/Physik/Optik/Linsen.md"]);
+    expect(folders).toEqual(["Leer", "Über uns/Größe", "Uni", "Uni/Leer & Co", "Uni/Physik", "Uni/Physik/Optik"]);
+  });
+
+  test("creating a folder creates exactly that folder and writes no placeholder file", async () => {
+    const { plugin, made, writes, files } = fakeFolder({});
+    const store = createFolderStore(plugin, "Vault");
+    expect(await store.createFolder("Uni/Physik ")).toBe("Uni/Physik");
+    expect(await store.createFolder("Über uns\\Größe")).toBe("Über uns/Größe");
+    expect(made).toEqual(["Uni/Physik", "Über uns/Größe"]);
+    expect(writes).toEqual([]);
+    expect(files).toEqual({});
+    expect((await store.list()).folders).toEqual(["Über uns/Größe", "Uni/Physik"]);
+  });
+
+  test("a hidden folder is refused because it would never show up in the list", async () => {
+    const { plugin, made } = fakeFolder({});
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of [".obsidian", "Uni/.git", ".trash", "node_modules", "Uni/node_modules/x"]) {
+      await expect(store.createFolder(path)).rejects.toBeInstanceOf(SkippedFolderError);
+    }
+    expect(made).toEqual([]);
+  });
+
+  test("a plugin without a folder list (older build) still lists the notes", async () => {
+    const plugin = { list: async () => ({ files: [{ path: "A/x.md", size: 1, modified: 1, local: true }] }) } as unknown as BloomFolderPlugin;
+    const { entries, folders } = await createFolderStore(plugin, "Vault").list();
+    expect(entries).toHaveLength(1);
+    expect(folders).toEqual([]);
+  });
+
+  test("a single file has no folders and creates none", async () => {
+    const store = createFileStore({} as BloomFolderPlugin, { token: "t", name: "Notiz.md" }, createFolderStore(fakeFolder({}).plugin, "Vault"));
+    expect((await store.list()).folders).toEqual([]);
+    await expect(store.createFolder("Neu")).rejects.toBeInstanceOf(UnsafePathError);
+  });
 });
 
 describe("single file opened from the Files app", () => {
@@ -240,7 +297,7 @@ describe("single file opened from the Files app", () => {
   test("lists the file as the only note", async () => {
     const store = createFileStore(fakeSingle(note).plugin, file);
     expect(store.kind).toBe("file");
-    expect(await store.list()).toEqual({ entries: [{ path: "Physik.md", title: "Physik", folder: "", local: true }], unreadable: [] });
+    expect(await store.list()).toEqual({ entries: [{ path: "Physik.md", title: "Physik", folder: "", local: true }], folders: [], unreadable: [] });
   });
 
   test("opening never writes; a real edit replaces the original file and nothing else", async () => {

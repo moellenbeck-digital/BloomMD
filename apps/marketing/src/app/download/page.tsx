@@ -97,7 +97,7 @@ export default async function DownloadPage({
             "Ordner als Workspace öffnen",
             "Direkt loslegen",
           ],
-          beta: "Web- und Cloud-Beta-Zugang",
+          beta: "Kostenloser Testaccount für Web und Cloud",
           docs: "Vollständige Anleitung",
           agent: "Optional: lokaler OpenClaw-Agent",
           agentDescription:
@@ -154,7 +154,7 @@ export default async function DownloadPage({
             "Open a folder as a workspace",
             "Start working",
           ],
-          beta: "Web and cloud beta access",
+          beta: "Free trial account for web and cloud",
           docs: "Full installation guide",
           agent: "Optional: local OpenClaw agent",
           agentDescription:

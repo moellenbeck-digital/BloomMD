@@ -1,6 +1,6 @@
 ---
 title: Erste Schritte
-description: Was BloomMD ist, was die Closed Beta umfasst und wo du anfängst.
+description: Was BloomMD ist, was die Beta umfasst und wo du anfängst.
 order: 1
 ---
 
@@ -17,7 +17,7 @@ HTML-Kommentare für stabile Knoten-IDs hinzu; jeder Markdown-Renderer ignoriert
 
 ## Womit anfangen
 
-Die Closed Beta führt mit der **Desktop-App**. Sie arbeitet vollständig lokal, braucht kein Konto
+Die Beta führt mit der **Desktop-App**. Sie arbeitet vollständig lokal, braucht kein Konto
 und keine Internetverbindung. Die **Web-App** unter `/app` ist der zweite Weg. Was dabei lokal bleibt
 und was in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud).
 
@@ -38,7 +38,7 @@ und was in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud
 ### Erste Schritte mit der Web-App
 
 1. Ein Konto anlegen, die E-Mail-Adresse bestätigen und anmelden. Die Schritte stehen unter
-   [Closed-Beta Zugang](/docs/closed-beta-zugang).
+   [Kostenloser Testaccount](/docs/closed-beta-zugang).
 2. In `/app` oben das Ordner-Symbol (Tooltip **Open local Markdown folder**) wählen und einen Ordner freigeben.
    Chrome und Edge unterstützen das; es wird nichts hochgeladen.
 3. Ist der Ordner nur zum Lesen freigegeben, erscheint **Nur Lesen**. Ein Klick darauf fragt den
@@ -52,16 +52,16 @@ speichert nichts.
 
 ![Echter Screenshot der Browser-Demo: Links ein Markdown-Eingabefeld, rechts die Karte der Vorlage Software Architecture Map](/docs/demo.png)
 
-Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account. Du
+Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du den kostenlosen Testaccount (30 Tage ab E-Mail-Bestätigung). Du
 registrierst dich direkt selbst, ohne Einladung und ohne Warteliste. Registrierung, E-Mail-Bestätigung
-und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
+und Login stehen unter [Kostenloser Testaccount](/docs/closed-beta-zugang).
 
 Hakt etwas bei Installation, Ordnerrechten, Sync oder Einladung? Die [Fehlerbehebung](/docs/fehlerbehebung)
 führt Symptom, Ursache und Schritte auf.
 
 **Ohne Einladung verfügbar:** [Browser-Demo](/demo), Desktop-Builds auf der
 [Download-Seite](/download) und das [Obsidian-Plugin](/obsidian) über BRAT oder
-GitHub-Releases. Nur bei aktivem Zugangsschalter betrifft eine Einladung den Web- und Cloud-Zugang.
+GitHub-Releases. Nur bei aktivem Zugangsschalter ist für den Web- und Cloud-Zugang eine Freischaltung nötig.
 
 ## Was in der Beta nicht enthalten ist
 
@@ -69,4 +69,4 @@ GitHub-Releases. Nur bei aktivem Zugangsschalter betrifft eine Einladung den Web
   öffentlichen App-Store-Download. Das Obsidian-Plugin ist davon getrennt und
   auch auf Mobilgeräten als Beta verfügbar.
 - Keine Wiederherstellungszusage für Cloud-Daten. Lade nichts hoch, was du nicht auch anderswo hast.
-- Windows-Desktop-Builds sind nicht Teil dieser Closed Beta.
+- Windows-Desktop-Builds sind nicht Teil dieser Beta.

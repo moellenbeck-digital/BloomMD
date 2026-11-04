@@ -4,7 +4,7 @@ import { purgeUnconfirmedAccounts } from "../src/lib/unconfirmed-accounts";
 import { latestLink, readMails } from "./fixtures/mail-outbox";
 
 /**
- * Open self-registration (#104): closed-beta gate off, real database and auth, no bypass.
+ * Open self-registration (#104): access gate off, real database and auth, no bypass.
  * Run with `bun run test:e2e:open-signup`; see playwright.open-signup.config.ts.
  */
 
@@ -79,7 +79,7 @@ test.beforeAll(resetMailBudget);
 
 const location = (response: APIResponse) => decodeURIComponent(response.headers().location ?? "");
 
-test.describe("open self-registration, closed-beta gate off", () => {
+test.describe("open self-registration, access gate off", () => {
   const address = uniqueAddress();
   test.use({ extraHTTPHeaders: { "X-Forwarded-For": address } });
 
@@ -88,7 +88,7 @@ test.describe("open self-registration, closed-beta gate off", () => {
 
     await page.goto("/signup?next=/app");
     await expect(page.getByTestId("beta-access-gate")).toHaveCount(0);
-    await expect(page.getByLabel("Beta-Code (optional)")).toHaveCount(0);
+    await expect(page.getByLabel("Zugangscode (optional)")).toHaveCount(0);
     await expect(page.getByTestId("signup-form")).toBeVisible();
 
     const consent = page.getByTestId("signup-consent");

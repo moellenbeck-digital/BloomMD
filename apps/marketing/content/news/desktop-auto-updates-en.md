@@ -16,6 +16,6 @@ The macOS app can now check for stable updates and show the download in the Abou
 
 The download path runs through BloomMD while CI builds, verifies and publishes the release artifacts. This lets the app point to new builds without exposing the GitHub release address in the interface.
 
-For the closed beta, the trust chain remains separate: the build at that time was ad-hoc signed and not notarized yet.
+For the beta, the trust chain remains separate: the build at that time was ad-hoc signed and not notarized yet.
 
 **Commit date:** August 23, 2026

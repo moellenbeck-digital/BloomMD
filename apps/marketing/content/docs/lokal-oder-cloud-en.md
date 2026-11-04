@@ -44,7 +44,7 @@ Only what you explicitly bring into a cloud workspace:
   ticked in the preview. The local files stay the source, and the folder path never leaves your
   device.
 
-During the beta, do not upload credentials, secrets, third-party personal data, or
+With the free trial account, do not upload credentials, secrets, third-party personal data, or
 production-critical content. There is no recovery promise for cloud data.
 
 ## When collaboration applies
@@ -67,4 +67,4 @@ Folder permissions, sync status, and invitations are explained in [Troubleshooti
 - **You only want to work with your own files:** desktop app, or a local folder in the Web app.
 - **You want to try BloomMD:** the [browser demo](/demo?lang=en), without an account.
 - **You want to work on the same file with others:** a cloud workspace. You create the account under
-  [Closed beta access](/docs/closed-beta-zugang?lang=en).
+  [Free trial account](/docs/closed-beta-zugang?lang=en).

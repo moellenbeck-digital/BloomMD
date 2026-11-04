@@ -15,8 +15,8 @@ import { hasActiveBetaInvite } from "./db";
 export type BetaAccessErrorReason = "email-not-invited" | "invalid-invite-code";
 
 const betaAccessMessages: Record<BetaAccessErrorReason, string> = {
-  "email-not-invited": "Diese E-Mail ist noch nicht für die Beta freigeschaltet.",
-  "invalid-invite-code": "Der Einladungscode ist ungültig.",
+  "email-not-invited": "Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.",
+  "invalid-invite-code": "Der Zugangscode ist ungültig.",
 };
 
 export class BetaAccessError extends Error {

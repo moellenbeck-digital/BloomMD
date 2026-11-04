@@ -19,8 +19,8 @@ export function AvailabilityOverview({ locale, embedded = false }: { locale: Mar
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-[#514C46]">
           {en
-            ? "BloomMD Web, cloud workspaces, sync and collaboration need a BloomMD account, and you can register yourself. The browser demo, local desktop builds and Obsidian plugin are available without an account."
-            : "Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit brauchst du ein BloomMD-Konto, das du selbst anlegen kannst. Browser-Demo, lokale Desktop-Builds und Obsidian-Plugin kannst du ohne Konto nutzen."}
+            ? "BloomMD Web, cloud workspaces, sync and collaboration are available with a free trial account: 30 days from email confirmation, no invitation and no waitlist. The browser demo, local desktop builds and Obsidian plugin are available without an account."
+            : "Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit gibt es den kostenlosen Testaccount: 30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste. Browser-Demo, lokale Desktop-Builds und Obsidian-Plugin kannst du ohne Konto nutzen."}
         </p>
 
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -44,11 +44,11 @@ export function AvailabilityOverview({ locale, embedded = false }: { locale: Mar
           </div>
 
           <div className="rounded-xl border border-[#E8E4DF] bg-white p-6">
-            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Account required" : "Konto erforderlich"}</h3>
+            <h3 className="text-lg font-semibold text-[#1A1A1A]">{en ? "Free trial account" : "Kostenloser Testaccount"}</h3>
             <p className="mt-4 text-sm leading-6 text-[#514C46]">
               {en
-                ? "BloomMD Web at bloommd.app, cloud workspaces, sync and collaboration need an account. The waitlist has ended; you can register right away."
-                : "BloomMD Web auf bloommd.app, Cloud-Workspaces, Sync und Zusammenarbeit brauchen ein Konto. Die Warteliste ist beendet; du kannst dich direkt registrieren."}
+                ? "BloomMD Web at bloommd.app, cloud workspaces, sync and collaboration need a free trial account. It is valid for 30 days from email confirmation; afterwards your account is read-only, export remains possible and nothing is lost. There is no invitation and no waitlist; you can register right away."
+                : "BloomMD Web auf bloommd.app, Cloud-Workspaces, Sync und Zusammenarbeit brauchen einen kostenlosen Testaccount. Er gilt 30 Tage ab E-Mail-Bestätigung; danach ist dein Konto nur noch lesbar, der Export bleibt möglich und nichts geht verloren. Es gibt keine Einladung und keine Warteliste; du kannst dich direkt registrieren."}
             </p>
             <a className="mt-4 inline-flex min-h-11 items-center font-semibold text-[#B94316] underline" href={signupHref} data-testid="signup-cta">
               {en ? "Register now" : "Jetzt registrieren"}

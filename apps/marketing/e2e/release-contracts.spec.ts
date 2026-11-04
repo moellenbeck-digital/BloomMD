@@ -257,7 +257,7 @@ test.describe("marketing release contracts", () => {
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
     const menu = page.locator("#mobile-navigation");
     await expect(menu).toBeVisible();
-    for (const label of ["Produkt", "Demo", "Vision", "Roadmap", "Download", "Hilfe", "Templates", "Obsidian", "Registrierung", "FAQ", "Login", "Jetzt registrieren"]) {
+    for (const label of ["Produkt", "Demo", "Vision", "Roadmap", "Download", "Testaccount", "Hilfe", "Templates", "Obsidian", "FAQ", "Login", "Jetzt registrieren"]) {
       await expect(menu.getByText(label, { exact: true }).first()).toBeVisible();
     }
 
@@ -469,8 +469,8 @@ test.describe("marketing documentation and registration", () => {
 
   test("separates public downloads from account-based cloud access in both languages", async ({ request }) => {
     for (const [path, available, gated, upcoming] of [
-      ["/download", "Jetzt verfügbar, ohne Konto", "Konto erforderlich", "Noch kein öffentlicher Download"],
-      ["/download?lang=en", "Available now, no account", "Account required", "No public download yet"],
+      ["/download", "Jetzt verfügbar, ohne Konto", "Kostenloser Testaccount", "Noch kein öffentlicher Download"],
+      ["/download?lang=en", "Available now, no account", "Free trial account", "No public download yet"],
     ]) {
       const response = await request.get(path);
       expect(response.ok(), path).toBe(true);

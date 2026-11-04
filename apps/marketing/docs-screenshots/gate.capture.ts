@@ -21,7 +21,7 @@ for (const locale of LOCALES) {
     test("signup without an invitation explains the access switch", async ({ page }) => {
       await prepare(page, locale);
       await page.goto(`/signup?next=%2Fapp&lang=${locale}`);
-      await expect(page.getByText(locale === "de" ? "Dein Cloud-Zugang ist noch nicht freigeschaltet." : "Your cloud access is not enabled yet.")).toBeVisible();
+      await expect(page.getByText(locale === "de" ? "Dein kostenloser Testaccount ist noch nicht freigeschaltet." : "Your free trial account is not enabled yet.")).toBeVisible();
       await capture(page, "signup-gate", locale);
     });
 

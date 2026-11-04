@@ -30,4 +30,4 @@ Das [separate Obsidian-Repository](https://github.com/moellenbeck-digital/bloomm
 
 Bitte melde noch nicht behobene Sicherheitslücken [vertraulich](https://github.com/moellenbeck-digital/BloomMD/blob/main/SECURITY.md) statt in einem öffentlichen Issue.
 
-Welche Apps du heute ohne Einladung herunterladen kannst und wofür die geschlossene Beta gilt, steht in der [Verfügbarkeitsübersicht](/download#availability).
+Welche Apps du heute ohne Einladung herunterladen kannst und wofür du den kostenlosen Testaccount brauchst, steht in der [Verfügbarkeitsübersicht](/download#availability).

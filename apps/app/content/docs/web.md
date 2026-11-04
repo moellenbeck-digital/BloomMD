@@ -24,11 +24,11 @@ Verfügbar in Chrome und Edge. Firefox und Safari unterstützen die API nicht.
 
 Mit Konto. Dokumente liegen in der Datenbank, Zusammenarbeit läuft über den Sync-Server.
 Die Registrierung (offen, ohne Einladung) ist unter
-[Closed-Beta Zugang](/docs/closed-beta-zugang) beschrieben.
+[Kostenloser Testaccount](/docs/closed-beta-zugang) beschrieben.
 
 ### Markdown-Datei in den Cloud-Workspace laden
 
-1. Melde dich auf `https://bloommd.app` mit deinem Beta-Account an.
+1. Melde dich auf `https://bloommd.app` mit deinem Testaccount an.
 2. Öffne die App und wähle den Cloud-Workspace, in dem die Datei landen soll.
 3. Nutze in der Toolbar oder Command-Palette **Markdown importieren**.
 4. Wähle eine `.md`- oder `.markdown`-Datei aus.
@@ -38,7 +38,7 @@ Ab diesem Moment liegt die Markdown-Datei serverseitig im Cloud-Workspace und ka
 Zusammenarbeit genutzt werden. Das ist bewusst anders als **Lokaler Ordner im Browser**: Dort bleibt
 alles auf deinem Rechner und es wird nichts hochgeladen.
 
-Bitte lade in der Beta keine Zugangsdaten, Secrets, personenbezogenen Daten Dritter oder
+Bitte lade im Testaccount keine Zugangsdaten, Secrets, personenbezogenen Daten Dritter oder
 produktionskritischen Inhalte hoch. Für Fehlermeldungen reicht fast immer ein reduziertes
 Markdown-Beispiel.
 
@@ -48,7 +48,7 @@ oder als Kopie sichern.
 
 ## Feedback geben
 
-Eingeloggte Beta-Tester nutzen den Feedback-Button in der App. Ein Screenshot ist Pflicht, ein
+Eingeloggte Nutzerinnen und Nutzer des Testaccounts nutzen den Feedback-Button in der App. Ein Screenshot ist Pflicht, ein
 kurzes Video ist optional. Bitte keine privaten Markdown-Inhalte, Zugangsdaten oder personenbezogene
 Daten Dritter hochladen. Wenn Login oder App nicht erreichbar sind, schreibe an
 `feedback@bloommd.io`. GitHub ist nur unser internes

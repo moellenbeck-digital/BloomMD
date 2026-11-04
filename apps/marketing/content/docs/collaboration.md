@@ -17,7 +17,7 @@ Alle Beteiligten melden sich mit ihrem eigenen Account an und öffnen dieselbe D
 ## Welche Variante brauchst du?
 
 - **Zwei Personen arbeiten im Browser:** Web-App + Cloud-Workspace. Beide brauchen eigene
-  Beta-Accounts.
+  Testaccounts.
 - **Eine Person im Browser, eine in der Desktop-App:** Web-App + Desktop-App im Server-Modus. Die Desktop-App
   braucht ein persönliches Token.
 - **Eine vorhandene lokale Datei gezielt gemeinsam bearbeiten:** Lokaler Desktop-Modus + **Diese
@@ -280,7 +280,7 @@ Markdown-Beispiel reicht meistens.
 Einladungs-, Sync- und Ordnerprobleme sind außerdem auf einer Seite gebündelt: [Fehlerbehebung](/docs/fehlerbehebung).
 
 - **Die zweite Person sieht den Workspace nicht.** Der Account ist nicht für denselben Workspace
-  freigeschaltet. Sende Feedback oder antworte auf die Beta-Mail.
+  freigeschaltet. Sende Feedback oder antworte auf die E-Mail zu deinem Testaccount.
 - **Die Desktop-App zeigt nur lokale Dateien.** Sie ist nicht im Server-Modus verbunden. Öffne
   **Mit Server verbinden** und trage `https://bloommd.app` plus Token ein.
 - **Der falsche Workspace ist aktiv.** Öffne in der Remote-Seitenleiste den Workspace-Selektor und

@@ -246,7 +246,7 @@ Testumgebung:
 | WEB-08 | Security headers | `test:e2e` | Pages und APIs liefern erwartete Header |
 | WEB-09 | In-App-Feedback | `apps/app` Unit/Route + `test:e2e` | Eingeloggter Nutzer oeffnet Formular; Screenshot ist Pflicht; API speichert Metadaten, legt Anhaenge im Feedback-Bucket ab und erstellt ein GitHub-Issue mit `user-feedback`/`beta-feedback` |
 | WEB-10 | Prod-Smoke, Gate aus | `bun run qa:production-smoke` | `/signup` zeigt das Registrierungsformular ohne Beta-Block; `/api/waitlist` antwortet 410, alte Wartelisten-Links leiten per 308 auf die Registrierung |
-| WEB-11 | Prod-Smoke, Gate an | `bun run qa:production-smoke --beta-gate` | `/signup` zeigt den Beta-Zugangsblock (ohne Wartelisten-Link), freigeschaltete E-Mail das Formular |
+| WEB-11 | Prod-Smoke, Gate an | `bun run qa:production-smoke --beta-gate` | `/signup` zeigt den Zugangsblock (Testaccount noch nicht freigeschaltet) (ohne Wartelisten-Link), freigeschaltete E-Mail das Formular |
 
 ## OKF / llm-wiki
 

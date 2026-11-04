@@ -1,6 +1,6 @@
 ---
 title: Desktop-App
-description: Der empfohlene Weg für die Closed Beta — lokal, ohne Konto auf macOS und Omarchy/Linux.
+description: Der empfohlene Weg für die Beta — lokal, ohne Konto auf macOS und Omarchy/Linux.
 order: 2
 ---
 
@@ -15,14 +15,14 @@ freigegebenen Desktop-Builds für macOS arm64 sowie Omarchy/Linux für x86_64 un
 mit Version, Plattformstatus und Installationshinweis.
 
 Die Desktop-Builds sind öffentlich verlinkt und lassen sich ohne Einladung oder BloomMD-Konto
-herunterladen. Der Closed-Beta-Zugang gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
+herunterladen. Der kostenlose Testaccount gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
 Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
 ## Erste Schritte: Download bis zur ersten Map
 
 1. **Download:** Auf [bloommd.io/download](/download) den Build für macOS arm64 laden.
 2. **DMG öffnen:** BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten (Details
-   weiter unten im Abschnitt „Installation in der Closed Beta“).
+   weiter unten im Abschnitt „Installation in der Beta“).
 3. **Ordner öffnen:** Einen Ordner mit Markdown-Dateien öffnen — über das Menü, per Doppelklick im
    Dateimanager oder per Kommandozeile (siehe den Abschnitt „Dateien und Ordner öffnen“).
 4. **Erste Map:** Eine Datei wählen. Ihre Überschriften werden zur Karte; die Markdown-Datei bleibt
@@ -71,9 +71,9 @@ Berechnung mit „Erneut versuchen“ wiederholen. Externe Änderungen einschlie
 und gelöschter `.markdown`-Dateien aktualisieren die Ansicht automatisch.
 
 
-## Installation in der Closed Beta
+## Installation in der Beta
 
-Der native Desktop-Client ist in der Closed Beta für **macOS und Omarchy/Linux** verfügbar. Der
+Der native Desktop-Client ist in der Beta für **macOS und Omarchy/Linux** verfügbar. Der
 macOS-Build zielt auf arm64; für Omarchy 4 und andere Arch-basierte Systeme gibt es Pacman-Pakete
 für x86_64 und aarch64. Windows folgt als eigener Beta-Release.
 
@@ -86,7 +86,7 @@ für x86_64 und aarch64. Windows folgt als eigener Beta-Release.
 - **Omarchy/Linux:** passendes Pacman-Paket für die eigene Architektur herunterladen und mit
   `sudo pacman -U` installieren. Der Linux-Build ist nicht Developer-ID-signiert; das ist für
   Pacman nicht erforderlich.
-- **Windows:** nicht Teil dieser Closed Beta; eigener Windows Beta Release folgt.
+- **Windows:** nicht Teil dieser Beta; eigener Windows Beta Release folgt.
 
 ![DMG-Fenster von BloomMD 0.5.7 mit App und Verknüpfung zum Programme-Ordner](/releases/desktop-0.5.7-installer.png)
 
@@ -158,7 +158,7 @@ Der genaue gemeinsame Ablauf steht unter [Zusammenarbeit](/docs/collaboration).
 
 ## Windows
 
-Windows ist bewusst außerhalb dieser Closed Beta. Ein eigener Release folgt nach Installer-,
+Windows ist bewusst außerhalb dieser Beta. Ein eigener Release folgt nach Installer-,
 Handoff-, Tastatur- und Plattformtests.
 
 Vor dem Windows-Beta-Release wird zusätzlich geprüft, wie Zugriffstoken im Cloud-Modus gespeichert

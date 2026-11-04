@@ -1,24 +1,35 @@
 ---
-title: Closed-Beta Zugang
-description: Offene Registrierung ohne Einladung — Account-Erstellung, E-Mail-Bestätigung, Login und Passwort.
+title: Kostenloser Testaccount
+description: Kostenloser Testaccount für Web und Cloud — 30 Tage ab E-Mail-Bestätigung, ohne Einladung und Warteliste; Registrierung, Login und Passwort.
 order: 2
 ---
 
-# Closed-Beta Zugang
+# Kostenloser Testaccount
 
-Die Registrierung für den Web-Zugang zu BloomMD (bloommd.app) ist offen: Du legst dir selbst ein
-Konto an, ohne Einladung und ohne Warteliste. Nur wenn der Betrieb den Zugangsschalter aktiviert hat,
-gilt vorübergehend die Einladung (siehe unten). Auf der Registrierungsseite siehst du, was gilt: Ist
-dort direkt ein Formular zu sehen, kannst du dich registrieren. Siehst du stattdessen den Hinweis,
-dass dein Cloud-Zugang noch nicht freigeschaltet ist, ist der Zugangsschalter aktiv.
+Der Cloud-Zugang zu BloomMD (bloommd.app) heißt **kostenloser Testaccount**. Du legst ihn selbst an,
+ohne Einladung und ohne Warteliste. Nur wenn der Betrieb den Zugangsschalter aktiviert hat, wird er
+vorübergehend nur für freigeschaltete E-Mail-Adressen angelegt (siehe unten). Auf der
+Registrierungsseite siehst du, was gilt: Ist dort direkt ein Formular zu sehen, kannst du dich
+registrieren. Siehst du stattdessen den Hinweis, dass dein kostenloser Testaccount noch nicht
+freigeschaltet ist, ist der Zugangsschalter aktiv.
 
 **Auch bei aktivem Zugangsschalter ist nur der Zugang zu BloomMD Web, Cloud-Workspaces, Sync und
 Zusammenarbeit eingeschränkt.** Die [Browser-Demo](/demo), [Desktop-Builds](/download) und das
 [Obsidian-Plugin](/obsidian) kannst du immer ohne Konto und ohne Einladung nutzen.
 
+## Testzeitraum
+
+- Der Testaccount gilt **30 Tage ab E-Mail-Bestätigung**.
+- Vor Ablauf bekommst du Hinweis-E-Mails nach **15 und 23 Tagen**.
+- Nach Ablauf ist dein Konto nur noch lesbar. Der Export bleibt möglich, es erscheint ein Hinweis.
+  Nichts geht verloren.
+- Bestehende Konten, auch von früheren Wartelisten-Teilnehmern: Der Testzeitraum zählt wegen der
+  Beta-Beteiligung ab dem **15.11.2026**.
+- Preise und Leistungsumfang werden vor Einführung veröffentlicht.
+
 ## Registrierung (Normalfall)
 
-Du brauchst keine Einladung und keinen Code.
+Du brauchst keine Einladung und keinen Code. Mit der E-Mail-Bestätigung (Schritt 5) beginnt dein Testzeitraum.
 
 1. Öffne die Registrierung auf bloommd.app.
 2. Trage E-Mail-Adresse und ein Passwort mit mindestens 10 Zeichen ein, das Buchstaben und Zahlen enthält.
@@ -49,43 +60,42 @@ Hinweises „E-Mail gesendet“; dann kannst du es später noch einmal versuchen
 Nutze auf der Anmeldeseite „Passwort vergessen?“. Du bekommst einen Link, der 60 Minuten gültig ist.
 Nach dem Zurücksetzen werden bestehende Anmeldungen beendet.
 
-## Nur bei aktivem Zugangsschalter: Einladung
+## Nur bei aktivem Zugangsschalter: Freischaltung
 
-Die Beta-Warteliste auf bloommd.io ist beendet; neue Einträge sind nicht mehr möglich. Der
-Zugangsschalter bleibt für den Betrieb erhalten. Ist er aktiv, wird ein Account nur für eingeladene
-E-Mail-Adressen oder mit Einladungscode freigeschaltet. Eine Beta-Einladung erstellt noch kein
-Passwort. Der Ablauf ist bewusst getrennt, damit klar ist, was in welchem Schritt passiert.
+Die Warteliste ist beendet; neue Einträge sind nicht mehr möglich. Der Zugangsschalter bleibt für den
+Betrieb erhalten. Ist er aktiv, wird ein Testaccount nur für freigeschaltete E-Mail-Adressen oder mit
+Zugangscode angelegt. Die Freischaltung erstellt noch kein Passwort. Der Ablauf ist bewusst getrennt,
+damit klar ist, was in welchem Schritt passiert.
 
-1. Ein Admin oder Staff-Mitglied lädt dich ein.
-2. Du bekommst eine persönliche Beta-Einladung per E-Mail mit einem Account-erstellen-Link.
-3. Über diesen Link öffnest du die Account-Erstellung. Die eingeladene E-Mail-Adresse ist bereits
-   vorausgefüllt.
+1. Ein Admin oder Staff-Mitglied schaltet deine E-Mail-Adresse frei.
+2. Du bekommst eine E-Mail „Dein kostenloser BloomMD-Testaccount“ mit einem Account-erstellen-Link.
+3. Über diesen Link öffnest du die Account-Erstellung. Die E-Mail-Adresse ist bereits vorausgefüllt.
 4. Du vergibst dein eigenes Passwort, stimmst Datenschutzerklärung und AGB zu und bestätigst
    danach deine Account-E-Mail.
 5. Danach kannst du dich auf bloommd.app mit E-Mail und Passwort anmelden.
 
-![Echter Screenshot: Die Registrierungsseite bei aktivem Zugangsschalter mit dem Hinweis, dass der Cloud-Zugang noch nicht freigeschaltet ist, und einem Feld für die eingeladene E-Mail-Adresse](/docs/signup-gate.png)
+![Echter Screenshot: Die Registrierungsseite bei aktivem Zugangsschalter mit dem Hinweis, dass der kostenlose Testaccount noch nicht freigeschaltet ist, und einem Feld für die E-Mail-Adresse](/docs/signup-gate.png)
 
-### Noch keine Einladung
+### Noch nicht freigeschaltet
 
-Wenn du noch keine Einladung bekommen hast, wende dich an das BloomMD-Team. Ohne Einladung oder
-Einladungscode wird bei aktivem Zugangsschalter kein Account freigeschaltet.
+Wenn dein Testaccount noch nicht freigeschaltet ist, wende dich an das BloomMD-Team. Ohne
+Freischaltung oder Zugangscode wird bei aktivem Zugangsschalter kein Account angelegt.
 
-### Einladung erhalten
+### Freischaltung erhalten
 
-Der Link in der Einladungs-E-Mail führt direkt zur Account-Erstellung. Bei persönlichen
-Einladungen brauchst du normalerweise keinen Einladungscode. Ein Code-Feld kann als Fallback
-sichtbar sein, falls ein Admin einen Code separat verschickt.
+Der Link in der E-Mail führt direkt zur Account-Erstellung. Normalerweise brauchst du keinen
+Zugangscode. Ein Code-Feld kann als Fallback sichtbar sein, falls ein Admin einen Code separat
+verschickt.
 
-![Echter Screenshot: Die Registrierungsseite, geöffnet über einen Einladungslink, mit schon eingetragener E-Mail-Adresse](/docs/signup-invited.png)
+![Echter Screenshot: Die Registrierungsseite, geöffnet über den Link aus der Freischaltungs-E-Mail, mit schon eingetragener E-Mail-Adresse](/docs/signup-invited.png)
 
-### Einladung erneut senden
+### E-Mail erneut senden
 
-Wenn eine Beta-Einladung nicht angekommen ist, kann ein Admin sie erneut senden. Prüfe vorher auch
-Spam- und Promotions-Ordner.
+Wenn die E-Mail zur Freischaltung nicht angekommen ist, kann ein Admin sie erneut senden. Prüfe vorher
+auch Spam- und Promotions-Ordner.
 
-Meldungen wie „Diese Einladung ist abgelaufen.“ oder eine falsche Adresse erklärt die
-[Fehlerbehebung](/docs/fehlerbehebung).
+Meldungen wie „Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.“
+oder eine falsche Adresse erklärt die [Fehlerbehebung](/docs/fehlerbehebung).
 
 ## Bereits einen Account erstellt
 

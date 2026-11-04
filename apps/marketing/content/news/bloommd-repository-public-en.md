@@ -30,4 +30,4 @@ The [separate Obsidian repository](https://github.com/moellenbeck-digital/bloomm
 
 Please report unpatched security vulnerabilities [privately](https://github.com/moellenbeck-digital/BloomMD/blob/main/SECURITY.md) rather than in a public issue.
 
-The [availability overview](/download?lang=en#availability) shows what you can download without an invitation and which features are part of the closed beta.
+The [availability overview](/download?lang=en#availability) shows what you can download without an invitation and which features need the free trial account.

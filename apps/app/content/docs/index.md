@@ -1,6 +1,6 @@
 ---
 title: Erste Schritte
-description: Was BloomMD ist, was die Closed Beta umfasst und wo du anfängst.
+description: Was BloomMD ist, was die Beta umfasst und wo du anfängst.
 order: 1
 ---
 
@@ -17,20 +17,20 @@ HTML-Kommentare für stabile Knoten-IDs hinzu; jeder Markdown-Renderer ignoriert
 
 ## Womit anfangen
 
-Die Closed Beta führt mit der **Desktop-App**. Sie arbeitet vollständig lokal, braucht kein Konto
+Die Beta führt mit der **Desktop-App**. Sie arbeitet vollständig lokal, braucht kein Konto
 und keine Internetverbindung.
 
 1. macOS-Desktop-App über [bloommd.io/download](/download) herunterladen. Windows und Linux folgen
-   als eigene Beta-Releases nach der Closed Beta.
+   als eigene Beta-Releases nach der Beta.
 2. Beim ersten Start einen Ordner mit Markdown-Dateien öffnen — oder einen neuen anlegen.
 3. Eine Datei auswählen. Die Überschriften werden zur Karte.
 
 Die Web-App unter `/app` ist der zweite Weg. Sie kann lokale Ordner über den Browser öffnen, ohne
 etwas hochzuladen.
 
-Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account. Du
+Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du den kostenlosen Testaccount (30 Tage ab E-Mail-Bestätigung). Du
 registrierst dich direkt selbst, ohne Einladung und ohne Warteliste. Registrierung, E-Mail-Bestätigung
-und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
+und Login stehen unter [Kostenloser Testaccount](/docs/closed-beta-zugang).
 
 ## Was in der Beta nicht enthalten ist
 
@@ -39,4 +39,4 @@ und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
 - Keine Wiederherstellungszusage für Cloud-Daten. Lade nichts hoch, was du nicht auch anderswo hast.
 - Keine Developer-ID-Signatur/Notarisierung des macOS-Desktop-Builds — macOS zeigt eine
   Gatekeeper-Warnung.
-- Windows- und Linux-Desktop-Builds sind nicht Teil dieser Closed Beta.
+- Windows- und Linux-Desktop-Builds sind nicht Teil dieser Beta.

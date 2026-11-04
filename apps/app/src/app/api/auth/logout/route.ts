@@ -3,6 +3,16 @@ import { revokeCurrentSession, safeNextPath, sessionCookieName, shouldUseSecureC
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { assertSameOrigin, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
 
+/** Logout never depends on the body: no body, JSON or an oversized form all fall back to no `next`. */
+async function readNextField(request: Request) {
+  try {
+    return (await readUrlEncodedForm(request)).get("next");
+  } catch (error) {
+    if (error instanceof RequestSecurityError) return null;
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     assertSameOrigin(request);
@@ -11,8 +21,7 @@ export async function POST(request: Request) {
     throw error;
   }
   await revokeCurrentSession();
-  const form = await readUrlEncodedForm(request);
-  const next = safeNextPath(form.get("next"), "/");
+  const next = safeNextPath(await readNextField(request), "/");
   const response = NextResponse.redirect(appRedirectUrl(next, request.url), 303);
   response.cookies.set(sessionCookieName(), "", {
     httpOnly: true,

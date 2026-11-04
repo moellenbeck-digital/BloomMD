@@ -10,6 +10,8 @@ draft: true
 The BloomMD plugin shows an Obsidian note as a map. Every heading is a node, and the file stays an
 ordinary Markdown file in your vault.
 
+![Diagram, not a screenshot: the same Markdown file in the Obsidian vault appears as text in Obsidian and as a map through the BloomMD plugin](/docs/obsidian-flow-en.svg)
+
 ## Installation
 
 - **Obsidian on Mac, Windows or Linux:** via BRAT with the repository

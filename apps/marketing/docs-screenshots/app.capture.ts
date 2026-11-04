@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { BROWSER_LOCALE, capture, LOCALES, readFixtureVault, type Locale } from "./shared";
 
 /**
@@ -202,5 +202,3 @@ for (const locale of LOCALES) {
     });
   });
 }
-
-export type { Browser };

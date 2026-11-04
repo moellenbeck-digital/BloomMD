@@ -18,6 +18,21 @@ Die Desktop-Builds sind öffentlich verlinkt und lassen sich ohne Einladung oder
 herunterladen. Der Closed-Beta-Zugang gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
 Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
+## Erste Schritte: Download bis zur ersten Map
+
+1. **Download:** Auf [bloommd.io/download](/download) den Build für macOS arm64 laden.
+2. **DMG öffnen:** BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten (Details
+   unter [Installation in der Closed Beta](#installation-in-der-closed-beta)).
+3. **Ordner öffnen:** Einen Ordner mit Markdown-Dateien öffnen — über das Menü, per Doppelklick im
+   Dateimanager oder per Kommandozeile (siehe [Dateien und Ordner öffnen](#dateien-und-ordner-öffnen)).
+4. **Erste Map:** Eine Datei wählen. Ihre Überschriften werden zur Karte; die Markdown-Datei bleibt
+   unverändert.
+
+![Schema, kein Screenshot: Links die Dateiliste des geöffneten Ordners, rechts die Karte der ausgewählten Datei mit Überschriften als Knoten](/docs/desktop-ordner.svg)
+
+Alles bleibt dabei auf deinem Rechner. Was lokal bleibt und was erst durch eine bewusste Freigabe
+in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud).
+
 ## Knoten bedienen ab 0.5.14
 
 Ein Klick wählt einen Knoten aus, ohne die sichtbare Map neu zu zentrieren. Mit den Pfeiltasten

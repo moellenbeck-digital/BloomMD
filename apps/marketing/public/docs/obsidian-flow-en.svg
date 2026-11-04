@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">Diagram: Obsidian vault and BloomMD plugin</title>
+  <desc id="desc">Schematic sketch, not a screenshot: the same Markdown file in the vault is shown as text in Obsidian and as a map through the BloomMD plugin.</desc>
+  <rect width="1200" height="520" rx="24" fill="#FAF8F5"/>
+  <rect x="60" y="150" width="320" height="220" rx="16" fill="#fff" stroke="#D4CFC8" stroke-width="2"/>
+  <text x="220" y="196" text-anchor="middle" fill="#5F574F" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="1">OBSIDIAN VAULT</text>
+  <rect x="100" y="226" width="240" height="96" rx="10" fill="#FFF1EA" stroke="#F4CBB8" stroke-width="2"/>
+  <text x="220" y="268" text-anchor="middle" fill="#8A3518" font-family="Arial, sans-serif" font-size="24" font-weight="700">Note.md</text>
+  <text x="220" y="300" text-anchor="middle" fill="#5F574F" font-family="Arial, sans-serif" font-size="16">Plain Markdown file</text>
+  <g stroke="#CFC8C0" stroke-width="3" fill="none"><path d="M380 260C450 260 470 150 560 150"/><path d="M380 260C450 260 470 370 560 370"/></g>
+  <rect x="560" y="100" width="260" height="100" rx="14" fill="#fff" stroke="#D4CFC8" stroke-width="2"/>
+  <text x="690" y="142" text-anchor="middle" fill="#3B352F" font-family="Arial, sans-serif" font-size="22" font-weight="700">Obsidian</text>
+  <text x="690" y="176" text-anchor="middle" fill="#5F574F" font-family="Arial, sans-serif" font-size="18">Text editor</text>
+  <rect x="560" y="320" width="260" height="100" rx="14" fill="#fff" stroke="#FF6B35" stroke-width="3"/>
+  <text x="690" y="362" text-anchor="middle" fill="#3B352F" font-family="Arial, sans-serif" font-size="22" font-weight="700">BloomMD plugin</text>
+  <text x="690" y="396" text-anchor="middle" fill="#B64A1F" font-family="Arial, sans-serif" font-size="18">Map</text>
+  <rect x="900" y="150" width="240" height="220" rx="16" fill="#1D1D1D"/>
+  <text x="1020" y="270" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="20" font-weight="700">Same file</text>
+  <text x="1020" y="300" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="20">no export, no account</text>
+  <g stroke="#CFC8C0" stroke-width="3" fill="none"><path d="M820 150C860 150 860 230 900 240"/><path d="M820 370C860 370 860 300 900 290"/></g>
+</svg>

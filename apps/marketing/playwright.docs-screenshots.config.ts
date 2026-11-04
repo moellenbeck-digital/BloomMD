@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
  * (the default `testDir` is `e2e/`) and write PNG files into `public/docs/`.
  *
  * Run with: `bun run --cwd apps/marketing docs:screenshots`
- * Subsets:  `docs:screenshots:app` (web app and sync) and `docs:screenshots:marketing` (demo).
+ * Subsets:  `docs:screenshots:app` (web app and sync), `docs:screenshots:marketing` (demo) and
+ *           `docs:screenshots:gate` (signup pages with the access switch on, a server of its own).
  *
  * Fixed on purpose: window 1280x800, scale factor 1, light theme, UTC, reduced motion. Every picture
  * comes out once per language (`name.png` German, `name-en.png` English). The only data source is
@@ -23,9 +24,10 @@ const MARKETING_PORT = Number(process.env.DOCS_SCREENSHOTS_MARKETING_PORT ?? 381
 const SYNC_PORT = Number(process.env.DOCS_SCREENSHOTS_SYNC_PORT ?? 4811);
 const target = process.env.DOCS_SCREENSHOTS_TARGET ?? "all";
 
-if (!["all", "app", "marketing"].includes(target)) {
-  throw new Error(`DOCS_SCREENSHOTS_TARGET must be all, app or marketing, got "${target}".`);
+if (!["all", "app", "marketing", "gate"].includes(target)) {
+  throw new Error(`DOCS_SCREENSHOTS_TARGET must be all, app, marketing or gate, got "${target}".`);
 }
+const gate = target === "gate";
 
 const appURL = `http://localhost:${APP_PORT}`;
 const marketingURL = `http://localhost:${MARKETING_PORT}`;
@@ -64,6 +66,8 @@ const appServers = [
       BLOOMMD_E2E_TEST_MODE: "1",
       BLOOMMD_LOCAL_DEPLOYMENT: "1",
       BLOOMMD_DIR: syncWorkspace,
+      // Access switch on: only the listed address is invited. Shown on the signup pages for the invitation flow.
+      ...(gate ? { BLOOMMD_BETA_ACCESS: "1", BLOOMMD_BETA_ALLOWED_EMAILS: "alex@example.com" } : {}),
     },
   },
 ];
@@ -101,17 +105,14 @@ export default defineConfig({
     trace: "off",
     screenshot: "off",
   },
-  webServer: [...(target === "marketing" ? [] : appServers), ...(target === "app" ? [] : marketingServers)],
-  projects: [
-    {
-      name: "docs-app",
-      testMatch: /app\.capture\.ts/,
-      use: { baseURL: appURL },
-    },
-    {
-      name: "docs-marketing",
-      testMatch: /marketing\.capture\.ts/,
-      use: { baseURL: marketingURL },
-    },
+  webServer: [
+    ...(target === "marketing" ? [] : gate ? appServers.slice(1) : appServers),
+    ...(target === "app" || gate ? [] : marketingServers),
   ],
+  projects: gate
+    ? [{ name: "docs-gate", testMatch: /gate\.capture\.ts/, use: { baseURL: appURL } }]
+    : [
+        { name: "docs-app", testMatch: /app\.capture\.ts/, use: { baseURL: appURL } },
+        { name: "docs-marketing", testMatch: /marketing\.capture\.ts/, use: { baseURL: marketingURL } },
+      ],
 });

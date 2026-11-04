@@ -182,9 +182,12 @@ for (const locale of LOCALES) {
     });
 
     test("sync status of a map in the cloud workspace", async ({ page }) => {
+      // The status sits in the header and only shows from 1536 px up; this is the one picture with a wider window.
+      await page.setViewportSize({ width: 1600, height: 800 });
       await signUpAndOpenApp(page, locale, "sync");
+      await expect(page.getByTestId("sync-status")).toBeVisible();
       await expect(page.getByTestId("sync-status")).toContainText(locale === "de" ? "Synchronisiert" : "Synced");
-      await capture(page, "sync-status", locale);
+      await capture(page, "sync-status", locale, { clip: { x: 0, y: 0, width: 1600, height: 100 } });
     });
 
     test("open a local folder: read-only notice", async ({ page }) => {

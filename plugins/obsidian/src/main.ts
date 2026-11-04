@@ -292,7 +292,8 @@ function filesInFolder(folder: TFolder | null): TFile[] {
   return result;
 }
 
-class BloomMDView extends ItemView {
+/** Exported for the view lifecycle tests; Obsidian only loads the default export. */
+export class BloomMDView extends ItemView {
   private sourceFile: TFile | null = null;
   private scopeFolder: TFolder | null = null;
   private layoutKey = "";

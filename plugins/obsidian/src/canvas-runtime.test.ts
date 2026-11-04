@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { act } from "preact/test-utils";
 import { createCanvasMount, renderMountFailure, type CanvasHeading, type CanvasMount, type CanvasProps } from "./canvas";
 import { ensureHeadingIds, parseHeadingTree, type MarkdownHeadingNode } from "./markdown-document";
+import { installCanvasDom, resizePane, resetPane, setPane } from "./canvas-test-env";
 
 /**
  * Renders the real canvas (React Flow, error boundary) the way the Obsidian view mounts it, in
@@ -54,67 +55,17 @@ function props(overrides: Partial<CanvasProps> = {}): CanvasProps {
 }
 
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
-let paneSize = { width: 800, height: 600 };
-/** Stands in for the browser telling React Flow its pane was laid out or resized. */
-const observers = new Set<{ notify(): void }>();
-const resizePane = (size: { width: number; height: number }) => {
-  paneSize = size;
-  act(() => observers.forEach((observer) => observer.notify()));
-};
 let container: HTMLElement;
 let mount: CanvasMount | null = null;
 
-beforeAll(() => {
-  const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
-  proto.createDiv = function (this: HTMLElement) {
-    return document.createElement("div");
-  };
-  (globalThis as { createDiv?: () => HTMLElement }).createDiv = () => document.createElement("div");
-  Object.assign(globalThis, {
-    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
-    cancelAnimationFrame: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
-  });
-  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
-    constructor(private readonly callback: (entries: Array<{ target: Element }>) => void) {
-      observers.add(this);
-    }
-    notify() {
-      this.deliver([]);
-    }
-    observe(target: Element) {
-      // Like a browser, report the element once right after it is observed.
-      queueMicrotask(() => this.deliver([{ target }]));
-    }
-    unobserve() {}
-    disconnect() {
-      observers.delete(this);
-    }
-    private deliver(entries: Array<{ target: Element }>) {
-      try {
-        this.callback(entries);
-      } catch {
-        // Observers of single nodes expect entries; only the pane and node observers matter here.
-      }
-    }
-  };
-  // happy-dom has no layout: the map pane gets the size the test sets, like a leaf Obsidian has
-  // laid out; every other element (the nodes) measures as a small box.
-  for (const [property, key, small] of [["offsetWidth", "width", 150], ["offsetHeight", "height", 40], ["clientWidth", "width", 150], ["clientHeight", "height", 40]] as const) {
-    Object.defineProperty(HTMLElement.prototype, property, {
-      configurable: true,
-      get(this: HTMLElement) {
-        return this.classList.contains("bloommd-flow-wrap") || this.classList.contains("react-flow") ? paneSize[key] : small;
-      },
-    });
-  }
-});
+beforeAll(installCanvasDom);
 
 afterEach(() => {
   act(() => mount?.unmount());
   mount = null;
   container?.remove();
   calls.length = 0;
-  paneSize = { width: 800, height: 600 };
+  resetPane();
 });
 
 async function show(next: CanvasProps) {
@@ -225,7 +176,7 @@ describe("canvas runtime: first fit waits for a measured pane", () => {
   const viewportTransform = () => (container.querySelector(".react-flow__viewport") as HTMLElement | null)?.style.transform ?? "";
 
   test("a pane that is still 0×0 is not fitted; the map fits once it has a size", async () => {
-    paneSize = { width: 0, height: 0 };
+    setPane({ width: 0, height: 0 });
     await show(props());
     await act(() => wait(300));
     const before = viewportTransform();

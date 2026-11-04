@@ -10,7 +10,7 @@ Map, outline, presentation
 Switch between the mind map, an outline for quick reading and a presentation view. Nodes can be tasks with status and due date, or decisions. On tablets the node editor opens as a side panel next to the map, on phones as a bottom sheet.
 
 No account, works offline
-BloomMD works without signing in and without an internet connection. Without a folder, your maps are Markdown files in the app's storage. Import Markdown files, and share any map as Markdown from the share menu. Opening a note never rewrites it – only real changes are saved.
+BloomMD works without signing in and without an internet connection. Without a folder, your maps are Markdown files in the app's storage. Import Markdown or OPML files, and share any map as Markdown, OPML, PDF, PNG or SVG from the share menu. Opening a note never rewrites it – only real changes are saved.
 
 Links into the app
 Links like bloommd://open open a note of the current folder right at a specific node.

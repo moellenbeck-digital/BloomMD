@@ -1,5 +1,5 @@
 ---
-title: "BloomMD for iPad and iPhone: beta, App Store release in preparation"
+title: "BloomMD for iPad and iPhone: version 1.0, App Store release in preparation"
 description: "The BloomMD app edits your Obsidian vault in iCloud Drive directly as a mind map – with Apple Pencil handwriting. The App Store release is being prepared."
 date: 2026-10-04
 commitDate: 2026-10-04
@@ -8,14 +8,14 @@ tags:
   - iPhone
   - Obsidian
   - Handwriting
-version: "0.1.0-beta.10"
+version: "1.0.0"
 draft: true
 ---
 
-# BloomMD for iPad and iPhone: beta, App Store release in preparation
+# BloomMD for iPad and iPhone: version 1.0, App Store release in preparation
 
-BloomMD is now available as its own app for iPad and iPhone. It is a beta; the App Store release is
-being prepared.
+BloomMD is now available as its own app for iPad and iPhone. It exists as version 1.0; the App Store
+release is being prepared.
 
 The app opens a folder from the Files app – for example your Obsidian vault in iCloud Drive – and
 edits the Markdown files right there. Every heading is a node, and the file stays an ordinary

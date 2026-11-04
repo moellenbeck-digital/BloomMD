@@ -1,9 +1,12 @@
-# Vorschlag: App-Abschnitt für die Datenschutzerklärung
+# App-Abschnitt der Datenschutzerklärung (Quelltext des Vorschlags)
 
-Die Datenschutzerklärung (`apps/marketing/src/app/datenschutz/page.tsx`) ist eine TSX-Seite ohne
-Entwurfsmechanismus. Deshalb steht der Vorschlag hier und wird erst nach Owner-Freigabe (und am
-besten juristischer Prüfung) als eigene `LegalSection` übernommen; danach `LEGAL_STATUS` in
-`apps/marketing/src/lib/legal.ts` aktualisieren.
+Dieser Text ist am 4. November 2026 als eigene `LegalSection` in
+`apps/marketing/src/app/datenschutz/page.tsx` übernommen worden (DE und EN; zusätzlich Share-Links
+und Workspace-Agenten), `LEGAL_STATUS` in `apps/marketing/src/lib/legal.ts` steht auf dem gleichen
+Datum. **Maßgeblich ist jetzt die Seite.** Die Fassung dort ergänzt gegenüber diesem Vorschlag: Hinweis
+auf die Datensicherung von Android, Universal Links (`https://bloommd.io/open`), Export-Formate, Laufzeit
+des Zugangs (ein Jahr) und die Gerätebezeichnung; die Angabe zum Hosting-Anbieter fehlt bewusst, bis
+der Owner sie bestätigt hat. Vor dem Deployment: juristische Prüfung und Owner-Freigabe.
 
 Grundlage: Code-Stand `packages/mobile` und `apps/app` (Share-Links), siehe `PRIVACY-ANSWERS.md`.
 
@@ -12,7 +15,7 @@ Grundlage: Code-Stand `packages/mobile` und `apps/app` (Share-Links), siehe `PRI
 - Verantwortlicher, Accountdaten, local-first, keine Zahlungen in M1, Resend, Sentry/Plausible/
   PostHog (Marketing/Web), optionaler Sync, Cookies, Warteliste (beendet; Einträge werden 90 Tage nach der
   Einladungs-E-Mail gelöscht), Rechtsgrundlagen, Betroffenenrechte.
-- **Fehlt:** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Standort, Speicherdauer der
+- **Fehlte (App, Share-Links, Agenten sind jetzt ergänzt; Hosting-Standort und Speicherdauer bleiben offen):** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Standort, Speicherdauer der
   Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
   kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen.
 

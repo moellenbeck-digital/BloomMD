@@ -71,4 +71,4 @@ Map, Text und Handschrift liegen als Markdown- und SVG-Dateien in deinem Ordner 
 in deinem Obsidian-Vault in iCloud Drive. Ein Konto brauchst du dafür nicht. Wie die App mit dem Vault
 arbeitet, steht in [BloomMD für iPad: dein Obsidian-Vault als Mind Map](/blog/bloommd-fuer-ipad-obsidian-vault-als-mind-map).
 
-Die App für iPad und iPhone ist eine Beta; die Veröffentlichung im App Store wird vorbereitet.
+Die App für iPad und iPhone liegt als Version 1.0 vor; die Veröffentlichung im App Store wird vorbereitet.

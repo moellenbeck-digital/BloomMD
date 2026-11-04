@@ -10,7 +10,7 @@ Map, Gliederung, Präsentation
 Wechsle zwischen der Mind Map, einer Gliederung zum schnellen Lesen und einer Präsentationsansicht. Knoten können Aufgaben mit Status und Fälligkeit oder Entscheidungen sein. Auf Tablets öffnet sich der Knoten-Editor als Seitenleiste neben der Map, auf Smartphones als Bottom-Sheet.
 
 Ohne Konto, offline
-BloomMD funktioniert ohne Anmeldung und ohne Internetverbindung. Ohne Ordnerauswahl liegen deine Maps als Markdown-Dateien im App-Speicher. Du kannst Markdown-Dateien importieren und jede Map als Markdown über das Teilen-Menü weitergeben. Eine Notiz zu öffnen schreibt sie nicht um – gespeichert werden nur echte Änderungen.
+BloomMD funktioniert ohne Anmeldung und ohne Internetverbindung. Ohne Ordnerauswahl liegen deine Maps als Markdown-Dateien im App-Speicher. Importiere Markdown- oder OPML-Dateien und gib jede Map über das Teilen-Menü als Markdown, OPML, PDF, PNG oder SVG weiter. Eine Notiz zu öffnen schreibt sie nicht um – gespeichert werden nur echte Änderungen.
 
 Links in die App
 Links der Form bloommd://open öffnen eine Notiz des geöffneten Ordners direkt an einem bestimmten Knoten.

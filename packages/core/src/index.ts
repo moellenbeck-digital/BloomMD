@@ -64,6 +64,22 @@ export {
   type SharedDocumentMirrorOptions,
 } from "./shared-document-mirror";
 export {
+  SHARED_FOLDER_CONFLICT_SUFFIX,
+  SHARED_FOLDER_MAX_FILE_BYTES,
+  SHARED_FOLDER_NAME_SEPARATOR,
+  cloudFilenameForRelativePath,
+  isSharedFolderPathExcluded,
+  planSharedFolderPublication,
+  type SharedFolderBlockReason,
+  type SharedFolderConflictStrategy,
+  type SharedFolderLocalFile,
+  type SharedFolderPlan,
+  type SharedFolderPlanInput,
+  type SharedFolderPlanItem,
+  type SharedFolderPlanStatus,
+  type SharedFolderPlanTotals,
+} from "./shared-folder-publication";
+export {
   WorkspaceSyncClient,
   type WorkspaceSyncFetch,
   type WorkspaceSyncClientConfig,

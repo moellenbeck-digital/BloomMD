@@ -18,6 +18,20 @@ The desktop builds are publicly linked and can be downloaded without an invitati
 account. Closed-beta access applies only to the Web app, cloud, sync and collaboration. If a
 download link does not work, contact `feedback@bloommd.io`.
 
+## Getting started: from download to your first map
+
+1. **Download:** Get the macOS arm64 build from [bloommd.io/download](/download?lang=en).
+2. **Open the DMG:** Drag BloomMD to the Applications folder and double-click it there (details in
+   [Installing the closed-beta build](#installing-the-closed-beta-build)).
+3. **Open a folder:** Open a folder with Markdown files from the menu, the file manager, or the command
+   line (see [Opening files and folders](#opening-files-and-folders)).
+4. **First map:** Select a file. Its headings become the map; the Markdown file stays unchanged.
+
+![Diagram, not a screenshot: the file list of the opened folder on the left, the map of the selected file with headings as nodes on the right](/docs/desktop-ordner-en.svg)
+
+Everything stays on your computer. What stays local, and what only goes to the cloud after an
+explicit choice, is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
+
 ## Working with nodes from 0.5.14
 
 Clicking a node selects it without recentering the visible map. Arrow keys move between parents,

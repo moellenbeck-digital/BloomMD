@@ -10,6 +10,8 @@ draft: true
 Das BloomMD-Plugin zeigt eine Obsidian-Notiz als Map. Jede Überschrift ist ein Knoten, die Datei
 bleibt eine normale Markdown-Datei in deinem Vault.
 
+![Schema, kein Screenshot: Dieselbe Markdown-Datei im Obsidian-Vault erscheint in Obsidian als Text und über das BloomMD-Plugin als Karte](/docs/obsidian-flow.svg)
+
 ## Installation
 
 - **Obsidian auf dem Mac, Windows oder Linux:** über BRAT mit dem Repository

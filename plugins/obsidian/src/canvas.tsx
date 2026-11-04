@@ -145,6 +145,8 @@ export interface CanvasActions {
   redo: (selectedId: string | null) => Promise<string | null>;
   persistLayout: (layout: PersistedCanvasLayout) => void;
   openMarkdown: () => void;
+  /** Loads the note again after a failure; without it the error state offers no retry. */
+  reloadNote?: () => void;
   /** Opens the note in the BloomMD app, at the given node when there is one. */
   openBloomMD: (nodeId?: string | null) => void;
   openWikiLink: (target: string) => void;
@@ -204,6 +206,8 @@ export interface CanvasProps {
   mapInkRevision?: number;
   /** Personal learning progress of this map; absent for folders or when progress is turned off. */
   learning?: CanvasLearning | null;
+  /** Why the view could not open or load the note; shown instead of the map, with the way back to Markdown. */
+  loadError?: string | null;
   actions: CanvasActions;
 }
 
@@ -1630,11 +1634,33 @@ function PresentationMode({
   );
 }
 
+/**
+ * True while the element has a layout size. A leaf that was just split, or a tab that is hidden, is
+ * 0×0 until Obsidian lays it out; React Flow then assumes a 500×500 pane and cannot tell.
+ */
+function useHasSize(element: HTMLElement | null): boolean {
+  const [sized, setSized] = useState(false);
+  useEffect(() => {
+    if (!element) return;
+    const measure = () => setSized(element.clientWidth > 0 && element.clientHeight > 0);
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      setSized(true);
+      return;
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return sized;
+}
+
 const NO_ENTRIES: Record<string, LearningEntry> = {};
 const noRate = () => undefined;
 
 function CanvasInner(props: CanvasProps) {
   const reactFlow = useReactFlow<BloomFlowNode>();
+  const fitPending = useRef(true);
   const shellRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(props.rootId || null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set(props.rootId ? [props.rootId] : []));
@@ -1647,6 +1673,7 @@ function CanvasInner(props: CanvasProps) {
   const [study, setStudy] = useState(false);
   const [drawOnMap, setDrawOnMap] = useState(false);
   const [flowHost, setFlowHost] = useState<HTMLElement | null>(null);
+  const flowSized = useHasSize(flowHost);
   const [mapNotice, setMapNotice] = useState<{ message: string; undo?: () => void } | null>(null);
   const mapNoticeTimer = useRef<number | undefined>(undefined);
   const mapInkActions = useMemo(() => ({ readInk: props.actions.readInk, saveInk: props.actions.saveMapInk }), [props.actions.readInk, props.actions.saveMapInk]);
@@ -2196,15 +2223,28 @@ function CanvasInner(props: CanvasProps) {
     setRevealed(new Set());
     setSessionIds(null);
     setOrderChoice(null);
+    fitPending.current = true;
     window.setTimeout(() => {
       reactFlow.setNodes((current) => current.map((node) => {
         const selected = node.id === props.rootId;
         return node.selected === selected ? node : { ...node, selected };
       }));
+    }, 20);
+  }, [props.filePath]);
+
+  // Fitting into a pane that is still 0×0 (a leaf that was just split or is hidden) fits the map to
+  // React Flow's 500×500 fallback, and nothing refits once the real size arrives, which leaves the
+  // nodes outside the visible pane. So the first fit of a note waits until the pane has a size.
+  useEffect(() => {
+    if (!flowSized) return;
+    const timer = window.setTimeout(() => {
+      if (!fitPending.current) return;
+      fitPending.current = false;
       if (props.layout.viewport) void reactFlow.setViewport(props.layout.viewport, { duration: 0 });
       else void reactFlow.fitView({ padding: 0.25, duration: 180 });
     }, 20);
-  }, [props.filePath]);
+    return () => window.clearTimeout(timer);
+  }, [props.filePath, flowSized]);
 
   useEffect(() => {
     if (!inspectorOpen) setInspectorFullscreen(false);
@@ -2833,7 +2873,16 @@ function sharedStatusLabel(status: NonNullable<CanvasProps["sharedStatus"]>): st
 
 function BloomMDCanvas(props: CanvasProps) {
   if (props.headings.length === 0) {
-    return <div className="bloommd-empty-state"><Network size={32} /><h3>No Markdown headings found</h3><p>Add a heading to the note and the mind map will update automatically.</p></div>;
+    // filePath is empty while the view shows neither a note nor a folder.
+    const noNote = props.filePath === "";
+    return (
+      <div className="bloommd-empty-state">
+        <Network size={32} />
+        <h3>{noNote ? "No note is open in this map" : "No Markdown headings found"}</h3>
+        <p>{noNote ? "Open a Markdown note and run ‘BloomMD: Visualize current note’, or go back to Markdown." : "Add a heading to the note and the mind map will update automatically."}</p>
+        <button type="button" onClick={props.actions.openMarkdown}>Back to Markdown</button>
+      </div>
+    );
   }
   return <ReactFlowProvider><CanvasInner {...props} /></ReactFlowProvider>;
 }
@@ -2841,6 +2890,12 @@ function BloomMDCanvas(props: CanvasProps) {
 interface CanvasErrorBoundaryProps {
   children: ReactNode;
   onBack: () => void;
+  /** A failure from outside React (opening or loading the note); shown like a render error. */
+  failure?: string | null;
+  /** Retries after `failure`; render errors retry by rendering the children again. */
+  onRetry?: () => void;
+  /** A render error is cleared when this changes, e.g. when another note is shown. */
+  resetKey?: string;
 }
 
 interface CanvasErrorBoundaryState {
@@ -2858,22 +2913,56 @@ class CanvasErrorBoundary extends Component<CanvasErrorBoundaryProps, CanvasErro
     console.error("BloomMD canvas failed to render", error);
   }
 
+  componentDidUpdate(previous: CanvasErrorBoundaryProps) {
+    if (this.state.error && previous.resetKey !== this.props.resetKey) this.setState({ error: null });
+  }
+
   render() {
-    if (!this.state.error) return this.props.children;
+    const { error } = this.state;
+    const { failure, onRetry } = this.props;
+    if (!error && failure == null) return this.props.children;
+    const message = error ? error.message || "Unknown rendering error" : failure || "Unknown error";
+    const retry = error ? () => this.setState({ error: null }) : onRetry;
 
     return (
       <div className="bloommd-render-error" role="alert">
         <AlertTriangle size={32} />
-        <h3>BloomMD could not render this map</h3>
-        <p>The note is still safe in Markdown. Reload the map or return to the note.</p>
-        <code>{this.state.error.message || "Unknown rendering error"}</code>
+        <h3>{error ? "BloomMD could not render this map" : "BloomMD could not open this map"}</h3>
+        <p>The note is still safe in Markdown. {retry ? "Try again or return to the note." : "Return to the note."}</p>
+        <code>{message}</code>
         <div className="bloommd-render-error-actions">
-          <button type="button" onClick={() => this.setState({ error: null })}>Try again</button>
+          {retry && <button type="button" onClick={retry}>Try again</button>}
           <button type="button" onClick={this.props.onBack}>Back to Markdown</button>
         </div>
       </div>
     );
   }
+}
+
+/**
+ * Last resort for when the React mount itself cannot be created, so no boundary can render. Plain DOM
+ * with the same wording and classes as the error state; never leaves the view without a way back.
+ */
+export function renderMountFailure(container: HTMLElement, message: string, onBack: () => void): void {
+  container.replaceChildren();
+  const panel = document.createElement("div");
+  panel.className = "bloommd-render-error";
+  panel.setAttribute("role", "alert");
+  const title = document.createElement("h3");
+  title.textContent = "BloomMD could not open this map";
+  const hint = document.createElement("p");
+  hint.textContent = "The note is still safe in Markdown. Return to the note.";
+  const detail = document.createElement("code");
+  detail.textContent = message || "Unknown error";
+  const actions = document.createElement("div");
+  actions.className = "bloommd-render-error-actions";
+  const back = document.createElement("button");
+  back.type = "button";
+  back.textContent = "Back to Markdown";
+  back.addEventListener("click", onBack);
+  actions.appendChild(back);
+  panel.append(title, hint, detail, actions);
+  container.appendChild(panel);
 }
 
 export function createCanvasMount(container: HTMLElement): CanvasMount {
@@ -2886,7 +2975,7 @@ export function createCanvasMount(container: HTMLElement): CanvasMount {
   return {
     host,
     render: (props) => root.render(
-      <CanvasErrorBoundary onBack={props.actions.openMarkdown}>
+      <CanvasErrorBoundary onBack={props.actions.openMarkdown} failure={props.loadError} onRetry={props.actions.reloadNote} resetKey={props.filePath}>
         <BloomMDCanvas {...props} />
       </CanvasErrorBoundary>,
     ),

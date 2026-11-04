@@ -28,3 +28,7 @@ test-results
 *.log
 .DS_Store
 obsidian-test-vaults
+# Store screenshots of the mobile app (~21 MB): artifacts for the app stores, read by no build, start or test in an image.
+packages/mobile/store/screenshots/ios
+packages/mobile/store/screenshots/ios-framed
+packages/mobile/store/screenshots/ios-header

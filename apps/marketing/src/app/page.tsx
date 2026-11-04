@@ -989,6 +989,9 @@ function WikiSection() {
             Googles offene Markdown-Spezifikation für Agenten-Wissen. Kein proprietärer Index, keine versteckte Modell-Erinnerung:
             eine Ordnerstruktur aus Markdown-Dateien, die du selbst verwaltest und jederzeit in deinen gewohnten Werkzeugen öffnest.
           </p>
+          <p className="mt-5 text-sm leading-6 text-[#666666]">
+            Unsere <Link href="/roadmap" className="font-semibold text-[#B94316] underline-offset-4 hover:underline">Wissensplattform-Roadmap</Link> zeigt die Richtung von Quellen und Sync über Rechte und belegte Suche bis zu Agenten-Workflows. Der Learnings-Pilot ist der erste interne Backend-Nutzungsfall; lokales Markdown bleibt der Kern.
+          </p>
         </div>
 
         <div className="mt-10 grid gap-5 lg:grid-cols-3">

@@ -23,6 +23,13 @@ type RoadmapCopy = {
   cardLabel: string;
   privacyTitle: string;
   privacyText: string;
+  visionTitle: string;
+  visionIntro: string;
+  visionThemes: string;
+  visionPhaseLabels: [string, string, string, string];
+  visionPhases: [string, string, string, string];
+  visionNote: string;
+  visionLink: string;
   statusText: Record<RoadmapStatus, string>;
   tagText: Record<RoadmapTag, string>;
 };
@@ -45,6 +52,13 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
     privacyTitle: "Bewusst kuratiert",
     privacyText:
       "Ein Ticket erscheint hier nur mit dem Label public-roadmap. Ticket-Titel bleiben in der Originalsprache, UI und Orientierung sind Deutsch und Englisch gepflegt.",
+    visionTitle: "Vom Markdown-Workspace zur offenen Wissensplattform",
+    visionIntro: "BloomMD bleibt lokal mit eigenen Markdown-Dateien nutzbar. Der interne Learnings-Pilot ist der erste Backend-Nutzungsfall. Die folgenden Themen sind eine Richtung für überprüfbare Ausbauschritte, keine bereits verfügbaren Funktionen.",
+    visionThemes: "Wissensmodell und Provenienz · belegte Suche · Sync und Offline · Identität und Delegation · Sicherheit und Governance · Konnektoren · Wissenslebenszyklus · Agenten-Workflows · Transparenz · Betrieb",
+    visionPhaseLabels: ["W0 · Jetzt prüfen", "W1 · Danach eingrenzen", "W2 · Vor breiter Suche", "W3 · Nach Nachweis"],
+    visionPhases: ["Learnings-Pilot und portable Quellen-/Trust-Felder", "Konfliktfester Sync und eine begrenzte lesende Quelle", "Widerrufbare Rechte, Audit und Suche mit Belegen", "Lebenszyklus, Agentenaktionen, Governance und Betrieb"],
+    visionNote: "Die Meilensteine bündeln Scope-Entscheidungen ohne Termin oder Funktionszusage. Die macOS-Beta hat Vorrang.",
+    visionLink: "Vollständige Roadmap und offene Fragen auf GitHub",
     statusText: {
       Feedback: "Feedback",
       Planned: "Geplant",
@@ -87,6 +101,13 @@ const copy: Record<RoadmapLocale, RoadmapCopy> = {
     privacyTitle: "Deliberately curated",
     privacyText:
       "A ticket appears here only with the public-roadmap label. Ticket titles keep their original language; interface and orientation are maintained in German and English.",
+    visionTitle: "From Markdown workspace to open knowledge platform",
+    visionIntro: "BloomMD remains usable locally with your own Markdown files. The internal learnings pilot is the first backend use case. The themes below guide verifiable steps; they do not describe features already available.",
+    visionThemes: "Knowledge model and provenance · cited search · sync and offline · identity and delegation · security and governance · connectors · knowledge lifecycle · agent workflows · transparency · operations",
+    visionPhaseLabels: ["W0 · Validate now", "W1 · Scope next", "W2 · Before broader search", "W3 · After evidence"],
+    visionPhases: ["Learnings pilot and portable source/trust fields", "Conflict-safe sync and one limited read-only source", "Revocable rights, audit, and cited search", "Lifecycle, agent actions, governance, and operations"],
+    visionNote: "These milestones group scope decisions without dates or feature commitments. The macOS beta remains the priority.",
+    visionLink: "Full roadmap and open questions on GitHub",
     statusText: {
       Feedback: "Feedback",
       Planned: "Planned",
@@ -181,6 +202,26 @@ export function RoadmapPage({ data, locale }: { data: RoadmapData; locale: Roadm
               </div>
             </div>
           </aside>
+        </div>
+      </section>
+
+      <section className="border-b border-[#E8E4DF] bg-white" aria-labelledby="knowledge-vision-title">
+        <div className="mx-auto max-w-7xl px-5 py-12 lg:py-16">
+          <h2 id="knowledge-vision-title" className="max-w-4xl text-3xl font-black leading-tight sm:text-4xl">{text.visionTitle}</h2>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-[#68615C]">{text.visionIntro}</p>
+          <div className="mt-8 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {text.visionPhases.map((phase, index) => (
+              <div key={phase} className="border-t-4 border-[#FF6B35] bg-[#F7F5F2] p-5">
+                <h3 className="text-sm font-black uppercase tracking-wide text-[#9A3412]">{text.visionPhaseLabels[index]}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#1A1A1A]">{phase}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 max-w-5xl text-sm leading-7 text-[#68615C]">{text.visionThemes}</p>
+          <p className="mt-3 text-sm leading-6 text-[#68615C]">{text.visionNote}</p>
+          <a href="https://github.com/moellenbeck-digital/BloomMD/blob/main/docs/WISSENSPLATTFORM-ROADMAP.md" className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[#B94316] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+            {text.visionLink}<ExternalLink size={14} aria-hidden="true" />
+          </a>
         </div>
       </section>
 

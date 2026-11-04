@@ -20,7 +20,7 @@ import { type EdgeMode, type MindMapNodeData } from "./useMindMapLayout";
 import { initialWorkspaceCollapse } from "./workspace-view";
 import { computeVisibleLayout } from "./visible-layout";
 import { SyncProvider } from "../sync/SyncProvider";
-import type { AwarenessIdentity, SyncFailure, SyncStatus } from "../sync/types";
+import { SYNC_ORIGIN, type AwarenessIdentity, type SyncFailure, type SyncStatus } from "../sync/types";
 import { cancelPendingNodeFocus, requestNodeFocus } from "../utils/nodeFocus";
 
 export interface RemoteUser {
@@ -69,12 +69,22 @@ interface MindMapState {
   remoteUsers: RemoteUser[];
   edgeMode: EdgeMode;
   canvasMode: CanvasMode;
+  /** While a map export runs, the canvas mounts every node instead of only those in view. */
+  exportRenderAll: boolean;
   focusNodeId: string | null;
   copiedBranches: BranchSnapshot[];
   /** Last blocked structural edit, shown to the user and cleared on the next successful action. */
   statusMessage: string | null;
+  /**
+   * Counts local edits to the open document (remote sync updates are not counted). The document is
+   * unsaved while `editRevision > savedRevision`; both restart at 0 whenever a document is loaded.
+   */
+  editRevision: number;
+  savedRevision: number;
 
   setStatusMessage: (message: string | null) => void;
+  /** Records that everything up to `revision` is persisted (saved, or held by a connected sync room). */
+  markSaved: (revision: number) => void;
   setDocument: (doc: MindMapDocument | null) => void;
   setDocumentFilePath: (filePath: string) => void;
   setStorageMetadata: (storage: MindMapDocument["storage"]) => void;
@@ -105,6 +115,7 @@ interface MindMapState {
   relayout: () => void;
   setEdgeMode: (mode: EdgeMode) => void;
   setCanvasMode: (mode: CanvasMode) => void;
+  setExportRenderAll: (renderAll: boolean) => void;
   setFocusNodeId: (nodeId: string | null) => void;
   copyBranches: (nodeIds?: string[]) => BranchSnapshot[];
   pasteBranches: (parentId?: string) => string[];
@@ -218,6 +229,11 @@ function reportBlockedEdit(set: (partial: Partial<MindMapState>) => void, error:
   return null;
 }
 
+/** Local edits advance the revision; updates that arrive from the sync server do not. */
+function localEditUpdate(revision: number, origin: unknown): { editRevision: number } | Record<string, never> {
+  return origin === SYNC_ORIGIN ? {} : { editRevision: revision + 1 };
+}
+
 let requestAutoEditToken = 0;
 
 function scheduleAfterRender(callback: () => void): void {
@@ -263,17 +279,21 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   remoteUsers: [],
   edgeMode: "hierarchy",
   canvasMode: "map",
+  exportRenderAll: false,
   focusNodeId: null,
   copiedBranches: [],
   statusMessage: null,
+  editRevision: 0,
+  savedRevision: 0,
 
   setStatusMessage: (statusMessage) => set({ statusMessage }),
+  markSaved: (revision) => set((state) => (revision > state.savedRevision ? { savedRevision: Math.min(revision, state.editRevision) } : {})),
 
   setDocument: (doc) => {
     cancelPendingNodeFocus();
     cancelLayout();
     // A status message belongs to the document it was raised for; never carry it across navigation.
-    set({ layoutPending: false, layoutFailed: false, statusMessage: null });
+    set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0 });
     // Cleanup previous sync provider FIRST (before destroying Y.Doc)
     const prevProvider = get().syncProvider;
     if (prevProvider) prevProvider.destroy();
@@ -300,7 +320,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     // Observe structural changes → recompute layout + fix stale selection
     const yNodes = yDoc.getMap("nodes");
     let observedDocument: MindMapDocument | null = doc;
-    yNodes.observeDeep(() => {
+    yNodes.observeDeep((_events, transaction) => {
       const currentDoc = yDocToDocument(yDoc);
       const { collapsedIds, focusNodeId, edgeMode } = get();
       const { nodes, edges } = computeLayout(currentDoc, collapsedIds, focusNodeId, edgeMode);
@@ -311,14 +331,14 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
         ? { selectedNodeId: fallbackId, selectedNodeIds: [fallbackId] }
         : {};
 
-      set({ document: currentDoc, nodes, edges, ...selectionUpdate });
+      set({ document: currentDoc, nodes, edges, ...selectionUpdate, ...localEditUpdate(get().editRevision, transaction.origin) });
       observedDocument = currentDoc;
       if (fallbackId) requestNodeFocus(fallbackId);
     });
 
     // Observe content changes (remote edits) → update document for editor re-render
     const yNodeContents = yDoc.getMap<Y.Text>("nodeContents");
-    yNodeContents.observeDeep(() => {
+    yNodeContents.observeDeep((_events, transaction) => {
       const currentDoc = get().document;
       if (!currentDoc) return;
 
@@ -337,7 +357,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
         const updatedDoc = { ...currentDoc, nodes: updatedNodes };
         const { collapsedIds, focusNodeId, edgeMode } = get();
         const { nodes, edges } = computeLayout(updatedDoc, collapsedIds, focusNodeId, edgeMode);
-        set({ document: updatedDoc, nodes, edges });
+        set({ document: updatedDoc, nodes, edges, ...localEditUpdate(get().editRevision, transaction.origin) });
       }
     });
 
@@ -831,6 +851,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   },
 
   setCanvasMode: (canvasMode) => set({ canvasMode }),
+  setExportRenderAll: (exportRenderAll) => set({ exportRenderAll }),
 
   setFocusNodeId: (focusNodeId) => {
     const { document: doc, collapsedIds, edgeMode } = get();

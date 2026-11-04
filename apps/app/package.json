@@ -17,6 +17,7 @@
     "feedback:verify-storage": "bun run scripts/verify-feedback-storage.ts",
     "db:maintenance": "bun run scripts/maintenance.ts",
     "db:purge-unconfirmed": "bun run scripts/purge-unconfirmed-accounts.ts",
+    "db:transfer-waitlist": "bun run scripts/transfer-waitlist-accounts.ts",
     "start": "next start",
     "test": "bun scripts/test-isolated.ts",
     "test:e2e": "playwright test",

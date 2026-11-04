@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <strong>The Markdown workspace for LLM-maintained knowledge.</strong>
+  <strong>Visual Markdown workspaces, local first.</strong>
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <a href="https://bloommd.io">Website</a> ·
   <a href="https://bloommd.io/demo">Open Demo</a> ·
   <a href="https://bloommd.io/templates">Browse Templates</a> ·
-  <a href="plugins/obsidian">Obsidian Preview</a> ·
+  <a href="plugins/obsidian">Obsidian Plugin</a> ·
   <a href="https://github.com/moellenbeck-digital/BloomMD/issues/new/choose">Report a Bug</a>
 </p>
 
@@ -29,23 +29,23 @@
 
 ## What is BloomMD?
 
-BloomMD is a local-first workspace for building an LLM-maintained wiki from ordinary Markdown. Headings become nodes, nested headings become branches, and the text under each heading stays as the node content.
+BloomMD is a local-first visual workspace for ordinary Markdown files. Headings become nodes, nested headings become branches, and the text under each heading stays as the node content.
 
 You can explore raw sources visually, connect concepts across maps, drag branches to restructure them, edit the distilled knowledge, and save the result back to normal `.md` files. The map is the interface; Markdown files remain portable and inspectable in Git, Obsidian, VS Code, or any text editor.
 
 BloomMD is becoming the visual layer for the **LLM Wiki pattern**: raw sources stay immutable, an interconnected Markdown wiki becomes the queryable knowledge layer, and human-defined conventions form the schema. Agents may later maintain the wiki, but every change remains reviewable Markdown rather than hidden model memory.
 
-BloomMD runs as a **closed beta**: while the closed-beta gate is on (`BLOOMMD_BETA_ACCESS=1`) the hosted
-cloud application is invitation only; with the gate off, anyone can register themselves (email
-confirmation, consent to privacy policy and terms, and signup rate limits still apply). The demo
-and the template library stay open to everyone. Desktop workspaces and local OKF/LLM-Wiki bundles
-work without any account. Obsidian compatibility is demonstrated during M1 with real local notes;
-the full Obsidian plugin beta distribution follows in M2.
+The hosted app currently runs as an **invitation-only closed beta**. The code supports open
+self-registration when `BLOOMMD_BETA_ACCESS` is off, but the production gate remains on until the
+approved rollout. Email confirmation, consent, and signup limits apply in either mode. The demo,
+templates, local Desktop builds, and local OKF/LLM-Wiki bundles need no BloomMD account. The
+separately released Obsidian plugin 0.7.1 is available on desktop, iPad, iPhone, and Android.
 
-**In scope:** Web, macOS Desktop, OKF/LLM-Wiki, and collaboration marked as beta on a single instance.
-Linux and Windows desktop builds are planned as follow-up beta releases after M1.
-**Out of scope:** mobile Obsidian, a public SaaS launch, billing, the template marketplace, the VS Code
-extension, and hosted autonomous agents.
+**Available now:** invited Web/Cloud beta; local Desktop builds for macOS and Omarchy/Arch Linux;
+local OKF/LLM-Wiki tools; Obsidian plugin beta on desktop and mobile. Collaboration remains a beta
+feature on one sync writer. **Not publicly available:** Windows Desktop beta, the standalone
+BloomMD mobile app in app stores, a general SaaS launch, billing, the template marketplace, the
+VS Code extension, and hosted autonomous agents.
 
 Full wording is in [docs/BETA-SCOPE.md](docs/BETA-SCOPE.md). Active launch work is tracked in the
 [public BloomMD roadmap](https://bloommd.io/roadmap).
@@ -175,9 +175,12 @@ Each template has `template.md`, `metadata.json`, and a public preview image pat
 
 [`plugins/obsidian`](plugins/obsidian) contains the BloomMD for Obsidian companion plugin. The
 monorepo is its only development source; `moellenbeck-digital/bloommd-obsidian` is a generated,
-read-only release mirror for BRAT and manual distribution. The M1 plugin beta is desktop-only.
+read-only release mirror for BRAT and manual distribution. The public 0.7.1 plugin beta supports
+desktop Obsidian as well as iPad, iPhone, and Android. This is separate from the standalone
+BloomMD mobile app.
 
-The Markdown parser and lossless structural operations are shared through `@bloommd/core/browser`.
+The Markdown parser and lossless structural operations are shared through the narrow
+`@bloommd/core/obsidian-markdown` export.
 Obsidian-specific Vault, View, settings, and UI behavior stays in the plugin. Use
 [`plugins/obsidian/RELEASE.md`](plugins/obsidian/RELEASE.md) for the mirror and release contract.
 
@@ -199,14 +202,13 @@ By default, the plugin keeps vault contents local and does not put Markdown cont
 | Area | Technology | Beta status |
 |---|---|
 | Web | Next.js 16 App Router with Turbopack | Hosted beta: invitation only with the gate on, open self-registration with the gate off |
-| Desktop | Electrobun v1 | Recommended local beta path on macOS for M1, no account required |
+| Desktop | Electrobun v1 | Local beta builds for macOS and Omarchy/Arch Linux, no account required |
 | OKF / LLM-Wiki | BloomMD CLI, MCP transport, `@bloommd/core` | Local and offline-capable |
 | Sync | Bun WebSocket service, Yjs, Postgres persistence | Beta, one writer replica only |
-| Mobile | Capacitor 8 | Package exists, but mobile support is outside the M1 beta scope |
+| Standalone mobile app | Capacitor 8 | Package exists, but no public app-store release yet |
 
-The mobile package remains in the monorepo for technical continuity, but mobile testing and support
-are explicitly out of scope for the closed beta. The beta promise is Web, Desktop, local
-OKF/LLM-Wiki, and collaboration marked as beta.
+The standalone mobile package remains in the monorepo for technical continuity. Obsidian plugin
+support on mobile has its own release and test matrix.
 
 The supported build runtime is Node.js 22. Node.js 23 and other odd-numbered releases are intentionally outside the release matrix.
 
@@ -290,9 +292,10 @@ bloommd-wiki lint ./wiki
 bloommd-wiki mcp ./wiki
 ```
 
-## M1 Release Artifacts
+## M1 Release Artifacts (historical scope)
 
-M1 uses deliberately separate artifacts:
+The release workflow uses deliberately separate artifacts. M1 began with macOS; the Linux
+Pacman packages were added afterward:
 
 | Artifact | Build command | Purpose |
 |---|---|---|
@@ -375,7 +378,8 @@ Required for the hosted closed beta:
 - optional fallback: `BLOOMMD_BETA_ALLOWED_EMAILS` or `BLOOMMD_BETA_INVITE_CODES`
 - optional: `BLOOMMD_TRUSTED_PROXY_HEADER` (name of the one header believed for the client address in
   rate limits, e.g. `cf-connecting-ip`; unset: last `x-forwarded-for` entry, right behind one proxy;
-  `release:check` warns when unset and rejects an invalid name)
+  `release:check` warns when unset and rejects an invalid name; the marketing app reads it too, for
+  the `/api/link-preview` limit, see `docs/ACCOUNT-ABUSE-PROTECTION.md`)
 - optional: `BLOOMMD_MAIL_DAILY_LIMIT` (default 300) and `BLOOMMD_MAIL_HOURLY_LIMIT` (default 60):
   global cap for confirmation and password-reset mails, counted in the database (migration
   `010_account_mail_budget.sql`; run `db:migrate` before the rollout). When reached, signup answers
@@ -440,7 +444,8 @@ step is a dry-run unless `--apply` is given):
 bun run --cwd apps/marketing waitlist count               # confirmed / pending / unsubscribed / total
 bun run --cwd apps/marketing waitlist export --out waitlist.csv   # email, status, time, source; ends with "N Einträge, davon bestätigt M"
 bun run --cwd apps/marketing waitlist invite              # dry-run: lists who would get the one-time mail
-bun run --cwd apps/marketing waitlist invite --apply      # sends it (confirmed, not unsubscribed, once per address)
+bun run --cwd apps/marketing waitlist invite --apply      # sends it (confirmed, not unsubscribed, once per address); NOT together with the transfer below
+bun run --cwd apps/marketing waitlist mark-transferred    # dry-run: counts addresses to mark as invited without a mail (see below)
 bun run --cwd apps/marketing waitlist purge               # dry-run: would deleting be allowed?
 bun run --cwd apps/marketing waitlist purge --apply       # deletes ALL entries
 ```
@@ -449,6 +454,73 @@ bun run --cwd apps/marketing waitlist purge --apply       # deletes ALL entries
 again; a failed send releases the mark. `purge --apply` is refused while confirmed addresses have not
 been invited and until `WAITLIST_PURGE_RETENTION_DAYS` (90, `src/lib/waitlist-retention.ts`) after the
 last invitation mail. The privacy policy names the same 90 days.
+
+### Transferring the waitlist to accounts (#105)
+
+Instead of the one-time `invite` mail, the confirmed waitlist addresses get a prepared account in
+the product app and one activation mail. The accounts live in `apps/app` (`bloom_users`,
+`bloom_waitlist_transfers`); the marketing app has no app database. **Do not run `invite --apply`
+for these addresses** (they would be mailed twice); `mark-transferred` below switches it off.
+
+Order (a human runs it against production; everything that writes or sends needs `--apply`):
+
+```bash
+bun run --cwd apps/app db:migrate                    # first: migration 011_waitlist_transfers.sql
+bun run --cwd apps/marketing waitlist export --out waitlist.csv     # closing line: "N Einträge, davon bestätigt M"
+bun run --cwd apps/app db:transfer-waitlist waitlist.csv --expected M            # dry run: numbers only
+bun run --cwd apps/app db:transfer-waitlist waitlist.csv --apply --expected M    # creates accounts, sends the mails
+bun run --cwd apps/marketing waitlist mark-transferred --apply   # only after a complete run: no second mail, purge clock starts
+```
+
+Add `--limit <n>` to cap the mails of one run. The mails count against the global account mail cap
+(`BLOOMMD_MAIL_HOURLY_LIMIT`, default 60 per hour and 300 per day, shared with sign-up), so a large
+waitlist needs several runs; use `--limit` to leave room for sign-ups. The run stops when the cap is
+reached and reports the rest as `deferred`; run it again later, finished addresses are skipped.
+
+What a run does per confirmed address:
+
+- no account yet: creates one with `password_hash = null` and no confirmed address, claims the
+  mail (`bloom_waitlist_transfers.invited_at`) and only then sends it, so a second run or a crash
+  halfway never mails anybody twice. A failed send gives the claim back, so only that address is
+  repeated (`retried`). The claim is taken before sending on purpose: if the process dies between
+  claim and send, that person gets no mail and is not retried automatically; they can still sign
+  up on the signup page.
+- account exists (registered by themselves, also since #104): nothing is created, changed or
+  mailed (`alreadyRegistered`).
+- prepared and mailed by an earlier run: skipped (`alreadyInvited`).
+
+The output is one JSON line of numbers, no addresses. `confirmed` equals
+`created + retried + alreadyRegistered + alreadyInvited + deferred + duplicates + invalid`, and in
+`--apply` `created + retried` equals `mailSent + mailFailed`; `balanced` and `matchesExport` say
+whether that holds and whether `confirmed` equals the M of the export. `--apply` refuses to start
+when the CSV has a different number of confirmed rows than `--expected`. The exit code is 1 when the
+numbers do not add up, a mail failed or the run stopped early. Run it soon after the export:
+somebody who unsubscribes in between is still in the CSV.
+
+Example with synthetic test data (a throwaway Postgres, not production): a CSV of 18 rows (14
+confirmed, 2 of them already registered, 8 prepared by an earlier run, 4 open or unsubscribed):
+
+```json
+{"dryRun":true,"rows":18,"notConfirmed":4,"confirmed":14,"created":4,"retried":0,"alreadyRegistered":2,"alreadyInvited":8,"deferred":0,"duplicates":0,"invalid":0,"mailSent":0,"mailFailed":0,"expectedConfirmed":null,"balanced":true,"matchesExport":null}
+{"dryRun":false,"rows":18,"notConfirmed":4,"confirmed":14,"created":4,"retried":0,"alreadyRegistered":2,"alreadyInvited":8,"deferred":0,"duplicates":0,"invalid":0,"mailSent":4,"mailFailed":0,"expectedConfirmed":14,"balanced":true,"matchesExport":true}
+```
+
+The production numbers (confirmed, created, already registered, mails sent, failed) are copied
+into the PR text by whoever runs the dry run; this repository has no access to the production
+waitlist.
+
+The person gets one mail (German, or English when the source ends in `-en`) with the link
+`/activate?token=…`. Opening the page changes nothing; the form on it posts to
+`/api/auth/activate-account`, which enforces the consent to privacy policy and terms on the server,
+sets the password and confirms the address in one statement that also uses up the single-use token
+(purpose `waitlist_activation`, 14 days, `WAITLIST_ACTIVATION_TTL_DAYS`). It only works for an
+account from the transfer whose mail was sent and whose address is still unconfirmed. Until then no
+login can succeed (`password_hash` is null and the address unconfirmed), and password reset and
+"resend confirmation" do nothing for such an account, so a reset link cannot activate it without
+the consent. A link that expired is no dead end: signing up with the address works as for anyone.
+Prepared accounts nobody activated are deleted 90 days after the mail by `db:maintenance` (preview
+with `db:purge-unconfirmed`, key `unactivatedWaitlistAccounts`), the same period as the waitlist
+entries.
 
 The public marketing entrypoints are `/` for German and `/en` for English beta participants. Both
 must keep the same product scope, beta CTA, app login target and release version visibility before
@@ -489,6 +561,25 @@ be used — the product claim is that Markdown stays intact, so the demo has to 
 
 ## Roadmap
 
+BloomMD's long-term direction is an open, locally usable knowledge and action layer built on portable Markdown. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) describes this direction without making release commitments.
+
+The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) gives the complete German and English scope, dependencies, and open decisions for all ten themes. Each theme now has a [planning issue](https://github.com/moellenbeck-digital/BloomMD/issues/256) in the BloomMD project and a planning milestone. These milestones commit to testable scope decisions, not to shipping every proposed capability or to a date.
+
+| Theme | What we need to prove before implementation | Planning issue |
+| --- | --- | --- |
+| Knowledge model and provenance | Portable Markdown records sources, owners, validity, relationships, and trust signals that survive review. | [#259](https://github.com/moellenbeck-digital/BloomMD/issues/259) |
+| Search and agentic RAG | A bounded use case returns cited answers from permitted sources and passes reference questions. | [#260](https://github.com/moellenbeck-digital/BloomMD/issues/260) |
+| Sync and offline | Local Markdown changes survive offline work, reconnection, and a visible conflict without cloud lock-in. | [#261](https://github.com/moellenbeck-digital/BloomMD/issues/261) |
+| Identity, roles, and delegation | Human and agent rights can be scoped, audited, revoked, and enforced for writes and search. | [#262](https://github.com/moellenbeck-digital/BloomMD/issues/262) |
+| Security and governance | A real scenario determines necessary isolation, privacy, retention, encryption, and organizational controls. | [#263](https://github.com/moellenbeck-digital/BloomMD/issues/263) |
+| Connectors and open interfaces | One useful external source has an explicit authority and read, mirror, or write mode. | [#264](https://github.com/moellenbeck-digital/BloomMD/issues/264) |
+| Knowledge lifecycle | Pilot evidence defines review, staleness, contradictions, archive, and recovery beyond learnings. | [#265](https://github.com/moellenbeck-digital/BloomMD/issues/265) |
+| Agent workflows | One action has clear triggers, limits, human approval, audit, and rollback. | [#266](https://github.com/moellenbeck-digital/BloomMD/issues/266) |
+| Transparency and trust | People can inspect sources, permissions, uncertainty, and external model use without leaking sensitive audit data. | [#267](https://github.com/moellenbeck-digital/BloomMD/issues/267) |
+| Operations and administration | A chosen pilot has measurable health, cost, limits, backup, and restore criteria. | [#268](https://github.com/moellenbeck-digital/BloomMD/issues/268) |
+
+The order follows dependencies: [W0: knowledge foundation and learnings pilot](https://github.com/moellenbeck-digital/BloomMD/milestone/4) first; [W1: sources and sync](https://github.com/moellenbeck-digital/BloomMD/milestone/5) next; [W2: identity, rights, and cited search](https://github.com/moellenbeck-digital/BloomMD/milestone/6) before cross-scope access; then [W3: lifecycle, workflows, governance, and operations](https://github.com/moellenbeck-digital/BloomMD/milestone/7). Work on the M1 macOS closed beta remains the priority. The [internal learnings pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116) is the first backend use case; it does not make cloud access a prerequisite for BloomMD's local editor.
+
 The [public roadmap](https://bloommd.io/roadmap) summarizes work that is ready to share. Browse and report concrete requests in [GitHub Issues](https://github.com/moellenbeck-digital/BloomMD/issues); maintainers plan them in the internal project board.
 
 ## Contributing
@@ -505,16 +596,13 @@ Useful starting points:
 - [Request an integration](https://github.com/moellenbeck-digital/BloomMD/issues/new?template=integration_request.yml)
 - [Obsidian plugin issue](https://github.com/moellenbeck-digital/BloomMD/issues/new?template=obsidian_plugin_issue.yml)
 
-GitHub Discussions should be enabled with categories for Ideas, Feature Requests, Questions, Show and Tell, Templates, and Integrations.
-
 ## License
 
 BloomMD source from the Marketing 0.5.1 release commit onward is licensed under the
 [Elastic License 2.0](LICENSE). Earlier published versions, including Desktop
 `v0.5.14`, remain under their original MIT terms; the previous license text is
 preserved in [LICENSE-MIT-legacy](LICENSE-MIT-legacy). The separately released
-[Obsidian plugin](plugins/obsidian/LICENSE) uses ELv2 from its next public release;
-published plugin versions through 0.5.12 remain MIT.
+[Obsidian plugin](plugins/obsidian/LICENSE) remains under MIT in its current public 0.7.1 release.
 
 Historical binary releases and their license boundary are explained in
 [Release history](docs/RELEASE-HISTORY.md).

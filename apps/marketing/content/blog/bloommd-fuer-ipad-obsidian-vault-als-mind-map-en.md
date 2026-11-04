@@ -74,5 +74,5 @@ is enough.
 
 ## Status
 
-The app is a beta, and the App Store release is being prepared. You don't need an account to work
+The app exists as version 1.0, and the App Store release is being prepared. You don't need an account to work
 with your vault; signing in with a BloomMD account for cloud workspaces is optional (beta).

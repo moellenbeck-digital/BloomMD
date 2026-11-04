@@ -17,6 +17,8 @@
  * offline, and on the server.
  */
 
+import { maskCode } from "./code-mask";
+import { parsePdfLinkTarget } from "./pdf-links";
 import { normalizeFolderPath, normalizeMarkdownPath } from "./path-rules";
 
 export type WorkspaceNodeKind = "folder" | "file";
@@ -83,6 +85,8 @@ interface RawLink {
   anchor: string | null;
   raw: string;
   line: number;
+  /** Set for `[[file.pdf#page=n]]`: a source reference into a PDF, never an edge between pages. */
+  pdf?: { file: string; page: number };
 }
 
 /** Per-reader content cache; file-set changes invalidate target resolution, not link extraction. */
@@ -97,35 +101,6 @@ export class WorkspaceGraphCache {
 
 const WIKILINK_RE = /\[\[([^\]]+)\]\]/g;
 const MARKDOWN_LINK_RE = /\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
-const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
-
-/**
- * Strips content that looks like a link but is not one.
- *
- * Fenced code blocks and inline code are the two places where `[[...]]` shows up as an example
- * rather than a reference — documentation about wiki links being the obvious case. Replacing with
- * spaces rather than deleting keeps every line number and column intact, which is what lets the
- * reported line actually point at the link.
- */
-function maskCode(lines: string[]): string[] {
-  let fence: string | null = null;
-  return lines.map((line) => {
-    const fenceMatch = FENCE_RE.exec(line);
-    if (fence) {
-      // A closing fence must be at least as long as the one that opened the block.
-      if (fenceMatch && fenceMatch[1]!.startsWith(fence[0]!) && fenceMatch[1]!.length >= fence.length) {
-        fence = null;
-      }
-      return " ".repeat(line.length);
-    }
-    if (fenceMatch) {
-      fence = fenceMatch[1]!;
-      return " ".repeat(line.length);
-    }
-    // Inline code spans, masked in place.
-    return line.replace(/`+[^`]*`+/g, (span) => " ".repeat(span.length));
-  });
-}
 
 /** True for targets that point outside the workspace, which are deliberately not crawled. */
 function isExternalTarget(target: string): boolean {
@@ -160,7 +135,14 @@ export function extractLinks(markdown: string): RawLink[] {
       if (!withoutAlias) continue;
       const { path, anchor } = splitAnchor(withoutAlias);
       if (!path) continue;
-      links.push({ target: path, anchor, raw: match[0]!, line: lineNumber });
+      const pdf = parsePdfLinkTarget(withoutAlias);
+      links.push({
+        target: path,
+        anchor,
+        raw: match[0]!,
+        line: lineNumber,
+        ...(pdf ? { pdf: { file: pdf.file, page: pdf.page } } : {}),
+      });
     }
 
     MARKDOWN_LINK_RE.lastIndex = 0;
@@ -355,7 +337,8 @@ export function buildWorkspaceGraph(files: WorkspaceFileInput[], cache?: Workspa
       // would send someone hunting for a problem that does not exist — the file is right there, it
       // simply is not part of a graph whose nodes are Markdown documents. Media references belong
       // to the preview layer instead.
-      if (isAssetTarget(link.target)) continue;
+      // A PDF link is a source reference: its `#page=n` is a page, not a heading anchor.
+      if (link.pdf || isAssetTarget(link.target)) continue;
 
       const candidates = resolveTarget(link.target, file.path, byPath, byName);
 

@@ -14,7 +14,7 @@ MAP, GLIEDERUNG, PRÄSENTATION
 Wechsle zwischen der Mind Map, einer Gliederung zum schnellen Lesen und einer Präsentationsansicht. Knoten können Aufgaben mit Status und Fälligkeit oder Entscheidungen sein. Der Knoten-Editor öffnet sich auf dem iPad als Seitenleiste neben der Map, auf dem iPhone als Bottom-Sheet.
 
 OHNE KONTO, OFFLINE
-BloomMD funktioniert ohne Anmeldung und ohne Internetverbindung. Ohne Ordnerauswahl liegen deine Maps im App-eigenen Ordner auf dem Gerät. Markdown-Dateien kannst du importieren und jede Map als Markdown über das Teilen-Menü weitergeben.
+BloomMD funktioniert ohne Anmeldung und ohne Internetverbindung. Ohne Ordnerauswahl liegen deine Maps im App-eigenen Ordner auf dem Gerät. Importiere Markdown- oder OPML-Dateien und gib jede Map über das Teilen-Menü als Markdown, OPML, PDF, PNG oder SVG weiter.
 
 LINKS IN DIE APP
 Links der Form bloommd://open öffnen eine Notiz des geöffneten Ordners direkt an einem bestimmten Knoten – praktisch aus Kurzbefehlen oder anderen Notizen heraus.

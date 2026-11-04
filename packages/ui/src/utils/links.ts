@@ -1,3 +1,5 @@
+import { extractPdfCitations, parsePdfLinkTarget, type PdfCitation, type PdfLink } from "@bloommd/core/browser";
+
 export interface NodeLinkResource {
   url: string;
   label: string;
@@ -88,6 +90,15 @@ export function extractLinksFromMarkdown(markdown: string): NodeLinkResource[] {
   return resources;
 }
 
+/** PDF links (`[[file.pdf#page=n]]`) of a node with the blockquote below each; see `extractPdfCitations`. */
+export type PdfLinkResource = PdfCitation;
+
+export function extractPdfLinksFromMarkdown(markdown: string): PdfLinkResource[] {
+  return extractPdfCitations(markdown);
+}
+
+export type { PdfLink };
+
 export function extractMapLinksFromMarkdown(markdown: string): MapLinkResource[] {
   const resources: MapLinkResource[] = [];
   const seen = new Set<string>();
@@ -98,6 +109,8 @@ export function extractMapLinksFromMarkdown(markdown: string): MapLinkResource[]
     // `![[Physik ink.svg]]` embeds an attachment (a drawing, an image); it is not a link to a map.
     const embedded = (match.index ?? 0) > 0 && markdown[(match.index ?? 0) - 1] === "!";
     if (embedded && /\.(?!md$|markdown$)[a-z0-9]{1,8}$/i.test(rawTarget.split("#")[0] ?? "")) continue;
+    // `[[paper.pdf#page=3]]` is a source reference into a PDF, handled by `extractPdfLinksFromMarkdown`.
+    if (parsePdfLinkTarget(rawTarget)) continue;
     if (!rawTarget || seen.has(`${rawTarget}|${label}`)) continue;
     seen.add(`${rawTarget}|${label}`);
 

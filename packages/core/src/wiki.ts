@@ -29,7 +29,7 @@ const WIKI_PAGE_STATUSES: readonly WikiPageStatus[] = ["draft", "stable", "depre
 
 /**
  * Pages of `type: learning` (docs/LEARNINGS.md) use their own status words, each mapped to the
- * OKF lifecycle: neu and unbestätigt = draft, bestätigt = stable, veraltet and ersetzt = deprecated.
+ * OKF lifecycle: neu and unbestätigt = draft, bestätigt = stable, veraltet, ersetzt and verworfen = deprecated.
  */
 const LEARNING_PAGE_TYPE = "learning";
 const LEARNING_STATUS_LIFECYCLE: Readonly<Record<string, WikiPageStatus>> = {
@@ -38,6 +38,7 @@ const LEARNING_STATUS_LIFECYCLE: Readonly<Record<string, WikiPageStatus>> = {
   veraltet: "deprecated",
   ersetzt: "deprecated",
   "unbestätigt": "draft",
+  verworfen: "deprecated",
 };
 
 const isLearning = (type: string | null): boolean => type?.toLowerCase() === LEARNING_PAGE_TYPE;

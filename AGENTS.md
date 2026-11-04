@@ -166,6 +166,7 @@ oder die Produktdatenbank.
 
 - `packages/mobile/src/storage.ts` — Wrapper um `@capacitor/filesystem`
 - Festes Verzeichnis `Documents/bloommd/` (nicht konfigurierbar wie Desktop)
+- Ordner sind echte Unterverzeichnisse, im App-Speicher wie im geöffneten Ordner (`MobileStore.list()` liefert `folders` inkl. leerer Ordner, `createFolder` legt sie an). Pfadregeln nur aus core (`normalizeMarkdownPath`, `normalizeFolderPath`); Ordner entstehen per `mkdir` (Plugin `capacitor-folder`, Filesystem `mkdir`), nie über Platzhalterdateien (`.gitkeep` o. Ä.)
 - Kein File Watching — externe Änderungen werden nicht erkannt
 
 ### Dateizugriff pro Plattform

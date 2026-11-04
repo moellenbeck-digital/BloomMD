@@ -1,0 +1,9 @@
+Mitschrift: Diskussion Wöchentliche Releases oder Release-Zug, 29.10.2026 (Beispieltext, frei erfunden)
+
+[00:00] Moderation: Heute geht es um die Frage, ob wir wöchentlich veröffentlichen oder einen festen Release-Zug alle vier Wochen fahren.
+[00:40] Entwicklung: Ich bin für wöchentliche Releases. Die Änderungen bleiben klein, Fehler sind leichter zu finden, und niemand wartet wochenlang auf seine Korrektur.
+[01:30] Test: Mein Einwand: Jeder Release kostet mich einen Regressionslauf. Wöchentlich heißt viermal so viel Testaufwand, den ich mit dem jetzigen Team nicht schaffe.
+[02:15] Vertrieb: Für Kunden ist ein fester Termin besser planbar. Mit vier Wochen Abstand können wir Ankündigungen sauber vorbereiten.
+[03:00] Entwicklung: Mit einer automatischen Testsuite würde sich der Aufwand für den Test deutlich verringern. Daran arbeiten wir schon.
+[03:45] Moderation: Ich fasse zusammen: Wir probieren den vierwöchigen Release-Zug für zwei Zyklen aus. Wöchentliche Releases sind nicht abgelehnt, sie hängen an der Testautomatisierung.
+[04:20] Test: Offen bleibt, wie wir dringende Korrekturen zwischen den Terminen ausliefern.

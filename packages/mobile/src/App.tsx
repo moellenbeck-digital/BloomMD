@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Menu, FilePlus, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search } from "lucide-react";
+import { Menu, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search, Folder, FolderPlus, ChevronRight, CornerLeftUp } from "lucide-react";
 import {
+  ConflictCopyBadge,
+  ConflictCopyBanner,
+  CreateEntryDialog,
   MindMapCanvas,
   LazyNodeEditor,
   HelpModal,
@@ -8,17 +11,27 @@ import {
   requestNodeFocus,
   useMindMapStore,
   useLocale,
+  buildTextExport,
+  downloadExportFile,
+  exportMapFile,
+  EXPORT_FORMATS,
+  MapExportError,
+  type ExportFormat,
 } from "@bloommd/ui";
-import { parseFile, serializeToMarkdown } from "@bloommd/core/browser";
+import { findConflictCopyOriginal, importOpml, isWorkspaceMindMap, normalizeFolderPath, OpmlError, parseConflictCopy, parseFile, serializeToMarkdown, titleFromPath } from "@bloommd/core/browser";
+import { Directory, Filesystem } from "@capacitor/filesystem";
 import { BloomFolder } from "@bloommd/capacitor-folder";
 import { BloomKeychain } from "@bloommd/capacitor-keychain";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { markdownFilename } from "./mobile-files";
+import { markdownFilename, newNoteMarkdown } from "./mobile-files";
+import { shareExportFile, type ExportShareDeps } from "./export-share";
 import { MobileRemoteClient, RemoteRequestError } from "./remote-client";
 import { DEFAULT_SERVER_URL, describeDevice, MobileAuth, MobileAuthError, normalizeServerUrl, type MobileSession } from "./mobile-auth";
 import { parseAppLink } from "./app-links";
-import { createAppStore, createFolderStore, type MobileStore, type StoreEntry } from "./stores";
+import { createAppStore, createFolderStore, SkippedFolderError, UnsafePathError, type MobileStore, type StoreEntry } from "./stores";
+import { existingFolder, folderLevel, folderOf, pathSteps, searchEntries } from "./folder-levels";
+import { openFileUrl } from "./opened-file";
 import { NoteSaver } from "./note-saver";
 import { APP_DIRECTORY, IS_ANDROID } from "./platform";
 import { appInkAttachments, folderInkAttachments } from "./ink-attachments";
@@ -92,6 +105,27 @@ const AUTH_TEXT = {
   },
 } as const;
 
+/** System share sheet with a temporary file in the app cache ("Save to Files", AirDrop, Mail, …). */
+const nativeShareDeps: ExportShareDeps = {
+  writeFile: async (path, data) => (await Filesystem.writeFile({ path, data, directory: Directory.Cache, recursive: true })).uri,
+  removeFile: async (path) => { await Filesystem.deleteFile({ path, directory: Directory.Cache }); },
+  canShare: async () => (await (await import("@capacitor/share")).Share.canShare()).value,
+  share: async ({ title, files }) => { await (await import("@capacitor/share")).Share.share({ title, files }); },
+  download: downloadExportFile,
+};
+
+const EXPORT_ICONS = { markdown: FileText, opml: ListTree, pdf: FileDown, png: ImageDown, svg: Shapes } as const;
+
+function exportEntries(t: ReturnType<typeof useLocale>["t"]): Record<ExportFormat, { label: string; Icon: typeof FileText }> {
+  return {
+    markdown: { label: t.exportMarkdown, Icon: EXPORT_ICONS.markdown },
+    opml: { label: t.exportOpml, Icon: EXPORT_ICONS.opml },
+    pdf: { label: t.exportPdf, Icon: EXPORT_ICONS.pdf },
+    png: { label: t.exportPng, Icon: EXPORT_ICONS.png },
+    svg: { label: t.exportSvg, Icon: EXPORT_ICONS.svg },
+  };
+}
+
 export function App() {
   const { t, locale } = useLocale();
   const authText = AUTH_TEXT[locale === "en" ? "en" : "de"];
@@ -106,13 +140,24 @@ export function App() {
   const document = useMindMapStore((s) => s.document);
   const syncStatus = useMindMapStore((s) => s.syncStatus);
   const [files, setFiles] = useState<StoreEntry[]>([]);
+  /** All folders of the store, empty ones included. */
+  const [folders, setFolders] = useState<string[]>([]);
+  /** The dialog for a new note or a new folder, while one is open. */
+  const [creating, setCreating] = useState<"file" | "folder" | null>(null);
   const [store, setStore] = useState<MobileStore>(() => createAppStore());
   const storeRef = useRef(store);
   storeRef.current = store;
   const [filter, setFilter] = useState("");
+  /** The folder of the open folder's notes shown in the list ("" at the top). */
+  const [folderPath, setFolderPath] = useState("");
+  // A folder that is gone (deleted, moved elsewhere) falls back to the nearest one that still exists; an empty one stays.
+  const shownFolder = useMemo(() => existingFolder(files, folderPath, folders), [files, folderPath, folders]);
+  const folderPathRef = useRef(shownFolder);
+  folderPathRef.current = shownFolder;
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,11 +217,13 @@ export function App() {
     if (remoteClient) {
       const remoteFiles = (await remoteClient.list()).map((entry): StoreEntry => ({ path: entry.filename, title: entry.frontmatter.title || entry.filename, folder: "", local: true, frontmatter: entry.frontmatter }));
       setFiles(remoteFiles);
+      setFolders([]);
       setTruncated(false);
       return remoteFiles;
     }
     const result = await from.list();
     setFiles(result.entries);
+    setFolders(result.folders);
     setTruncated(Boolean(result.truncated));
     if (result.unreadable.length > 0) setError(textRef.current.errors.unreadable(result.unreadable.length));
     return result.entries;
@@ -186,6 +233,7 @@ export function App() {
     await flushSave();
     storeRef.current = next;
     setStore(next);
+    setFolderPath("");
     saver.open(null, null);
     useMindMapStore.setState({ document: null, nodes: [], edges: [], selectedNodeId: null, selectedNodeIds: [] });
     const entries = await refreshFiles(next);
@@ -352,37 +400,91 @@ export function App() {
     if (localFiles[0] && storeRef.current.kind === "app") await loadFile(localFiles[0].path);
   }, [auth, authText, loadFile, refreshFiles]);
 
-  const handleNew = useCallback(async () => {
-    const title = prompt(t.newMindmapPrompt);
-    if (!title) return;
-    await flushSave();
+  const handleNew = useCallback((kind: "file" | "folder" = "file") => {
+    // A single file from the Files app has no folder to add notes or folders to.
+    if (storeRef.current.kind === "file") return;
+    setCreating(kind);
+  }, []);
 
-    const id = crypto.randomUUID().slice(0, 8);
-    const now = new Date().toISOString();
+  /** What the dialog shows when the store refuses: the reason in the app's language. */
+  const createFailure = useCallback((error: unknown, fallback: string): Error => {
+    if (error instanceof UnsafePathError) return new Error(textRef.current.errors.badPath);
+    if (error instanceof SkippedFolderError) return new Error(textRef.current.errors.folderHidden);
+    console.error("[BloomMD] Create failed:", error instanceof Error ? error.message : "unknown");
+    return new Error(fallback);
+  }, []);
 
-    const markdown = `---\ntitle: ${title}\nid: ${id}\ncreated: "${now}"\nupdated: "${now}"\nlayout:\n  direction: LR\n---\n\n# ${title}\n`;
-    const filename = markdownFilename(title, id, files.map((file) => file.path.split("/").pop() ?? file.path));
-    const doc = parseFile(storeRef.current.pathFor(filename), markdown);
-    const saved = await storeRef.current.save({ document: doc, baseline: "" }, doc);
-    saver.open(storeRef.current, saved);
-    setDocument(doc);
-    await refreshFiles();
-  }, [t, files, flushSave, saver, setDocument, refreshFiles]);
+  /** A new note at the path the dialog collected (folder and name); `content` is the chosen template, if any. */
+  const createNote = useCallback(async (path: string, content?: string) => {
+    const current = storeRef.current;
+    const slash = path.lastIndexOf("/");
+    let target: string;
+    try {
+      target = current.pathFor(path.slice(slash + 1), slash >= 0 ? path.slice(0, slash) : "");
+    } catch (error) {
+      throw createFailure(error, textRef.current.errors.createNoteFailed);
+    }
+    // Names only have to be free in the folder of the new note; the list holds every path.
+    if (files.some((entry) => entry.path.toLowerCase() === target.toLowerCase())) throw new Error(textRef.current.errors.noteExists(target));
+    try {
+      await flushSave();
+      const markdown = content ?? newNoteMarkdown(titleFromPath(target), crypto.randomUUID().slice(0, 8), new Date().toISOString());
+      const doc = parseFile(target, markdown);
+      const saved = await current.save({ document: doc, baseline: "" }, doc);
+      saver.open(current, saved);
+      setDocument(doc);
+      // Show the folder the note is in, so it is in the list.
+      setFolderPath(folderOf(target));
+      await refreshFiles();
+      return target;
+    } catch (error) {
+      throw createFailure(error, textRef.current.errors.createNoteFailed);
+    }
+  }, [files, createFailure, flushSave, saver, setDocument, refreshFiles]);
+
+  /** A new folder at the path the dialog collected; it is made without any file in it. */
+  const createFolderEntry = useCallback(async (path: string) => {
+    let folder: string;
+    try {
+      folder = normalizeFolderPath(path);
+    } catch (error) {
+      throw createFailure(error, textRef.current.errors.createFolderFailed);
+    }
+    if (folders.some((known) => known.toLowerCase() === folder.toLowerCase())) throw new Error(textRef.current.errors.folderExists(folder));
+    try {
+      await storeRef.current.createFolder(folder);
+      await refreshFiles();
+      return folder;
+    } catch (error) {
+      throw createFailure(error, textRef.current.errors.createFolderFailed);
+    }
+  }, [folders, createFailure, refreshFiles]);
 
   const handleImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || storeRef.current.kind === "file") return;
     if (file.size > 10 * 1024 * 1024) {
       setError(textRef.current.errors.tooLarge);
       return;
     }
     try {
       await flushSave();
-      const markdown = await file.text();
-      const base = file.name.replace(/\.(md|markdown)$/i, "") || "Import";
-      const filename = markdownFilename(base, crypto.randomUUID().slice(0, 8), files.map((entry) => entry.path.split("/").pop() ?? entry.path));
-      const doc = parseFile(storeRef.current.pathFor(filename), markdown);
+      let markdown = await file.text();
+      const isOpml = /\.opml$/i.test(file.name);
+      if (isOpml) {
+        try {
+          markdown = importOpml(markdown).markdown;
+        } catch (opmlError) {
+          if (!(opmlError instanceof OpmlError)) throw opmlError;
+          console.error("[BloomMD] OPML import failed:", opmlError);
+          setError(`${t.importOpmlFailed} ${opmlError.message}`);
+          return;
+        }
+      }
+      const base = file.name.replace(/\.(md|markdown|opml)$/i, "") || "Import";
+      const filename = markdownFilename(base, crypto.randomUUID().slice(0, 8), files.filter((entry) => entry.folder === shownFolder).map((entry) => entry.path.split("/").pop() ?? entry.path));
+      const doc = parseFile(storeRef.current.pathFor(filename, shownFolder), markdown);
       saver.open(storeRef.current, await storeRef.current.save({ document: doc, baseline: "" }, doc));
       setDocument(doc);
       await refreshFiles();
@@ -391,7 +493,7 @@ export function App() {
     } catch {
       setError(textRef.current.errors.importFailed);
     }
-  }, [files, flushSave, refreshFiles, saver, setDocument]);
+  }, [files, shownFolder, flushSave, refreshFiles, saver, setDocument, t.importOpmlFailed]);
 
   const handleDelete = useCallback(async (path: string) => {
     if (!window.confirm(store.kind === "folder" ? textRef.current.confirmDeleteFromFolder(path, store.name) : textRef.current.confirmDeleteFromDevice(path))) return;
@@ -410,20 +512,22 @@ export function App() {
     }
   }, [document, flushSave, loadFile, refreshFiles, saver, store]);
 
-  const handleShare = useCallback(async () => {
-    if (!document) return;
-    const markdown = serializeToMarkdown(document);
-    try {
-      const { Share } = await import("@capacitor/share");
-      await Share.share({
-        title: document.frontmatter.title,
-        text: markdown,
-      });
-    } catch {
-      // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(markdown);
+  const handleExport = useCallback(async (format: ExportFormat) => {
+    setExportOpen(false);
+    const current = useMindMapStore.getState().document;
+    if (!current) return;
+    if (isWorkspaceMindMap(current)) {
+      useMindMapStore.getState().setStatusMessage(t.derivedWorkspaceExport);
+      return;
     }
-  }, [document]);
+    try {
+      const file = format === "markdown" || format === "opml" ? buildTextExport(format, current) : await exportMapFile(format);
+      await shareExportFile(file, nativeShareDeps);
+    } catch (exportError) {
+      console.error("[BloomMD] export failed:", exportError);
+      setError(exportError instanceof MapExportError && exportError.code === "no-map" ? t.exportNoMap : t.exportFailed);
+    }
+  }, [t]);
 
   useEffect(() => {
     if (!document) return;
@@ -453,16 +557,58 @@ export function App() {
       // An open drawing keeps its strokes until Done: back never discards it.
       if (window.document.querySelector(".bloommd-ink-surface")) return;
       if (helpOpen) setHelpOpen(false);
+      else if (exportOpen) setExportOpen(false);
       else if (drawerOpen) setDrawerOpen(false);
       else if (editorVisible) useMindMapStore.getState().setEditorVisible(false);
       else void flushSave().finally(() => void CapacitorApp.minimizeApp());
     });
     return () => { void listener.then((handle) => handle.remove()).catch(() => undefined); };
-  }, [drawerOpen, editorVisible, flushSave, helpOpen]);
+  }, [drawerOpen, editorVisible, exportOpen, flushSave, helpOpen]);
+
+  const lastOpenedFile = useRef({ url: "", at: 0 });
+
+  /**
+   * "Open in BloomMD" from the Files app: the file is opened where it lies, as a note of the open
+   * folder when it is in it, else as a single file. Nothing is copied.
+   */
+  const openExternalFile = useCallback(async (url: string, force = false) => {
+    // A cold start delivers the URL twice: as launch URL and as the retained open event.
+    const now = Date.now();
+    if (!force && lastOpenedFile.current.url === url && now - lastOpenedFile.current.at < 3000) return;
+    lastOpenedFile.current = { url, at: now };
+    try {
+      setError(null);
+      await flushSave();
+      const opened = await openFileUrl(BloomFolder, url, storeRef.current);
+      const loaded = await opened.store.read(opened.path);
+      const listing = await opened.store.list();
+      if (remoteClient) {
+        useMindMapStore.getState().disconnectSync();
+        setRemoteClient(null);
+      }
+      if (opened.store !== storeRef.current) {
+        storeRef.current = opened.store;
+        setStore(opened.store);
+      }
+      setFiles(listing.entries);
+      setTruncated(Boolean(listing.truncated));
+      setFolderPath(folderOf(opened.path));
+      saver.open(opened.store, loaded);
+      setDocument(loaded.document);
+      setDrawerOpen(false);
+    } catch (openError) {
+      setError(textRef.current.errors.fileFailed);
+      throw openError;
+    }
+  }, [flushSave, remoteClient, saver, setDocument]);
 
   const handleLink = useCallback(async (raw: string) => {
     const link = parseAppLink(raw);
     if (!link) return;
+    if (link.kind === "file") {
+      await openExternalFile(link.url).catch(() => undefined);
+      return;
+    }
     if (link.kind === "auth") {
       await completeSignIn(link.url);
       return;
@@ -479,12 +625,21 @@ export function App() {
         await loadFile(path, node, folder);
         const selected = useMindMapStore.getState().selectedNodeId;
         if (node && selected !== node) throw new Error(`selected ${selected ?? "nothing"} instead of ${node}`);
+      }, async (url) => {
+        await openExternalFile(url, true);
+        const path = useMindMapStore.getState().document?.filePath ?? null;
+        // The folder shown follows after the next render.
+        for (let waited = 0; path && folderPathRef.current !== folderOf(path) && waited < 3000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+        return { path, store: storeRef.current.kind, folder: folderPathRef.current };
       });
       return;
     }
+    // Cloud documents (`doc`) are parsed but not opened yet: the app has no lookup by document id.
+    if (link.kind !== "open") return;
     setDrawerOpen(false);
+    setFolderPath(folderOf(link.path));
     await loadFile(link.path, link.node).catch(() => undefined);
-  }, [completeSignIn, flushSave, loadFile, refreshFiles]);
+  }, [completeSignIn, flushSave, loadFile, openExternalFile, refreshFiles]);
 
   useEffect(() => {
     const listener = CapacitorApp.addListener("appUrlOpen", ({ url }) => { void handleLink(url); });
@@ -543,12 +698,18 @@ export function App() {
       const match = files.find((entry) => entry.title.toLowerCase() === target.toLowerCase());
       if (match) void loadFile(match.path).catch(() => undefined);
     };
+    // A single file from the Files app has no attachment folder next to it that the app may use.
+    if (store.kind === "file") return null;
     return store.kind === "folder" ? folderInkAttachments(BloomFolder, { pickNote, openNote }) : appInkAttachments({ pickNote, openNote });
   }, [files, loadFile, remoteClient, store]);
 
-  const visibleFiles = filter.trim()
-    ? files.filter((entry) => `${entry.folder}/${entry.title}`.toLowerCase().includes(filter.trim().toLowerCase()))
-    : files;
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && parseConflictCopy(document.filePath));
+
+  // While a filter is typed the list is flat across all folders; otherwise it is the level shown.
+  const searching = filter.trim() !== "";
+  const level = useMemo(() => folderLevel(files, shownFolder, folders), [files, shownFolder, folders]);
+  const visibleNotes = searching ? searchEntries(files, filter) : level.notes;
 
   if (loading) {
     return (
@@ -561,7 +722,7 @@ export function App() {
   return (
     <InkAttachmentsContext.Provider value={inkAttachments}>
     <div className="h-full flex flex-col bg-[#FAFAFA]">
-      <input ref={fileInputRef} type="file" accept=".md,.markdown,text/markdown,text/plain" className="hidden" onChange={handleImport} />
+      <input ref={fileInputRef} type="file" accept=".md,.markdown,.opml,text/markdown,text/plain,text/x-opml+xml,text/xml" className="hidden" onChange={handleImport} />
       {/* Header — compact for mobile */}
       <header className="h-12 border-b border-[#E8E4DF] bg-white flex items-center px-3 shrink-0">
         <button
@@ -591,15 +752,37 @@ export function App() {
           >
             {saved ? <Check size={20} /> : <Save size={20} />}
           </button>
-          <button
-            onClick={handleShare}
-            aria-label={text.shareMarkdown}
-            title={text.shareMarkdown}
-            disabled={!document}
-            className="p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-30"
-          >
-            <Share2 size={20} />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportOpen((open) => !open)}
+              aria-label={t.exportMenu}
+              title={t.exportMenu}
+              aria-haspopup="menu"
+              aria-expanded={exportOpen}
+              data-testid="toolbar-export"
+              disabled={!document}
+              className="p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center disabled:opacity-30"
+            >
+              <Share2 size={20} />
+            </button>
+            {exportOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setExportOpen(false)} aria-hidden="true" />
+                <div role="menu" aria-label={t.exportMenu} data-testid="export-menu" className="absolute right-0 top-full z-50 mt-1 w-56 rounded-lg border border-[#E8E4DF] bg-white p-1.5 shadow-xl">
+                  {EXPORT_FORMATS.map((format) => {
+                    const { label, Icon } = exportEntries(t)[format];
+                    return (
+                      <button key={format} type="button" role="menuitem" data-testid={`export-${format}`} onClick={() => void handleExport(format)} className="flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-[#1A1A1A] active:bg-[#F5F3F0]">
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -627,22 +810,23 @@ export function App() {
                 <X size={18} aria-hidden="true" />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-2 border-b border-[#E8E4DF] p-2">
-              <button type="button" onClick={() => void handleNew()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><FilePlus size={16} aria-hidden="true" />{text.newMap}</button>
-              <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><Upload size={16} aria-hidden="true" />{text.importMap}</button>
+            <div className="grid grid-cols-2 gap-2 border-b border-[#E8E4DF] p-2">
+              <button type="button" onClick={() => handleNew("file")} disabled={store.kind === "file"} data-testid="mobile-new-map" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><FilePlus size={16} aria-hidden="true" />{text.newMap}</button>
+              <button type="button" onClick={() => handleNew("folder")} disabled={store.kind === "file"} data-testid="mobile-new-folder" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><FolderPlus size={16} aria-hidden="true" />{text.newFolder}</button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={store.kind === "file"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><Upload size={16} aria-hidden="true" />{text.importMap}</button>
               <button type="button" onClick={() => setHelpOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><CircleHelp size={16} aria-hidden="true" />{text.help}</button>
             </div>
             {!remoteClient && (
               <div className="grid gap-2 border-b border-[#E8E4DF] p-3" data-testid="mobile-store">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#666]">
-                  {store.kind === "folder" ? <FolderOpen size={15} className="text-[#FF6B35]" /> : <Tablet size={15} className="text-[#FF6B35]" />}
+                  {store.kind === "folder" ? <FolderOpen size={15} className="text-[#FF6B35]" /> : store.kind === "file" ? <FileText size={15} className="text-[#FF6B35]" /> : <Tablet size={15} className="text-[#FF6B35]" />}
                   <span className="min-w-0 truncate">{store.kind === "app" ? text.onThisDevice : store.name}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => void openFolder()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><FolderOpen size={15} aria-hidden="true" />{text.openFolder}</button>
                   <button type="button" onClick={() => void useAppFolder()} disabled={store.kind === "app"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold disabled:opacity-40"><Tablet size={15} aria-hidden="true" />{text.appFolderOnly}</button>
                 </div>
-                <p className="text-[11px] leading-4 text-[#999]">{text.folderHint}</p>
+                <p className="text-[11px] leading-4 text-[#999]">{store.kind === "file" ? text.singleFileHint : text.folderHint}</p>
               </div>
             )}
             <div className="grid gap-2 border-b border-[#E8E4DF] p-3" data-testid="mobile-account">
@@ -691,11 +875,49 @@ export function App() {
                 {text.truncated(files.length)}
               </p>
             )}
-            <div className="flex-1 overflow-y-auto p-2">
-              {visibleFiles.map((entry) => {
+            {!searching && (shownFolder || level.folders.length > 0) && (
+              <nav aria-label={text.folderPath} data-testid="mobile-folder-path" className="flex items-center gap-1 border-b border-[#E8E4DF] px-2">
+                {shownFolder && (
+                  <button type="button" onClick={() => setFolderPath(level.parent ?? "")} aria-label={text.folderUp} title={text.folderUp} data-testid="mobile-folder-up" className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#666] active:bg-[#F5F3F0]"><CornerLeftUp size={16} aria-hidden="true" /></button>
+                )}
+                <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 py-1 font-mono text-[11px] text-[#666]">
+                  <li className="flex items-center">
+                    {shownFolder
+                      ? <button type="button" onClick={() => setFolderPath("")} className="min-h-9 rounded px-1 active:bg-[#F5F3F0]">{store.kind === "app" ? text.onThisDevice : store.name}</button>
+                      : <span aria-current="page" className="px-1 font-semibold text-[#1A1A1A]">{store.kind === "app" ? text.onThisDevice : store.name}</span>}
+                  </li>
+                  {pathSteps(shownFolder).map((step, index, steps) => (
+                    <li key={step.path} className="flex items-center gap-0.5">
+                      <ChevronRight size={11} className="shrink-0 text-[#999]" aria-hidden="true" />
+                      {index === steps.length - 1
+                        ? <span aria-current="page" className="truncate px-1 font-semibold text-[#1A1A1A]">{step.name}</span>
+                        : <button type="button" onClick={() => setFolderPath(step.path)} className="min-h-9 truncate rounded px-1 active:bg-[#F5F3F0]">{step.name}</button>}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            )}
+            <div className="flex-1 overflow-y-auto p-2" data-testid="mobile-note-list">
+              {!searching && level.folders.map((row) => (
+                <button
+                  key={`folder:${row.path}`}
+                  type="button"
+                  onClick={() => setFolderPath(row.path)}
+                  aria-label={text.openSubfolder(row.name)}
+                  title={row.path}
+                  data-testid="mobile-folder-row"
+                  className="mb-1 flex min-h-11 w-full items-center gap-2 rounded-md border border-transparent px-3 py-2 text-left active:bg-[#F5F3F0]"
+                >
+                  <Folder size={16} className="shrink-0 text-[#FF6B35]" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#1A1A1A]">{row.name}</span>
+                  <span className="shrink-0 text-[11px] text-[#999]">{row.notes === 0 ? text.folderEmpty : text.noteCount(row.notes)}</span>
+                  <ChevronRight size={15} className="shrink-0 text-[#999]" aria-hidden="true" />
+                </button>
+              ))}
+              {visibleNotes.map((entry) => {
                 const isActive = document?.filePath === entry.path || (entry.frontmatter?.id !== undefined && document?.frontmatter.id === entry.frontmatter.id);
                 return (
-                  <div key={entry.path} className={`mb-1 flex items-center rounded-md border ${isActive ? "border-[#FFD4BF] bg-[#FFF4EE]" : "border-transparent"}`}>
+                  <div key={entry.path} data-testid="mobile-note-row" className={`mb-1 flex items-center rounded-md border ${isActive ? "border-[#FFD4BF] bg-[#FFF4EE]" : "border-transparent"}`}>
                     <button
                       onClick={() => { void loadFile(entry.path).catch(() => undefined); setDrawerOpen(false); }}
                       disabled={!entry.local}
@@ -705,13 +927,19 @@ export function App() {
                       <div className={`flex items-center gap-1.5 truncate text-sm font-semibold ${isActive ? "text-[#FF6B35]" : "text-[#1A1A1A]"}`}>
                         {!entry.local && <CloudDownload size={14} className="shrink-0" aria-label={text.downloadingFromICloud} />}
                         <span className="truncate">{entry.title}</span>
+                        <ConflictCopyBadge filename={entry.path} />
                       </div>
-                      <div className="mt-0.5 truncate font-mono text-[11px] text-[#999]">{entry.folder || entry.path}</div>
+                      {searching && <div className="mt-0.5 truncate font-mono text-[11px] text-[#999]">{entry.folder || entry.path}</div>}
                     </button>
-                    <button type="button" onClick={() => void handleDelete(entry.path)} aria-label={text.deleteNote(entry.title)} title={text.deleteFile} className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#999] active:bg-red-50 active:text-red-700"><Trash2 size={16} aria-hidden="true" /></button>
+                    {store.kind !== "file" && (
+                      <button type="button" onClick={() => void handleDelete(entry.path)} aria-label={text.deleteNote(entry.title)} title={text.deleteFile} className="grid h-11 w-11 shrink-0 place-items-center rounded text-[#999] active:bg-red-50 active:text-red-700"><Trash2 size={16} aria-hidden="true" /></button>
+                    )}
                   </div>
                 );
               })}
+              {!searching && (store.kind === "folder" || shownFolder !== "") && level.folders.length === 0 && level.notes.length === 0 && (
+                <p className="px-3 py-2 text-[11px] leading-4 text-[#999]">{text.emptyFolder}</p>
+              )}
             </div>
           </aside>
         </>
@@ -720,21 +948,42 @@ export function App() {
       {/* Help */}
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
 
+      {/* New note or folder: the folder shown is preselected; errors of the store show in the dialog */}
+      {creating && (
+        <CreateEntryDialog
+          kind={creating}
+          folders={folders}
+          defaultParent={shownFolder}
+          parentForFolders
+          onCreate={creating === "file" ? createNote : createFolderEntry}
+          onClose={() => setCreating(null)}
+        />
+      )}
+
       {/* Canvas */}
       <div className="flex-1 min-h-0 relative lg:flex">
-        <div className="relative h-full min-w-0 lg:flex-1">
+        <div className={`relative h-full min-w-0 lg:flex-1 ${showConflictBanner ? "flex flex-col" : ""}`}>
+        {document && showConflictBanner && (
+          <ConflictCopyBanner
+            filename={document.filePath}
+            originalFilename={findConflictCopyOriginal(document.filePath, files.map((entry) => ({ filename: entry.path })))}
+            onOpenOriginal={(path) => void loadFile(path).catch(() => undefined)}
+          />
+        )}
+        <div className={showConflictBanner ? "relative min-h-0 flex-1" : "relative h-full"}>
         {document ? <MindMapCanvas /> : (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>
               <h2 className="text-lg font-semibold text-[#1A1A1A]">{text.noMapOpen}</h2>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={() => void handleNew()} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white"><FilePlus size={17} aria-hidden="true" />{text.newMap}</button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold"><Upload size={17} aria-hidden="true" />{text.importMap}</button>
+                <button type="button" onClick={() => handleNew("file")} disabled={store.kind === "file"} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white disabled:opacity-40"><FilePlus size={17} aria-hidden="true" />{text.newMap}</button>
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={store.kind === "file"} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold disabled:opacity-40"><Upload size={17} aria-hidden="true" />{text.importMap}</button>
                 <button type="button" onClick={() => (files.length > 0 ? setDrawerOpen(true) : void openFolder())} className="inline-flex h-11 items-center gap-2 rounded-md border border-[#D4CFC8] bg-white px-4 text-sm font-semibold"><FolderOpen size={17} aria-hidden="true" />{files.length > 0 ? text.pickNote : text.openFolder}</button>
               </div>
             </div>
           </div>
         )}
+        </div>
         </div>
 
         {/* Mobile bottom sheet editor */}

@@ -34,6 +34,14 @@
                 <data android:scheme="bloommd" android:host="open" />
             </intent-filter>
 
+            <!-- https://bloommd.io/open?path=…&node=… and /open/<document-id> open the app when it is installed (App Links). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="bloommd.io" android:pathPrefix="/open" />
+            </intent-filter>
+
         </activity>
 
         <provider

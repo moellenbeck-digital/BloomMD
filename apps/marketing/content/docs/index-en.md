@@ -18,19 +18,45 @@ Markdown renderer ignores them.
 ## Where to begin
 
 The closed beta starts with the **Desktop app**. It works locally, needs no account, and does not
-need an internet connection.
+need an internet connection. The **Web app** at `/app` is the second path. What stays local and what
+goes to the cloud is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
 
-1. Download a desktop build from [bloommd.io/download](/download?lang=en): macOS arm64 or an
-   Omarchy/Linux Pacman package for x86_64 or aarch64.
-2. Open a folder with Markdown files on first launch, or create a new one.
-3. Select a file. Its headings become the map.
+### Getting started with the desktop app (macOS)
 
-The Web app at `/app` is the second path. It can open local folders in the browser without uploading
-them.
+1. Download the macOS arm64 desktop build from [bloommd.io/download](/download?lang=en). (Omarchy/Linux:
+   Pacman package, see [Desktop app](/docs/desktop?lang=en).)
+2. Open the DMG file and drag BloomMD to the Applications folder.
+
+   ![BloomMD 0.5.7 DMG window with the BloomMD app and the Applications shortcut](/releases/desktop-0.5.7-installer.png)
+
+3. Double-click BloomMD in the Applications folder to start it.
+4. Open a folder with Markdown files, or create a new one.
+5. Select a file. Its headings become the map.
+
+![Diagram, not a screenshot: the file list of the opened folder on the left, the map of the selected file with headings as nodes on the right](/docs/desktop-ordner-en.svg)
+
+### Getting started with the Web app
+
+1. Create an account, confirm your email address, and sign in. The steps are in
+   [Closed beta access](/docs/closed-beta-zugang?lang=en).
+2. In `/app`, choose the folder icon (tooltip **Open local Markdown folder**) at the top and grant access to a
+   folder. Chrome and Edge support this; nothing is uploaded.
+3. If the folder is read-only, a **Read only** notice appears. Click it to request write access.
+4. Pick a file in the selector next to the folder name. Its headings become the map.
+
+![Real screenshot of the Web app: the file Kapitel 1 from a local folder as a map with three child nodes](/docs/web-app-map-en.png)
+
+Without an account, the [browser demo](/demo?lang=en) works right away. It loads a built-in template
+and saves nothing.
+
+![Real screenshot of the browser demo: a Markdown input on the left, the map of the Software Architecture Map template on the right](/docs/demo-en.png)
 
 The Web app, cloud workspaces, sync, and collaboration require an account. You
 register yourself, without an invitation and without a waitlist. Registration, email confirmation,
 and sign-in are described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
+
+Something stuck with installation, folder permissions, sync, or an invitation? [Troubleshooting](/docs/fehlerbehebung?lang=en)
+lists symptom, cause, and steps.
 
 **Available without an invitation:** the [browser demo](/demo?lang=en), desktop
 builds on the [download page](/download?lang=en), and the [Obsidian plugin](/obsidian?lang=en)

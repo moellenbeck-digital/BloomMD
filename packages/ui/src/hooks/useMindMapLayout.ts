@@ -1,7 +1,7 @@
 import dagre from "dagre";
 import type { Node, Edge } from "@xyflow/react";
 import type { MindMapDocument, MindMapNodeMetadata } from "@bloommd/core/browser";
-import { extractLinksFromMarkdown, extractMapLinksFromMarkdown } from "../utils/links";
+import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown } from "../utils/links";
 
 export type EdgeMode = "hierarchy" | "links" | "backlinks" | "all";
 export type EdgeRelation = "hierarchy" | "link" | "backlink";
@@ -74,7 +74,7 @@ export function layoutMindMap(doc: MindMapDocument, edgeMode: EdgeMode = "hierar
           collapsed: node.collapsed,
           childCount: node.children.length,
           linkCount: extractLinksFromMarkdown(node.content).length
-            + (isWorkspaceDocument ? 0 : extractMapLinksFromMarkdown(node.content).length)
+            + (isWorkspaceDocument ? 0 : extractMapLinksFromMarkdown(node.content).length + extractPdfLinksFromMarkdown(node.content).length)
             + (derivedLinkCounts.get(node.id) ?? 0),
           ...(node.metadata ? { metadata: node.metadata } : {}),
         },

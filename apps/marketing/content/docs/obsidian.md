@@ -1,6 +1,6 @@
 ---
 title: Obsidian-Plugin
-description: Markdown-Notizen in Obsidian als Map bearbeiten, mit Handschrift im Knoten-Inspector – auf dem Mac und als Beta auf dem iPad.
+description: Markdown-Notizen in Obsidian als Map bearbeiten, mit Handschrift im Knoten-Inspector – auf Desktop, iPad, iPhone und Android.
 order: 5
 draft: true
 ---
@@ -10,16 +10,50 @@ draft: true
 Das BloomMD-Plugin zeigt eine Obsidian-Notiz als Map. Jede Überschrift ist ein Knoten, die Datei
 bleibt eine normale Markdown-Datei in deinem Vault.
 
+![Schema, kein Screenshot: Dieselbe Markdown-Datei im Obsidian-Vault erscheint in Obsidian als Text und über das BloomMD-Plugin als Karte](/docs/obsidian-flow.svg)
+
+## Schnellstart
+
+1. **Plugin installieren** (siehe unten): über BRAT mit `moellenbeck-digital/bloommd-obsidian`
+   hinzufügen und **BloomMD** unter *Community-Plugins* einschalten. Obsidian muss mindestens
+   Version 1.13.0 haben.
+2. **Notiz öffnen** und im Befehlsmenü **BloomMD: Visualize current note** wählen (auch über das
+   Symbol in der Seitenleiste). Jede Überschrift wird ein Knoten, der Text darunter sein Inhalt.
+3. **Bearbeiten:** Knoten umbenennen, Geschwister oder Kinder anlegen, Zweige verschieben oder
+   löschen. Bestätigte Änderungen schreiben dieselbe Datei zurück.
+4. **Zurück zum Text:** Die Notiz bleibt eine gewöhnliche Markdown-Datei; du kannst sie jederzeit in
+   Obsidian als Text bearbeiten.
+5. **Ganzer Ordner:** **BloomMD: Visualize current folder** legt die Notizen des Ordners auf eine
+   Fläche.
+
+Ein Konto brauchst du dafür nicht; das Plugin arbeitet lokal im Vault.
+
 ## Installation
 
 - **Obsidian auf dem Mac, Windows oder Linux:** über BRAT mit dem Repository
   `moellenbeck-digital/bloommd-obsidian` oder durch Kopieren von `manifest.json`, `main.js`,
   `shared-runtime.js` und `styles.css` nach `.obsidian/plugins/bloommd/`.
-- **Obsidian auf dem iPad (Beta):** ab Version 0.6.0. Installation ebenfalls über BRAT. Die
-  Mobile-Unterstützung ist eine Beta; bekannte Grenzen stehen unten.
+- **Obsidian auf iPad, iPhone und Android (Beta):** mit der öffentlich veröffentlichten Version
+  0.7.0 oder neuer, ebenfalls über BRAT oder den GitHub-Release. Version 0.6.0 wurde nicht separat
+  veröffentlicht. Bekannte Mobile-Grenzen stehen unten.
 
 Befehle: **Visualize current note** öffnet die aktuelle Notiz als Map, **Visualize current folder**
 den Ordner.
+
+## Was mit deinen Dateien passiert
+
+- **Geschrieben wird in die Notiz, die du ansiehst.** Probiere das Plugin in einem wichtigen Vault
+  zuerst an einer Kopie aus.
+- **Pro Überschrift ein unsichtbarer Kommentar**, zum Beispiel `## Ziel <!-- bloommd:id=a1b2c3 -->`.
+  Er gibt dem Knoten eine stabile ID und ist in der Obsidian-Vorschau nicht zu sehen. Löschst du ihn,
+  erzeugt BloomMD bei Bedarf eine neue ID.
+- **Unverändert bleiben** Frontmatter, Codeblöcke, HTML-Blöcke und Text außerhalb von Überschriften.
+  Überschriften in Codeblöcken zählen nicht als Knoten.
+- **Lokal gespeichert, nicht im Markdown:** Knotenpositionen, Ansicht und eingeklappte Zweige liegen in
+  `.obsidian/plugins/bloommd/data.json` im Vault.
+- **Nichts wird hochgeladen.** Inhalte, Datei- und Ordnernamen, Knotentexte und das Layout verlassen
+  deinen Rechner nicht. Das ändert sich erst, wenn du eine einzelne Notiz ausdrücklich mit einem
+  BloomMD-Workspace teilst (nur Desktop).
 
 ## In BloomMD Desktop öffnen
 
@@ -128,7 +162,7 @@ Im Zeichenmodus lässt sich die ganze Map mit dem Apple Pencil (oder der Maus) b
 
 - **Langes Drücken** (iPad) bzw. **Rechtsklick** auf einen Knoten öffnet ein Menü mit allen Aktionen.
 - **Lernmodus** (Hut-Symbol): Knoteninhalte sind verdeckt, Tippen deckt sie einzeln auf.
-- **Export** (Bild-Symbol): die ganze Map als PNG oder PDF im Anhangsordner.
+- **Export** (Bild-Symbol): Markdown, OPML, PDF, PNG oder SVG der ganzen Map im Anhangsordner — dieselben fünf Einträge wie in den Apps, siehe [Export und Import](/docs/export). Der Befehl **Import OPML** legt aus einer OPML-Datei (MindNode, Xmind) eine neue Notiz an.
 
 ## Lernfortschritt auf der Map
 
@@ -154,6 +188,9 @@ zum nächsten.
 
 ## Grenzen
 
+- **Teilen geschieht nur ausdrücklich:** Eine Notiz kommt nur in einen BloomMD-Workspace, wenn du
+  **Share current note with workspace** ausführst, und nur diese eine Notiz. Der Vault wird nie als
+  Ganzes in die Cloud gespiegelt.
 - **Shared Mode** (Zusammenarbeit) ist vorerst nur auf dem Desktop verfügbar.
 - Gesten des **Apple Pencil Pro** (Drücken, Drehen) und der Doppeltipp stehen Plugins in Obsidian
   nicht zur Verfügung; Werkzeuge wechselst du über die Leiste.

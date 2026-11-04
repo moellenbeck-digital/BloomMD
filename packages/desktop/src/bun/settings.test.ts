@@ -68,6 +68,63 @@ describe("desktop settings", () => {
     }]);
   });
 
+  test("keeps valid shared-folder bindings and drops unsafe ones", async () => {
+    const path = await settingsPath();
+    const binding = {
+      schemaVersion: 1 as const,
+      workspaceId: "workspace-1",
+      documentId: "document-1",
+      cloudFilename: "docs__a.md",
+      lastAcknowledgedMarkdownHash: "hash-1",
+      lastKnownCloudVersion: 1,
+      connectionState: "connected" as const,
+    };
+    const folder = {
+      id: "folder-1",
+      folderPath: "/Users/me/Notes",
+      profileId: "server-1",
+      workspaceId: "workspace-1",
+      strategy: "keep-cloud" as const,
+      excluded: ["drafts"],
+      publishedAt: "2026-11-04T10:00:00.000Z",
+      files: [
+        { relativePath: "docs/a.md", binding },
+        { relativePath: "../escape.md", binding },
+        { relativePath: "/abs.md", binding },
+        { relativePath: "bad.md", binding: { schemaVersion: 0 } },
+      ],
+    };
+    await writeFile(path, JSON.stringify({
+      sharedFolderBindings: [
+        folder,
+        { ...folder, id: "relative", folderPath: "Notes" },
+        { ...folder, id: "strategy", strategy: "overwrite" },
+      ],
+    }));
+
+    // An entry saved before the activity list existed gets its known paths from what it published and excluded.
+    expect((await loadSettings(path)).sharedFolderBindings).toEqual([{
+      ...folder,
+      files: [{ relativePath: "docs/a.md", binding }],
+      state: "connected",
+      knownPaths: ["docs/a.md", "drafts"],
+      splitRenames: [],
+    }]);
+  });
+
+  test("keeps the revoked state, known paths and split renames of a shared folder", async () => {
+    const path = await settingsPath();
+    await writeFile(path, JSON.stringify({
+      sharedFolderBindings: [
+        { id: "folder-1", folderPath: "/Users/me/Notes", profileId: "server-1", workspaceId: "workspace-1", strategy: "suffix", excluded: [], publishedAt: "2026-11-04T10:00:00.000Z", files: [], state: "revoked", knownPaths: ["a.md", "b.md"], splitRenames: ["c.md"] },
+        { id: "folder-2", folderPath: "/Users/me/Other", profileId: "server-1", workspaceId: "workspace-1", strategy: "suffix", excluded: [], publishedAt: "2026-11-04T10:00:00.000Z", files: [], state: "other", knownPaths: [1], splitRenames: "x" },
+      ],
+    }));
+    const [first, second] = (await loadSettings(path)).sharedFolderBindings ?? [];
+    expect(first).toMatchObject({ state: "revoked", knownPaths: ["a.md", "b.md"], splitRenames: ["c.md"] });
+    expect(second).toMatchObject({ state: "connected", knownPaths: [], splitRenames: [] });
+  });
+
   test("returns empty settings for malformed JSON", async () => {
     const path = await settingsPath();
     await writeFile(path, "not json");

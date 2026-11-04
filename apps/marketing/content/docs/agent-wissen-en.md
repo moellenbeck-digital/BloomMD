@@ -164,8 +164,28 @@ bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
   shortened or reworded (the only change: line breaks are stored as `\n`). A template without a "Quellen"
   node (`weekly`) gets one. Without original text or source reference nothing is written ("Missing source").
 - **Limits:** original text at most **200,000 characters**, sections at most **150 nodes** (template
-  skeleton and source node not counted). Above that you get an error with the actual value and the limit,
-  and nothing is written.
+  skeleton and source node not counted) and at most **5 levels** below the map title (a skeleton node of
+  the template = level 1, a section below it = level 2; Markdown has only six heading levels anyway).
+  Above that you get an error with the actual value and the limit, and nothing is written. The depth
+  also applies when adding with `--in-map`: the level of the existing parent counts.
+- **Adding instead of creating:** with `--in-map <path>` (MCP: `inMap`) the sections go into an existing
+  map, e.g. the second meeting of the same project. A section whose parent already has exactly one child
+  with the same title is not created again; its new children hang below it and its content stays.
+  `relations` targets (ref, node id or title) and `[[Note]]` links are connected when the target is
+  unambiguous, otherwise `hinweise` says so. The original becomes one more source node "Originaltext
+  <date>"; the same source twice is a duplicate.
+- **Area hub:** per area (Schule, Arbeit, Projekte, Gespräche; for a custom area the last segment of the
+  path) `ingest` keeps one entry map: the map in the area folder that is named like the area (e.g.
+  `Schule/Schule.md`, frontmatter `type: hub`). If it is missing it is created; otherwise an entry with
+  `[[title of the map]]` is added below the fixed node "Maps". A second ingest into the same map adds
+  nothing twice. The hub follows the rights of the map: with "propose" it is a second proposal, with
+  "read" nothing happens (the map is not created either), with "write" it is logged with its own change
+  id and can be taken back with `undo` (undoing the map leaves the hub). It appears in the answer as
+  `hub` (path, `angelegt`, `verlinkt`, change or proposal id) and in `hinweise`. The hub does not count
+  against the 150 nodes, is no duplicate of a map titled like the area, and can be extended with
+  `--in-map` like any map (then without an entry of its own). If it cannot be written, the ingest does
+  not fail: the map is saved and `hinweise` gives the reason. Your own notes in the hub are left alone;
+  if you delete the node "Maps" it comes back with the next ingest.
 - **Duplicates:** if the target area already has a map with the same title (case and punctuation do not
   count), nothing is created; the error names the path. The same title in another area is not a
   duplicate. There is no `--force`.
@@ -174,6 +194,22 @@ bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
 - **No credentials and no personal data** (passwords, tokens, keys, private details) in the original text
   or the sections: the tool filters nothing. Remove what does not belong in the map first (as with
   learnings).
+
+### Photo of a note, a board or a notebook
+
+A photo is not an input of its own: `bloommd_ingest` and `agent ingest` take **text** and call no model
+that could read images. The agent does the work itself:
+
+1. It reads the photo (handwriting, board, notebook page) with its own image understanding and copies it
+   **word for word**; anything illegible it marks as `[unleserlich]` instead of guessing.
+2. It structures the transcription into sections with the fitting template (e.g. `lesson` for a board).
+3. It files both with `ingest`: the transcription as `--text`, the structure as `--abschnitte`. As
+   `--quelle` it names the photo (file name or a description like "photo board Physics 8b") and as
+   `--quelle-datum` the day it was taken.
+
+The image itself is not stored; the transcription stands as the "Originaltext" in the map. With photos,
+check especially that names or details on them do not belong in the map (no personal data, no
+credentials).
 
 ## Change a single node
 
@@ -291,10 +327,10 @@ Likewise `bloommd-wiki agent stale <vault>` reports maps whose `stale_after` has
 
 ### Trust and expiry
 
-The agent can set `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`), `stale_after`, `verified` (appended),
+The agent can set `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`, `verworfen`), `stale_after`, `verified` (appended),
 `scope` and `replaced_by` when creating a map and later on; `bloommd_update_map` then changes only those
 fields. `bloommd_search` also finds tags and frontmatter values and filters by `status`, `tag` and `scope`.
-Expired maps and maps marked `veraltet` or `ersetzt` are only returned with `includeStale: true` (or with a
+Expired maps and maps marked `veraltet`, `ersetzt` or `verworfen` are only returned with `includeStale: true` (or with a
 `status` filter). `bloommd_stale` lists the expired maps.
 
 ## Control

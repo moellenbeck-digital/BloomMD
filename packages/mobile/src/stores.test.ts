@@ -1,12 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import type { BloomFolderPlugin, FolderFile } from "@bloommd/capacitor-folder";
+import { parseFile } from "@bloommd/core/browser";
 import { parseAppLink } from "./app-links";
-import { createFolderStore, folderEntries, StoreConflictError } from "./stores";
+import { openFileUrl } from "./opened-file";
+import { createFileStore, createFolderStore, folderEntries, safePath, SkippedFolderError, StoreConflictError, UnsafePathError, type MobileStore } from "./stores";
 
-function fakeFolder(files: Record<string, { data: string; modified: number }>) {
+function fakeFolder(files: Record<string, { data: string; modified: number }>, folders: string[] = []) {
   const writes: Array<{ path: string; data: string }> = [];
+  const made: string[] = [];
   const plugin = {
-    list: async () => ({ files: Object.entries(files).map(([path, file]): FolderFile => ({ path, size: file.data.length, modified: file.modified, local: true })) }),
+    list: async () => ({ files: Object.entries(files).map(([path, file]): FolderFile => ({ path, size: file.data.length, modified: file.modified, local: true })), folders }),
+    mkdir: async ({ path }: { path: string }) => { made.push(path); folders.push(path); },
     read: async ({ path }: { path: string }) => ({ ...files[path]! }),
     write: async ({ path, data, expectedModified }: { path: string; data: string; expectedModified?: number }) => {
       if (expectedModified !== undefined && files[path] && files[path]!.modified !== expectedModified) throw Object.assign(new Error("The file changed on another device."), { code: "CONFLICT" });
@@ -17,7 +21,7 @@ function fakeFolder(files: Record<string, { data: string; modified: number }>) {
     },
     remove: async () => undefined,
   } as unknown as BloomFolderPlugin;
-  return { plugin, writes, files };
+  return { plugin, writes, files, made, folders };
 }
 
 const note = "# Physik\n\nEinleitung.\n\n## Thermodynamik\n\nWärme.\n";
@@ -149,5 +153,251 @@ describe("handwriting files changed elsewhere", () => {
     const attachments = folderInkAttachments(vault(files, ["Physik ink.svg"]));
     expect(await attachments.write(null, "<svg>neu</svg>", "Physik.md")).toBe("Physik ink 1.svg");
     expect(files["Physik ink 1.svg"]!.data).toBe("<svg>neu</svg>");
+  });
+});
+
+describe("folder store: paths stay inside the folder", () => {
+  const bad = ["../secret.md", "Schule/../../secret.md", "Schule/..", "/etc/passwd.md", "C:/Windows/x.md", "./Notiz.md", "Schule/./Notiz.md", "Schule//Notiz.md", "Schule/", "", "Notiz\u0000.md"];
+
+  function spy() {
+    const calls: string[] = [];
+    const plugin = {
+      list: async () => ({ files: [], folders: [] }),
+      mkdir: async ({ path }: { path: string }) => { calls.push(`mkdir ${path}`); },
+      read: async ({ path }: { path: string }) => { calls.push(`read ${path}`); return { data: note, modified: 1 }; },
+      write: async ({ path }: { path: string }) => { calls.push(`write ${path}`); return { modified: 1 }; },
+      remove: async ({ path }: { path: string }) => { calls.push(`remove ${path}`); },
+    } as unknown as BloomFolderPlugin;
+    return { plugin, calls };
+  }
+
+  test("reading, removing and creating a path with traversal is rejected before the plugin is called", async () => {
+    const { plugin, calls } = spy();
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of bad) {
+      await expect(store.read(path)).rejects.toBeInstanceOf(UnsafePathError);
+      await expect(store.remove(path)).rejects.toBeInstanceOf(UnsafePathError);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  test("saving a note whose path leaves the folder writes nothing", async () => {
+    const { plugin, calls } = spy();
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of ["../Escape.md", "/Escape.md", "a/../../Escape.md"]) {
+      const document = parseFile(path, "# Escape\n");
+      await expect(store.save({ document, baseline: "" }, document)).rejects.toMatchObject({ code: "BAD_PATH" });
+      await expect(store.saveCopy(document, "iPad-Konflikt")).rejects.toBeInstanceOf(UnsafePathError);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  test("pathFor puts a new note in the folder shown and refuses a folder that leaves the vault", () => {
+    const store = createFolderStore(spy().plugin, "Vault");
+    expect(store.pathFor("Neu.md")).toBe("Neu.md");
+    expect(store.pathFor("Neu.md", "")).toBe("Neu.md");
+    expect(store.pathFor("Neu.md", "Uni/Physik")).toBe("Uni/Physik/Neu.md");
+    expect(store.pathFor("Neu.md", "Uni/Physik/")).toBe("Uni/Physik/Neu.md");
+    expect(() => store.pathFor("Neu.md", "..")).toThrow(UnsafePathError);
+    expect(() => store.pathFor("Neu.md", "../..")).toThrow(UnsafePathError);
+    expect(() => store.pathFor("Neu.md", "/abs")).toThrow(UnsafePathError);
+    expect(() => store.pathFor("../Neu.md", "Uni")).toThrow(UnsafePathError);
+  });
+
+  test("a new note in a subfolder is written to exactly that subfolder", async () => {
+    const { plugin, files } = fakeFolder({ "Uni/Physik/Alt.md": { data: note, modified: 1 } });
+    const store = createFolderStore(plugin, "Vault");
+    const path = store.pathFor("Neu.md", "Uni/Physik");
+    const document = parseFile(path, "# Neu\n");
+    await store.save({ document, baseline: "" }, document);
+    expect(Object.keys(files).sort()).toEqual(["Uni/Physik/Alt.md", "Uni/Physik/Neu.md"]);
+  });
+
+  test("ordinary nested paths and names with spaces, umlauts and dots are fine", () => {
+    for (const path of ["Notiz.md", "Schule/Physik.md", "Uni/Physik/Optik/Linsen.md", "Über uns/Größe & Form.md", "a.b/c.d.md", "Ordner mit  Leerzeichen/x y.md"]) expect(safePath(path)).toBe(path);
+  });
+
+  test("creating a folder with traversal, an absolute path or control characters is rejected before the plugin is called", async () => {
+    const { plugin, calls } = spy();
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of ["..", "../Draussen", "Uni/../../Draussen", "Uni/..", "/abs", "C:/Windows", "./x", "Uni/./x", "", "   ", "A\u0000B", "A\u001fB"]) {
+      await expect(store.createFolder(path)).rejects.toThrow();
+    }
+    expect(calls).toEqual([]);
+  });
+});
+
+describe("folders in the folder store", () => {
+  test("lists empty folders and folders with notes, without Obsidian's own, dot folders and node_modules", async () => {
+    const { plugin } = fakeFolder(
+      { "Uni/Physik/Optik/Linsen.md": { data: note, modified: 1 } },
+      ["Leer", "Uni", "Uni/Physik", "Uni/Physik/Optik", "Uni/Leer & Co", ".obsidian", ".obsidian/plugins", ".trash", "Uni/.versteckt", "node_modules", "node_modules/x", "Über uns/Größe"],
+    );
+    const { entries, folders } = await createFolderStore(plugin, "Vault").list();
+    expect(entries.map((entry) => entry.path)).toEqual(["Uni/Physik/Optik/Linsen.md"]);
+    expect(folders).toEqual(["Leer", "Über uns/Größe", "Uni", "Uni/Leer & Co", "Uni/Physik", "Uni/Physik/Optik"]);
+  });
+
+  test("creating a folder creates exactly that folder and writes no placeholder file", async () => {
+    const { plugin, made, writes, files } = fakeFolder({});
+    const store = createFolderStore(plugin, "Vault");
+    expect(await store.createFolder("Uni/Physik ")).toBe("Uni/Physik");
+    expect(await store.createFolder("Über uns\\Größe")).toBe("Über uns/Größe");
+    expect(made).toEqual(["Uni/Physik", "Über uns/Größe"]);
+    expect(writes).toEqual([]);
+    expect(files).toEqual({});
+    expect((await store.list()).folders).toEqual(["Über uns/Größe", "Uni/Physik"]);
+  });
+
+  test("a hidden folder is refused because it would never show up in the list", async () => {
+    const { plugin, made } = fakeFolder({});
+    const store = createFolderStore(plugin, "Vault");
+    for (const path of [".obsidian", "Uni/.git", ".trash", "node_modules", "Uni/node_modules/x"]) {
+      await expect(store.createFolder(path)).rejects.toBeInstanceOf(SkippedFolderError);
+    }
+    expect(made).toEqual([]);
+  });
+
+  test("a plugin without a folder list (older build) still lists the notes", async () => {
+    const plugin = { list: async () => ({ files: [{ path: "A/x.md", size: 1, modified: 1, local: true }] }) } as unknown as BloomFolderPlugin;
+    const { entries, folders } = await createFolderStore(plugin, "Vault").list();
+    expect(entries).toHaveLength(1);
+    expect(folders).toEqual([]);
+  });
+
+  test("a single file has no folders and creates none", async () => {
+    const store = createFileStore({} as BloomFolderPlugin, { token: "t", name: "Notiz.md" }, createFolderStore(fakeFolder({}).plugin, "Vault"));
+    expect((await store.list()).folders).toEqual([]);
+    await expect(store.createFolder("Neu")).rejects.toBeInstanceOf(UnsafePathError);
+  });
+});
+
+describe("single file opened from the Files app", () => {
+  function fakeSingle(initial: string, modified = 1) {
+    const state = { data: initial, modified, writes: [] as string[], deletes: 0 };
+    const plugin = {
+      readFile: async ({ token }: { token: string }) => {
+        if (token !== "t1") throw Object.assign(new Error("The file is no longer open."), { code: "NO_FILE" });
+        return { data: state.data, modified: state.modified };
+      },
+      writeFile: async ({ token, data, expectedModified }: { token: string; data: string; expectedModified?: number }) => {
+        if (token !== "t1") throw Object.assign(new Error("The file is no longer open."), { code: "NO_FILE" });
+        if (expectedModified !== undefined && state.modified !== expectedModified) throw Object.assign(new Error("The file changed on another device."), { code: "CONFLICT" });
+        state.data = data;
+        state.modified += 1000;
+        state.writes.push(data);
+        return { modified: state.modified };
+      },
+      remove: async () => { state.deletes += 1; },
+    } as unknown as BloomFolderPlugin;
+    return { plugin, state };
+  }
+  const file = { token: "t1", name: "Physik.md" };
+
+  test("lists the file as the only note", async () => {
+    const store = createFileStore(fakeSingle(note).plugin, file);
+    expect(store.kind).toBe("file");
+    expect(await store.list()).toEqual({ entries: [{ path: "Physik.md", title: "Physik", folder: "", local: true }], folders: [], unreadable: [] });
+  });
+
+  test("opening never writes; a real edit replaces the original file and nothing else", async () => {
+    const { plugin, state } = fakeSingle(note);
+    const store = createFileStore(plugin, file);
+    const loaded = await store.read("Physik.md");
+    expect(await store.save(loaded, loaded.document)).toBeNull();
+    expect(state.writes).toEqual([]);
+    const edited = { ...loaded.document, nodes: new Map(loaded.document.nodes) };
+    const root = edited.nodes.get(edited.rootId)!;
+    edited.nodes.set(edited.rootId, { ...root, content: "Direkt in der Originaldatei." });
+    const next = await store.save(loaded, edited);
+    expect(next?.modified).toBe(1001);
+    expect(state.writes).toHaveLength(1);
+    expect(state.data).toContain("Direkt in der Originaldatei.");
+  });
+
+  test("an edit from another device is detected, the file is not overwritten", async () => {
+    const { plugin, state } = fakeSingle(note);
+    const store = createFileStore(plugin, file);
+    const loaded = await store.read("Physik.md");
+    state.data = `${note}\nVom Mac.\n`;
+    state.modified = 99_999;
+    const edited = { ...loaded.document, nodes: new Map(loaded.document.nodes) };
+    edited.nodes.set(edited.rootId, { ...edited.nodes.get(edited.rootId)!, content: "Vom iPad." });
+    await expect(store.save(loaded, edited)).rejects.toBeInstanceOf(StoreConflictError);
+    expect(state.data).toContain("Vom Mac.");
+    expect(state.data).not.toContain("Vom iPad.");
+  });
+
+  test("the iPad's version of a conflict goes to the copy store, never next to the file", async () => {
+    const { plugin } = fakeSingle(note);
+    const copies: string[] = [];
+    const copyTo = { saveCopy: async (document, label) => { copies.push(`${document.filePath} ${label}`); return "Physik (iPad-Konflikt).md"; } } as MobileStore;
+    const store = createFileStore(plugin, file, copyTo);
+    const document = parseFile("Physik.md", note);
+    expect(await store.saveCopy(document, "iPad-Konflikt")).toBe("Physik (iPad-Konflikt).md");
+    expect(copies).toEqual(["Physik.md iPad-Konflikt"]);
+  });
+
+  test("other paths are refused, the file cannot be deleted, a lost token fails clearly", async () => {
+    const { plugin, state } = fakeSingle(note);
+    const store = createFileStore(plugin, file);
+    await expect(store.read("Anderes.md")).rejects.toBeInstanceOf(UnsafePathError);
+    await expect(store.read("../Physik.md")).rejects.toBeInstanceOf(UnsafePathError);
+    const stranger = parseFile("Anderes.md", "# Anderes\n");
+    await expect(store.save({ document: stranger, baseline: "" }, stranger)).rejects.toBeInstanceOf(UnsafePathError);
+    await expect(store.remove("Physik.md")).rejects.toThrow();
+    expect(state.writes).toEqual([]);
+    expect(state.deletes).toBe(0);
+    await expect(createFileStore(plugin, { token: "old", name: "Physik.md" }).read("Physik.md")).rejects.toMatchObject({ code: "NO_FILE" });
+  });
+});
+
+describe("opening a file URL from the Files app", () => {
+  function fakePlugin(opened: { token: string; name: string; folderPath: string | null }, folderName: string | null = "Vault") {
+    const calls: string[] = [];
+    const plugin = {
+      openFile: async ({ url }: { url: string }) => { calls.push(url); return opened; },
+      current: async () => ({ name: folderName }),
+      list: async () => ({ files: [] }),
+    } as unknown as BloomFolderPlugin;
+    return { plugin, calls };
+  }
+  const app = createFolderStore(fakeFolder({}).plugin, "Vault");
+
+  test("a file inside the open folder is a note of that folder, in the store already open", async () => {
+    const { plugin, calls } = fakePlugin({ token: "t", name: "Physik.md", folderPath: "Uni/Physik.md" });
+    const opened = await openFileUrl(plugin, "file:///private/var/Uni/Physik.md", app);
+    expect(calls).toEqual(["file:///private/var/Uni/Physik.md"]);
+    expect(opened.store).toBe(app);
+    expect(opened.path).toBe("Uni/Physik.md");
+  });
+
+  test("a file inside the folder, while another store is shown, opens through a folder store", async () => {
+    const { plugin } = fakePlugin({ token: "t", name: "Physik.md", folderPath: "Uni/Physik.md" });
+    const opened = await openFileUrl(plugin, "file:///x/Uni/Physik.md", createFileStore(plugin, { token: "old", name: "Alt.md" }));
+    expect(opened.store.kind).toBe("folder");
+    expect(opened.store.name).toBe("Vault");
+    expect(opened.path).toBe("Uni/Physik.md");
+  });
+
+  test("a file elsewhere is opened as a single file under its own name", async () => {
+    const { plugin } = fakePlugin({ token: "t", name: "Extern.md", folderPath: null });
+    const opened = await openFileUrl(plugin, "file:///private/var/mobile/Mobile%20Documents/Extern.md", app);
+    expect(opened.store.kind).toBe("file");
+    expect(opened.store.name).toBe("Extern.md");
+    expect(opened.path).toBe("Extern.md");
+  });
+
+  test("a file in Obsidian's own or a hidden folder is not a note of the folder", async () => {
+    for (const folderPath of [".obsidian/workspace.md", ".trash/Alt.md", "Uni/.versteckt/Geheim.md", "node_modules/x/README.md"]) {
+      const { plugin } = fakePlugin({ token: "t", name: folderPath.split("/").pop()!, folderPath });
+      const opened = await openFileUrl(plugin, "file:///x.md", app);
+      expect(opened.store.kind).toBe("file");
+    }
+  });
+
+  test("a path from the plugin that leaves the folder is refused", async () => {
+    const { plugin } = fakePlugin({ token: "t", name: "x.md", folderPath: "../x.md" });
+    await expect(openFileUrl(plugin, "file:///x.md", app)).rejects.toBeInstanceOf(UnsafePathError);
   });
 });

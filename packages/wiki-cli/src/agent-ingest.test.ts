@@ -185,7 +185,7 @@ describe("agent ingest: file a transcript as a map", () => {
     const both = await agent(["ingest", "--vault", root, "--name", "coder", "--vorlage", "lesson", "--titel", "Zwei", "--text", "-", "--quelle", "stdin", "--abschnitte", "-"], { ...deps, stdin: () => { throw new Error("stdin must not be read"); } });
     expect(both.code).toBe(EXIT.usage);
     expect(both.json.fehler).toMatch(/Nur ein Eingang darf stdin/);
-    expect(await markdownFiles(root)).toEqual(["Schule/Aus stdin.md"]);
+    expect(await markdownFiles(root)).toEqual(["Schule/Aus stdin.md", "Schule/Schule.md"]);
   });
 
   test("the area can be chosen; the same title in another area is no duplicate", async () => {
@@ -203,10 +203,12 @@ describe("agent ingest: rights, proposals, log and undo", () => {
     const run = await ingest(root);
     expect(run.json.modus).toBe("geschrieben");
     const log = await agent(["log", root]);
-    expect(log.json.changes).toEqual([expect.objectContaining({ event: "written", tool: "bloommd_ingest", path: run.json.pfad, changeId: run.json.aenderung, source: "fixtures/besprechung-transkript.txt, 2026-10-20" })]);
+    expect(log.json.changes).toHaveLength(2);
+    expect(log.json.changes).toContainEqual(expect.objectContaining({ event: "written", tool: "bloommd_ingest", path: run.json.pfad, changeId: run.json.aenderung, source: "fixtures/besprechung-transkript.txt, 2026-10-20" }));
+    expect(log.json.changes).toContainEqual(expect.objectContaining({ event: "written", tool: "bloommd_ingest", path: "Arbeit/Arbeit.md", changeId: run.json.hub.aenderung }));
     const undo = await agent(["undo", root, run.json.aenderung]);
     expect(undo.code).toBe(0);
-    expect(await markdownFiles(root)).toEqual([]);
+    expect(await markdownFiles(root)).toEqual(["Arbeit/Arbeit.md"]);
   });
 
   test("propose: only a proposal; a person approves it with agent approve", async () => {
@@ -218,7 +220,9 @@ describe("agent ingest: rights, proposals, log and undo", () => {
     expect(run.json.hinweis).toMatch(/agent approve/);
     expect(await markdownFiles(root)).toEqual([]);
     const proposals = await agent(["proposals", root]);
-    expect(proposals.json).toEqual([expect.objectContaining({ id: run.json.vorschlag, tool: "bloommd_ingest", path: run.json.pfad })]);
+    expect(proposals.json).toHaveLength(2);
+    expect(proposals.json).toContainEqual(expect.objectContaining({ id: run.json.vorschlag, tool: "bloommd_ingest", path: run.json.pfad }));
+    expect(proposals.json).toContainEqual(expect.objectContaining({ id: run.json.hub.vorschlag, tool: "bloommd_ingest", path: "Arbeit/Arbeit.md" }));
     const approved = await agent(["approve", root, run.json.vorschlag, "--reviewer", "Max"]);
     expect(approved.code).toBe(0);
     expect(fencedText(await readFile(join(root, run.json.pfad), "utf8"))).toBe(await readFile(TRANSCRIPT, "utf8"));
@@ -249,7 +253,7 @@ describe("agent ingest: duplicate", () => {
     expect(again.code).toBe(EXIT.duplicate);
     expect(again.json).toMatchObject({ duplicate: true, pfad: first.json.pfad, bereich: "Arbeit" });
     expect(again.json.fehler).toContain(first.json.pfad);
-    expect(await markdownFiles(root)).toEqual([first.json.pfad]);
+    expect(await markdownFiles(root)).toEqual(["Arbeit/Arbeit.md", first.json.pfad]);
   });
 
   test("a vault title with characters a file name drops still counts as the same title", async () => {
@@ -404,6 +408,6 @@ describe("bloommd_ingest (MCP)", () => {
     await expect(call("bloommd_ingest", { ...input, title: "Ohne", source: " " })).rejects.toThrow(/"source" must be a non-empty string/);
     await expect(call("bloommd_ingest", { template: "meeting", title: "Ohne", source: "x" })).rejects.toThrow(/"text" must be a non-empty string/);
     await expect(call("bloommd_ingest", { ...input, title: "Lernen", template: "learning" })).rejects.toThrow(/agent create/);
-    expect(await markdownFiles(root)).toEqual(["Arbeit/Plan.md"]);
+    expect(await markdownFiles(root)).toEqual(["Arbeit/Arbeit.md", "Arbeit/Plan.md"]);
   });
 });

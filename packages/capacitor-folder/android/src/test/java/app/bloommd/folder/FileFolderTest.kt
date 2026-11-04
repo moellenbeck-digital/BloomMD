@@ -103,6 +103,53 @@ class FileFolderTest {
     }
 
     @Test
+    fun mkdirCreatesNestedFoldersWithoutPlaceholderFiles() {
+        val (root, vault) = folder()
+        vault.mkdir(path("Schule/Physik/Klasse 9"))
+        assertTrue(File(root, "Schule/Physik/Klasse 9").isDirectory)
+        // Nothing was written into the new folders, and creating one again is not an error.
+        assertEquals(0, File(root, "Schule/Physik/Klasse 9").list()!!.size)
+        vault.mkdir(path("Schule/Physik"))
+
+        val listing = vault.list(FolderRules.normalizeExtensions(null))
+        assertEquals(listOf("Schule", "Schule/Physik", "Schule/Physik/Klasse 9"), listing.folders.sorted())
+        assertTrue(listing.files.isEmpty())
+        assertFalse(listing.truncated)
+    }
+
+    @Test
+    fun mkdirRefusesAFileOfTheSameNameAndPathsOutOfTheFolder() {
+        val (_, vault) = folder()
+        vault.write(path("Notiz.md"), "# Notiz", null, false)
+        assertError(FolderError.EXISTS) { vault.mkdir(path("Notiz.md")) }
+        assertError(FolderError.BAD_PATH) { vault.mkdir(FolderRules.segments("../Draussen")) }
+        assertError(FolderError.BAD_PATH) { vault.mkdir(FolderRules.segments("/absolut")) }
+    }
+
+    @Test
+    fun mkdirRefusesSymbolicLinksOutOfTheFolder() {
+        val (root, vault) = folder()
+        val outside = temporary.newFolder("Outside")
+        java.nio.file.Files.createSymbolicLink(File(root, "link").toPath(), outside.toPath())
+        assertError(FolderError.BAD_PATH) { vault.mkdir(path("link/neu")) }
+        assertFalse(File(outside, "neu").exists())
+    }
+
+    @Test
+    fun listsFoldersWithAndWithoutNotesButNotHiddenOnes() {
+        val (root, vault) = folder()
+        File(root, "Leer").mkdirs()
+        File(root, ".obsidian/plugins").mkdirs()
+        File(root, ".trash").mkdirs()
+        File(root, "node_modules/x").mkdirs()
+        vault.write(path("Arbeit/Team/Meeting.md"), "# Meeting", null, false)
+
+        val listing = vault.list(FolderRules.normalizeExtensions(null))
+        assertEquals(listOf("Arbeit", "Arbeit/Team", "Leer"), listing.folders.sorted())
+        assertEquals(listOf("Arbeit/Team/Meeting.md"), listing.files.map { it.path })
+    }
+
+    @Test
     fun aMissingFolderIsReported() {
         val (root, vault) = folder()
         root.deleteRecursively()

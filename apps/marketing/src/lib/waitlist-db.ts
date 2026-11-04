@@ -198,6 +198,27 @@ export async function releaseWaitlistInvitation(email: string): Promise<void> {
   `;
 }
 
+/**
+ * Marks every confirmed, not unsubscribed, not yet invited address as invited, without sending
+ * anything (#105). For the addresses the app's waitlist transfer wrote to: afterwards `invite` has
+ * nobody left to mail (no second mail), and the purge guard counts the retention from now. Returns
+ * how many entries were marked.
+ */
+export async function markWaitlistInvitedWithoutMail(): Promise<number> {
+  if (!isWaitlistConfigured()) return 0;
+  await ensureWaitlistSchema();
+
+  const rows = await getWaitlistSql()`
+    update bloom_waitlist
+    set invited_at = now(), updated_at = now()
+    where confirmed_at is not null
+      and unsubscribed_at is null
+      and invited_at is null
+    returning id
+  `;
+  return rows.length;
+}
+
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : String(value);
 }

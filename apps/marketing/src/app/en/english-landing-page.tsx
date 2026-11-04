@@ -651,7 +651,7 @@ function DesktopSection() {
         </div>
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
           {[
-            { icon: HardDrive, title: "Your files, your machine", text: "Work directly on a local folder. No upload, no account and no hidden background sync." },
+            { icon: HardDrive, title: "Your files, your machine", text: "Work directly on a local folder. No upload, no account and no hidden background sync. Your files belong to you: every export (Markdown, OPML, PDF, PNG, SVG) is free for everyone." },
             { icon: RefreshCw, title: "External edits show up", text: "Changes from Obsidian, VS Code or Git can be reflected without copying files into a platform." },
             { icon: FileCode2, title: "Open Markdown directly", text: "The beta path includes opening .md files and folders as maps from the native app." },
           ].map((reason) => (
@@ -700,6 +700,9 @@ function LocalFirstAndWikiSection() {
           <h3 className="text-2xl font-semibold">Agent-maintained knowledge still needs human approval.</h3>
           <p className="mt-4 leading-7 text-[#666666]">
             BloomMD reads and writes Open Knowledge Format bundles: Markdown pages, source hashes, trust signals and explicit approval before agent proposals are applied.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-[#666666]">
+            Our <Link href="/en/roadmap" className="font-semibold text-[#B94316] underline-offset-4 hover:underline">knowledge platform roadmap</Link> outlines sources and sync, rights and cited search, and later agent workflows. The learnings pilot is the first internal backend use case; local Markdown remains the core.
           </p>
           <p className="mt-4 text-sm leading-6 text-[#666666]">
             This works through BloomMD and OpenClaw without Bun, a terminal, or access to a source checkout.
@@ -787,7 +790,7 @@ function Footer() {
         { label: "Blog", href: "/en/blog" },
         { label: "News", href: "/en/news" },
         { label: "Roadmap", href: "/en/roadmap" },
-        { label: "Help", href: "/docs" },
+        { label: "Help", href: "/docs?lang=en" },
         { label: "FAQ", href: "#faq" },
       ],
     },

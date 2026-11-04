@@ -18,6 +18,21 @@ Die Desktop-Builds sind öffentlich verlinkt und lassen sich ohne Einladung oder
 herunterladen. Der Closed-Beta-Zugang gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
 Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
+## Erste Schritte: Download bis zur ersten Map
+
+1. **Download:** Auf [bloommd.io/download](/download) den Build für macOS arm64 laden.
+2. **DMG öffnen:** BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten (Details
+   weiter unten im Abschnitt „Installation in der Closed Beta“).
+3. **Ordner öffnen:** Einen Ordner mit Markdown-Dateien öffnen — über das Menü, per Doppelklick im
+   Dateimanager oder per Kommandozeile (siehe den Abschnitt „Dateien und Ordner öffnen“).
+4. **Erste Map:** Eine Datei wählen. Ihre Überschriften werden zur Karte; die Markdown-Datei bleibt
+   unverändert.
+
+![Schema, kein Screenshot: Links die Dateiliste des geöffneten Ordners, rechts die Karte der ausgewählten Datei mit Überschriften als Knoten](/docs/desktop-ordner.svg)
+
+Läuft etwas nicht wie beschrieben, hilft die [Fehlerbehebung](/docs/fehlerbehebung). Alles bleibt dabei auf deinem Rechner. Was lokal bleibt und was erst durch eine bewusste Freigabe
+in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud).
+
 ## Knoten bedienen ab 0.5.14
 
 Ein Klick wählt einen Knoten aus, ohne die sichtbare Map neu zu zentrieren. Mit den Pfeiltasten
@@ -66,7 +81,8 @@ für x86_64 und aarch64. Windows folgt als eigener Beta-Release.
 
 - **macOS:** DMG öffnen, BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten.
   Eine manuelle Gatekeeper-Ausnahme ist für diesen Release nicht vorgesehen. Falls macOS den Start
-  blockiert, Version und Meldung an `feedback@bloommd.io` melden.
+  blockiert, Version und Meldung an `feedback@bloommd.io` melden; die Schritte stehen unter
+  [Fehlerbehebung](/docs/fehlerbehebung).
 - **Omarchy/Linux:** passendes Pacman-Paket für die eigene Architektur herunterladen und mit
   `sudo pacman -U` installieren. Der Linux-Build ist nicht Developer-ID-signiert; das ist für
   Pacman nicht erforderlich.
@@ -101,6 +117,18 @@ Doppelklick im Dateimanager oder von der Kommandozeile:
 bloommd ./notizen        # Ordner als Workspace
 bloommd notiz.md         # einzelne Datei
 ```
+
+## Ordner als gemeinsamen Workspace veröffentlichen
+
+Im lokalen Modus kannst du einen ganzen Ordner bewusst in einen Cloud-Workspace veröffentlichen.
+Der Einstieg **Ordner als gemeinsamen Workspace veröffentlichen** in der Seitenleiste ist getrennt
+von **Diese lokale Datei teilen**; keiner der beiden Wege ändert den anderen. Du wählst Ordner,
+Server-Profil und einen beschreibbaren Workspace (Viewer-Workspaces sind gesperrt), prüfst die
+Vorschau mit Dateianzahl, Größe, Konfliktstrategie und einem Ausschluss-Häkchen je Datei und
+Unterordner und bestätigst erst dann mit **Veröffentlichen**. Übertragen werden nur die angehakten
+Markdown-Dateien; die lokalen Dateien bleiben die Quelle, und der Ordnerpfad verlässt dein Gerät
+nicht. Entzieht der Server den Zugriff, stoppt der Abgleich, ohne dass lokale Dateien verändert
+oder gelöscht werden. Den vollständigen Ablauf beschreibt [Zusammenarbeit](/docs/collaboration).
 
 ## Mit der Web-App verbinden
 

@@ -1,13 +1,16 @@
 import { consumeMailBudget } from "./db";
 
-/** Global cap for outgoing account mails (confirmation, password reset). Invitation and beta mails are not counted. */
+/**
+ * Global cap for outgoing account mails (confirmation, password reset, and the one-time activation
+ * mail of the waitlist transfer, #105). Invitation and beta mails are not counted.
+ */
 export const ACCOUNT_MAIL_LIMIT_DEFAULTS = { hourly: 60, daily: 300 } as const;
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const ALERT_INTERVAL_MS = 60 * 1000;
 
-export type AccountMailKind = "verification" | "password-reset";
+export type AccountMailKind = "verification" | "password-reset" | "waitlist-activation";
 
 export class MailBudgetError extends Error {
   readonly retryAfterSeconds: number;
@@ -73,8 +76,11 @@ export async function assertAccountMailBudget(kind: AccountMailKind, now = Date.
   if (now - lastAlertAt >= ALERT_INTERVAL_MS) {
     lastAlertAt = now;
     const limit = refusedScope === "hour" ? limits.hourly : limits.daily;
+    const hint = kind === "waitlist-activation"
+      ? "The waitlist transfer stops here; run it again with --apply once the window has passed."
+      : "Possible abuse of open registration; check Resend and the sign-up traffic.";
     console.error(
-      `[BloomMD][ALERT] Global account mail limit reached (${limit} per ${refusedScope}, BLOOMMD_MAIL_${refusedScope === "hour" ? "HOURLY" : "DAILY"}_LIMIT): ${kind} mail not sent. Possible abuse of open registration; check Resend and the sign-up traffic.`,
+      `[BloomMD][ALERT] Global account mail limit reached (${limit} per ${refusedScope}, BLOOMMD_MAIL_${refusedScope === "hour" ? "HOURLY" : "DAILY"}_LIMIT): ${kind} mail not sent. ${hint}`,
     );
   }
   const windowEnd = (refusedScope === "hour" ? hourStart + HOUR_MS : dayStart + DAY_MS);

@@ -3,6 +3,7 @@
  */
 import { Capacitor } from "@capacitor/core";
 import { Directory } from "@capacitor/filesystem";
+import { CONFLICT_COPY_LABELS } from "@bloommd/core/browser";
 
 export const IS_ANDROID = Capacitor.getPlatform() === "android";
 
@@ -15,4 +16,4 @@ export const IS_ANDROID = Capacitor.getPlatform() === "android";
 export const APP_DIRECTORY: Directory = IS_ANDROID ? Directory.Data : Directory.Documents;
 
 /** How conflict copies name this device; the interface texts themselves live in shell-text.ts. */
-export const DEVICE = IS_ANDROID ? { conflictLabel: "Android-Konflikt" } : { conflictLabel: "iPad-Konflikt" };
+export const DEVICE = { conflictLabel: IS_ANDROID ? CONFLICT_COPY_LABELS.android : CONFLICT_COPY_LABELS.ios };

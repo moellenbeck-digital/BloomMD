@@ -12,6 +12,17 @@ export type {
 
 export { HeadingDepthError, MAX_HEADING_LEVEL } from "./types";
 export { parseFile, serializeToMarkdown } from "./parser";
+export { exportOpml, exportOpmlOutline, importOpml, OpmlError, type OpmlErrorCode, type OpmlImportResult, type OpmlOutlineNode } from "./opml";
+export {
+  CONFLICT_COPY_LABELS,
+  conflictCopyPath,
+  parseConflictCopy,
+  isConflictCopy,
+  findConflictCopyOriginal,
+  type ConflictCopyInfo,
+  type ConflictCopyLabel,
+} from "./conflict-copy";
+export { NOTE_HISTORY_LIMIT, sortRevisionsNewestFirst, type NoteHistorySource, type NoteRevision } from "./note-history";
 export { collapseUnchanged, diffLines, diffStats, type DiffKind, type DiffLine, type DiffStats } from "./diff";
 export { addNode, deleteNode, moveNode, renameNode } from "./operations";
 export { FileStore } from "./fileStore";
@@ -53,6 +64,31 @@ export {
   type SharedDocumentMirrorOptions,
 } from "./shared-document-mirror";
 export {
+  SHARED_FOLDER_CONFLICT_SUFFIX,
+  SHARED_FOLDER_MAX_FILE_BYTES,
+  SHARED_FOLDER_NAME_SEPARATOR,
+  cloudFilenameForRelativePath,
+  isSharedFolderPathExcluded,
+  planSharedFolderPublication,
+  type SharedFolderBlockReason,
+  type SharedFolderConflictStrategy,
+  type SharedFolderLocalFile,
+  type SharedFolderPlan,
+  type SharedFolderPlanInput,
+  type SharedFolderPlanItem,
+  type SharedFolderPlanStatus,
+  type SharedFolderPlanTotals,
+} from "./shared-folder-publication";
+export {
+  detectSharedFolderActivity,
+  type SharedFolderActivityEntry,
+  type SharedFolderActivityInput,
+  type SharedFolderBoundFile,
+  type SharedFolderNewEntry,
+  type SharedFolderRemovedEntry,
+  type SharedFolderRenamedEntry,
+} from "./shared-folder-activity";
+export {
   WorkspaceSyncClient,
   type WorkspaceSyncFetch,
   type WorkspaceSyncClientConfig,
@@ -93,6 +129,31 @@ export {
   HEADING_NODE_PREFIX,
   type WorkspaceMindMapOptions,
 } from "./workspace-document";
+export {
+  parsePdfLinkTarget,
+  extractPdfLinks,
+  extractPdfCitations,
+  formatPdfLink,
+  pdfPageUrl,
+  buildPdfCitationNode,
+  checkPdfLinks,
+  resolvePdfResource,
+  type PdfLink,
+  type PdfCitation,
+  type PdfCitationInput,
+  type PdfCitationNode,
+  type PdfLinkProblem,
+} from "./pdf-links";
+export {
+  buildBibliography,
+  readCitation,
+  formatBibtex,
+  formatBibliographyMarkdown,
+  type Bibliography,
+  type BibliographyEntry,
+  type BibliographySkip,
+  type BibliographyOptions,
+} from "./bibliography";
 export {
   lintWorkspace,
   checkRoundtrip,

@@ -12,8 +12,12 @@ export type CreateEntryKind = "folder" | "file";
 
 export interface CreateEntryDialogProps {
   kind: CreateEntryKind;
-  /** Existing folders, offered as a destination for a new file. */
+  /** Existing folders, offered as a destination for a new file (and for a new folder with `parentForFolders`). */
   folders: string[];
+  /** Folder preselected as the destination, "" for the top; for a folder shown in `folders`. */
+  defaultParent?: string;
+  /** Offer the destination choice when creating a folder too, so it is made inside the chosen folder. */
+  parentForFolders?: boolean;
   /**
    * Reads the user's own templates (the `.md` files in the workspace's template folder) when a file
    * dialog opens. A workspace without that folder resolves with an empty list.
@@ -39,10 +43,10 @@ export interface CreateEntryDialogProps {
  * language, or one of the user's own. The dialog fills in the template and hands the content to
  * `onCreate`.
  */
-export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate, onClose }: CreateEntryDialogProps) {
+export function CreateEntryDialog({ kind, folders, defaultParent = "", parentForFolders = false, loadCustomTemplates, onCreate, onClose }: CreateEntryDialogProps) {
   const { t, locale } = useLocale();
   const [name, setName] = useState("");
-  const [parent, setParent] = useState("");
+  const [parent, setParent] = useState(defaultParent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState("");
@@ -51,10 +55,10 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
 
   useEffect(() => {
     setName("");
-    setParent("");
+    setParent(defaultParent);
     setError(null);
     setTemplateId("");
-  }, [kind]);
+  }, [kind, defaultParent]);
 
   useEffect(() => {
     setCustomTemplates([]);
@@ -95,9 +99,11 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
   const fullPath = useMemo(() => {
     const trimmed = name.trim().replace(/^\/+/, "");
     if (!trimmed) return "";
-    const withParent = parent ? `${parent}/${trimmed}` : trimmed;
+    // A folder is created at the top unless the destination choice is offered for folders.
+    const destination = kind === "file" || parentForFolders ? parent : "";
+    const withParent = destination ? `${destination}/${trimmed}` : trimmed;
     return kind === "file" && !/\.(md|markdown)$/i.test(withParent) ? `${withParent}.md` : withParent;
-  }, [kind, name, parent]);
+  }, [kind, name, parent, parentForFolders]);
 
   const submit = async () => {
     if (!fullPath || problem || busy) return;
@@ -131,20 +137,20 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
           <h2 className="flex-1 text-base font-semibold text-[var(--color-ink)]">
             {kind === "folder" ? t.newFolder : t.newMindmap}
           </h2>
-          <button type="button" onClick={onClose} aria-label={t.close} className="rounded p-1 hover:bg-[var(--color-surface-sunken)]">
+          <button type="button" onClick={onClose} aria-label={t.close} className="rounded p-1 hover:bg-[var(--color-surface-sunken)] pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center pointer-coarse:justify-center">
             <X size={16} />
           </button>
         </header>
 
         <div className="space-y-4 px-5 py-4">
-          {kind === "file" && folders.length > 0 && (
+          {(kind === "file" || parentForFolders) && folders.length > 0 && (
             <label className="block">
               <span className="text-xs font-medium text-[var(--color-ink-muted)]">{t.folder}</span>
               <select
                 value={parent}
                 data-testid="create-entry-parent"
                 onChange={(event) => setParent(event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                className="mt-1 h-10 pointer-coarse:h-11 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
               >
                 <option value="">{t.rootDirectory}</option>
                 {folders.map((folder) => (
@@ -161,7 +167,7 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
                 value={templateId}
                 data-testid="create-entry-template"
                 onChange={(event) => setTemplateId(event.target.value)}
-                className="mt-1 h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
+                className="mt-1 h-10 pointer-coarse:h-11 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)]"
               >
                 <option value="">{t.createEntryTemplateBlank}</option>
                 <optgroup label={t.createEntryTemplateBuiltIn}>
@@ -197,7 +203,7 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
                 if (event.key === "Escape") onClose();
               }}
               placeholder={kind === "folder" ? t.createEntryFolderPlaceholder : t.createEntryFilePlaceholder}
-              className="mt-1 h-10 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
+              className="mt-1 h-10 pointer-coarse:h-11 w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
             />
           </label>
 
@@ -220,7 +226,7 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
           <button
             type="button"
             onClick={onClose}
-            className="h-9 rounded-md border border-[var(--color-border-strong)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"
+            className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border-strong)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"
           >
             {t.cancel}
           </button>
@@ -229,7 +235,7 @@ export function CreateEntryDialog({ kind, folders, loadCustomTemplates, onCreate
             data-testid="create-entry-submit"
             disabled={!fullPath || Boolean(problem) || busy}
             onClick={() => void submit()}
-            className="h-9 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-9 pointer-coarse:h-11 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? t.createEntryBusy : t.create}
           </button>

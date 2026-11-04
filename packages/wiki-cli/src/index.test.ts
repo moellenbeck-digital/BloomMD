@@ -442,3 +442,35 @@ describe("report rendering", () => {
     expect(plural(0, "Warnung", "Warnungen")).toBe("0 Warnungen");
   });
 });
+
+describe("PDF links in a workspace", () => {
+  let pdfRoot = "";
+
+  beforeAll(async () => {
+    pdfRoot = await mkdtemp(join(tmpdir(), "bloommd-cli-pdf-"));
+    await mkdir(join(pdfRoot, "papers"), { recursive: true });
+    await writeFile(join(pdfRoot, "papers", "smith.pdf"), "%PDF-1.4");
+    await writeFile(join(pdfRoot, "review.md"), "# Review\n\n[[papers/smith.pdf#page=3]]\n\n> Zitat\n\n[[gone.pdf#page=2]]\n");
+  });
+
+  afterAll(async () => {
+    await rm(pdfRoot, { recursive: true, force: true });
+  });
+
+  test("the reader lists the PDFs of a folder, but not for a single file", async () => {
+    expect((await readWorkspace(pdfRoot)).pdfFiles).toEqual(["papers/smith.pdf"]);
+    expect((await readWorkspace(join(pdfRoot, "review.md"))).pdfFiles).toBeUndefined();
+  });
+
+  test("lint reports only the PDF that is not in the workspace, as a warning", async () => {
+    const result = await run(["lint", pdfRoot, "--format", "json"]);
+    expect(result.code).toBe(0);
+    const parsed = JSON.parse(result.stdout) as LintResult;
+    expect(parsed.findings.map((finding) => [finding.code, finding.severity, finding.line])).toEqual([["missing-resource", "warning", 7]]);
+  });
+
+  test("a single file is not checked against a folder it was not given", async () => {
+    const result = await run(["lint", join(pdfRoot, "review.md"), "--format", "json"]);
+    expect((JSON.parse(result.stdout) as LintResult).findings).toEqual([]);
+  });
+});

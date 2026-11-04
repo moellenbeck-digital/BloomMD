@@ -1,5 +1,5 @@
 import { parseFile, serializeToMarkdown } from "@bloommd/core";
-import type { MindMapDocument, MindMapListEntry, MindMapNode } from "@bloommd/core";
+import type { MindMapDocument, MindMapListEntry, MindMapNode, NoteRevision } from "@bloommd/core";
 
 export interface ApiFileStoreConfig {
   baseUrl: string;
@@ -164,6 +164,34 @@ export class ApiFileStore {
     if (data.storage) doc.storage = data.storage;
   }
 
+  /** The version history of a note on the server: its versions, newest first, and whether this user may restore one. */
+  async listHistory(filename: string): Promise<{ revisions: NoteRevision[]; canRestore: boolean }> {
+    const res = await fetch(
+      `${this.baseUrl}/api/mindmaps/${encodeURIComponent(filename)}/history`,
+      { headers: this.headers({ includeWorkspace: true }) },
+    );
+    if (!res.ok) throw new Error(`API history failed: ${res.status} ${res.statusText}`);
+    const data = (await res.json()) as { revisions?: NoteRevision[]; canRestore?: boolean };
+    return { revisions: data.revisions ?? [], canRestore: data.canRestore === true };
+  }
+
+  /** Restores one version through the server's normal write path (version check, sync room), which keeps the replaced one. */
+  async restoreVersion(filename: string, revisionId: string): Promise<void> {
+    const res = await fetch(
+      `${this.baseUrl}/api/mindmaps/${encodeURIComponent(filename)}/history`,
+      {
+        method: "POST",
+        headers: this.headers({ includeWorkspace: true }),
+        body: JSON.stringify({ revisionId }),
+      },
+    );
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null) as { code?: string; error?: string } | null;
+      if (payload?.code) throw new Error(payload.code);
+      throw new Error(payload?.error || `API restore failed: ${res.status} ${res.statusText}`);
+    }
+  }
+
   async delete(filename: string): Promise<void> {
     const res = await fetch(
       `${this.baseUrl}/api/mindmaps/${encodeURIComponent(filename)}`,
@@ -270,6 +298,17 @@ export class ApiFileStore {
       permission: "read" | "write";
       identity?: { name?: string | null; email?: string | null };
     }>;
+  }
+
+  /** One audit request for a published folder; carries document IDs only, never paths or names. */
+  async recordSharedFolderBinding(action: "bound" | "unbound", documentIds: string[]): Promise<void> {
+    if (!this.activeWorkspace) throw new Error("Workspace selection is required.");
+    const res = await fetch(`${this.baseUrl}/api/shared-documents/audit`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ action, documentIds, workspaceId: this.activeWorkspace.id }),
+    });
+    if (!res.ok) throw new Error(`Shared folder audit failed: ${res.status} ${res.statusText}`);
   }
 
   async recordSharedDocumentBinding(action: "bound" | "unbound", documentId: string): Promise<void> {

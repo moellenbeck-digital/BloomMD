@@ -13,6 +13,8 @@ mock.module("../../../../lib/auth", () => ({
 mock.module("../../../../lib/db", () => ({
   normalizeUuid: (value: unknown) => typeof value === "string" ? value : null,
   recordSharedDocumentBindingAudit: async (input: unknown) => { calls.push(input); },
+  recordSharedFolderBindingAudit: async (input: unknown) => { calls.push(input); },
+  SHARED_FOLDER_AUDIT_MAX_DOCUMENTS: 200,
 }));
 
 mock.module("../../../../lib/request-security", () => ({
@@ -49,6 +51,38 @@ describe("shared document audit route", () => {
       workspaceId: "22222222-2222-4222-8222-222222222222",
       documentId: "33333333-3333-4333-8333-333333333333",
     }]);
+  });
+
+  test("records a published folder in one request with document IDs only", async () => {
+    const documentIds = ["33333333-3333-4333-8333-333333333333", "44444444-4444-4444-8444-444444444444"];
+    const response = await POST(new Request("https://bloommd.app/api/shared-documents/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer bloom_pat_test" },
+      body: JSON.stringify({ action: "bound", workspaceId: "22222222-2222-4222-8222-222222222222", documentIds }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ recorded: true, count: 2 });
+    expect(calls).toEqual([{
+      userId: "11111111-1111-4111-8111-111111111111",
+      action: "bound",
+      workspaceId: "22222222-2222-4222-8222-222222222222",
+      documentIds,
+    }]);
+  });
+
+  test("rejects empty, oversized, mixed, or non-string folder audit lists", async () => {
+    const send = (extra: Record<string, unknown>) => POST(new Request("https://bloommd.app/api/shared-documents/audit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer bloom_pat_test" },
+      body: JSON.stringify({ action: "bound", workspaceId: "22222222-2222-4222-8222-222222222222", ...extra }),
+    }));
+
+    expect((await send({ documentIds: [] })).status).toBe(400);
+    expect((await send({ documentIds: Array.from({ length: 201 }, (_, index) => String(index)) })).status).toBe(400);
+    expect((await send({ documentIds: ["33333333-3333-4333-8333-333333333333"], documentId: "x" })).status).toBe(400);
+    expect((await send({ documentIds: [42] })).status).toBe(400);
+    expect(calls).toEqual([]);
   });
 
   test("rejects unknown audit payloads", async () => {

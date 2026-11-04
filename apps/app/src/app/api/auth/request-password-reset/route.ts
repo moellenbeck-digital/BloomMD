@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { safeNextPath, validateLoginEmail } from "../../../../lib/auth";
 import { MAIL_UNAVAILABLE_ERROR } from "../../../../lib/auth-copy";
-import { createAuthToken, findPasswordUserByEmail } from "../../../../lib/db";
+import { createAuthToken, findPasswordUserByEmail, isPreparedWaitlistAccount } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { sendPasswordResetEmail } from "../../../../lib/email";
 import { assertAccountMailBudget, MailBudgetError } from "../../../../lib/mail-budget";
@@ -30,7 +30,9 @@ export async function POST(request: Request) {
     });
     const user = await findPasswordUserByEmail(email);
 
-    if (user) {
+    // A prepared waitlist account (#105) has no password to reset and nobody has agreed to the
+    // terms yet: the activation link is its only way in. The answer stays the same either way.
+    if (user && !(await isPreparedWaitlistAccount(user))) {
       await assertAccountMailBudget("password-reset");
       const reset = await createAuthToken({
         userId: user.id,

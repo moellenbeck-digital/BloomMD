@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sendBetaInviteEmail, sendPasswordResetEmail, sendVerificationEmail, sendWorkspaceInvitationEmail } from "./email";
+import { sendBetaInviteEmail, sendPasswordResetEmail, sendVerificationEmail, sendWaitlistActivationEmail, sendWorkspaceInvitationEmail } from "./email";
 
 const originalFetch = globalThis.fetch;
 const originalEnv = {
@@ -72,6 +72,24 @@ describe("account email links", () => {
 
     expect(body.text).toContain("https://bloommd.app/reset-password?token=token%20with%20space");
     expect(body.html).not.toContain("localhost");
+  });
+
+  test("waitlist activation mails link to the activation page of the app, in German by default and in English on request (#105)", async () => {
+    configureEmailTest();
+
+    const german = await captureMail(() => sendWaitlistActivationEmail("max@example.test", "token with space"));
+    expect(german.text).toContain("https://bloommd.app/activate?token=token%20with%20space\n");
+    expect(german.text).not.toContain("lang=");
+    expect(german.text).toContain("noch nicht aktiv");
+    expect(german.text).toContain("Der Link funktioniert einmal und 14 Tage lang.");
+    expect(german.text).toContain("90 Tage nach dieser E-Mail gelöscht");
+    expect(german.html).not.toContain("localhost");
+    expect(german.html).toContain("<a href=\"https://bloommd.app/activate?token=token%20with%20space\">Account aktivieren</a>");
+
+    const english = await captureMail(() => sendWaitlistActivationEmail("max@example.test", "abc", { lang: "en" }));
+    expect(english.text).toContain("https://bloommd.app/activate?token=abc&lang=en");
+    expect(english.text).toContain("not active yet");
+    expect(english.text).not.toContain("Warteliste");
   });
 
   test("beta invite mails point to the app signup form with the invited address", async () => {

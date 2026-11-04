@@ -28,6 +28,13 @@ You need neither an invitation nor a code.
    a login nor a session.
 6. Sign in at bloommd.app with your email and password.
 
+![Real screenshot: the BloomMD signup page with name, email, password, and consent](/docs/signup-en.png)
+
+After you submit, the sign-in page opens with a notice that a confirmation email was sent. Your
+email address is already filled in.
+
+![Real screenshot: the sign-in page after registration with a green notice about the confirmation email](/docs/signup-verify-en.png)
+
 Registration is rate limited against mass signups. After too many attempts in a short time the page
 shows "Too many attempts"; wait about an hour and try again.
 
@@ -56,6 +63,8 @@ separate so that every stage is clear.
    email.
 5. Sign in at bloommd.app with your email and password.
 
+![Real screenshot: the signup page while the access switch is on, with the notice that cloud access is not enabled yet and a field for the invited email address](/docs/signup-gate-en.png)
+
 ### No invitation yet
 
 Contact the BloomMD team. With the access switch on, an account is not enabled without an
@@ -66,10 +75,15 @@ invitation or invitation code.
 The invitation email links directly to account creation. Personal invitations normally do not need
 a separate code. A code field may be shown as a fallback when an admin sent a code separately.
 
+![Real screenshot: the signup page opened from an invitation link, with the invited email address already filled in](/docs/signup-invited-en.png)
+
 ### Resending an invitation
 
 If a beta invitation did not arrive, an admin can resend it. Check your spam and promotions folders
 first.
+
+Messages such as "This invitation has expired." or a wrong address are explained in
+[Troubleshooting](/docs/fehlerbehebung?lang=en).
 
 ## You already created an account
 

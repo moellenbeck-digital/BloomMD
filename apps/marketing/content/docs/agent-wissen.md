@@ -165,8 +165,30 @@ bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
   „Quellen“-Knoten (`weekly`), legt das Werkzeug ihn an. Ohne Originaltext oder Quellenverweis wird nichts
   geschrieben („Fehlende Quelle“).
 - **Grenzen:** Originaltext höchstens **200 000 Zeichen**, Abschnitte höchstens **150 Knoten** (ohne
-  Vorlagen-Skelett und Quellen-Knoten). Darüber kommt eine Fehlermeldung mit Ist- und Grenzwert, nichts
-  wird geschrieben.
+  Vorlagen-Skelett und Quellen-Knoten) und höchstens **5 Ebenen** unter dem Maptitel (Skelett-Knoten
+  der Vorlage = Ebene 1, ein Abschnitt darunter = Ebene 2; Markdown kennt ohnehin nur sechs
+  Überschriftenebenen). Darüber kommt eine Fehlermeldung mit Ist- und Grenzwert, nichts wird
+  geschrieben. Die Tiefe gilt auch beim Ergänzen mit `--in-map`: dort zählt die Ebene des vorhandenen
+  Elternknotens mit.
+- **Ergänzen statt neu anlegen:** Mit `--in-map <pfad>` (MCP: `inMap`) kommen die Abschnitte in eine
+  vorhandene Map, etwa die zweite Besprechung zum selben Projekt. Ein Abschnitt, dessen Elternknoten
+  schon genau ein Kind mit gleichem Titel hat, wird nicht doppelt angelegt; seine neuen Kinder hängen
+  darunter, sein Inhalt bleibt. `relations`-Ziele (Ref, Knoten-ID oder Titel) und `[[Notiz]]` werden
+  verknüpft, wenn das Ziel eindeutig ist, sonst steht ein Hinweis in `hinweise`. Das Original wird ein
+  weiterer Quellknoten „Originaltext <Datum>“; dieselbe Quelle zweimal ist ein Duplikat.
+- **Bereichs-Hub:** Je Bereich (Schule, Arbeit, Projekte, Gespräche; bei einem eigenen Bereich der letzte
+  Teil des Pfads) pflegt `ingest` eine Einstiegs-Map: die Map im Bereichsordner, die wie der Bereich heißt
+  (z. B. `Schule/Schule.md`, Frontmatter `type: hub`). Fehlt sie, wird sie angelegt; sonst kommt unter dem
+  festen Knoten „Maps“ ein Eintrag mit `[[Titel der Map]]` dazu. Ein zweiter Ingest in dieselbe Map
+  ergänzt nichts doppelt. Der Hub folgt den Rechten der Map: bei „vorschlagen“ ist er ein zweiter
+  Vorschlag, bei „lesen“ passiert nichts (auch die Map wird nicht angelegt), bei „schreiben“ steht er mit
+  eigener Änderungs-ID im Protokoll und lässt sich mit `undo` zurücknehmen (der Undo der Map lässt den
+  Hub stehen). Er erscheint in der Antwort als `hub` (Pfad, `angelegt`, `verlinkt`, Änderungs- oder
+  Vorschlags-ID) und in `hinweise`. Der Hub zählt nicht zu den 150 Knoten, ist kein Duplikat einer Map mit
+  dem Titel des Bereichs und lässt sich mit `--in-map` wie jede Map ergänzen (dann ohne eigenen Eintrag).
+  Lässt er sich nicht schreiben, schlägt der Ingest nicht fehl: die Map ist gespeichert, `hinweise` nennt
+  den Grund. Eigene Notizen im Hub bleiben unberührt; wer den Knoten „Maps“ löscht, bekommt ihn beim
+  nächsten Ingest wieder.
 - **Duplikate:** Gibt es im Zielbereich schon eine Map mit gleichem Titel (Groß-/Kleinschreibung und
   Satzzeichen zählen nicht), wird nichts angelegt; die Fehlermeldung nennt den Pfad. Gleicher Titel in
   einem anderen Bereich ist kein Duplikat. Ein `--force` gibt es nicht.
@@ -175,6 +197,22 @@ bloommd-wiki agent ingest --vault ~/Vault --name coder --vorlage meeting \
 - **Keine Zugangsdaten und keine Personendaten** (Passwörter, Tokens, Schlüssel, private Angaben) in
   Originaltext oder Abschnitte: das Werkzeug filtert nichts. Was nicht in die Map gehört, vorher
   entfernen (wie bei den Learnings).
+
+### Foto von einer Notiz, einer Tafel oder einem Heft
+
+Ein Foto ist kein eigener Eingang: `bloommd_ingest` und `agent ingest` nehmen **Text** und rufen kein
+Modell auf, das Bilder lesen könnte. Der Agent erledigt den Weg selbst:
+
+1. Er liest das Foto (Handschrift, Tafelbild, Seite aus dem Heft) mit seinem eigenen Bildverständnis und
+   schreibt es **Wort für Wort** ab; Unleserliches markiert er als `[unleserlich]`, statt zu raten.
+2. Er gliedert die Abschrift nach der passenden Vorlage (z. B. `lesson` für eine Tafel) in Abschnitte.
+3. Er legt beides mit `ingest` ab: Abschrift als `--text`, Gliederung als `--abschnitte`. Als
+   `--quelle` nennt er das Foto (Dateiname oder Beschreibung wie „Foto Tafel Physik 8b“) und als
+   `--quelle-datum` das Aufnahmedatum.
+
+Das Bild selbst wird nicht gespeichert; die Abschrift steht als „Originaltext“ in der Map. Prüfe bei
+Fotos besonders, ob Namen oder Angaben darauf nicht in die Map gehören (keine Personendaten, keine
+Zugangsdaten).
 
 ## Einen Knoten gezielt ändern
 
@@ -298,10 +336,10 @@ Ebenso meldet `bloommd-wiki agent stale <vault>` Maps, deren `stale_after` errei
 
 ### Vertrauen und Veraltung
 
-Der Agent kann `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`), `stale_after`, `verified` (wird angehängt),
+Der Agent kann `status` (`neu`, `bestätigt`, `veraltet`, `ersetzt`, `verworfen`), `stale_after`, `verified` (wird angehängt),
 `scope` und `replaced_by` beim Anlegen und später gezielt setzen; `bloommd_update_map` ändert dann nur diese
 Felder. `bloommd_search` findet zusätzlich Tags und Frontmatter-Werte und filtert nach `status`, `tag` und
-`scope`. Abgelaufene sowie als `veraltet` oder `ersetzt` markierte Maps liefert die Suche nur mit
+`scope`. Abgelaufene sowie als `veraltet`, `ersetzt` oder `verworfen` markierte Maps liefert die Suche nur mit
 `includeStale: true` (oder mit einem `status`-Filter). `bloommd_stale` listet die abgelaufenen Maps.
 
 ## Kontrolle

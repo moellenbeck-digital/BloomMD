@@ -5,6 +5,8 @@ import { useLocale } from "../i18n/LocaleContext";
 
 export interface WorkspaceHealthProps {
   files: WorkspaceFileInput[];
+  /** Paths of the workspace's non-Markdown files; with them, PDF links to missing files are reported. */
+  resources?: string[];
   onOpenFile?: (path: string) => void;
   onClose?: () => void;
 }
@@ -31,14 +33,14 @@ const TONE: Record<LintSeverity, string> = {
  * The round-trip check is opt-in here for the same reason it is a separate CLI command — it parses
  * and re-serialises every file, which is fine for a click and wrong for every keystroke.
  */
-export function WorkspaceHealth({ files, onOpenFile, onClose }: WorkspaceHealthProps) {
+export function WorkspaceHealth({ files, resources, onOpenFile, onClose }: WorkspaceHealthProps) {
   const { t } = useLocale();
   const [withRoundtrip, setWithRoundtrip] = useState(false);
   const [withOrphans, setWithOrphans] = useState(false);
 
   const result = useMemo(
-    () => lintWorkspace(files, { checkRoundtrip: withRoundtrip, reportOrphans: withOrphans }),
-    [files, withRoundtrip, withOrphans],
+    () => lintWorkspace(files, { checkRoundtrip: withRoundtrip, reportOrphans: withOrphans, resources }),
+    [files, resources, withRoundtrip, withOrphans],
   );
 
   const grouped = useMemo(() => {

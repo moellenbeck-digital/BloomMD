@@ -18,6 +18,20 @@ The desktop builds are publicly linked and can be downloaded without an invitati
 account. Closed-beta access applies only to the Web app, cloud, sync and collaboration. If a
 download link does not work, contact `feedback@bloommd.io`.
 
+## Getting started: from download to your first map
+
+1. **Download:** Get the macOS arm64 build from [bloommd.io/download](/download?lang=en).
+2. **Open the DMG:** Drag BloomMD to the Applications folder and double-click it there (details in the
+   section “Installing the closed-beta build” below).
+3. **Open a folder:** Open a folder with Markdown files from the menu, the file manager, or the command
+   line (see the section “Opening files and folders”).
+4. **First map:** Select a file. Its headings become the map; the Markdown file stays unchanged.
+
+![Diagram, not a screenshot: the file list of the opened folder on the left, the map of the selected file with headings as nodes on the right](/docs/desktop-ordner-en.svg)
+
+If something does not work as described, see [Troubleshooting](/docs/fehlerbehebung?lang=en). Everything stays on your computer. What stays local, and what only goes to the cloud after an
+explicit choice, is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
+
 ## Working with nodes from 0.5.14
 
 Clicking a node selects it without recentering the visible map. Arrow keys move between parents,
@@ -63,7 +77,7 @@ Windows follows as a separate beta release.
 **Starting with version 0.5.7, the macOS arm64 release is Developer ID signed and notarized by Apple.**
 Open the DMG, drag BloomMD to Applications, and double-click it there. This release does not require
 a manual Gatekeeper exception. If macOS blocks launch, report the version and message to
-`feedback@bloommd.io`.
+`feedback@bloommd.io`; the steps are in [Troubleshooting](/docs/fehlerbehebung?lang=en).
 
 ![BloomMD 0.5.7 DMG window with the BloomMD app and the Applications shortcut](/releases/desktop-0.5.7-installer.png)
 
@@ -94,6 +108,17 @@ line:
 bloommd ./notes        # folder as workspace
 bloommd note.md        # single file
 ```
+
+## Publishing a folder as a shared workspace
+
+In local mode you can deliberately publish a whole folder to a cloud workspace. The sidebar entry
+**Publish folder as a shared workspace** is separate from **Share this local file**; neither path
+changes the other. You choose the folder, a server profile, and a writable workspace (viewer
+workspaces are locked), review the preview with file count, size, conflict strategy, and an exclude
+checkbox per file and subfolder, and only then confirm with **Publish**. Only the checked Markdown
+files are transferred; your local files stay the source, and the folder path never leaves your
+device. If the server withdraws access, syncing stops without changing or deleting any local file.
+The full flow is described under [Collaboration](/docs/collaboration?lang=en).
 
 ## Connecting to the Web app
 

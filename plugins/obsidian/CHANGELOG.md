@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixes
+
+- The map view no longer stays blank after **Visualize current note**: the map is fitted once the view has a size (a freshly split or hidden pane is not laid out yet), and a map restored with the workspace is reused instead of opening a second one.
+- If opening, loading or rendering a map fails, the view shows what went wrong with **Back to Markdown** (and **Try again**) instead of an empty pane. An empty view and a note without headings now offer **Back to Markdown** too, and the button also works in folder mode.
+
+### Live Preview
+
+- The `<!-- bloommd:id=… -->` and `<!-- bloommd:meta=… -->` comments BloomMD writes behind headings are now hidden in Live Preview, so notes no longer look cluttered. The file is not changed: the comments stay exactly as they are, and Source mode still shows them. Other HTML comments in your notes stay visible. The cursor skips the hidden part, and typing or deleting at the end of a heading never removes the comment.
+
 ### Templates
 
 - New command **New note from template**: pick one of five built-in templates (Lecture, Cornell, Literature note, Exam prep, Project; German when Obsidian is set to German, English otherwise) or one of your own, enter a name, and the note is created in the folder Obsidian uses for new notes next to the active file (a name with `/` goes into a sub-folder) and opened. Only `{{title}}` and `{{date}}` (`YYYY-MM-DD`) are replaced; other `{{…}}` stay as written.

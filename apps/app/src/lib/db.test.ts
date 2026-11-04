@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, migrateMarketSchema, normalizeWorkspaceName, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
+import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, listCloudRevisions, migrateMarketSchema, normalizeWorkspaceName, readCloudRevisionMarkdown, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SqlClient } from "./sql-client";
@@ -468,5 +468,93 @@ describe("agent token rights, proposals and log", () => {
     await migrateMarketSchema();
     expect(expected.length).toBe(2);
     for (const statement of expected) expect(statements).toContain(statement);
+  });
+
+  test("the migration file and the schema db:migrate applies create the same waitlist transfer table (#105)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/011_waitlist_transfers.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(1);
+    for (const statement of expected) expect(statements).toContain(statement);
+  });
+  test("the migration file and the schema db:migrate applies create the same document revision table (#3)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/012_document_revisions.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(2);
+    for (const statement of expected) expect(statements).toContain(statement);
+  });
+});
+
+describe("cloud document revisions (#3)", () => {
+  const callerId = "11111111-1111-4111-8111-111111111111";
+  const ownWorkspace = "33333333-3333-4333-8333-333333333333";
+  const revisionId = "44444444-4444-4444-8444-444444444444";
+
+  function revisionSql(rows: unknown[]) {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const statements: Array<{ statement: string; params: unknown[] }> = [];
+    const sql = ((parts: TemplateStringsArray, ...params: unknown[]) => {
+      const statement = parts.join("?").replace(/\s+/g, " ").trim();
+      statements.push({ statement, params });
+      if (statement.startsWith("select w.id, w.name, w.slug, w.kind, m.role")) return Promise.resolve([{ id: ownWorkspace, name: "Team", slug: "team", kind: "team", role: "viewer" }]);
+      if (statement.startsWith("select r.")) return Promise.resolve(rows);
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    return statements;
+  }
+
+  test("lists the newest versions of a document of the caller's own workspace, readers included", async () => {
+    const statements = revisionSql([
+      { id: revisionId, version: "6", replaced_at: "2026-11-03T09:00:00.000Z", size: "42", author: "Ada" },
+    ]);
+
+    const revisions = await listCloudRevisions(callerId, "Notiz.md", ownWorkspace);
+
+    expect(revisions).toEqual([{ id: revisionId, version: 6, replacedAt: "2026-11-03T09:00:00.000Z", size: 42, author: "Ada" }]);
+    const query = statements.find(({ statement }) => statement.startsWith("select r."))!;
+    // The workspace comes from the membership lookup, and rows are matched against it, never against a client value.
+    expect(query.statement).toContain("d.workspace_id = ? and lower(d.filename) = lower(?)");
+    expect(query.statement).toContain("r.workspace_id = d.workspace_id");
+    expect(query.statement).toContain("order by r.version desc limit ?");
+    expect(query.params).toEqual([ownWorkspace, "Notiz.md", 20]);
+  });
+
+  test("reads one version only inside the caller's workspace and only for a well-formed id", async () => {
+    const statements = revisionSql([{ markdown: "# Old" }]);
+
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", revisionId, ownWorkspace)).toBe("# Old");
+    const query = statements.find(({ statement }) => statement.startsWith("select r."))!;
+    expect(query.statement).toContain("d.workspace_id = ?");
+    expect(query.statement).toContain("r.workspace_id = d.workspace_id");
+    expect(query.params).toEqual([ownWorkspace, "Notiz.md", revisionId]);
+
+    const before = statements.length;
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", "not-a-uuid", ownWorkspace)).toBeNull();
+    expect(statements.length).toBe(before);
+  });
+
+  test("a version of another workspace's document is not found", async () => {
+    revisionSql([]);
+
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", revisionId, ownWorkspace)).toBeNull();
+    expect(await listCloudRevisions(callerId, "Notiz.md", ownWorkspace)).toEqual([]);
   });
 });

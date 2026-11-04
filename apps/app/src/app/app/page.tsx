@@ -36,8 +36,10 @@ import {
   CreateEntryDialog,
   type CreateEntryKind,
   CommandPalette,
+  ConflictCopyBanner,
   HelpModal,
   AboutDialog,
+  NoteHistoryDialog,
   RenameMindmapDialog,
   SyncStatus,
   useMindMapStore,
@@ -53,12 +55,15 @@ import {
 import {
   buildWorkspaceMindMap,
   filenameForTitleInPath,
+  findConflictCopyOriginal,
   isWorkspaceMindMap,
+  parseConflictCopy,
   parseFile,
   serializeToMarkdown,
   type MindMapDocument,
   type MindMapListEntry,
   type MindMapNode,
+  type NoteRevision,
   type WorkspaceFileInput,
 } from "@bloommd/core/browser";
 import {
@@ -73,6 +78,19 @@ import { publicMarketingUrl } from "@/lib/deployment";
 import { WorkspaceManager } from "./WorkspaceManager";
 import { WorkspaceAgentPanel } from "./WorkspaceAgentPanel";
 import { ShareLinksDialog } from "./ShareLinksDialog";
+import {
+  backTarget,
+  closeTab,
+  parseStoredTabs,
+  removeTab,
+  renameTabFile,
+  serializeTabs,
+  tabKey,
+  upsertTab,
+  type OpenTab,
+  type TabIdentity,
+  type TabOrigin,
+} from "./document-tabs";
 
 const ONBOARDING_STORAGE_KEY = "bloommd_onboarding_seen";
 const OPEN_TABS_STORAGE_KEY = "bloommd_open_tabs";
@@ -122,6 +140,18 @@ const appCopy = {
     feedbackThanks: "Danke, dein Feedback ist im Beta-Board angekommen.",
     fileBrowser: "Datei-Browser öffnen (Cmd+O)",
     backToWorkspace: "Zur Workspace-Übersicht",
+    documentTabs: "Geöffnete Dokumente",
+    closeTab: "Tab schließen",
+    tabUnsaved: "Ungespeicherte Änderungen",
+    backToMap: "Zurück zur Karte",
+    backToDocument: "Zurück zu",
+    leaveBlocked:
+      "Die Änderungen an diesem Dokument konnten nicht gespeichert werden. Du bleibst im Dokument, damit nichts verloren geht. Zum Verwerfen das Tab schließen und „Verwerfen“ wählen.",
+    closeUnsavedTitle: "Ungespeicherte Änderungen",
+    closeUnsavedBody: "hat Änderungen, die noch nicht gespeichert sind.",
+    saveAndClose: "Speichern und schließen",
+    discardAndClose: "Verwerfen und schließen",
+    cancelClose: "Abbrechen",
     forwardToFile: "Zur zuletzt geöffneten Datei",
     mapView: "Kartenansicht",
     documentView: "Dokument",
@@ -173,6 +203,18 @@ const appCopy = {
     feedbackThanks: "Thanks, your feedback reached the beta board.",
     fileBrowser: "Open file browser (Cmd+O)",
     backToWorkspace: "Back to workspace overview",
+    documentTabs: "Open documents",
+    closeTab: "Close tab",
+    tabUnsaved: "Unsaved changes",
+    backToMap: "Back to the map",
+    backToDocument: "Back to",
+    leaveBlocked:
+      "The changes to this document could not be saved. You stay in the document so nothing is lost. To drop them, close the tab and choose Discard.",
+    closeUnsavedTitle: "Unsaved changes",
+    closeUnsavedBody: "has changes that are not saved yet.",
+    saveAndClose: "Save and close",
+    discardAndClose: "Discard and close",
+    cancelClose: "Cancel",
     forwardToFile: "Forward to the previously opened file",
     mapView: "Map view",
     documentView: "Document",
@@ -247,19 +289,16 @@ interface WorkspaceAgentActivity {
   tasks: WorkspaceAgentActivityTask[];
 }
 
-interface OpenTab {
-  filename: string;
-  title: string;
-}
-
 type RenameResult =
   { success: true; filename: string } | { success: false; message: string };
 
 interface ResourcePreviewRequest {
   kind?: string;
   file?: string;
+  /** Inline Markdown images name exactly one file; file nodes and Obsidian embeds may match by name. */
+  exact?: boolean;
   respond: (
-    result: { url: string; revokeOnCleanup?: boolean } | { error: string },
+    result: { url: string; revokeOnCleanup?: boolean; blob?: Blob } | { error: string },
   ) => void;
 }
 
@@ -373,6 +412,9 @@ export default function Home() {
   const [notice, setNotice] = useState<AppNotice | null>(null);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCanRestore, setHistoryCanRestore] = useState(true);
+  const [conflictCopyOriginal, setConflictCopyOriginal] = useState<{ filename: string; original: string | null } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [aboutBuildInfo, setAboutBuildInfo] = useState<AboutBuildInfo>(() =>
@@ -402,6 +444,9 @@ export default function Home() {
     string | null
   >(null);
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [closeRequestKey, setCloseRequestKey] = useState<string | null>(null);
+  /** Origin to attach to the tab of the next document opened from the map or from another document. */
+  const pendingTabOriginRef = useRef<{ key: string; origin: TabOrigin } | null>(null);
   const toolbarRef = useRef<ToolbarHandle>(null);
   const initialLoadStartedRef = useRef(false);
   const currentFileRef = useRef("typescript-basics.md");
@@ -459,6 +504,44 @@ export default function Home() {
     document &&
     (isWorkspaceMindMap(document) ||
       browserWorkspaceFiles.some((entry) => entry.path === document.filePath)),
+  );
+
+  const editRevision = useMindMapStore((s) => s.editRevision);
+  const savedRevision = useMindMapStore((s) => s.savedRevision);
+  const syncStatus = useMindMapStore((s) => s.syncStatus);
+  const documentReadOnly = useMindMapStore((s) => s.readOnly);
+  // A connected sync room already holds every edit, so only unsynced or offline edits are "unsaved".
+  const hasUnsavedChanges = Boolean(
+    document &&
+    !isWorkspaceMindMap(document) &&
+    !documentReadOnly &&
+    syncStatus !== "connected" &&
+    editRevision > savedRevision,
+  );
+  useEffect(() => {
+    if (syncStatus === "connected" && editRevision > savedRevision) {
+      useMindMapStore.getState().markSaved(editRevision);
+    }
+  }, [editRevision, savedRevision, syncStatus]);
+
+  const currentWorkspaceId = cloudWorkspace?.id ?? null;
+  const tabIdentityOf = (doc: MindMapDocument): TabIdentity =>
+    browserWorkspaceRef.current &&
+    browserWorkspaceFiles.some((entry) => entry.path === doc.filePath)
+      ? { source: "local", workspaceId: null, filename: doc.filePath }
+      : {
+          source: "cloud",
+          workspaceId: currentWorkspaceId,
+          filename: doc.filePath.split("/").pop() || doc.filePath,
+        };
+  const activeTabKey =
+    document && !isWorkspaceMindMap(document) ? tabKey(tabIdentityOf(document)) : null;
+  const activeTabKeyRef = useRef<string | null>(null);
+  activeTabKeyRef.current = activeTabKey;
+  const visibleTabs = openTabs.filter((tab) =>
+    tab.source === "local"
+      ? Boolean(browserWorkspaceName)
+      : tab.workspaceId === currentWorkspaceId,
   );
 
   const refreshAgentActivity = useCallback(async () => {
@@ -618,17 +701,155 @@ export default function Home() {
     setForwardLocalFileAvailable(false);
   }, []);
 
-  const openLocalFile = useCallback(
-    async (path: string, preserveForwardNavigation = false) => {
+  /**
+   * Writes the document to wherever it lives. `"saved"` means the content is persisted (or held by
+   * a connected sync room); `"blocked"` means it is not — a conflict or sync notice was shown. Failures throw.
+   */
+  const persistDocument = useCallback(
+    async (doc: MindMapDocument): Promise<"saved" | "blocked"> => {
+      if (isWorkspaceMindMap(doc)) {
+        showNotice(copy.derived, null);
+        return "blocked";
+      }
+      // Edits made while the request is in flight stay unsaved: only this revision is marked.
+      const savedRevision = useMindMapStore.getState().editRevision;
+      const saved = (): "saved" => {
+        useMindMapStore.getState().markSaved(savedRevision);
+        return "saved";
+      };
       const workspace = browserWorkspaceRef.current;
-      if (!workspace) return;
+      if (
+        workspace &&
+        browserWorkspaceFiles.some((entry) => entry.path === doc.filePath)
+      ) {
+        await workspace.write(doc.filePath, serializeToMarkdown(doc));
+        return saved();
+      }
+      // Yjs room persistence is authoritative while connected. When disconnected, the API sends a
+      // version-checked snapshot to the sync server; it never writes a cloud document directly.
+      if (useMindMapStore.getState().syncStatus === "connected") return saved();
+      const filename = currentFileRef.current || doc.filePath;
+      const response = await fetch(
+        `/api/mindmaps/${encodeURIComponent(filename)}${workspaceQuery(doc.storage?.mode === "database" ? doc.storage.workspaceId : null)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            markdown: serializeToMarkdown(doc),
+            expectedVersion: doc.storage?.version,
+          }),
+        },
+      );
+      if (response.status === 409 || response.status === 503) {
+        // Someone else saved first. Hand the user the other version instead of an error string —
+        // "reload before saving again" throws away their work without showing what they would lose.
+        const payload = (await response.json()) as {
+          code?: string;
+          conflict?: { markdown: string; version: number | null };
+        };
+        if (
+          payload.code === "SYNC_ROOM_ACTIVE" ||
+          payload.code === "SYNC_ROOM_PENDING"
+        ) {
+          showNotice(copy.syncActive, doc.rootId);
+          return "blocked";
+        }
+        if (
+          payload.code === "SYNC_ROOM_DEGRADED" ||
+          payload.code === "SYNC_ROOM_SAVE_FAILED" ||
+          payload.code === "SYNC_MUTATION_UNAVAILABLE"
+        ) {
+          showNotice(copy.syncFailed, doc.rootId);
+          return "blocked";
+        }
+        if (payload.conflict) {
+          setConflict({
+            filename,
+            mine: serializeToMarkdown(doc),
+            theirs: payload.conflict.markdown,
+            theirVersion: payload.conflict.version,
+          });
+          return "blocked";
+        }
+      }
+      if (!response.ok) throw new Error(await response.text());
+      const result = (await response.json()) as {
+        storage?: MindMapDocument["storage"];
+      };
+      if (result.storage)
+        useMindMapStore.getState().setStorageMetadata(result.storage);
+      return saved();
+    },
+    [browserWorkspaceFiles, copy.derived, copy.syncActive, copy.syncFailed, showNotice],
+  );
+
+  /** Toolbar and shortcut save: the outcome is shown by the toolbar and the conflict dialog. */
+  const saveDocument = useCallback(
+    async (doc: MindMapDocument) => {
+      await persistDocument(doc);
+    },
+    [persistDocument],
+  );
+
+  /**
+   * Called before the open document is replaced. Pending edits are saved first; if that fails the
+   * switch is refused and the user stays in the document with a visible message, never a silent loss.
+   * Edits are safe without a save while a connected sync room holds them (see the effect marking them saved).
+   */
+  const settleCurrentDocument = useCallback(async (): Promise<boolean> => {
+    const state = useMindMapStore.getState();
+    const current = state.document;
+    if (!current || isWorkspaceMindMap(current) || state.readOnly) return true;
+    if (state.editRevision <= state.savedRevision) return true;
+    try {
+      if ((await persistDocument(current)) === "saved") return true;
+    } catch (saveError) {
+      console.error("[BloomMD] Saving before leaving the document failed:", saveError);
+    }
+    showNotice(copy.leaveBlocked, null);
+    return false;
+  }, [copy.leaveBlocked, persistDocument, showNotice]);
+
+
+  /** Changes the tab list and keeps the stored copy (cloud tabs only) in step. */
+  const updateTabs = useCallback((change: (tabs: OpenTab[]) => OpenTab[]) => {
+    setOpenTabs((tabs) => {
+      const next = change(tabs);
+      if (next !== tabs) {
+        try {
+          window.localStorage.setItem(OPEN_TABS_STORAGE_KEY, serializeTabs(next));
+        } catch (storageError) {
+          console.warn("[BloomMD] Open tabs could not be stored:", storageError);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  /** Remembers where the document about to open came from; its tab picks that up when it is created. */
+  const rememberTabOrigin = useCallback((identity: TabIdentity, origin: TabOrigin | undefined) => {
+    pendingTabOriginRef.current = origin ? { key: tabKey(identity), origin } : null;
+  }, []);
+
+  /** Resolves to false, without opening anything, when pending edits could not be saved first. */
+  const openLocalFile = useCallback(
+    async (
+      path: string,
+      preserveForwardNavigation = false,
+      origin?: TabOrigin,
+    ): Promise<boolean> => {
+      const workspace = browserWorkspaceRef.current;
+      if (!workspace) return false;
+      if (!(await settleCurrentDocument())) return false;
       if (!preserveForwardNavigation) clearLocalForwardNavigation();
       const doc = parseFile(path, await workspace.read(path));
       currentFileRef.current = path;
+      rememberTabOrigin({ source: "local", workspaceId: null, filename: path }, origin);
       setDocument(doc);
       setMapView("document");
+      return true;
     },
-    [clearLocalForwardNavigation, setDocument],
+    [clearLocalForwardNavigation, rememberTabOrigin, setDocument, settleCurrentDocument],
   );
 
   const loadBrowserWorkspaceDocument = useCallback(
@@ -678,6 +899,7 @@ export default function Home() {
       const files = await workspace.refresh();
       browserWorkspaceRef.current = workspace;
       clearLocalForwardNavigation();
+      updateTabs((tabs) => (tabs.some((tab) => tab.source === "local") ? tabs.filter((tab) => tab.source !== "local") : tabs));
       setBrowserWorkspaceName(workspace.name);
       setBrowserWorkspaceFiles(files);
       setWorkspaceRenameOpen(false);
@@ -687,7 +909,7 @@ export default function Home() {
       if ((workspaceError as DOMException).name !== "AbortError")
         setError(String(workspaceError));
     }
-  }, [clearLocalForwardNavigation, loadBrowserWorkspaceDocument]);
+  }, [clearLocalForwardNavigation, loadBrowserWorkspaceDocument, updateTabs]);
 
   /**
    * Asks for write access to a folder that was opened read-only.
@@ -785,77 +1007,6 @@ export default function Home() {
     if (mapView === "workspace" || healthOpen) void loadWorkspaceGraph();
   }, [mapView, healthOpen, loadWorkspaceGraph]);
 
-  const saveDocument = useCallback(
-    async (doc: MindMapDocument) => {
-      if (isWorkspaceMindMap(doc)) {
-        showNotice(copy.derived, null);
-        return;
-      }
-      const workspace = browserWorkspaceRef.current;
-      if (
-        workspace &&
-        browserWorkspaceFiles.some((entry) => entry.path === doc.filePath)
-      ) {
-        await workspace.write(doc.filePath, serializeToMarkdown(doc));
-        return;
-      }
-      // Yjs room persistence is authoritative while connected. When disconnected, the API sends a
-      // version-checked snapshot to the sync server; it never writes a cloud document directly.
-      if (useMindMapStore.getState().syncStatus === "connected") return;
-      const filename = currentFileRef.current || doc.filePath;
-      const response = await fetch(
-        `/api/mindmaps/${encodeURIComponent(filename)}${workspaceQuery(doc.storage?.mode === "database" ? doc.storage.workspaceId : null)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            markdown: serializeToMarkdown(doc),
-            expectedVersion: doc.storage?.version,
-          }),
-        },
-      );
-      if (response.status === 409 || response.status === 503) {
-        // Someone else saved first. Hand the user the other version instead of an error string —
-        // "reload before saving again" throws away their work without showing what they would lose.
-        const payload = (await response.json()) as {
-          code?: string;
-          conflict?: { markdown: string; version: number | null };
-        };
-        if (
-          payload.code === "SYNC_ROOM_ACTIVE" ||
-          payload.code === "SYNC_ROOM_PENDING"
-        ) {
-          showNotice(copy.syncActive, doc.rootId);
-          return;
-        }
-        if (
-          payload.code === "SYNC_ROOM_DEGRADED" ||
-          payload.code === "SYNC_ROOM_SAVE_FAILED" ||
-          payload.code === "SYNC_MUTATION_UNAVAILABLE"
-        ) {
-          showNotice(copy.syncFailed, doc.rootId);
-          return;
-        }
-        if (payload.conflict) {
-          setConflict({
-            filename,
-            mine: serializeToMarkdown(doc),
-            theirs: payload.conflict.markdown,
-            theirVersion: payload.conflict.version,
-          });
-          return;
-        }
-      }
-      if (!response.ok) throw new Error(await response.text());
-      const result = (await response.json()) as {
-        storage?: MindMapDocument["storage"];
-      };
-      if (result.storage)
-        useMindMapStore.getState().setStorageMetadata(result.storage);
-    },
-    [browserWorkspaceFiles],
-  );
-
   const reload = useCallback(async () => {
     // Use the currently loaded document's filename, not the initial default
     const current = useMindMapStore.getState().document;
@@ -889,17 +1040,91 @@ export default function Home() {
     setDocument,
   ]);
 
-  const openMindmap = useCallback(
-    async (filename: string) => {
+  /** Resolves to false, without opening anything, when pending edits could not be saved first. */
+  const openMindmapChecked = useCallback(
+    async (filename: string, origin?: TabOrigin): Promise<boolean> => {
+      if (!(await settleCurrentDocument())) return false;
       clearLocalForwardNavigation();
       const doc = await loadMindmap(filename, cloudWorkspace?.id);
       currentFileRef.current = filename;
+      rememberTabOrigin(
+        {
+          source: "cloud",
+          workspaceId: cloudWorkspace?.id ?? null,
+          filename: filename.split("/").pop() || filename,
+        },
+        origin,
+      );
       setDocument(doc);
+      return true;
     },
-    [clearLocalForwardNavigation, cloudWorkspace?.id, setDocument],
+    [clearLocalForwardNavigation, cloudWorkspace?.id, rememberTabOrigin, setDocument, settleCurrentDocument],
+  );
+
+  const openMindmap = useCallback(
+    async (filename: string) => {
+      await openMindmapChecked(filename);
+    },
+    [openMindmapChecked],
+  );
+
+  /** Activates a tab. The tab itself never moves; only the document changes. */
+  const openTab = useCallback(
+    async (tab: OpenTab) => {
+      if (tab.key === activeTabKey) {
+        setMapView("document");
+        return;
+      }
+      try {
+        if (tab.source === "local") await openLocalFile(tab.filename);
+        else await openMindmapChecked(tab.filename);
+      } catch (openError) {
+        console.error("[BloomMD] Opening a tab failed:", openError);
+        showNotice(String(openError), null);
+      }
+    },
+    [activeTabKey, openLocalFile, openMindmapChecked, showNotice],
+  );
+
+  /** Closes a tab; closing the open one first opens its neighbour (right, else left). */
+  const performTabClose = useCallback(
+    async (key: string) => {
+      if (key === activeTabKey) {
+        const { neighbour } = closeTab(openTabs, visibleTabs, key);
+        if (!neighbour) return;
+        const opened =
+          neighbour.source === "local"
+            ? await openLocalFile(neighbour.filename)
+            : await openMindmapChecked(neighbour.filename);
+        if (!opened) return;
+      }
+      updateTabs((tabs) => removeTab(tabs, key));
+    },
+    [activeTabKey, openLocalFile, openMindmapChecked, openTabs, updateTabs, visibleTabs],
+  );
+
+  const requestTabClose = useCallback(
+    (key: string) => {
+      if (visibleTabs.length <= 1) return;
+      if (key === activeTabKey && hasUnsavedChanges) {
+        setCloseRequestKey(key);
+        return;
+      }
+      void performTabClose(key).catch((closeError: unknown) => {
+        console.error("[BloomMD] Closing a tab failed:", closeError);
+        showNotice(String(closeError), null);
+      });
+    },
+    [activeTabKey, hasUnsavedChanges, performTabClose, showNotice, visibleTabs.length],
   );
 
   const handleBackToWorkspace = useCallback(() => {
+    // A document opened from another document returns to it; otherwise back leads to the map.
+    const documentOrigin = backTarget(openTabs, activeTabKey, false);
+    if (documentOrigin?.kind === "document" && !workspaceNavigationPending && mapView === "document") {
+      void openTab(documentOrigin.tab);
+      return true;
+    }
     const workspace = browserWorkspaceRef.current;
     const current = useMindMapStore.getState().document;
     if (
@@ -918,7 +1143,7 @@ export default function Home() {
     setHealthOpen(false);
     setMapView("workspace");
     return true;
-  }, [browserWorkspaceFiles, mapView, workspaceNavigationPending]);
+  }, [activeTabKey, browserWorkspaceFiles, mapView, openTab, openTabs, workspaceNavigationPending]);
 
   const handleForwardToFile = useCallback(() => {
     const workspace = browserWorkspaceRef.current;
@@ -1071,6 +1296,10 @@ export default function Home() {
         );
     };
 
+    // Back from a linked document returns to the document the link was followed in.
+    const linkOrigin = (): TabOrigin | undefined =>
+      activeTabKeyRef.current ? { kind: "document", key: activeTabKeyRef.current } : undefined;
+
     const openResource = (event: Event) => {
       const detail = (
         event as CustomEvent<{
@@ -1078,6 +1307,8 @@ export default function Home() {
           kind?: string;
           file?: string;
           targetNodeId?: string;
+          /** 1-based PDF page, set when a `[[file.pdf#page=n]]` link was clicked. */
+          page?: number;
         }>
       ).detail;
       const workspace = browserWorkspaceRef.current;
@@ -1108,13 +1339,13 @@ export default function Home() {
           detail.kind === "file" &&
           browserWorkspaceFiles.some((entry) => entry.path === resolvedPath)
         ) {
-          void openLocalFile(resolvedPath).catch((openError) =>
+          void openLocalFile(resolvedPath, false, linkOrigin()).catch((openError) =>
             showNotice(String(openError), detail.nodeId),
           );
           return;
         }
         void workspace
-          .openResource(resolvedPath)
+          .openResource(resolvedPath, detail.kind === "pdf" ? detail.page : undefined)
           .catch((openError) => showNotice(String(openError), detail.nodeId));
         return;
       }
@@ -1132,11 +1363,12 @@ export default function Home() {
           ? resolvedPath
           : null;
       const openTarget = localMapPath
-        ? openLocalFile(localMapPath)
-        : openMindmap(detail.file);
+        ? openLocalFile(localMapPath, false, linkOrigin())
+        : openMindmapChecked(detail.file, linkOrigin());
       void openTarget
-        .then(() => {
+        .then((opened) => {
           if (
+            opened &&
             detail.targetNodeId &&
             useMindMapStore.getState().document?.nodes.has(detail.targetNodeId)
           ) {
@@ -1163,6 +1395,7 @@ export default function Home() {
     locale,
     openLocalFile,
     openMindmap,
+    openMindmapChecked,
     showNotice,
   ]);
 
@@ -1184,7 +1417,11 @@ export default function Home() {
         return;
       }
 
-      const resolvedPath = workspace.resolvePath(detail.file);
+      const resolvedPath = detail.exact
+        ? workspace.resourcePaths().includes(detail.file)
+          ? detail.file
+          : null
+        : workspace.resolvePath(detail.file);
       if (!resolvedPath) {
         detail.respond({
           error: `„${detail.file}“ wurde im geöffneten Ordner nicht gefunden — oder der Name kommt mehrfach vor.`,
@@ -1192,9 +1429,13 @@ export default function Home() {
         return;
       }
 
+      // The file goes along with its URL: "Save image" reads the bytes from it, since the page's
+      // content security policy does not let `fetch` request a blob: URL.
       void workspace
-        .resourceObjectUrl(resolvedPath)
-        .then((url) => detail.respond({ url, revokeOnCleanup: true }))
+        .resourceFile(resolvedPath)
+        .then((file) =>
+          detail.respond({ url: URL.createObjectURL(file), revokeOnCleanup: true, blob: file }),
+        )
         .catch((previewError) =>
           detail.respond({ error: String(previewError) }),
         );
@@ -1206,31 +1447,26 @@ export default function Home() {
 
   useEffect(() => {
     setBrowserWorkspaceSupported(supportsBrowserWorkspaces());
-    try {
-      const stored = window.localStorage.getItem(OPEN_TABS_STORAGE_KEY);
-      if (stored) setOpenTabs(JSON.parse(stored) as OpenTab[]);
-    } catch {
-      setOpenTabs([]);
-    }
+    setOpenTabs(parseStoredTabs(window.localStorage.getItem(OPEN_TABS_STORAGE_KEY)));
   }, []);
 
+  // Every opened document gets a tab (appended, never reordered); title changes update it in place.
   useEffect(() => {
-    if (!document) return;
-    if (
-      browserWorkspaceRef.current &&
-      browserWorkspaceFiles.some((entry) => entry.path === document.filePath)
-    )
-      return;
-    const filename = document.filePath.split("/").pop() || document.filePath;
-    setOpenTabs((tabs) => {
-      const next = [
-        { filename, title: document.frontmatter.title },
-        ...tabs.filter((tab) => tab.filename !== filename),
-      ].slice(0, 5);
-      window.localStorage.setItem(OPEN_TABS_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, [browserWorkspaceFiles, document?.filePath, document?.frontmatter.title]);
+    if (!document || isWorkspaceMindMap(document)) return;
+    const identity = tabIdentityOf(document);
+    const key = tabKey(identity);
+    const pending = pendingTabOriginRef.current;
+    const origin = pending?.key === key ? pending.origin : undefined;
+    if (pending?.key === key) pendingTabOriginRef.current = null;
+    updateTabs((tabs) =>
+      upsertTab(
+        tabs,
+        { ...identity, title: document.frontmatter.title || identity.filename },
+        { activeKey: key, unsavedKeys: new Set(), origin },
+      ),
+    );
+    // tabIdentityOf reads exactly the values listed here.
+  }, [browserWorkspaceFiles, currentWorkspaceId, document?.filePath, document?.frontmatter.title, updateTabs]);
 
   useKeyboardShortcuts({
     onNew: () => toolbarRef.current?.triggerNew(),
@@ -1335,8 +1571,11 @@ export default function Home() {
           ? useMindMapStore.getState().document
           : renamedInactiveDocument;
         if (!documentToPersist || !titleChanged) return;
+        const revisionBeforeSave = useMindMapStore.getState().editRevision;
         await persistDocumentBeforeRename(documentToPersist, oldFilename);
         titlePersistedBeforeRename = true;
+        // The whole open document was written, so its edits up to here are saved.
+        if (isActiveFile) useMindMapStore.getState().markSaved(revisionBeforeSave);
       };
 
       try {
@@ -1405,6 +1644,13 @@ export default function Home() {
           payload.newFilename ||
           payload.newFilePath.split("/").pop() ||
           newFilename;
+        updateTabs((tabs) =>
+          renameTabFile(
+            tabs,
+            { source: "cloud", workspaceId: cloudWorkspace?.id ?? null, filename: oldFilename },
+            actualFilename,
+          ),
+        );
         if (isActiveFile) {
           currentFileRef.current = actualFilename;
           setDocumentFilePath(payload.newFilePath);
@@ -1479,6 +1725,7 @@ export default function Home() {
       copy.fileRenameFailed,
       persistDocumentBeforeRename,
       setDocumentFilePath,
+      updateTabs,
       showNotice,
       syncUrl,
     ],
@@ -1497,6 +1744,127 @@ export default function Home() {
     },
     [renameFileForTitle],
   );
+
+  // Version history of the open note (local folder or cloud; notes of a browser-local workspace have none)
+  const historyAvailable = Boolean(
+    document && !isWorkspaceMindMap(document) && !localWorkspaceActive,
+  );
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(
+    mapView === "document" &&
+      conflictCopyOriginal &&
+      conflictCopyOriginal.filename === currentFileRef.current,
+  );
+
+  const historyUrl = useCallback(() => {
+    const current = useMindMapStore.getState().document;
+    const filename = currentFileRef.current || current?.filePath || "";
+    return `/api/mindmaps/${encodeURIComponent(filename)}/history${workspaceQuery(current?.storage?.mode === "database" ? current.storage.workspaceId : null)}`;
+  }, []);
+
+  const openHistory = useCallback(async () => {
+    const store = useMindMapStore.getState();
+    const current = store.document;
+    if (!current || isWorkspaceMindMap(current)) return;
+    // A save is what puts the previous version into the history: write what is still open first.
+    // A note in a connected cloud session is persisted by its room.
+    if (current.storage?.mode !== "database" || store.syncStatus !== "connected") {
+      await toolbarRef.current?.triggerSave();
+    }
+    setHistoryCanRestore(true);
+    setHistoryOpen(true);
+  }, []);
+
+  const loadHistory = useCallback(async (): Promise<NoteRevision[]> => {
+    const response = await fetch(historyUrl());
+    if (!response.ok) throw new Error(`History request failed with HTTP ${response.status}`);
+    const data = (await response.json()) as { revisions?: NoteRevision[]; canRestore?: boolean };
+    setHistoryCanRestore(data.canRestore === true);
+    return data.revisions ?? [];
+  }, [historyUrl]);
+
+  const restoreHistoryVersion = useCallback(
+    async (revision: NoteRevision) => {
+      const store = useMindMapStore.getState();
+      const activeDocument = store.document;
+      const filename = currentFileRef.current;
+      if (!activeDocument || !filename) throw new Error("RESTORE_FAILED");
+      const activeStorage =
+        activeDocument.storage?.mode === "database" ? activeDocument.storage : null;
+      const reconnect = Boolean(
+        syncUrl &&
+        (store.syncProvider !== null || store.syncStatus !== "disconnected"),
+      );
+      const stillCurrent = () => currentFileRef.current === filename;
+      try {
+        // The sync server rejects document mutations while this client still occupies the room.
+        if (reconnect) await store.disconnectSync();
+        const response = await fetch(historyUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revisionId: revision.id }),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as {
+            code?: string;
+          } | null;
+          throw new Error(payload?.code ?? "RESTORE_FAILED");
+        }
+      } catch (error) {
+        if (reconnect && stillCurrent()) {
+          await connectDocumentSync(activeDocument, stillCurrent).catch(
+            (reconnectError: unknown) => {
+              console.error(
+                "[BloomMD] Failed to reconnect after a failed restore:",
+                reconnectError,
+              );
+            },
+          );
+        }
+        throw error;
+      }
+      // Show the restored note, then join the session again.
+      const restored = await loadMindmap(
+        filename,
+        activeStorage?.workspaceId ?? cloudWorkspace?.id,
+      );
+      setDocument(restored);
+      if (reconnect && stillCurrent()) {
+        await connectDocumentSync(restored, stillCurrent).catch(
+          (reconnectError: unknown) => {
+            console.error(
+              "[BloomMD] Failed to reconnect after a restore:",
+              reconnectError,
+            );
+          },
+        );
+      }
+    },
+    [cloudWorkspace?.id, connectDocumentSync, historyUrl, setDocument, syncUrl],
+  );
+
+  // Conflict copies point to their original, when it still exists.
+  useEffect(() => {
+    const filename = currentFileRef.current;
+    if (!document || isWorkspaceMindMap(document) || localWorkspaceActive || !parseConflictCopy(filename)) {
+      setConflictCopyOriginal(null);
+      return;
+    }
+    let cancelled = false;
+    const workspaceId = document.storage?.mode === "database" ? document.storage.workspaceId : cloudWorkspace?.id;
+    void fetch(`/api/mindmaps${workspaceQuery(workspaceId)}`)
+      .then(async (response) => (response.ok ? ((await response.json()) as { files?: Array<{ filename: string }> }) : null))
+      .then((data) => {
+        if (!cancelled) setConflictCopyOriginal({ filename, original: data?.files ? findConflictCopyOriginal(filename, data.files) : null });
+      })
+      .catch((error: unknown) => {
+        console.error("[BloomMD] Looking up the original of a conflict copy failed:", error);
+        if (!cancelled) setConflictCopyOriginal({ filename, original: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cloudWorkspace?.id, document?.filePath, document?.storage?.mode, localWorkspaceActive]);
 
   const handleRenameFromSidebar = useCallback(
     (filename: string, title: string) => {
@@ -1560,6 +1928,9 @@ export default function Home() {
           throw error;
         }
         deleteCompleted = true;
+        updateTabs((tabs) =>
+          removeTab(tabs, tabKey({ source: "cloud", workspaceId: cloudWorkspace?.id ?? null, filename })),
+        );
 
         if (!isActiveFile) return;
 
@@ -1613,6 +1984,7 @@ export default function Home() {
       setDocument,
       showNotice,
       syncUrl,
+      updateTabs,
       t.deleteFailed,
       t.documentConflict,
       t.filesLoadFailed,
@@ -1920,6 +2292,23 @@ export default function Home() {
       ),
     ) && !workspaceNavigationPending;
 
+  // The active tab keeps full-contrast text: the brand orange on the light tint misses WCAG AA.
+  const tabShell = (active: boolean) =>
+    active
+      ? "border-[#FF6B35]/50 bg-[var(--color-bloom-light)] text-[var(--color-ink)]"
+      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
+  const tabBack =
+    mapView === "document" && !workspaceNavigationPending
+      ? backTarget(openTabs, activeTabKey, canNavigateBack)
+      : null;
+  const tabBackLabel =
+    tabBack?.kind === "document"
+      ? `${copy.backToDocument} „${tabBack.tab.title}“`
+      : copy.backToMap;
+  const closeRequestTab = closeRequestKey
+    ? openTabs.find((tab) => tab.key === closeRequestKey)
+    : undefined;
+
   return (
     <div className="h-screen flex flex-col bg-[var(--color-surface)]">
       {/* Header */}
@@ -2158,28 +2547,88 @@ export default function Home() {
             <SyncStatus />
           </div>
         )}
-        {openTabs.length > 1 && (
-          <div className="ml-3 hidden min-w-0 max-w-[42vw] items-center gap-1 overflow-x-auto lg:flex">
-            {openTabs.map((tab) => {
-              const active = document?.filePath.endsWith(tab.filename);
-              return (
-                <button
-                  key={tab.filename}
-                  type="button"
-                  onClick={() => void openMindmap(tab.filename)}
-                  className={`max-w-40 truncate rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? "border-[#FF6B35]/40 bg-[var(--color-bloom-light)] text-[#FF6B35]"
-                      : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
-                  }`}
-                  title={tab.filename}
-                  data-testid="mindmap-tab"
-                  data-filename={tab.filename}
-                >
-                  {tab.title}
-                </button>
-              );
-            })}
+        {visibleTabs.length > 0 && (
+          <div
+            className="ml-3 flex min-w-0 max-w-[42vw] items-center gap-1"
+            data-testid="mindmap-tabs"
+          >
+            {tabBack && (
+              <button
+                type="button"
+                data-testid="mindmap-tab-back"
+                onClick={() => void handleBackToWorkspace()}
+                title={`${tabBackLabel} (Cmd/Ctrl+←)`}
+                aria-label={tabBackLabel}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+              >
+                <ArrowLeft size={14} aria-hidden="true" />
+              </button>
+            )}
+            {/*
+              Tabs and their close buttons are siblings in one grid, not nested: a tablist may only own
+              tabs, and a button inside a tab is a nested control. `contents` keeps both groups in the
+              grid so each close button still sits right behind its tab.
+            */}
+            <div className="grid min-w-0 auto-cols-max grid-flow-col items-stretch overflow-x-auto">
+              <div role="tablist" aria-label={copy.documentTabs} className="contents">
+                {visibleTabs.map((tab, index) => {
+                  const active = tab.key === activeTabKey;
+                  const unsaved = active && hasUnsavedChanges;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      style={{ gridColumn: index * 2 + 1, gridRow: 1 }}
+                      onClick={() => void openTab(tab)}
+                      onMouseDown={(event) => {
+                        // Keeps the browser from starting autoscroll on a middle click.
+                        if (event.button === 1) event.preventDefault();
+                      }}
+                      onAuxClick={(event) => {
+                        if (event.button !== 1) return;
+                        event.preventDefault();
+                        requestTabClose(tab.key);
+                      }}
+                      className={`flex max-w-40 items-center gap-1.5 rounded-l-md border border-r-0 py-1 pl-2.5 pr-1 text-xs font-medium transition-colors ${tabShell(active)}`}
+                      title={`${tab.title} — ${tab.filename}`}
+                      data-testid="mindmap-tab"
+                      data-filename={tab.filename}
+                      data-unsaved={unsaved ? "true" : undefined}
+                    >
+                      {unsaved && (
+                        <span
+                          aria-hidden="true"
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#FF6B35]"
+                          data-testid="mindmap-tab-unsaved"
+                        />
+                      )}
+                      <span className="truncate">{tab.title}</span>
+                      {unsaved && <span className="sr-only">{copy.tabUnsaved}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="contents">
+                {visibleTabs.map((tab, index) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    data-testid="mindmap-tab-close"
+                    data-filename={tab.filename}
+                    disabled={visibleTabs.length <= 1}
+                    style={{ gridColumn: index * 2 + 2, gridRow: 1 }}
+                    onClick={() => requestTabClose(tab.key)}
+                    aria-label={`${copy.closeTab}: ${tab.title}`}
+                    title={`${copy.closeTab}: ${tab.title}`}
+                    className={`mr-1 flex w-6 items-center justify-center rounded-r-md border border-l-0 text-xs transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${tabShell(tab.key === activeTabKey)}`}
+                  >
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {browserWorkspaceSupported && (
@@ -2282,12 +2731,81 @@ export default function Home() {
               docsHref={localizedDocsUrl}
               accountHref={`/account?lang=${locale}`}
               onShareLink={document?.storage?.mode === "database" && !localWorkspaceActive ? shareReadOnlyLink : undefined}
+              onOpenHistory={historyAvailable ? () => void openHistory() : undefined}
             />
           </div>
         </div>
       </header>
 
       {/* Modals */}
+      {closeRequestTab && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setCloseRequestKey(null);
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="tab-close-title"
+            aria-describedby="tab-close-body"
+            data-testid="mindmap-tab-close-confirm"
+            className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 shadow-xl"
+          >
+            <h2 id="tab-close-title" className="text-base font-semibold text-[var(--color-ink)]">
+              {copy.closeUnsavedTitle}
+            </h2>
+            <p id="tab-close-body" className="mt-2 text-sm text-[var(--color-ink-muted)]">
+              „{closeRequestTab.title}“ {copy.closeUnsavedBody}
+            </p>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                data-testid="mindmap-tab-close-cancel"
+                onClick={() => setCloseRequestKey(null)}
+                className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+              >
+                {copy.cancelClose}
+              </button>
+              <button
+                type="button"
+                data-testid="mindmap-tab-close-discard"
+                onClick={() => {
+                  const key = closeRequestTab.key;
+                  setCloseRequestKey(null);
+                  // Discarding is the explicit choice: the edits no longer block leaving the document.
+                  const state = useMindMapStore.getState();
+                  state.markSaved(state.editRevision);
+                  void performTabClose(key).catch((closeError: unknown) => {
+                    console.error("[BloomMD] Closing a tab failed:", closeError);
+                    showNotice(String(closeError), null);
+                  });
+                }}
+                className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-red-600 hover:bg-[var(--color-surface-sunken)]"
+              >
+                {copy.discardAndClose}
+              </button>
+              <button
+                type="button"
+                data-testid="mindmap-tab-close-save"
+                autoFocus
+                onClick={() => {
+                  const key = closeRequestTab.key;
+                  setCloseRequestKey(null);
+                  void performTabClose(key).catch((closeError: unknown) => {
+                    console.error("[BloomMD] Closing a tab failed:", closeError);
+                    showNotice(String(closeError), null);
+                  });
+                }}
+                className="rounded-md bg-[#FF6B35] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+              >
+                {copy.saveAndClose}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {shareLinksTarget && (
         <ShareLinksDialog
           filename={shareLinksTarget.filename}
@@ -2346,8 +2864,18 @@ export default function Home() {
         onImport={() => toolbarRef.current?.triggerImport()}
         onExport={() => toolbarRef.current?.triggerExport()}
         onReload={() => void reload()}
+        onOpenHistory={historyAvailable ? () => void openHistory() : undefined}
         onOpenMindmap={openMindmap}
       />
+      {historyOpen && document && (
+        <NoteHistoryDialog
+          filename={currentFileRef.current || document.filePath}
+          loadRevisions={loadHistory}
+          onRestore={restoreHistoryVersion}
+          canRestore={historyCanRestore}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
       <HelpModal
         open={helpOpen}
         onClose={() => setHelpOpen(false)}
@@ -2833,7 +3361,15 @@ export default function Home() {
 
       {/* Main area */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 h-full">
+        <div className={`flex-1 h-full ${showConflictBanner ? "flex min-w-0 flex-col" : ""}`}>
+          {showConflictBanner && conflictCopyOriginal && (
+            <ConflictCopyBanner
+              filename={conflictCopyOriginal.filename}
+              originalFilename={conflictCopyOriginal.original}
+              onOpenOriginal={(original) => void openMindmap(original)}
+            />
+          )}
+          <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {mapView === "workspace" ? (
             <div className="relative h-full w-full">
               {workspaceMapError && (
@@ -2848,8 +3384,10 @@ export default function Home() {
                 files={workspaceGraphFiles}
                 workspaceKey={browserWorkspaceName ?? "cloud"}
                 onOpenFile={(path) => {
-                  setMapView("document");
-                  void openLocalFile(path);
+                  void openLocalFile(path, false, { kind: "map" }).catch((openError: unknown) => {
+                    console.error("[BloomMD] Opening a file from the map failed:", openError);
+                    showNotice(String(openError), null);
+                  });
                 }}
               />
             </div>
@@ -2871,15 +3409,19 @@ export default function Home() {
               agentActivity={selectedAgentActivity}
             />
           )}
+          </div>
         </div>
         {healthOpen && (
           <div className="w-80 shrink-0">
             <WorkspaceHealth
               files={workspaceGraphFiles}
+              resources={browserWorkspaceRef.current?.resourcePaths()}
               onClose={() => setHealthOpen(false)}
               onOpenFile={(path) => {
-                setMapView("document");
-                void openLocalFile(path);
+                void openLocalFile(path, false, { kind: "map" }).catch((openError: unknown) => {
+                  console.error("[BloomMD] Opening a file from the health panel failed:", openError);
+                  showNotice(String(openError), null);
+                });
               }}
             />
           </div>

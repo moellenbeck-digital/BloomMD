@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APP_SOURCE = join(ROOT, "mainview", "App.tsx");
 const BUN_SOURCE = join(ROOT, "bun", "index.ts");
+const FOLDER_DIALOG_SOURCE = join(ROOT, "mainview", "FolderPublicationDialog.tsx");
+const FOLDER_PUBLISH_SOURCE = join(ROOT, "bun", "folder-publish.ts");
+const FOLDER_SHARE_SOURCE = join(ROOT, "bun", "folder-share.ts");
+const FOLDER_SHARES_DIALOG_SOURCE = join(ROOT, "mainview", "FolderSharesDialog.tsx");
 const FILE_CONTEXT_MENU_SOURCE = join(ROOT, "..", "..", "ui", "src", "components", "FileContextMenu.tsx");
 
 function compact(source: string): string {
@@ -78,7 +82,7 @@ describe("desktop mainview contract", () => {
       "onCreateNew={handleCreateNew}",
       "onSaveFile={handleSaveFile}",
       "onImportFile={handleImportFile}",
-      "onExportFile={handleExportFile}",
+      "onDeliverExport={handleDeliverExport}",
       "onNew={() => toolbarRef.current?.triggerNew()}",
       "onSave={() => void toolbarRef.current?.triggerSave()}",
       "onImport={() => toolbarRef.current?.triggerImport()}",
@@ -148,19 +152,24 @@ describe("desktop mainview contract", () => {
     const renderer = compact(await readFile(APP_SOURCE, "utf8"));
     const main = compact(await readFile(BUN_SOURCE, "utf8"));
 
-    expect(renderer).toContain("const result = await importFile(); if (!(\"frontmatter\" in result)) return;");
+    expect(renderer).toContain("const result = await importFile(); if (!(\"frontmatter\" in result)) { if (result.error)");
     expect(renderer).toContain("setDocument(doc); const importedFilename = result.filePath.split(\"/\").pop() || \"\"; currentFileRef.current = importedFilename;");
     expect(renderer).toContain("await refreshFileList();");
     expect(renderer).toContain("const { markdown } = await serializeMindmap(serializedDoc);");
-    expect(renderer).toContain("a.download = `${doc.frontmatter.title || \"mindmap\"}.md`; a.click(); URL.revokeObjectURL(url);");
+    expect(renderer).toContain("const result = await saveExport(file.filename, bytesToBase64(file.data)); if (\"error\" in result) throw new Error(result.error);");
+    // "Save image" / "Save diagram" in the enlarged view (#53) take the same route into the Downloads folder.
+    expect(renderer).toContain("const detail = (event as CustomEvent<DeliverExportDetail>).detail; detail.handle(handleDeliverExport(detail.file));");
+    expect(renderer).toContain("window.addEventListener(DELIVER_EXPORT_EVENT, deliver);");
     expect(renderer).toContain("const updatedFiles = await refreshFileList(); if (!navigationStillCurrent()) return;");
     expect(renderer).toContain("const activeSharedMirror = sharedMirrorRef.current;");
     expect(renderer).toContain("activeSharedMirror.mirror.handleLocalMarkdown(markdown)");
     expect(renderer).toContain("await loadFile(filename);");
     expect(renderer).toContain("else if (currentFileRef.current === null && connectionMode === \"local\") { await loadWorkspace(\"fileChanged\"); }");
 
-    expect(main).toContain("const content = await readFile(srcPath, \"utf-8\");");
-    expect(main).toContain("const filename = sanitizeMarkdownFilename(srcPath.split(\"/\").pop() || \"imported.md\");");
+    expect(main).toContain("let content = await readFile(srcPath, \"utf-8\");");
+    expect(main).toContain("content = importOpml(content).markdown;");
+    expect(main).toContain("const filename = sanitizeMarkdownFilename(sourceName);");
+    expect(main).toContain("await saveExportFile(Utils.paths.downloads, filename, dataBase64)");
     expect(main).toContain("const destPath = resolveMarkdownPath(bloommdDir, filename); const doc = parseFile(destPath, content); await localStore.write(doc);");
     expect(main).toContain("const nextWatcher = watchWorkspace(bloommdDir,");
     expect(main).toContain("if (watcher !== nextWatcher) return;");
@@ -247,6 +256,84 @@ describe("desktop mainview contract", () => {
     expect(main).toContain("getSharedSyncTicket: async ({ localFilename }) => {");
     expect(main).not.toContain("apiStore.create(safeLocalFilename");
     expect(main).not.toContain("const documentId = cloudDocument.frontmatter.id;");
+  });
+
+  test("publishes a local folder only through its own entry point and after a confirmed preview", async () => {
+    const renderer = compact(await readFile(APP_SOURCE, "utf8"));
+    const dialog = compact(await readFile(FOLDER_DIALOG_SOURCE, "utf8"));
+    const main = compact(await readFile(BUN_SOURCE, "utf8"));
+    const folderPublish = compact(await readFile(FOLDER_PUBLISH_SOURCE, "utf8"));
+
+    // A separate entry point with its own name; the single-file share keeps its button and dialog.
+    expect(renderer).toContain("data-testid=\"publish-folder-as-workspace\"");
+    expect(renderer).toContain("data-testid=\"desktop-share-local-document\"");
+    expect(renderer).toContain("<SharedDocumentDialog");
+    expect(renderer).toContain("<FolderPublicationDialog");
+    expect(renderer).toContain("folderPublicationOpen && connectionMode === \"local\"");
+    expect(dialog).toContain("Ordner als gemeinsamen Workspace veröffentlichen");
+    expect(dialog).toContain("Publish folder as a shared workspace");
+
+    // Choosing and previewing never upload; only the confirm button calls publishFolderAsWorkspace.
+    expect(dialog.match(/publishFolderAsWorkspace\(/g)).toHaveLength(1);
+    expect(dialog).toContain("onClick={() => void publish()}");
+    expect(dialog).toContain("data-testid=\"folder-publication-confirm\"");
+    expect(dialog).toContain("const confirmedUploads = preview.items.filter((item) => item.status === \"upload\" && !excluded.has(item.relativePath))");
+    expect(dialog).toContain("Nothing is read or uploaded until you confirm in the preview.");
+
+    // Bun side: preview and folder choice are read-only, the folder comes from the native dialog.
+    const previewHandler = main.slice(main.indexOf("previewFolderPublication: async"), main.indexOf("publishFolderAsWorkspace: async"));
+    expect(previewHandler).toContain("prepareFolderPublicationRequest(");
+    expect(previewHandler).not.toContain("publishFolderPlan");
+    expect(previewHandler).not.toContain(".create(");
+    expect(main).toContain("publicationFolder = resolve(selected);");
+    expect(main).toContain("if (!folderPath) throw new Error(\"PUBLICATION_FOLDER_NOT_SELECTED\");");
+    expect(main).toContain("if (workspace.role === \"viewer\") throw new Error(\"WORKSPACE_READ_ONLY\");");
+    expect(main).toContain("confirmed: confirmedUploads,");
+    expect(main).toContain("recordFolderBinding: (documentIds) => prepared.apiStore.recordSharedFolderBinding(\"bound\", documentIds),");
+
+    // Only Markdown names and IDs go to the cloud: no folder or relative path in any cloud call.
+    expect(folderPublish).toContain("input.cloud.create(item.uploadFilename, markdown)");
+    expect(folderPublish).toContain("input.cloud.recordFolderBinding(");
+    expect(folderPublish).not.toMatch(/input\.cloud\.\w+\([^)]*(relativePath|folderPath)/);
+    expect(main).not.toContain("apiStore.create(prepared.folderPath");
+    expect(main).not.toMatch(/recordSharedFolderBinding\([^)]*(folderPath|relativePath)/);
+  });
+
+  test("a published folder changes the cloud only through an explicit decision and never deletes on its own", async () => {
+    const renderer = compact(await readFile(APP_SOURCE, "utf8"));
+    const sharesDialog = compact(await readFile(FOLDER_SHARES_DIALOG_SOURCE, "utf8"));
+    const main = compact(await readFile(BUN_SOURCE, "utf8"));
+    const folderShare = compact(await readFile(FOLDER_SHARE_SOURCE, "utf8"));
+
+    // Entry point and labels.
+    expect(renderer).toContain("data-testid=\"folder-shares\"");
+    expect(renderer).toContain("<FolderSharesDialog");
+    for (const text of ["neu, noch nicht geteilt", "lokal entfernt", "lokal umbenannt", "Zugriff entzogen", "Ordnerfreigabe trennen", "Cloud-Dokument behalten", "Cloud-Dokument entfernen"]) {
+      expect(sharesDialog).toContain(text);
+    }
+
+    // The cloud is deleted in exactly one place: the explicit remove-cloud decision, after its audit.
+    expect(folderShare.match(/cloud\.delete\(/g)).toHaveLength(1);
+    expect(folderShare).toContain("if (decision.action === \"remove-cloud\") {");
+    expect(folderShare.indexOf("cloud.recordFolderUnbinding([file.binding.documentId]);")).toBeLessThan(folderShare.indexOf("await cloud.delete(file.binding.cloudFilename);"));
+    expect(sharesDialog).toContain("data-testid=\"folder-activity-remove-cloud-confirm\"");
+    expect(sharesDialog).toContain("setConfirming(key)");
+
+    // Reading the activity list never uploads or deletes.
+    const activityHandler = main.slice(main.indexOf("getFolderActivity: async"), main.indexOf("resolveFolderActivity: async"));
+    expect(activityHandler).toContain("computeFolderActivity(");
+    for (const forbidden of ["applyFolderDecision", ".create(", ".delete(", "publishFolderPlan"]) expect(activityHandler).not.toContain(forbidden);
+
+    // A refusal by the server stops the share and keeps local files.
+    expect(main).toContain("stopRevokedFolderShare");
+    expect(folderShare).toContain("if (folder.state === \"revoked\") throw new Error(\"FOLDER_ACCESS_REVOKED\");");
+    expect(folderShare).toContain("{ type: \"access_revoked\" }");
+
+    // Disconnecting ends the local binding first, audits afterwards and deletes nothing.
+    const disconnectHandler = main.slice(main.indexOf("disconnectFolderShare: async"), main.indexOf("createFolder: async"));
+    expect(disconnectHandler.indexOf("persistDesktopSettings(")).toBeLessThan(disconnectHandler.indexOf("auditFolderUnbinding("));
+    for (const forbidden of [".delete(", ".create(", "rm(", "unlink("]) expect(disconnectHandler).not.toContain(forbidden);
+    expect(main).toContain("PART_OF_FOLDER_SHARE");
   });
 
   test("keeps one shared file on its Yjs provider while mirroring local watcher changes", async () => {

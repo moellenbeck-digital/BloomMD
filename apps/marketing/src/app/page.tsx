@@ -901,7 +901,7 @@ function DesktopSection() {
     {
       icon: HardDrive,
       title: "Deine Dateien, dein Rechner",
-      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund.",
+      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund. Deine Dateien gehören dir: Alle Exporte (Markdown, OPML, PDF, PNG, SVG) sind für jeden frei.",
     },
     {
       icon: RefreshCw,
@@ -988,6 +988,9 @@ function WikiSection() {
             BloomMD schreibt und liest das <strong className="font-semibold text-[#1A1A1A]">Open Knowledge Format</strong> (OKF v0.2),
             Googles offene Markdown-Spezifikation für Agenten-Wissen. Kein proprietärer Index, keine versteckte Modell-Erinnerung:
             eine Ordnerstruktur aus Markdown-Dateien, die du selbst verwaltest und jederzeit in deinen gewohnten Werkzeugen öffnest.
+          </p>
+          <p className="mt-5 text-sm leading-6 text-[#666666]">
+            Unsere <Link href="/roadmap" className="font-semibold text-[#B94316] underline-offset-4 hover:underline">Wissensplattform-Roadmap</Link> zeigt die Richtung von Quellen und Sync über Rechte und belegte Suche bis zu Agenten-Workflows. Der Learnings-Pilot ist der erste interne Backend-Nutzungsfall; lokales Markdown bleibt der Kern.
           </p>
         </div>
 

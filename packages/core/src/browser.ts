@@ -12,6 +12,17 @@ export type {
 
 export { HeadingDepthError, MAX_HEADING_LEVEL } from "./types";
 export { parseFile, serializeToMarkdown } from "./parser";
+export { exportOpml, exportOpmlOutline, importOpml, OpmlError, type OpmlErrorCode, type OpmlImportResult, type OpmlOutlineNode } from "./opml";
+export {
+  CONFLICT_COPY_LABELS,
+  conflictCopyPath,
+  parseConflictCopy,
+  isConflictCopy,
+  findConflictCopyOriginal,
+  type ConflictCopyInfo,
+  type ConflictCopyLabel,
+} from "./conflict-copy";
+export { NOTE_HISTORY_LIMIT, sortRevisionsNewestFirst, type NoteHistorySource, type NoteRevision } from "./note-history";
 export { collapseUnchanged, diffLines, diffStats, type DiffKind, type DiffLine, type DiffStats } from "./diff";
 export { addNode, deleteNode, moveNode, renameNode } from "./operations";
 export { documentToYDoc, yDocToDocument } from "./yjs-bridge";
@@ -90,6 +101,31 @@ export {
   type WorkspaceMindMapOptions,
 } from "./workspace-document";
 export {
+  parsePdfLinkTarget,
+  extractPdfLinks,
+  extractPdfCitations,
+  formatPdfLink,
+  pdfPageUrl,
+  buildPdfCitationNode,
+  checkPdfLinks,
+  resolvePdfResource,
+  type PdfLink,
+  type PdfCitation,
+  type PdfCitationInput,
+  type PdfCitationNode,
+  type PdfLinkProblem,
+} from "./pdf-links";
+export {
+  buildBibliography,
+  readCitation,
+  formatBibtex,
+  formatBibliographyMarkdown,
+  type Bibliography,
+  type BibliographyEntry,
+  type BibliographySkip,
+  type BibliographyOptions,
+} from "./bibliography";
+export {
   lintWorkspace,
   checkRoundtrip,
   type LintFinding,
@@ -124,6 +160,19 @@ export {
   type WorkspaceAgentToolName,
   type WorkspaceAgentResult,
 } from "./workspace-agent";
+export {
+  IMAGE_EXTENSIONS,
+  assetPathCandidates,
+  describeAssetRejection,
+  imageExtension,
+  imageMimeType,
+  isImagePath,
+  resolveAssetPath,
+  type AssetPathRejection,
+  type AssetPathResult,
+  type ImageRefSyntax,
+} from "./asset-path";
+export { extractImageRefs, type ImageRef } from "./image-refs";
 // The pure path rules; `paths.ts` stays out of the browser bundle because it needs `node:path`.
 export { filenameForTitle, filenameForTitleInPath, normalizeMarkdownPath, normalizeFolderPath } from "./path-rules";
 export {

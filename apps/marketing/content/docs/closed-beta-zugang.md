@@ -28,6 +28,13 @@ Du brauchst keine Einladung und keinen Code.
    weder Login noch Sitzung.
 6. Melde dich auf bloommd.app mit E-Mail und Passwort an.
 
+![Echter Screenshot: Die Registrierungsseite von BloomMD mit Name, E-Mail, Passwort und Zustimmung](/docs/signup.png)
+
+Nach dem Absenden öffnet sich die Anmeldeseite mit dem Hinweis, dass eine Bestätigungs-E-Mail
+gesendet wurde. Die E-Mail-Adresse ist schon eingetragen.
+
+![Echter Screenshot: Die Anmeldeseite nach der Registrierung mit grünem Hinweis zur Bestätigungs-E-Mail](/docs/signup-verify.png)
+
 Die Registrierung ist gegen Massenanmeldungen begrenzt. Bei zu vielen Versuchen in kurzer Zeit
 zeigt die Seite „Zu viele Versuche“ an; warte dann etwa eine Stunde und versuche es erneut.
 
@@ -57,6 +64,8 @@ Passwort. Der Ablauf ist bewusst getrennt, damit klar ist, was in welchem Schrit
    danach deine Account-E-Mail.
 5. Danach kannst du dich auf bloommd.app mit E-Mail und Passwort anmelden.
 
+![Echter Screenshot: Die Registrierungsseite bei aktivem Zugangsschalter mit dem Hinweis, dass der Cloud-Zugang noch nicht freigeschaltet ist, und einem Feld für die eingeladene E-Mail-Adresse](/docs/signup-gate.png)
+
 ### Noch keine Einladung
 
 Wenn du noch keine Einladung bekommen hast, wende dich an das BloomMD-Team. Ohne Einladung oder
@@ -68,10 +77,15 @@ Der Link in der Einladungs-E-Mail führt direkt zur Account-Erstellung. Bei pers
 Einladungen brauchst du normalerweise keinen Einladungscode. Ein Code-Feld kann als Fallback
 sichtbar sein, falls ein Admin einen Code separat verschickt.
 
+![Echter Screenshot: Die Registrierungsseite, geöffnet über einen Einladungslink, mit schon eingetragener E-Mail-Adresse](/docs/signup-invited.png)
+
 ### Einladung erneut senden
 
 Wenn eine Beta-Einladung nicht angekommen ist, kann ein Admin sie erneut senden. Prüfe vorher auch
 Spam- und Promotions-Ordner.
+
+Meldungen wie „Diese Einladung ist abgelaufen.“ oder eine falsche Adresse erklärt die
+[Fehlerbehebung](/docs/fehlerbehebung).
 
 ## Bereits einen Account erstellt
 

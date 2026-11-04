@@ -1,4 +1,5 @@
 import type { SqlClient } from "./sql-client";
+import { WAITLIST_UNACTIVATED_RETENTION_DAYS } from "./waitlist-transfer-constants";
 
 /** Unconfirmed accounts are removed after this many days (#169); they are junk and addresses of third parties. */
 export const UNCONFIRMED_ACCOUNT_RETENTION_DAYS = 7;
@@ -98,4 +99,65 @@ function summarize(row: unknown, days: number, dryRun: boolean): UnconfirmedAcco
     tokens: Number(value.tokens ?? 0),
     oldestCreatedAt: oldest == null ? null : new Date(oldest).toISOString(),
   };
+}
+
+export interface UnactivatedWaitlistAccountCleanup {
+  dryRun: boolean;
+  days: number;
+  /** Prepared accounts that match (dry run) or were deleted. */
+  accounts: number;
+}
+
+/**
+ * Deletes prepared waitlist accounts (#105) that nobody activated within `days` of the activation
+ * mail (or of their creation, when the mail never went out), with their transfer row and tokens.
+ *
+ * `purgeUnconfirmedAccounts` leaves them alone because they have no password; without this the
+ * address of someone who ignored the mail would stay forever, while the waitlist entry itself is
+ * deleted after the same number of days. Only accounts nobody could have used are touched:
+ * no password, never confirmed, nothing attached. No address is returned or logged.
+ */
+export async function purgeUnactivatedWaitlistAccounts(
+  sql: SqlClient,
+  options: { days?: number; dryRun: boolean },
+): Promise<UnactivatedWaitlistAccountCleanup> {
+  const days = options.days ?? WAITLIST_UNACTIVATED_RETENTION_DAYS;
+  if (!Number.isSafeInteger(days) || days < 1) throw new Error("days must be a positive integer.");
+
+  if (options.dryRun) {
+    const rows = await sql`
+      select count(*)::int as accounts
+      from bloom_users u
+      join bloom_waitlist_transfers t on t.user_id = u.id
+      where t.activated_at is null
+        and u.password_hash is null
+        and u.email_verified_at is null
+        and u.stripe_customer_id is null
+        and coalesce(t.invited_at, t.created_at) < now() - (${days} * interval '1 day')
+        and not exists (select 1 from bloom_workspace_members m where m.user_id = u.id)
+        and not exists (select 1 from bloom_workspaces w where w.owner_user_id = u.id)
+        and not exists (select 1 from bloom_access_tokens a where a.user_id = u.id)
+    `;
+    return { dryRun: true, days, accounts: Number((rows[0] as { accounts?: number } | undefined)?.accounts ?? 0) };
+  }
+
+  // The transfer row and the auth tokens of the account go with it (on delete cascade).
+  const rows = await sql`
+    with removed as (
+      delete from bloom_users u
+      using bloom_waitlist_transfers t
+      where t.user_id = u.id
+        and t.activated_at is null
+        and u.password_hash is null
+        and u.email_verified_at is null
+        and u.stripe_customer_id is null
+        and coalesce(t.invited_at, t.created_at) < now() - (${days} * interval '1 day')
+        and not exists (select 1 from bloom_workspace_members m where m.user_id = u.id)
+        and not exists (select 1 from bloom_workspaces w where w.owner_user_id = u.id)
+        and not exists (select 1 from bloom_access_tokens a where a.user_id = u.id)
+      returning u.id
+    )
+    select count(*)::int as accounts from removed
+  `;
+  return { dryRun: false, days, accounts: Number((rows[0] as { accounts?: number } | undefined)?.accounts ?? 0) };
 }

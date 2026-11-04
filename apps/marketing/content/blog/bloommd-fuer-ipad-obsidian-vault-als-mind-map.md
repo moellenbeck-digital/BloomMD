@@ -78,6 +78,6 @@ unterwegs reicht das iPhone.
 
 ## Stand
 
-Die App ist eine Beta, die Veröffentlichung im App Store wird vorbereitet. Ein Konto brauchst du für
+Die App liegt als Version 1.0 vor, die Veröffentlichung im App Store wird vorbereitet. Ein Konto brauchst du für
 die Arbeit mit deinem Vault nicht; die Anmeldung mit einem BloomMD-Konto für Cloud-Workspaces ist
 optional (Beta).

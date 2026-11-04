@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2 } from "lucide-react";
-import { parseFile, serializeToMarkdown, type MindMapDocument, type MindMapListEntry, type MindMapNode } from "@bloommd/core/browser";
+import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2, History, Quote, BookOpen } from "lucide-react";
+import { buildPdfCitationNode, parseFile, serializeToMarkdown, type MindMapDocument, type MindMapListEntry, type MindMapNode } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { bibliographyFilename, bibliographyForDocument, downloadTextFile } from "../utils/bibliography";
 import { extractLinksFromMarkdown } from "../utils/links";
+import { ConflictCopyBadge } from "./ConflictCopyBadge";
 
 interface ApiListResponse {
   files: MindMapListEntry[];
@@ -28,11 +30,13 @@ interface CommandPaletteProps {
   onImport: () => void;
   onExport: () => void;
   onReload: () => void;
+  /** Opens the version history of the open note; the action is only listed when it is given. */
+  onOpenHistory?: () => void;
   onOpenMindmap?: (filename: string) => void | Promise<void>;
 }
 
 type PaletteItem =
-  | { id: string; category: string; title: string; subtitle: string; kind: "action"; icon: typeof Plus; run: () => void | Promise<void> }
+  | { id: string; category: string; title: string; subtitle: string; kind: "action"; icon: typeof Plus; run: () => void | Promise<void>; keepOpen?: boolean }
   | { id: string; category: string; title: string; subtitle: string; kind: "mindmap"; filename: string }
   | { id: string; category: string; title: string; subtitle: string; kind: "node"; nodeId: string; linkCount: number };
 
@@ -52,6 +56,7 @@ export function CommandPalette({
   onImport,
   onExport,
   onReload,
+  onOpenHistory,
   onOpenMindmap,
 }: CommandPaletteProps) {
   const { t } = useLocale();
@@ -63,11 +68,19 @@ export function CommandPalette({
   const setSelectedNodeId = useMindMapStore((s) => s.setSelectedNodeId);
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
   const document = useMindMapStore((s) => s.document);
+  const readOnly = useMindMapStore((s) => s.readOnly);
+  const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
+  const addChildNode = useMindMapStore((s) => s.addChildNode);
+  const updateNodeContent = useMindMapStore((s) => s.updateNodeContent);
+  const [pdfForm, setPdfForm] = useState<{ file: string; page: string; quote: string; error: string | null } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setFocusedIndex(0);
+    setPdfForm(null);
+    setNotice(null);
     requestAnimationFrame(() => inputRef.current?.focus());
     fetch("/api/mindmaps")
       .then((res) => res.json())
@@ -158,13 +171,64 @@ export function CommandPalette({
     [setDocument, t],
   );
 
+  const exportBibliography = useCallback(
+    (format: "bib" | "md") => {
+      if (!document) return false;
+      try {
+        const result = bibliographyForDocument(document, files);
+        if (result.entries.length === 0) {
+          setNotice(t.bibliographyEmpty);
+          return false;
+        }
+        downloadTextFile(
+          bibliographyFilename(document, format),
+          format === "bib" ? result.bibtex : result.markdown,
+          format === "bib" ? "application/x-bibtex" : "text/markdown",
+        );
+        return true;
+      } catch (error) {
+        console.error("[BloomMD] Bibliography export failed:", error);
+        setNotice(t.bibliographyFailed);
+        return false;
+      }
+    },
+    [document, files, t.bibliographyEmpty, t.bibliographyFailed],
+  );
+
+  const submitPdfForm = useCallback(() => {
+    if (!pdfForm) return;
+    const fail = (error: string) => setPdfForm({ ...pdfForm, error });
+    if (!document) return fail(t.pdfCitationNoMap);
+    const built = buildPdfCitationNode({ file: pdfForm.file, page: pdfForm.page, quote: pdfForm.quote });
+    if (!built.ok) return fail(built.error === "page-invalid" ? t.pdfCitationErrorPage : t.pdfCitationErrorFile);
+    const parentId = selectedNodeId && document.nodes.has(selectedNodeId) ? selectedNodeId : document.rootId;
+    const nodeId = addChildNode(parentId, built.title);
+    if (!nodeId) return fail(t.pdfCitationFailed);
+    updateNodeContent(nodeId, built.content);
+    setSelectedNodeId(nodeId);
+    setEditorVisible(true);
+    onClose();
+  }, [addChildNode, document, onClose, pdfForm, selectedNodeId, setEditorVisible, setSelectedNodeId, t, updateNodeContent]);
+
   const items = useMemo<PaletteItem[]>(() => {
     const actions: PaletteItem[] = [
       { id: "action-new", category: t.categoryCommands, title: t.newMindmap, subtitle: "Cmd/Ctrl+N", kind: "action", icon: Plus, run: onNew },
       { id: "action-save", category: t.categoryCommands, title: t.save, subtitle: "Cmd/Ctrl+S", kind: "action", icon: Save, run: onSave },
       { id: "action-import", category: t.categoryCommands, title: t.importMd, subtitle: "Cmd/Ctrl+I", kind: "action", icon: Upload, run: onImport },
-      { id: "action-export", category: t.categoryCommands, title: t.exportMd, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
+      { id: "action-export", category: t.categoryCommands, title: t.exportMenu, subtitle: "Cmd/Ctrl+E", kind: "action", icon: Download, run: onExport },
       { id: "action-reload", category: t.categoryCommands, title: t.reload, subtitle: "Cmd/Ctrl+R", kind: "action", icon: RefreshCw, run: onReload },
+      ...(onOpenHistory && document
+        ? [{ id: "action-history", category: t.categoryCommands, title: t.historyAction, subtitle: document.frontmatter.title, kind: "action" as const, icon: History, run: onOpenHistory }]
+        : []),
+      ...(document && !readOnly
+        ? [{ id: "action-pdf-citation", category: t.categoryCommands, title: t.insertPdfCitation, subtitle: t.pdfCitationHint, kind: "action" as const, icon: Quote, keepOpen: true, run: () => setPdfForm({ file: "", page: "1", quote: "", error: null }) }]
+        : []),
+      ...(document && !document.derived
+        ? [
+            { id: "action-bibliography-bibtex", category: t.categoryCommands, title: t.exportBibtex, subtitle: t.bibliographyHint, kind: "action" as const, icon: BookOpen, keepOpen: true, run: () => { if (exportBibliography("bib")) onClose(); } },
+            { id: "action-bibliography-markdown", category: t.categoryCommands, title: t.exportBibliographyMd, subtitle: t.bibliographyHint, kind: "action" as const, icon: BookOpen, keepOpen: true, run: () => { if (exportBibliography("md")) onClose(); } },
+          ]
+        : []),
       { id: "action-template-research", category: t.categoryCommands, title: t.researchTemplate, subtitle: t.template, kind: "action", icon: FileText, run: () => createTemplateMindmap("research") },
       { id: "action-template-project", category: t.categoryCommands, title: t.projectTemplate, subtitle: t.template, kind: "action", icon: FileText, run: () => createTemplateMindmap("project") },
     ];
@@ -194,7 +258,7 @@ export function CommandPalette({
       : [];
 
     return [...actions, ...mindmaps, ...nodes];
-  }, [createTemplateMindmap, document, files, onExport, onImport, onNew, onReload, onSave, t]);
+  }, [createTemplateMindmap, document, exportBibliography, files, onClose, onExport, onImport, onNew, onOpenHistory, onReload, onSave, readOnly, t]);
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -214,7 +278,9 @@ export function CommandPalette({
   const runItem = useCallback(
     async (item: PaletteItem) => {
       if (item.kind === "action") {
+        setNotice(null);
         await item.run();
+        if (item.keepOpen) return;
       } else if (item.kind === "mindmap") {
         await openMindmap(item.filename);
       } else {
@@ -230,9 +296,12 @@ export function CommandPalette({
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        if (pdfForm) setPdfForm(null);
+        else onClose();
         return;
       }
+      // Inside the PDF form Enter and the arrows belong to the fields, not to the command list.
+      if (pdfForm) return;
       if (filteredItems.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -245,7 +314,7 @@ export function CommandPalette({
         void runItem(filteredItems[focusedIndex] ?? filteredItems[0]!);
       }
     },
-    [filteredItems, focusedIndex, onClose, runItem],
+    [filteredItems, focusedIndex, onClose, pdfForm, runItem],
   );
 
   if (!open) return null;
@@ -267,6 +336,7 @@ export function CommandPalette({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t.commandPlaceholder}
+              disabled={Boolean(pdfForm)}
               className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-faint)]"
               data-testid="command-palette-input"
             />
@@ -276,7 +346,81 @@ export function CommandPalette({
             </div>
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto p-2">
+          {notice && (
+            <p role="status" className="border-b border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-ink-muted)]" data-testid="command-palette-notice">
+              {notice}
+            </p>
+          )}
+
+          {pdfForm && (
+            <form
+              className="grid gap-3 p-4"
+              data-testid="pdf-citation-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitPdfForm();
+              }}
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-ink)]">
+                <Quote size={16} className="text-[#FF6B35]" />
+                {t.insertPdfCitation}
+              </div>
+              <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
+                {t.pdfCitationFile}
+                <input
+                  autoFocus
+                  value={pdfForm.file}
+                  onChange={(event) => setPdfForm({ ...pdfForm, file: event.target.value, error: null })}
+                  placeholder={t.pdfCitationFilePlaceholder}
+                  className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
+                  data-testid="pdf-citation-file"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
+                {t.pdfCitationPage}
+                <input
+                  value={pdfForm.page}
+                  onChange={(event) => setPdfForm({ ...pdfForm, page: event.target.value, error: null })}
+                  inputMode="numeric"
+                  className="w-28 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
+                  data-testid="pdf-citation-page"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
+                {t.pdfCitationQuote}
+                <textarea
+                  value={pdfForm.quote}
+                  onChange={(event) => setPdfForm({ ...pdfForm, quote: event.target.value, error: null })}
+                  rows={4}
+                  className="resize-y rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm font-normal text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
+                  data-testid="pdf-citation-quote"
+                />
+              </label>
+              {pdfForm.error && (
+                <p role="alert" className="text-xs text-red-600" data-testid="pdf-citation-error">
+                  {pdfForm.error}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPdfForm(null)}
+                  className="rounded-md border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+                >
+                  {t.pdfCitationCancel}
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-md bg-[#FF6B35] px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"
+                  data-testid="pdf-citation-submit"
+                >
+                  {t.pdfCitationInsert}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className={pdfForm ? "hidden" : "max-h-[420px] overflow-y-auto p-2"}>
             {filteredItems.length === 0 && (
               <div className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">
                 {t.noSearchResults}
@@ -309,7 +453,10 @@ export function CommandPalette({
                     <Icon size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">{item.title}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="block min-w-0 truncate text-sm font-semibold text-[var(--color-ink)]">{item.title}</span>
+                      {item.kind === "mindmap" && <ConflictCopyBadge filename={item.filename} />}
+                    </span>
                     <span className="block truncate text-xs text-[var(--color-ink-faint)]">
                       {item.category} · {item.subtitle}
                     </span>

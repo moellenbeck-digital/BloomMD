@@ -4,7 +4,7 @@
  */
 import { KNOWLEDGE_NODE_PATCH_FIELDS, KNOWLEDGE_STATUSES, parseKnowledgeFrontmatterInput, parseKnowledgeNodeInputs, type KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { McpTextResult, type McpServerOptions, type McpTool } from "./mcp";
-import { INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, parseIngestNodes, type KnowledgeService } from "./knowledge-service";
+import { INGEST_MAX_DEPTH, INGEST_MAX_NODES, INGEST_MAX_TEXT_CHARS, INGEST_TEMPLATE_IDS, parseIngestNodes, type KnowledgeService } from "./knowledge-service";
 
 export type KnowledgeTargets = Partial<Record<"vault" | "cloud", KnowledgeService>>;
 
@@ -50,7 +50,7 @@ const changeMeta = {
 
 /** Trust and lifecycle fields of a map (frontmatter); see docs/LEARNINGS.md. */
 const trustProperties = {
-  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet, ersetzt or unbestätigt (derived statement without evidence; still found by the default search)." },
+  status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Lifecycle of the map: neu, bestätigt, veraltet, ersetzt, unbestätigt (derived statement without evidence; still found by the default search) or verworfen (decided against by a person; retired like veraltet)." },
   stale_after: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$", description: "Date YYYY-MM-DD from which the map is to be checked again." },
   verified: {
     type: "object",
@@ -75,17 +75,17 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_search",
     title: "Suchen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt are left out unless includeStale is true (a status filter always applies as given).",
+    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt/verworfen are left out unless includeStale is true (a status filter always applies as given).",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
         query: { type: "string", description: "Text to find; may be empty when status, tag or scope is given." },
         area: { type: "string" },
-        status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt)." },
+        status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt/verworfen)." },
         tag: { type: "string", description: "Only maps with this tag (exact, case-insensitive), e.g. a role like coder." },
         scope: { type: "string", description: "Only maps whose scope contains this text (case-insensitive), e.g. a component." },
-        includeStale: { type: "boolean", description: "Also return expired maps and maps with status veraltet or ersetzt." },
+        includeStale: { type: "boolean", description: "Also return expired maps and maps with status veraltet, ersetzt or verworfen." },
         ...targetProperty,
       },
     },
@@ -94,7 +94,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_stale",
     title: "Abgelaufene Maps",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Nothing to check: the text is exactly NO_REPLY. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt.",
+    description: "Maps whose stale_after is today or earlier (to re-check, renew or retire), most overdue first: path, title, status, stale_after, daysOverdue (negative = expires in n days) and scope. days adds maps that expire within the next n days. Filter by area, tag or scope. Nothing to check: the text is exactly NO_REPLY. Renew with bloommd_update_map (stale_after, verified) or retire with status veraltet/ersetzt/verworfen.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -126,7 +126,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_workspace_index",
     title: "Workspace-Index",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Link health over all maps the agent can read. Without path: summary and findings — broken and ambiguous links, links to a heading that does not exist (stale-anchor), links to a map that is veraltet/ersetzt or past stale_after with its replaced_by (stale-document), and a bloommd:id that occurs more than once (duplicate-node-id) with every place. With path: that map's document node, its headings (level, line, anchor, id) with their backlinks (a link with an anchor counts for the heading, one without for the map; per backlink source map, source heading, line, link as written) and the findings that belong to it (links written in it, a duplicate id first found in it).",
+    description: "Link health over all maps the agent can read. Without path: summary and findings — broken and ambiguous links, links to a heading that does not exist (stale-anchor), links to a map that is veraltet/ersetzt/verworfen or past stale_after with its replaced_by (stale-document), and a bloommd:id that occurs more than once (duplicate-node-id) with every place. With path: that map's document node, its headings (level, line, anchor, id) with their backlinks (a link with an anchor counts for the heading, one without for the map; per backlink source map, source heading, line, link as written) and the findings that belong to it (links written in it, a duplicate id first found in it).",
     inputSchema: { type: "object", additionalProperties: false, properties: { path: { type: "string", description: "Only this map: nodes with backlinks and its findings." }, ...targetProperty } },
   },
   {
@@ -161,7 +161,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_ingest",
     title: "Text ablegen",
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    description: `File raw text (transcript, chat, note) as a new map from a template. You hand over the original text AND the sections you already structured; the tool invents nothing and calls no model. The original is stored word for word (no shortening, no normalising) as a node of kind source titled "Originaltext" below "Quellen" (added when the template has none, e.g. weekly), with the source reference (citation, and url for http(s)) and date. nodes use the format of bloommd_create_map; parents are skeleton refs of the template (bloommd_templates). Limits: text at most ${INGEST_MAX_TEXT_CHARS} characters, nodes at most ${INGEST_MAX_NODES} (template skeleton and source node not counted); above that, with no text or no source, or with an unknown template, nothing is written and the error names the limit. A map with the same title (ignoring case and punctuation) in the same area is a duplicate: nothing is written, the error names the existing map. Rights like bloommd_create_map: read is refused, propose becomes a proposal for the owner (never approve it yourself), write is written; logged, undo with bloommd_undo. With inMap (path of an existing map) the same input adds to that map instead: a section node whose parent already has exactly one child with the same normalized title is not created again (its new children hang below it, its content stays); otherwise it is created (several matches: created, with a hint "mehrdeutig" in hinweise). parent is a ref of your list, a node id of that map, or a skeleton ref of a template whose node the map has; otherwise nothing is written. The original becomes one more source node "Originaltext <date or source>" below "Quellen" (existing sources stay unchanged); a source node with the same citation is a duplicate and nothing is written. relations targets (ref, node id or title) and [[Note]] links in the content of new nodes are connected only when the target is unambiguous, otherwise hinweise says so. template, title and area are not allowed with inMap; a missing map refuses with nothing written. Use template learning's own flow (bloommd_create_map) for learnings, not this tool. Never file credentials (passwords, tokens, keys) or personal data: the tool does not filter them.`,
+    description: `File raw text (transcript, chat, note) as a new map from a template. You hand over the original text AND the sections you already structured; the tool invents nothing and calls no model. The original is stored word for word (no shortening, no normalising) as a node of kind source titled "Originaltext" below "Quellen" (added when the template has none, e.g. weekly), with the source reference (citation, and url for http(s)) and date. nodes use the format of bloommd_create_map; parents are skeleton refs of the template (bloommd_templates). Limits: text at most ${INGEST_MAX_TEXT_CHARS} characters, nodes at most ${INGEST_MAX_NODES} (template skeleton and source node not counted); nodes at most ${INGEST_MAX_DEPTH} levels below the map title (the template skeleton is level 1; with inMap the level of the existing parent counts); above that, with no text or no source, or with an unknown template, nothing is written and the error names the limit. A map with the same title (ignoring case and punctuation) in the same area is a duplicate: nothing is written, the error names the existing map. Rights like bloommd_create_map: read is refused, propose becomes a proposal for the owner (never approve it yourself), write is written; logged, undo with bloommd_undo. With inMap (path of an existing map) the same input adds to that map instead: a section node whose parent already has exactly one child with the same normalized title is not created again (its new children hang below it, its content stays); otherwise it is created (several matches: created, with a hint "mehrdeutig" in hinweise). parent is a ref of your list, a node id of that map, or a skeleton ref of a template whose node the map has; otherwise nothing is written. The original becomes one more source node "Originaltext <date or source>" below "Quellen" (existing sources stay unchanged); a source node with the same citation is a duplicate and nothing is written. relations targets (ref, node id or title) and [[Note]] links in the content of new nodes are connected only when the target is unambiguous, otherwise hinweise says so. template, title and area are not allowed with inMap; a missing map refuses with nothing written. Area hub: per area (Schule, Arbeit, Projekte, Gespräche, or the last segment of a custom area) the tool keeps one hub map in the area folder, named like the area (frontmatter type hub): it is created when missing, otherwise a [[link]] to the map is added below its node "Maps" (never twice). The hub is no duplicate of a map titled like the area, does not count against the node limit, follows the same rights as the map (propose: a second proposal; logged with its own changeId, undo with bloommd_undo) and is reported as hub in the result; if it cannot be written, the ingest still succeeds and hinweise says why. Use template learning's own flow (bloommd_create_map) for learnings, not this tool. Never file credentials (passwords, tokens, keys) or personal data: the tool does not filter them.`,
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -290,7 +290,7 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
 export const KNOWLEDGE_INSTRUCTIONS = [
   "BloomMD shows Markdown notes as mind maps: every heading is a node, the document is the map.",
   "File information so that a person can understand and explain it from the map alone:",
-  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt maps are left out unless includeStale is true).",
+  "1. bloommd_overview to see areas and access; bloommd_search to find an existing map for the topic (filters status, tag, scope for learnings by role or component; expired and veraltet/ersetzt/verworfen maps are left out unless includeStale is true).",
   "2. Existing topic: bloommd_get_map, then bloommd_update_map with new nodes under the right parent (several nodes at once) or bloommd_update_node to change one node (status, content, relations) and/or add children below it. New topic: bloommd_templates, then bloommd_create_map with the fitting template.",
   "3. Only use facts from the source; questions instead of guesses; short titles, details in content; tasks with status/due/assignee; decisions with decision state; connect related nodes with relations.",
   "4. Private material (school, own conversations) goes to target vault; work and team material to target cloud when it is configured.",

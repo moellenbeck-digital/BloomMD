@@ -48,16 +48,23 @@ describe("CreateEntryDialog templates", () => {
     locale?: Locale;
     kind?: CreateEntryKind;
     load?: () => Promise<CustomNoteTemplate[]>;
+    folders?: string[];
+    defaultParent?: string;
+    parentForFolders?: boolean;
+    failWith?: string;
   } = {}) {
     await act(async () => {
       root!.render(
         <LocaleProvider initialLocale={options.locale ?? "de"}>
           <CreateEntryDialog
             kind={options.kind ?? "file"}
-            folders={[]}
+            folders={options.folders ?? []}
+            defaultParent={options.defaultParent}
+            parentForFolders={options.parentForFolders}
             loadCustomTemplates={options.load}
             onClose={() => undefined}
             onCreate={async (path, content) => {
+              if (options.failWith) throw new Error(options.failWith);
               created.push({ path, content });
               return path;
             }}
@@ -180,5 +187,66 @@ describe("CreateEntryDialog templates", () => {
   test("folders have no template choice", async () => {
     await open({ kind: "folder" });
     expect(query("create-entry-template")).toBeNull();
+  });
+
+  test("a new file goes to the preselected folder, which the user can change", async () => {
+    await open({ folders: ["Uni", "Uni/Physik"], defaultParent: "Uni/Physik" });
+    const parent = query<HTMLSelectElement>("create-entry-parent")!;
+    expect(parent.value).toBe("Uni/Physik");
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Optik", "input");
+    await submit();
+    expect(created).toEqual([{ path: "Uni/Physik/Optik.md", content: undefined }]);
+  });
+
+  test("another folder can be chosen instead of the preselected one", async () => {
+    await open({ folders: ["Uni", "Uni/Physik"], defaultParent: "Uni/Physik" });
+    await setValue(query<HTMLSelectElement>("create-entry-parent")!, "Uni", "change");
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Optik", "input");
+    await submit();
+    expect(created[0]!.path).toBe("Uni/Optik.md");
+  });
+
+  test("nothing is preselected by default: a new file goes to the top", async () => {
+    await open({ folders: ["Uni"] });
+    expect(query<HTMLSelectElement>("create-entry-parent")!.value).toBe("");
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Notiz", "input");
+    await submit();
+    expect(created[0]!.path).toBe("Notiz.md");
+  });
+
+  test("a new folder has no destination choice unless asked for", async () => {
+    await open({ kind: "folder", folders: ["Uni"], defaultParent: "Uni" });
+    expect(query("create-entry-parent")).toBeNull();
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Optik", "input");
+    await submit();
+    expect(created[0]!.path).toBe("Optik");
+  });
+
+  test("with the destination choice a new folder is created inside the chosen folder", async () => {
+    await open({ kind: "folder", folders: ["Uni", "Uni/Physik"], defaultParent: "Uni", parentForFolders: true });
+    expect(query<HTMLSelectElement>("create-entry-parent")!.value).toBe("Uni");
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Optik", "input");
+    expect(container.textContent).toContain("Uni/Optik");
+    await submit();
+    expect(created).toEqual([{ path: "Uni/Optik", content: undefined }]);
+  });
+
+  test("traversal, control characters and a backslash are named in the dialog and nothing is created", async () => {
+    await open({ locale: "de", folders: ["Uni"], defaultParent: "Uni" });
+    const name = query<HTMLInputElement>("create-entry-name")!;
+    for (const value of ["../Draussen", "Notiz\u0007", "Uni\\Notiz", "/absolut"]) {
+      await setValue(name, value, "input");
+      expect(query("create-entry-problem")?.textContent ?? "").not.toBe("");
+      expect(query<HTMLButtonElement>("create-entry-submit")!.disabled).toBe(true);
+    }
+    expect(created).toEqual([]);
+  });
+
+  test("an error of the store is shown in the dialog and the dialog stays open", async () => {
+    await open({ failWith: "Es gibt schon eine Notiz mit diesem Namen." });
+    await setValue(query<HTMLInputElement>("create-entry-name")!, "Notiz", "input");
+    await submit();
+    expect(query("create-entry-error")?.textContent).toBe("Es gibt schon eine Notiz mit diesem Namen.");
+    expect(query("create-entry-dialog")).not.toBeNull();
   });
 });

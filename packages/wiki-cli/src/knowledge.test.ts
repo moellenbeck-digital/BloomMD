@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setSystemTime, test } from "bun:test";
 import { execFileSync, spawn } from "node:child_process";
 import { chmod, mkdtemp, truncate, readdir, readFile, symlink, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -950,6 +950,16 @@ describe("search with frontmatter, filters and expiry", () => {
     expect(await readFile(join(root, created.path), "utf8")).toContain('status: "unbestätigt"');
   });
 
+  test("verworfen is retired like veraltet: left out by default, back with includeStale, found by the status filter", async () => {
+    const { root, service } = await learnings();
+    await writeFile(join(root, "Learnings", "Verworfen-Learning.md"), '---\ntitle: "Verworfen-Learning"\nstatus: "verworfen"\nscope: "BloomMD, coder"\nstale_after: "2027-01-01"\ntags: ["coder"]\n---\n\n# Verworfen-Learning\n\n## Ursache\n\nLockfile verworfen.\n', "utf8");
+    expect(paths((await service.search("lockfile", { now: NOW })).hits)).not.toContain("Verworfen-Learning");
+    expect(paths((await service.search("lockfile", { now: NOW, includeStale: true })).hits)).toContain("Verworfen-Learning");
+    expect(paths((await service.search("lockfile", { now: NOW, status: "verworfen" })).hits)).toEqual(["Verworfen-Learning"]);
+    const created = await service.createMap({ area: "Learnings", title: "Per Dienst verworfen", template: "learning", frontmatter: { status: "verworfen" } });
+    expect(await readFile(join(root, created.path), "utf8")).toContain('status: "verworfen"');
+  });
+
   test("an explicit status filter wins over the default exclusion", async () => {
     const { service } = await learnings();
     expect(paths((await service.search("lockfile", { now: NOW, status: "veraltet" })).hits)).toEqual(["Veraltet-Learning"]);
@@ -1029,12 +1039,15 @@ describe("stale maps", () => {
     const lines: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]) => { lines.push(args.join(" ")); };
+    // The CLI reads the real clock, the fixtures' stale_after dates are fixed: pin "today" to NOW.
+    setSystemTime(NOW);
     try {
       const empty = await vault();
       expect(await runAgentCli(["stale", empty.root], "test")).toBe(0);
       const { root } = await learnings();
       expect(await runAgentCli(["stale", root, "--days", "7"], "test")).toBe(0);
     } finally {
+      setSystemTime();
       console.log = original;
     }
     expect(lines[0]).toBe("NO_REPLY");

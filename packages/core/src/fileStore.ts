@@ -1,7 +1,9 @@
-import { access, copyFile, mkdir, readdir, readFile, writeFile, unlink  } from "node:fs/promises";
-import { basename, join  } from "node:path";
+import { constants } from "node:fs";
+import { access, copyFile, mkdir, readdir, readFile, stat, writeFile, unlink  } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { assertPathInDirectory, normalizeMarkdownFilename, resolveMarkdownPath, normalizeMarkdownPath, normalizeFolderPath, resolveFolderPath } from "./paths";
 import { parseFile, serializeToMarkdown } from "./parser";
+import { NOTE_HISTORY_LIMIT, sortRevisionsNewestFirst, type NoteRevision } from "./note-history";
 import { DEFAULT_TEMPLATE_FOLDER, selectTemplatePaths, type CustomNoteTemplate } from "./note-templates";
 import { buildWorkspaceMindMap, WorkspaceDocumentCache } from "./workspace-document";
 import type {
@@ -13,6 +15,17 @@ import type { WorkspaceFileInput } from "./workspace-graph";
 
 /** Called only by explicitly tolerant readers; strict readers still reject failed entries. */
 export type FileReadIssueHandler = (path: string, error: unknown) => void;
+
+const BACKUP_SUFFIX = ".bak";
+const BACKUP_TIMESTAMP = /^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2})-(\d{3}Z)$/;
+
+/** `2026-11-03T09-15-02-123Z` (the form used in backup file names) → `2026-11-03T09:15:02.123Z`. */
+function backupTimestampToIso(stamp: string): string | null {
+  const match = BACKUP_TIMESTAMP.exec(stamp);
+  if (!match) return null;
+  const iso = `${match[1]}:${match[2]}:${match[3]}.${match[4]}`;
+  return Number.isNaN(Date.parse(iso)) ? null : iso;
+}
 
 export class FileStore {
   private workspaceCache = new WorkspaceDocumentCache();
@@ -189,8 +202,81 @@ export class FileStore {
     await unlink(filePath);
   }
 
-  private async backupExistingFile(filePath: string): Promise<void> {
-    if (!this.backupsEnabled) return;
+  /**
+   * The version history of one note: the backups `write()` made before each overwrite, newest
+   * first, at most `NOTE_HISTORY_LIMIT` of them. Empty for a note that was never overwritten.
+   */
+  async listBackups(filename: string): Promise<NoteRevision[]> {
+    return this.readBackups(resolveMarkdownPath(this.baseDir, filename));
+  }
+
+  /** The Markdown of one backup; null when `id` is none of the note's backups (it never names a path). */
+  async readBackup(filename: string, id: string): Promise<string | null> {
+    const filePath = resolveMarkdownPath(this.baseDir, filename);
+    const entry = (await this.readBackups(filePath)).find((candidate) => candidate.id === id);
+    return entry ? readFile(join(this.backupDirFor(filePath), entry.id), "utf-8") : null;
+  }
+
+  /**
+   * Makes a backup the current version of the note. Restoring is a write like any other: the
+   * version it replaces is backed up first (even when automatic backups are off, because restoring
+   * must never lose anything), so it shows up in the history and can be restored again.
+   * `id` is an entry of `listBackups`; anything else is refused, so it can never name a path.
+   */
+  async restoreBackup(filename: string, id: string): Promise<MindMapDocument> {
+    const normalized = normalizeMarkdownPath(filename);
+    const filePath = resolveMarkdownPath(this.baseDir, normalized);
+    const markdown = await this.readBackup(normalized, id);
+    if (markdown === null) throw new Error("BACKUP_NOT_FOUND");
+    // A backup that no longer parses must not replace a note that does.
+    parseFile(filePath, markdown);
+    await this.backupExistingFile(filePath, true);
+    await writeFile(filePath, markdown, "utf-8");
+    return this.read(normalized);
+  }
+
+  /**
+   * Backups live in `.bloommd/backups`, in the same sub-folder as their note, so two notes that
+   * share a file name in different folders keep separate histories (and separate retention).
+   * Notes at the top keep the flat layout earlier versions used. Backups that earlier versions
+   * made for notes inside folders sit in the flat directory under the bare file name; they cannot
+   * be told apart from another folder's note and are not part of any history.
+   */
+  private backupDirFor(filePath: string): string {
+    return join(this.baseDir, ".bloommd", "backups", relative(resolve(this.baseDir), dirname(filePath)));
+  }
+
+  private async readBackups(filePath: string): Promise<NoteRevision[]> {
+    const dir = this.backupDirFor(filePath);
+    const prefix = `${basename(filePath)}.`;
+    let names: string[];
+    try {
+      names = await readdir(dir);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+      throw error;
+    }
+    const found: NoteRevision[] = [];
+    for (const name of names) {
+      if (!name.startsWith(prefix) || !name.endsWith(BACKUP_SUFFIX)) continue;
+      const replacedAt = backupTimestampToIso(name.slice(prefix.length, -BACKUP_SUFFIX.length));
+      if (!replacedAt) continue;
+      try {
+        found.push({ id: name, source: "local", replacedAt, size: (await stat(join(dir, name))).size });
+      } catch (error) {
+        // Removed while listing (another write pruned it): it is not part of the history any more.
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+    return sortRevisionsNewestFirst(found);
+  }
+
+  /**
+   * Copies the file that is about to be overwritten to `.bloommd/backups` and keeps the newest
+   * `NOTE_HISTORY_LIMIT` backups of that note; older ones are removed here, when a new one is made.
+   */
+  private async backupExistingFile(filePath: string, force = false): Promise<void> {
+    if (!this.backupsEnabled && !force) return;
 
     try {
       await access(filePath);
@@ -198,17 +284,35 @@ export class FileStore {
       return;
     }
 
-    const backupDir = join(this.baseDir, ".bloommd", "backups");
+    const backupDir = this.backupDirFor(filePath);
     await mkdir(backupDir, { recursive: true });
 
     const filename = basename(filePath);
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupPath = join(backupDir, `${filename}.${timestamp}.bak`);
-    try {
-      await copyFile(filePath, backupPath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
-      throw err;
+    // Two writes within one millisecond would share a name; the later one moves on to the next free one.
+    for (let at = Date.now(); ; at += 1) {
+      const timestamp = new Date(at).toISOString().replace(/[:.]/g, "-");
+      try {
+        await copyFile(filePath, join(backupDir, `${filename}.${timestamp}${BACKUP_SUFFIX}`), constants.COPYFILE_EXCL);
+        break;
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") return;
+        if (code !== "EEXIST") throw err;
+      }
+    }
+    await this.pruneBackups(filePath);
+  }
+
+  /** A backup that cannot be removed must not fail the save it belongs to; the next write retries. */
+  private async pruneBackups(filePath: string): Promise<void> {
+    const expired = (await this.readBackups(filePath)).slice(NOTE_HISTORY_LIMIT);
+    for (const entry of expired) {
+      try {
+        await unlink(join(this.backupDirFor(filePath), entry.id));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        console.warn("[BloomMD] Old backup could not be removed:", entry.id, error instanceof Error ? error.message : error);
+      }
     }
   }
 }

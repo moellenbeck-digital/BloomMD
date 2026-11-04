@@ -84,6 +84,9 @@ sichtbar sein, falls ein Admin einen Code separat verschickt.
 Wenn eine Beta-Einladung nicht angekommen ist, kann ein Admin sie erneut senden. Prüfe vorher auch
 Spam- und Promotions-Ordner.
 
+Meldungen wie „Diese Einladung ist abgelaufen.“ oder eine falsche Adresse erklärt die
+[Fehlerbehebung](/docs/fehlerbehebung).
+
 ## Bereits einen Account erstellt
 
 Wenn dein Account existiert und die E-Mail bestätigt ist, nutzt du die Anmeldung auf bloommd.app.

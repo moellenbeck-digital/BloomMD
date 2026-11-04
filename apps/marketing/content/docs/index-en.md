@@ -55,6 +55,9 @@ The Web app, cloud workspaces, sync, and collaboration require an account. You
 register yourself, without an invitation and without a waitlist. Registration, email confirmation,
 and sign-in are described in [Closed beta access](/docs/closed-beta-zugang?lang=en).
 
+Something stuck with installation, folder permissions, sync, or an invitation? [Troubleshooting](/docs/fehlerbehebung?lang=en)
+lists symptom, cause, and steps.
+
 **Available without an invitation:** the [browser demo](/demo?lang=en), desktop
 builds on the [download page](/download?lang=en), and the [Obsidian plugin](/obsidian?lang=en)
 through BRAT or GitHub releases. Only while the access switch is on does an invitation apply, and then only to Web and cloud access.

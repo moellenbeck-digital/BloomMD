@@ -58,6 +58,10 @@ folder turns it into a cloud document.
 
 The full flow is described in [Collaboration](/docs/collaboration?lang=en).
 
+## When something does not work
+
+Folder permissions, sync status, and invitations are explained in [Troubleshooting](/docs/fehlerbehebung?lang=en).
+
 ## Which path to choose
 
 - **You only want to work with your own files:** desktop app, or a local folder in the Web app.

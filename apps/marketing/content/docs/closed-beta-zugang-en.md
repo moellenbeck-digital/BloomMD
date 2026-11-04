@@ -82,6 +82,9 @@ a separate code. A code field may be shown as a fallback when an admin sent a co
 If a beta invitation did not arrive, an admin can resend it. Check your spam and promotions folders
 first.
 
+Messages such as "This invitation has expired." or a wrong address are explained in
+[Troubleshooting](/docs/fehlerbehebung?lang=en).
+
 ## You already created an account
 
 If the account exists and the email is confirmed, use the sign-in page at bloommd.app. Password

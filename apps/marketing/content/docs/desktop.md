@@ -22,15 +22,15 @@ Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
 1. **Download:** Auf [bloommd.io/download](/download) den Build für macOS arm64 laden.
 2. **DMG öffnen:** BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten (Details
-   unter [Installation in der Closed Beta](#installation-in-der-closed-beta)).
+   weiter unten im Abschnitt „Installation in der Closed Beta“).
 3. **Ordner öffnen:** Einen Ordner mit Markdown-Dateien öffnen — über das Menü, per Doppelklick im
-   Dateimanager oder per Kommandozeile (siehe [Dateien und Ordner öffnen](#dateien-und-ordner-öffnen)).
+   Dateimanager oder per Kommandozeile (siehe den Abschnitt „Dateien und Ordner öffnen“).
 4. **Erste Map:** Eine Datei wählen. Ihre Überschriften werden zur Karte; die Markdown-Datei bleibt
    unverändert.
 
 ![Schema, kein Screenshot: Links die Dateiliste des geöffneten Ordners, rechts die Karte der ausgewählten Datei mit Überschriften als Knoten](/docs/desktop-ordner.svg)
 
-Alles bleibt dabei auf deinem Rechner. Was lokal bleibt und was erst durch eine bewusste Freigabe
+Läuft etwas nicht wie beschrieben, hilft die [Fehlerbehebung](/docs/fehlerbehebung). Alles bleibt dabei auf deinem Rechner. Was lokal bleibt und was erst durch eine bewusste Freigabe
 in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud).
 
 ## Knoten bedienen ab 0.5.14
@@ -81,7 +81,8 @@ für x86_64 und aarch64. Windows folgt als eigener Beta-Release.
 
 - **macOS:** DMG öffnen, BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten.
   Eine manuelle Gatekeeper-Ausnahme ist für diesen Release nicht vorgesehen. Falls macOS den Start
-  blockiert, Version und Meldung an `feedback@bloommd.io` melden.
+  blockiert, Version und Meldung an `feedback@bloommd.io` melden; die Schritte stehen unter
+  [Fehlerbehebung](/docs/fehlerbehebung).
 - **Omarchy/Linux:** passendes Pacman-Paket für die eigene Architektur herunterladen und mit
   `sudo pacman -U` installieren. Der Linux-Build ist nicht Developer-ID-signiert; das ist für
   Pacman nicht erforderlich.

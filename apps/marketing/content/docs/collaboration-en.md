@@ -196,7 +196,8 @@ transfer ownership or add another owner first.
 
 Invitation links are single-use and expire automatically. The owner can resend or revoke a pending
 invitation. If the workspace is missing after sign-in, check that the account email exactly matches
-the invited address and that the invitation has not expired or been revoked.
+the invited address and that the invitation has not expired or been revoked. Invitation, sync, and
+folder problems are also collected on one page: [Troubleshooting](/docs/fehlerbehebung?lang=en).
 
 ## Sync and local files
 

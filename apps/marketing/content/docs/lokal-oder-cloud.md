@@ -58,6 +58,10 @@ oder das Veröffentlichen eines Ordners macht sie zum Cloud-Dokument.
 
 Den vollständigen Ablauf beschreibt [Zusammenarbeit](/docs/collaboration).
 
+## Wenn etwas nicht klappt
+
+Ordnerrechte, Sync-Status und Einladungen sind unter [Fehlerbehebung](/docs/fehlerbehebung) erklärt.
+
 ## Welchen Weg wählen?
 
 - **Du willst nur mit eigenen Dateien arbeiten:** Desktop-App oder lokaler Ordner in der Web-App.

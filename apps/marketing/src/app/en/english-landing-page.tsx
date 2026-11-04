@@ -787,7 +787,7 @@ function Footer() {
         { label: "Blog", href: "/en/blog" },
         { label: "News", href: "/en/news" },
         { label: "Roadmap", href: "/en/roadmap" },
-        { label: "Help", href: "/docs" },
+        { label: "Help", href: "/docs?lang=en" },
         { label: "FAQ", href: "#faq" },
       ],
     },

@@ -6,7 +6,8 @@ order: 3
 
 # Web-App
 
-Unter `/app`. Zwei Betriebsarten, die sich deutlich unterscheiden.
+Unter `/app`. Zwei Betriebsarten, die sich deutlich unterscheiden. Wenn Ordnerrechte, Sync oder
+Einladung haken, hilft die [Fehlerbehebung](/docs/fehlerbehebung).
 
 ## Lokaler Ordner und Cloud im Überblick
 
@@ -91,6 +92,8 @@ Vergleich beider Fassungen und drei Möglichkeiten — die gespeicherte Fassung 
 oder als Kopie sichern.
 
 ## Feedback geben
+
+Vorher einen Blick in die [Fehlerbehebung](/docs/fehlerbehebung): Dort stehen die häufigen Fälle.
 
 Eingeloggte Beta-Tester nutzen den Feedback-Button in der App. Ein Screenshot ist Pflicht, ein
 kurzes Video ist optional. Bitte keine privaten Markdown-Inhalte, Zugangsdaten oder personenbezogene

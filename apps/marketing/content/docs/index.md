@@ -56,6 +56,9 @@ Für Web-App, Cloud-Workspace, Sync und Collaboration brauchst du einen Account.
 registrierst dich direkt selbst, ohne Einladung und ohne Warteliste. Registrierung, E-Mail-Bestätigung
 und Login stehen unter [Closed-Beta Zugang](/docs/closed-beta-zugang).
 
+Hakt etwas bei Installation, Ordnerrechten, Sync oder Einladung? Die [Fehlerbehebung](/docs/fehlerbehebung)
+führt Symptom, Ursache und Schritte auf.
+
 **Ohne Einladung verfügbar:** [Browser-Demo](/demo), Desktop-Builds auf der
 [Download-Seite](/download) und das [Obsidian-Plugin](/obsidian) über BRAT oder
 GitHub-Releases. Nur bei aktivem Zugangsschalter betrifft eine Einladung den Web- und Cloud-Zugang.

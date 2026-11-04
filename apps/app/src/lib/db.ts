@@ -1,4 +1,5 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
+import { TRIAL_DAYS, TRIAL_REMINDER_DAYS, TRIAL_REMINDER_KINDS, type TrialReminderKind } from "./trial";
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { NOTE_HISTORY_LIMIT } from "@bloommd/core/note-history";
@@ -192,7 +193,8 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_document_views') as document_views,
       to_regclass('public.bloom_mail_budget') as mail_budget,
       to_regclass('public.bloom_waitlist_transfers') as waitlist_transfers,
-      to_regclass('public.bloom_document_revisions') as document_revisions
+      to_regclass('public.bloom_document_revisions') as document_revisions,
+      to_regclass('public.bloom_trial_reminders') as trial_reminders
   `;
   const row = rows[0] as Record<string, string | null> | undefined;
   const missing = Object.entries(row ?? {})
@@ -210,6 +212,9 @@ async function verifyMarketSchema() {
       and (table_name, column_name) in (
         ('bloom_users', 'password_hash'),
         ('bloom_users', 'email_verified_at'),
+        ('bloom_users', 'trial_legacy'),
+        ('bloom_users', 'trial_ends_at'),
+        ('bloom_users', 'locale'),
         ('bloom_stripe_events', 'processed_at'),
         ('bloom_stripe_events', 'processing_started_at'),
         ('bloom_stripe_events', 'attempts'),
@@ -287,7 +292,7 @@ async function verifyMarketSchema() {
       )
   `;
   if (
-    Number((columns[0] as { count?: number } | undefined)?.count ?? 0) !== 76
+    Number((columns[0] as { count?: number } | undefined)?.count ?? 0) !== 79
   ) {
     throw new Error(
       "BloomMD database migration is incomplete: required columns are missing.",
@@ -955,6 +960,24 @@ async function createMarketSchema() {
   await sql`
     create index if not exists bloom_document_revisions_document_idx
       on bloom_document_revisions(document_id, version desc)
+  `;
+
+  // Trial period and reminders; see db/013_trial_period.sql, which explains the statements.
+  await sql`alter table bloom_users add column if not exists trial_legacy boolean not null default true`;
+  await sql`alter table bloom_users alter column trial_legacy set default false`;
+  await sql`alter table bloom_users add column if not exists trial_ends_at timestamptz`;
+  await sql`update bloom_users set trial_ends_at = '2026-12-15T00:00:00Z' where trial_legacy and trial_ends_at is null`;
+  await sql`alter table bloom_users add column if not exists locale text not null default 'de' check (locale in ('de', 'en'))`;
+  await sql`update bloom_users u set locale = t.locale from bloom_waitlist_transfers t where t.user_id = u.id and t.locale = 'en' and u.locale = 'de'`;
+  await sql`
+    create table if not exists bloom_trial_reminders (
+      user_id uuid not null references bloom_users(id) on delete cascade,
+      kind text not null,
+      claimed_at timestamptz not null default now(),
+      sent_at timestamptz,
+      primary key (user_id, kind),
+      check (kind in ('15', '23'))
+    )
   `;
 }
 
@@ -3210,6 +3233,8 @@ export async function createPasswordUser(input: {
   email: string;
   name?: string | null;
   passwordHash: string;
+  /** Language of the account mails (trial reminders); 'de' without one. */
+  locale?: "de" | "en";
 }) {
   if (!isDatabaseConfigured()) {
     throw new Error("DATABASE_URL ist nicht konfiguriert.");
@@ -3218,8 +3243,8 @@ export async function createPasswordUser(input: {
 
   const normalizedEmail = input.email.trim().toLowerCase();
   const rows = await getSql()`
-    insert into bloom_users (auth_provider, auth_user_id, email, name, password_hash)
-    values ('password', ${normalizedEmail}, ${normalizedEmail}, ${input.name ?? null}, ${input.passwordHash})
+    insert into bloom_users (auth_provider, auth_user_id, email, name, password_hash, locale)
+    values ('password', ${normalizedEmail}, ${normalizedEmail}, ${input.name ?? null}, ${input.passwordHash}, ${input.locale === "en" ? "en" : "de"})
     on conflict ((lower(email))) do nothing
     returning id, email, name, password_hash, email_verified_at
   `;
@@ -3906,7 +3931,9 @@ export async function markEmailVerified(userId: string) {
 
   await getSql()`
     update bloom_users
-    set email_verified_at = coalesce(email_verified_at, now()), updated_at = now()
+    set email_verified_at = coalesce(email_verified_at, now()),
+      trial_ends_at = coalesce(trial_ends_at, coalesce(email_verified_at, now()) + (${TRIAL_DAYS} * interval '1 day')),
+      updated_at = now()
     where id = ${dbUserId}
   `;
   await recordAuditEvent({
@@ -3918,13 +3945,15 @@ export async function markEmailVerified(userId: string) {
 export async function updatePasswordForEmail(input: {
   email: string;
   passwordHash: string;
+  /** Signup of a still unconfirmed account: the latest language wins. Left alone when omitted. */
+  locale?: "de" | "en";
 }) {
   if (!isDatabaseConfigured()) return false;
   await ensureMarketSchema();
 
   const result = await getSql()`
     update bloom_users
-    set password_hash = ${input.passwordHash}, updated_at = now()
+    set password_hash = ${input.passwordHash}, locale = coalesce(${input.locale ?? null}, locale), updated_at = now()
     where lower(email) = ${input.email.trim().toLowerCase()}
     returning id
   `;
@@ -3988,8 +4017,8 @@ export async function createPreparedWaitlistAccount(input: { email: string; loca
   const normalizedEmail = input.email.trim().toLowerCase();
   const rows = await getSql()`
     with created as (
-      insert into bloom_users (auth_provider, auth_user_id, email)
-      values ('password', ${normalizedEmail}, ${normalizedEmail})
+      insert into bloom_users (auth_provider, auth_user_id, email, locale)
+      values ('password', ${normalizedEmail}, ${normalizedEmail}, ${input.locale})
       on conflict ((lower(email))) do nothing
       returning id
     )
@@ -4024,6 +4053,94 @@ export async function claimWaitlistInvitation(userId: string): Promise<WaitlistL
   `;
   const locale = (rows[0] as { locale: string } | undefined)?.locale;
   return locale === "en" ? "en" : locale === "de" ? "de" : null;
+}
+
+export interface TrialReminderCandidate {
+  userId: string;
+  email: string;
+  locale: WaitlistLocale;
+  trialEndsAt: string;
+  /** Existed when migration 013 ran: fixed trial end, reminders only behind their own switch. */
+  existingAccount: boolean;
+  /** Reminders already claimed or sent; a claim without a send is never retried. */
+  claimed: TrialReminderKind[];
+}
+
+/**
+ * Confirmed accounts whose trial is still running and whose first reminder is due (#274). This is
+ * only the coarse selection; `dueTrialReminder` in trial.ts decides which reminder, if any, goes out.
+ */
+export async function listTrialReminderCandidates(now: Date): Promise<TrialReminderCandidate[]> {
+  if (!isDatabaseConfigured()) return [];
+  await ensureMarketSchema();
+
+  const firstReminderDays = TRIAL_REMINDER_DAYS[TRIAL_REMINDER_KINDS[0]!];
+  const rows = await getSql()`
+    select
+      u.id,
+      u.email,
+      u.locale,
+      u.trial_ends_at,
+      u.trial_legacy,
+      coalesce((select array_agg(r.kind) from bloom_trial_reminders r where r.user_id = u.id), '{}') as claimed
+    from bloom_users u
+    where u.email_verified_at is not null
+      and u.trial_ends_at is not null
+      and u.trial_ends_at > ${now.toISOString()}::timestamptz
+      and u.trial_ends_at - (${TRIAL_DAYS - firstReminderDays} * interval '1 day') <= ${now.toISOString()}::timestamptz
+    order by u.trial_ends_at, u.id
+  `;
+  return (rows as unknown as Array<{ id: string; email: string; locale: string; trial_ends_at: Date | string; trial_legacy: boolean; claimed: string[] | null }>).map((row) => ({
+    userId: row.id,
+    email: row.email,
+    locale: row.locale === "en" ? "en" : "de",
+    trialEndsAt: new Date(row.trial_ends_at).toISOString(),
+    existingAccount: row.trial_legacy,
+    claimed: (row.claimed ?? []).filter((kind): kind is TrialReminderKind => (TRIAL_REMINDER_KINDS as string[]).includes(kind)),
+  }));
+}
+
+/**
+ * Takes a reminder before its mail is sent, so a second run or a crash halfway never sends it
+ * twice. True only for the run that inserted the row, and only while the address is still
+ * confirmed and the trial still runs (the account may have been deleted or have ended meanwhile).
+ */
+export async function claimTrialReminder(userId: string, kind: TrialReminderKind, now: Date): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    insert into bloom_trial_reminders (user_id, kind)
+    select u.id, ${kind}
+    from bloom_users u
+    where u.id = ${userId}
+      and u.email_verified_at is not null
+      and u.trial_ends_at > ${now.toISOString()}::timestamptz
+    on conflict (user_id, kind) do nothing
+    returning user_id
+  `;
+  return rows.length > 0;
+}
+
+export async function markTrialReminderSent(userId: string, kind: TrialReminderKind) {
+  if (!isDatabaseConfigured()) return;
+  await ensureMarketSchema();
+
+  await getSql()`
+    update bloom_trial_reminders set sent_at = now()
+    where user_id = ${userId} and kind = ${kind} and sent_at is null
+  `;
+}
+
+/** Gives the claim back after a failed send; the next run tries this reminder again. */
+export async function releaseTrialReminder(userId: string, kind: TrialReminderKind) {
+  if (!isDatabaseConfigured()) return;
+  await ensureMarketSchema();
+
+  await getSql()`
+    delete from bloom_trial_reminders
+    where user_id = ${userId} and kind = ${kind} and sent_at is null
+  `;
 }
 
 /** Gives the claim back after a failed send; the next run tries this address again. */
@@ -4079,7 +4196,9 @@ export async function activateWaitlistAccount(input: { token: string; passwordHa
       returning user_id
     ), activated as (
       update bloom_users u
-      set password_hash = ${input.passwordHash}, email_verified_at = now(), updated_at = now()
+      set password_hash = ${input.passwordHash}, email_verified_at = now(),
+        trial_ends_at = coalesce(u.trial_ends_at, now() + (${TRIAL_DAYS} * interval '1 day')),
+        updated_at = now()
       from consumed c
       where u.id = c.user_id
         and u.email_verified_at is null

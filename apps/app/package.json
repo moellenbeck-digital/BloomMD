@@ -18,6 +18,7 @@
     "db:maintenance": "bun run scripts/maintenance.ts",
     "db:purge-unconfirmed": "bun run scripts/purge-unconfirmed-accounts.ts",
     "db:transfer-waitlist": "bun run scripts/transfer-waitlist-accounts.ts",
+    "db:trial-reminders": "bun run scripts/trial-reminders.ts",
     "start": "next start",
     "test": "bun scripts/test-isolated.ts",
     "test:e2e": "playwright test",

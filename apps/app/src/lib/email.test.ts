@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sendBetaInviteEmail, sendPasswordResetEmail, sendVerificationEmail, sendWaitlistActivationEmail, sendWorkspaceInvitationEmail } from "./email";
+import { sendBetaInviteEmail, sendPasswordResetEmail, sendTrialReminderEmail, sendVerificationEmail, sendWaitlistActivationEmail, sendWorkspaceInvitationEmail } from "./email";
 
 const originalFetch = globalThis.fetch;
 const originalEnv = {
@@ -90,6 +90,22 @@ describe("account email links", () => {
     expect(english.text).toContain("https://bloommd.app/activate?token=abc&lang=en");
     expect(english.text).toContain("not active yet");
     expect(english.text).not.toContain("Warteliste");
+  });
+
+  test("trial reminder mails name the days left, the end date in UTC and the app link, in German and English (#274)", async () => {
+    configureEmailTest();
+
+    const german = await captureMail(() => sendTrialReminderEmail("max@example.test", { daysLeft: 15, endsAt: "2026-12-15T00:00:00.000Z" }));
+    expect(german.text).toContain("Dein kostenloser BloomMD-Testaccount endet am 15. Dezember 2026 (noch 15 Tage).");
+    expect(german.text).toContain("nur noch lesbar, der Export bleibt möglich");
+    expect(german.text).toContain("https://bloommd.app\n");
+    expect(german.html).toContain("<a href=\"https://bloommd.app\">BloomMD öffnen</a>");
+    expect(german.html).not.toContain("localhost");
+
+    const english = await captureMail(() => sendTrialReminderEmail("max@example.test", { lang: "en", daysLeft: 1, endsAt: new Date("2026-12-08T23:59:59.000Z") }));
+    expect(english.text).toContain("ends on December 8, 2026 (1 day left)");
+    expect(english.text).toContain("read-only and export remains possible");
+    expect(english.text).not.toContain("Testaccount");
   });
 
   test("beta invite mails point to the app signup form with the invited address", async () => {

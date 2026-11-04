@@ -5,8 +5,12 @@
  * Android) for the test runner to read.
  */
 import { BloomFolder } from "@bloommd/capacitor-folder";
+import { parseFile } from "@bloommd/core/browser";
 import { Encoding, Filesystem } from "@capacitor/filesystem";
+import { parseAppLink } from "./app-links";
+import { folderLevel } from "./folder-levels";
 import { CONFLICT_COPY_LABEL, NoteSaver } from "./note-saver";
+import { openFileUrl } from "./opened-file";
 import { APP_DIRECTORY, IS_ANDROID } from "./platform";
 import { createFolderStore, StoreConflictError } from "./stores";
 
@@ -16,7 +20,11 @@ interface Check {
   detail?: string;
 }
 
-export async function runSelfTest(openNote: (path: string, node: string | null) => Promise<void>): Promise<void> {
+export async function runSelfTest(
+  openNote: (path: string, node: string | null) => Promise<void>,
+  /** Hands a `file://` URL to the app like "Open in BloomMD" does; resolves with what the app shows afterwards. */
+  openFile: (url: string) => Promise<{ path: string | null; store: string; folder: string }>,
+): Promise<void> {
   const checks: Check[] = [];
   const check = async (name: string, body: () => Promise<string | void>) => {
     try {
@@ -162,6 +170,90 @@ export async function runSelfTest(openNote: (path: string, node: string | null) 
     throw new Error("read outside the folder");
   });
 
+  await check("a nested vault is walked level by level, folders before notes", async () => {
+    // "Uni/Physik.md" and the folder "Uni/Physik/" share a name; both must stay reachable.
+    await BloomFolder.write({ path: "Uni/Notiz.md", data: "# Notiz\n" });
+    await BloomFolder.write({ path: "Uni/Physik.md", data: "# Physik (Uni)\n" });
+    await BloomFolder.write({ path: "Uni/Physik/Optik/Linsen.md", data: "# Linsen\n" });
+    const { entries } = await store.list();
+    const top = folderLevel(entries, "");
+    if (top.folders.map((row) => row.name).join(",") !== "Arbeit,Schule,Uni" || top.notes.length !== 0) throw new Error(`top level ${JSON.stringify(top)}`);
+    const uni = folderLevel(entries, "Uni");
+    if (uni.folders.map((row) => `${row.name}:${row.notes}`).join(",") !== "Physik:1") throw new Error(`Uni folders ${JSON.stringify(uni.folders)}`);
+    if (uni.notes.map((entry) => entry.path).join(",") !== "Uni/Notiz.md,Uni/Physik.md" || uni.parent !== "") throw new Error(`Uni notes ${JSON.stringify(uni.notes)}`);
+    const optik = folderLevel(entries, "Uni/Physik/Optik");
+    if (optik.notes.map((entry) => entry.path).join(",") !== "Uni/Physik/Optik/Linsen.md" || optik.parent !== "Uni/Physik") throw new Error(`Optik ${JSON.stringify(optik)}`);
+    if (entries.some((entry) => entry.path.startsWith(".obsidian/"))) throw new Error("hidden folder listed");
+    return "Uni > Physik > Optik";
+  });
+
+  await check("a new note lands in the folder shown, nothing leaks to the top", async () => {
+    const path = store.pathFor("Neu.md", "Uni/Physik");
+    if (path !== "Uni/Physik/Neu.md") throw new Error(`path ${path}`);
+    const document = parseFile(path, "# Neu\n");
+    await store.save({ document, baseline: "" }, document);
+    const { data } = await BloomFolder.read({ path });
+    if (!data.includes("# Neu")) throw new Error("note missing in the subfolder");
+    if (await BloomFolder.read({ path: "Neu.md" }).then(() => true, () => false)) throw new Error("note also at the top");
+    return path;
+  });
+
+  await check("the folder store refuses paths that leave the folder", async () => {
+    for (const bad of ["../x.md", "Schule/../../x.md", "/etc/x.md"]) {
+      if (await store.read(bad).then(() => true, (error: { code?: string }) => error.code !== "BAD_PATH")) throw new Error(`${bad} was not refused`);
+    }
+    if (await Promise.resolve().then(() => store.pathFor("x.md", "../..")).then(() => true, () => false)) throw new Error("pathFor accepted ..");
+  });
+
+  // "Open in BloomMD" is an iOS feature: Android hands no file URLs to the app, so these checks run on iOS only.
+  const external = "selftest-external/Extern.md";
+  const externalText = "# Extern\n\nVon aussen.\n\n## Teil <!-- bloommd:id=teil1 -->\n\nText.\n";
+  await Filesystem.rmdir({ directory: APP_DIRECTORY, path: "selftest-external", recursive: true }).catch(() => undefined);
+  await Filesystem.writeFile({ directory: APP_DIRECTORY, path: external, data: externalText, encoding: Encoding.UTF8, recursive: true });
+  const externalUrl = (await Filesystem.getUri({ directory: APP_DIRECTORY, path: external })).uri;
+  const readExternal = async () => (await Filesystem.readFile({ directory: APP_DIRECTORY, path: external, encoding: Encoding.UTF8 })).data as string;
+
+  if (!IS_ANDROID) await check("a file URL is recognised, a non-Markdown one is not", async () => {
+    if (parseAppLink(externalUrl)?.kind !== "file") throw new Error(`not a file link: ${externalUrl}`);
+    if (parseAppLink("file:///private/var/Bild.png") !== null) throw new Error("non-Markdown file accepted");
+    if (await BloomFolder.openFile({ url: "file:///private/var/Bild.png" }).then(() => true, (error: { code?: string }) => error.code !== "BAD_PATH")) throw new Error("plugin opened a non-Markdown file");
+  });
+
+  if (!IS_ANDROID) await check("a file outside the folder is opened and saved in place, without a copy", async () => {
+    const opened = await openFileUrl(BloomFolder, externalUrl, store);
+    if (opened.store.kind !== "file" || opened.path !== "Extern.md") throw new Error(`opened as ${opened.store.kind} ${opened.path}`);
+    const loaded = await opened.store.read(opened.path);
+    if (await opened.store.save(loaded, loaded.document)) throw new Error("saved without changes");
+    if ((await readExternal()) !== externalText) throw new Error("file changed on open");
+    const document = { ...loaded.document, nodes: new Map(loaded.document.nodes) };
+    document.nodes.set("teil1", { ...document.nodes.get("teil1")!, content: "Bearbeitet auf dem iPad." });
+    const saved = await opened.store.save(loaded, document);
+    if (!saved || !(await readExternal()).includes("Bearbeitet auf dem iPad.")) throw new Error("edit missing in the original file");
+    if (await Filesystem.stat({ directory: APP_DIRECTORY, path: "Extern.md" }).then(() => true, () => false)) throw new Error("a copy appeared in the app folder");
+    // The same rules as in a folder: an edit from another device is never overwritten.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await Filesystem.writeFile({ directory: APP_DIRECTORY, path: external, data: `${await readExternal()}\nVom Mac.\n`, encoding: Encoding.UTF8 });
+    const again = { ...document, nodes: new Map(document.nodes) };
+    again.nodes.set("teil1", { ...again.nodes.get("teil1")!, content: "Zweite Änderung." });
+    try {
+      await opened.store.save(saved, again);
+    } catch (error) {
+      if (!(error instanceof StoreConflictError)) throw error;
+      const now = await readExternal();
+      if (!now.includes("Vom Mac.") || now.includes("Zweite Änderung.")) throw new Error("file from the Mac overwritten");
+      return "saved in place, conflict detected";
+    }
+    throw new Error("stale save was accepted");
+  });
+
+  if (!IS_ANDROID) await check("a file inside the open folder is a note of that folder, Obsidian's own folders are not", async () => {
+    const inside = await openFileUrl(BloomFolder, encodeURI(`file://${root}/Schule/Physik.md`), store);
+    if (inside.store !== store || inside.path !== "Schule/Physik.md") throw new Error(`opened as ${inside.store.kind} ${inside.path}`);
+    const hidden = await openFileUrl(BloomFolder, encodeURI(`file://${root}/.obsidian/workspace.md`), store);
+    if (hidden.store.kind !== "file") throw new Error(`.obsidian file opened as ${hidden.store.kind}`);
+    return "Schule/Physik.md";
+  });
+
   await check("deep link opens the note at its node", async () => {
     await openNote("Schule/Physik.md", "thermo1");
   });
@@ -238,6 +330,14 @@ export async function runSelfTest(openNote: (path: string, node: string | null) 
     // The secret never lands in WebView storage.
     if (JSON.stringify({ ...window.localStorage }).includes("bloom_pat_")) throw new Error("token found in localStorage");
     return "Keychain round trip ok";
+  });
+
+  if (!IS_ANDROID) await check("the app opens a file URL like \"Open in BloomMD\" (outside the folder, then inside it)", async () => {
+    const outside = await openFile(externalUrl);
+    if (outside.store !== "file" || outside.path !== "Extern.md") throw new Error(`outside: ${JSON.stringify(outside)}`);
+    const inside = await openFile(encodeURI(`file://${root}/Uni/Physik/Optik/Linsen.md`));
+    if (inside.store !== "folder" || inside.path !== "Uni/Physik/Optik/Linsen.md" || inside.folder !== "Uni/Physik/Optik") throw new Error(`inside: ${JSON.stringify(inside)}`);
+    return "Extern.md as file, Linsen.md in Uni/Physik/Optik";
   });
 
   await Filesystem.writeFile({

@@ -55,6 +55,11 @@ Servers, öffentlicher SaaS-Start, Abrechnung.
   Zeichnung nur dann über die bestehende Datei, wenn diese unverändert ist, sonst legt es eine Konfliktkopie
   „… (conflict).svg“ an (`plugins/obsidian/src/drawing-save.ts`). Der iOS-Ordnerzugriff meldet iCloud-Konflikte
   und schreibt optimistisch nach Änderungszeit (`packages/capacitor-folder/src/index.ts`).
+- Einzelne Markdown-Dateien aus der Dateien-App („Öffnen in BloomMD“, Dokumenttyp in `Info.plist`) öffnet die iOS-App
+  an Ort und Stelle (`openFile`, `readFile`, `writeFile` in `packages/capacitor-folder`): Zugriff über den
+  Security-Scope der übergebenen URL, koordiniert und mit atomarem Austausch, gleiche Konfliktprüfung wie im
+  Ordner. Liegt die Datei im geöffneten Ordner, ist sie dessen Notiz. Die Ordnerliste zeigt Unterordner als Ebenen
+  (`packages/mobile/src/folder-levels.ts`).
 - Der native Ordnerzugriff (`packages/capacitor-folder`) liest und schreibt Daten als Text (UTF-8), nicht als
   Binärdaten; Standard-Erweiterungen sind nur Markdown. Binäranhänge sind dort nicht vorgesehen (**offen**:
   Erweiterungsaufwand für Bilder und PDFs).

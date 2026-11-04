@@ -35,8 +35,8 @@ Test without an account
 1. Open the app. The empty screen says "No mind map open". Tap "New", enter a title. A map with one node appears.
 2. Switch the canvas mode to "Outline" and tap the row of the node. The node editor opens (side panel on iPad, bottom sheet on iPhone). Edit the title or text of the node there; changes are saved to the file (the save button shows a check mark).
 3. Handwriting: in the node editor choose "Handwriting" > "New drawing". With Apple Pencil, draw directly. Without a pencil, tap the hand icon ("Draw with finger") first, then draw with a finger. Tools: pen, highlighter, eraser, lasso, text. Tap the check mark to finish: the drawing is saved as an SVG file and embedded in the node.
-4. Open the side menu (top left). "Import" takes a .md or .opml file, "Open folder" opens any folder from the Files app (edited in place, no import), "This device" returns to the app's own folder. The share icon (top right) exports the map as Markdown, OPML, PDF, PNG or SVG.
-5. Link into the app: bloommd://open?path=<note path>&node=<node id> opens a note of the opened folder at a node.
+4. Open the side menu (top left). "Import" takes a .md or .opml file, "Open folder" opens any folder from the Files app (edited in place, no import; subfolders are levels to walk through, with the path shown and a way back up), "This device" returns to the app's own folder. The share icon (top right) exports the map as Markdown, OPML, PDF, PNG or SVG.
+5. Link into the app: bloommd://open?path=<note path>&node=<node id> opens a note of the opened folder at a node. A Markdown file in the Files app can also be opened with BloomMD (Share or Open in…); it is edited where it lies, without a copy.
 
 Optional cloud sign-in (browser, authorization code with PKCE)
 1. Side menu > "Sign in". The sign-in page opens in an in-app browser; the password is typed only there, never in the app.
@@ -69,7 +69,9 @@ All core features work without an account (open a folder with "Open folder", or 
   server can be entered; the default is `https://bloommd.app`. The in-app browser opens only that
   server's `/auth/mobile` and `/account` pages, there is no address bar.
 - **Files:** iOS uses a security-scoped bookmark of the folder picked in the Files app; Android uses
-  the Storage Access Framework (folder grant). The app writes only what the user changes: opening a
+  the Storage Access Framework (folder grant). On iOS a single Markdown file handed over by the
+  Files app ("Open in BloomMD", document type Markdown, opened in place) is read and replaced in place
+  through the security scope of its URL, never copied. The app writes only what the user changes: opening a
   note never rewrites it, and a note changed on another device is not overwritten but kept as
   "… (iPad-Konflikt).md" / "… (Android-Konflikt).md".
 - **Handwriting:** a pen (Apple Pencil, S Pen, USI) draws with pressure; fingers pan and zoom, a

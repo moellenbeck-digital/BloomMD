@@ -762,7 +762,7 @@ function TemplatesSection() {
             <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Vorlagen</p>
             <h2 className="text-3xl font-semibold sm:text-4xl">Nicht mit einer leeren Map starten.</h2>
             <p className="mt-4 text-lg leading-8 text-[#666666]">
-              Jede Vorlage ist eine normale Markdown-Datei mit Beispielinhalten. Öffne sie als Map und passe sie für deine Arbeit an.
+              Jede Vorlage ist eine normale Markdown-Datei. Öffne sie als Map und ersetze die Beispielinhalte durch deine eigenen.
             </p>
           </div>
           <Link href="/templates" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1A1A1A]/20">

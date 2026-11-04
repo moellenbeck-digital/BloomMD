@@ -23,7 +23,7 @@ Build a local-first product that lets knowledge workers understand large Markdow
 
 - Core promise: turn Markdown into an editable map.
 - Free entry: local templates and demo.
-- Paid expansion: pro workflows, sync, desktop polish and team features.
+- Open question: how can optional sync and team workflows preserve portable files and reviewable changes?
 
 ## Customers <!-- bloommd:id=startup-os-customers -->
 

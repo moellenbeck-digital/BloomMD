@@ -39,7 +39,7 @@ verfuegbar. Windows bleibt ein eigener spaeterer Beta-Release.
 |---|---|---|
 | macOS (arm64) | Lokale Beta, DMG auf der Downloadseite | Freigabehinweise auf der Downloadseite beachten |
 | Omarchy/Arch Linux (x86_64, ARM64) | Lokale Beta als Pacman-Paket auf der Downloadseite | Paket installieren und lokalen Markdown-Ordner öffnen |
-| Windows (x64) | **Nach M1.** Eigener Windows Beta Release; #73 bleibt vor Cloud-Nutzung zu lösen oder klar zu begrenzen | noch nicht Teil der Tester-Kommunikation |
+| Windows (x64) | **Nach M1.** Eigener Windows Beta Release. Das Secure-Store-Backend für Token (Windows Credential Manager, #73) ist vorhanden und per Unit-Test belegt, aber noch nicht auf echtem Windows geprüft; das gehört vor den Windows-Beta-Release | noch nicht Teil der Tester-Kommunikation |
 
 Der historische M1-Build war ad-hoc signiert. Aktuelle Signatur und Installationshinweise stehen
 bei den jeweiligen Artefakten auf der [Downloadseite](https://bloommd.io/download); alte M1-Angaben

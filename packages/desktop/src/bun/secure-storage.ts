@@ -238,6 +238,11 @@ function loadWindowsCredentialLibrary(): WindowsCredentialLibrary {
 /**
  * Credential Manager access through in-process FFI: the token only lives in this process's memory
  * and is handed to advapi32 as a CREDENTIALW blob, so it never appears in argv, environment or a file.
+ * Why this over DPAPI: DPAPI would need our own blob file (a location to protect and migrate) or a
+ * PowerShell child process, and the Credential Manager is the platform counterpart of Keychain and
+ * Secret Service. `bun:ffi` ships with the Bun runtime Electrobun embeds, so no native addon is needed.
+ * `GetLastError` is read right after the failing call; if the runtime clobbered it in between, the
+ * worst case is a missing entry reported as unavailable (fails closed) or the reverse for `get`.
  * The blob is UTF-16LE, the encoding Windows tools (cmdkey, the Credential Manager UI) use for secrets.
  */
 export class NativeWindowsCredentialApi implements WindowsCredentialApi {

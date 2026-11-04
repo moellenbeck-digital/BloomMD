@@ -22,14 +22,18 @@ Alle Beteiligten melden sich mit ihrem eigenen Account an und öffnen dieselbe D
   braucht ein persönliches Token.
 - **Eine vorhandene lokale Datei gezielt gemeinsam bearbeiten:** Lokaler Desktop-Modus + **Diese
   lokale Datei teilen**. Die Freigabe gilt nur für diese eine Datei und wird sichtbar bestätigt.
+- **Einen ganzen lokalen Ordner bewusst als gemeinsamen Workspace veröffentlichen:** Lokaler
+  Desktop-Modus + **Ordner als gemeinsamen Workspace veröffentlichen** in der Seitenleiste. Das ist
+  ein eigener Ablauf, getrennt von der Einzeldatei-Freigabe.
 - **Nur lokale Dateien auf deinem Rechner:** Lokaler Desktop-Modus. Ohne diese ausdrückliche
   Freigabe gibt es keine Zusammenarbeit und keinen Upload.
 
 ## Eine lokale Desktop-Datei bewusst teilen
 
 Eine lokale Markdown-Datei bleibt zuerst auf deinem Rechner. Du entscheidest pro Datei, ob sie in
-einen Workspace gespiegelt werden soll. BloomMD lädt niemals einen ganzen Ordner oder weitere
-lokale Dateien hoch.
+einen Workspace gespiegelt werden soll. Diese Einzeldatei-Freigabe lädt niemals einen Ordner oder
+weitere lokale Dateien hoch; für einen ganzen Ordner gibt es den eigenen Ablauf „Einen lokalen
+Ordner bewusst veröffentlichen“ weiter unten.
 
 ![Illustration: Eine gemeinsame BloomMD-Map mit Markdown als sichtbarer Grundlage](/blog/collaboration-sync.png)
 
@@ -86,6 +90,68 @@ Die Auswahl überträgt nur Workspace- und Cloud-Dokumentdaten. Der Vault-Pfad w
 Server gesendet. Ist der lokale Notizstand nicht derselbe wie der Cloud-Stand, zeigt BloomMD einen
 Konflikt an, statt eine Seite still zu überschreiben. Nach einem serverseitigen Entzug endet auch
 die Obsidian-Verbindung; die letzte lokale Notiz bleibt erhalten und kann nicht zurückschreiben.
+
+## Einen lokalen Ordner bewusst veröffentlichen
+
+Für mehrere Markdown-Dateien gibt es einen zweiten, eigenen Weg: den ganzen lokalen Ordner als
+gemeinsamen Workspace veröffentlichen. Er ist bewusst getrennt von **Diese lokale Datei teilen**
+benannt und liegt an einem anderen Einstieg (Seitenleiste im lokalen Desktop-Modus). Ein Ordner wird
+nie nebenbei geteilt: Nichts wird gelesen oder hochgeladen, bevor du in der Vorschau bestätigst.
+
+### Ablauf
+
+1. Wähle in der Seitenleiste **Ordner als gemeinsamen Workspace veröffentlichen**. BloomMD schlägt
+   den aktuell geöffneten Ordner vor; mit **Anderen Ordner wählen …** öffnest du den nativen
+   Auswahldialog. Die Auswahl allein ändert und überträgt nichts.
+2. Wähle ein gespeichertes Server-Profil und den Ziel-Workspace. Workspaces, in denen du nur Viewer
+   bist, lassen sich nicht wählen.
+3. Prüfe die Vorschau: Ziel-Workspace, Anzahl der Markdown-Dateien, Gesamtgröße, Konfliktstrategie
+   und die Liste aller Dateien und Unterordner. Mit dem Häkchen schließt du einzelne Dateien oder
+   ganze Unterordner aus.
+4. Bestätige mit **Veröffentlichen**. Erst jetzt werden genau die angehakten Dateien als
+   Cloud-Dokumente angelegt.
+
+### Was übertragen wird
+
+- Nur Markdown-Dateien (`.md`, `.markdown`). Bilder, PDFs und andere Dateitypen werden nicht
+  angeboten und nie hochgeladen. Versteckte Ordner (`.git`, `.obsidian` …), `node_modules` und
+  Symlinks werden übersprungen.
+- Die lokalen Dateien bleiben die Quelle und werden nicht verändert.
+- Der Server erhält Workspace-ID, Cloud-Dokument-ID und Cloud-Dateiname. Der Ordnerpfad und die
+  lokalen Unterordner bleiben auf dem Gerät. Die Bindung steht pro Dokument im Workspace-Audit.
+- Nichts wird überschrieben und nichts gelöscht, weder lokal noch in der Cloud.
+
+### Wie lokale Pfade zu Cloud-Namen werden
+
+Ein Cloud-Workspace kennt keine Unterordner, nur Dateinamen. BloomMD verbindet den relativen Pfad
+deshalb nach einer festen Regel mit `__`, und die Vorschau zeigt jeden Namen vorab:
+
+| Lokal | Im Workspace |
+| --- | --- |
+| `idee.md` | `idee.md` |
+| `notizen/2026/idee.md` | `notizen__2026__idee.md` |
+
+Dateien, die nicht passen, stehen mit Grund in der Vorschau und lassen sich nicht einschließen: Namen
+mit Zeichen, die der Workspace ändern würde (zum Beispiel `: * ? " < > |`, ein Punkt am Anfang oder
+doppelte Leerzeichen), Dateien, deren Cloud-Name nach dem Zusammenführen mit einer anderen lokalen
+Datei übereinstimmt (`a/b.md` und `a__b.md`), und Dateien über 1 MB.
+
+### Wenn der Name im Workspace schon existiert
+
+Die Konfliktstrategie wählst du in der Vorschau. Keine Variante überschreibt eine vorhandene Datei.
+
+- **Vorhandene Cloud-Datei nicht anfassen, als Konflikt melden** (Standard): Die lokale Datei wird
+  nicht hochgeladen und in der Vorschau als Konflikt markiert.
+- **Lokale Datei unter anderem Namen hochladen (Suffix):** Die Datei wird als `name-local.md`
+  angelegt (bei Bedarf `name-local-2.md` …); die vorhandene Datei bleibt unberührt.
+
+Dateien, die du schon einzeln geteilt oder aus diesem Ordner in denselben Workspace veröffentlicht
+hast, werden nicht noch einmal angeboten.
+
+> **Stand der Beta:** **Veröffentlichen** lädt die bestätigten Dateien einmal hoch und merkt sich
+> die Zuordnung lokal. Ein fortlaufender Abgleich des Ordners (neue, umbenannte oder gelöschte
+> Dateien, Aktivitätsliste, Ordnerfreigabe trennen) ist noch nicht Teil dieser Funktion; bis dahin
+> bleiben spätere lokale Änderungen lokal.
 
 ## Zwei Personen in der Web-App
 

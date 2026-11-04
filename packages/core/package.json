@@ -84,6 +84,10 @@
       "import": "./src/shared-document-mirror.ts",
       "types": "./src/shared-document-mirror.ts"
     },
+    "./shared-folder-publication": {
+      "import": "./src/shared-folder-publication.ts",
+      "types": "./src/shared-folder-publication.ts"
+    },
     "./workspace-sync-client": {
       "import": "./src/workspace-sync-client.ts",
       "types": "./src/workspace-sync-client.ts"

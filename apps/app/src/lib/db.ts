@@ -3507,6 +3507,48 @@ export async function recordSharedDocumentBindingAudit(input: {
   });
 }
 
+/** Upper bound for one folder audit call; larger folders are audited in several calls. */
+export const SHARED_FOLDER_AUDIT_MAX_DOCUMENTS = 200;
+
+/**
+ * Audit counterpart of `recordSharedDocumentBindingAudit` for a deliberately published local
+ * folder: one request covers many documents so a folder of any size stays inside the audit rate
+ * limit. All documents are validated before the first event is written. Like the single-file
+ * audit, it never receives a local path, folder name, Markdown, or token.
+ */
+export async function recordSharedFolderBindingAudit(input: {
+  userId: string;
+  workspaceId: string;
+  documentIds: string[];
+  action: "bound" | "unbound";
+}) {
+  const workspace = await getWorkspaceForUser(input.userId, input.workspaceId);
+  const documentIds = [...new Set(input.documentIds.map((value) => normalizeUuid(value)))];
+  if (documentIds.length === 0 || documentIds.length > SHARED_FOLDER_AUDIT_MAX_DOCUMENTS || documentIds.some((id) => !id)) {
+    throw new Error("Invalid shared document.");
+  }
+
+  for (const documentId of documentIds as string[]) {
+    const rows = await getSql()`
+      select id
+      from bloom_documents
+      where id = ${documentId} and workspace_id = ${workspace.id} and deleted_at is null
+      limit 1
+    `;
+    if (!rows[0]) throw new Error("Shared document not found.");
+  }
+
+  for (const documentId of documentIds as string[]) {
+    await recordAuditEvent({
+      actorUserId: input.userId,
+      eventType: input.action === "bound" ? "shared_document.bound" : "shared_document.unbound",
+      targetType: "document",
+      targetId: documentId,
+      details: { mode: "folder" },
+    });
+  }
+}
+
 export async function createAccessToken(input: {
   userId: string;
   name: string;

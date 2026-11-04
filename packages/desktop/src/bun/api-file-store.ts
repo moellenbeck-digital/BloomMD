@@ -300,6 +300,17 @@ export class ApiFileStore {
     }>;
   }
 
+  /** One audit request for a published folder; carries document IDs only, never paths or names. */
+  async recordSharedFolderBinding(action: "bound" | "unbound", documentIds: string[]): Promise<void> {
+    if (!this.activeWorkspace) throw new Error("Workspace selection is required.");
+    const res = await fetch(`${this.baseUrl}/api/shared-documents/audit`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify({ action, documentIds, workspaceId: this.activeWorkspace.id }),
+    });
+    if (!res.ok) throw new Error(`Shared folder audit failed: ${res.status} ${res.statusText}`);
+  }
+
   async recordSharedDocumentBinding(action: "bound" | "unbound", documentId: string): Promise<void> {
     if (!this.activeWorkspace) throw new Error("Workspace selection is required.");
     const res = await fetch(`${this.baseUrl}/api/shared-documents/audit`, {

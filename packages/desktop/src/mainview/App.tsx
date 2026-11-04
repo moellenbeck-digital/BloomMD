@@ -2,7 +2,8 @@ import { FileChangeQueue } from "./file-change-queue";
 import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
 import { lazy, Suspense, useEffect, useState, useCallback, useRef, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, CloudUpload, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CloudUpload, FolderUp, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { FolderPublicationDialog, folderPublicationLabel, type FolderPublicationApi } from "./FolderPublicationDialog";
 import {
   MindMapCanvas,
   ResizableEditor,
@@ -40,7 +41,7 @@ import {
   listRemoteWorkspaces, selectRemoteWorkspace,
   getConnectionMode, onConnectionModeChanged, getBuildInfo, onAboutRequested,
   consumeExternalFile, onExternalFileOpened,
-  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
+  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, choosePublicationFolder, selectOpenFolderForPublication, previewFolderPublication, publishFolderAsWorkspace, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
   submitFeedback, getUpdateState, checkForUpdate, downloadUpdate, applyUpdate, onUpdateStatus, setApplicationLocale,
 } from "./rpc";
 import { isChangedFileActive } from "../shared/file-change";
@@ -89,6 +90,15 @@ function documentWithRootTitle(doc: MindMapDocument, title: string): MindMapDocu
 function workspaceRoleLabel(role: DesktopWorkspaceInfo["role"], t: ReturnType<typeof useLocale>["t"]): string {
   return role === "owner" ? t.ownerRole : role === "editor" ? t.editorRole : t.viewerRole;
 }
+
+const FOLDER_PUBLICATION_API: FolderPublicationApi = {
+  getConnectionMode,
+  listProfileWorkspaces,
+  choosePublicationFolder,
+  selectOpenFolderForPublication,
+  previewFolderPublication,
+  publishFolderAsWorkspace,
+};
 
 function sharedBindingFromInfo(sharedDocument: DesktopSharedDocumentInfo): SharedDocumentBinding {
   return {
@@ -208,6 +218,7 @@ export function App() {
   const [forwardNavigationAvailable, setForwardNavigationAvailable] = useState(false);
   const [sharedDocument, setSharedDocument] = useState<DesktopSharedDocumentInfo | null>(null);
   const [sharedDocumentDialogOpen, setSharedDocumentDialogOpen] = useState(false);
+  const [folderPublicationOpen, setFolderPublicationOpen] = useState(false);
   const sharedMirrorRef = useRef<{ localFilename: string; mirror: SharedDocumentMirror } | null>(null);
 
   const clearForwardNavigation = useCallback(() => {
@@ -2004,6 +2015,14 @@ export function App() {
           onResolveConflict={resolveSharedDocumentConflict}
         />
       )}
+      {folderPublicationOpen && connectionMode === "local" && (
+        <FolderPublicationDialog
+          profiles={connectionProfiles.filter((profile) => profile.hasToken)}
+          locale={locale}
+          api={FOLDER_PUBLICATION_API}
+          onClose={() => setFolderPublicationOpen(false)}
+        />
+      )}
 
       {/* Main area */}
       {reconnectFailedUrl && (
@@ -2202,6 +2221,16 @@ export function App() {
                 </>
               ) : (
                 <>
+                  <button
+                    type="button"
+                    data-testid="publish-folder-as-workspace"
+                    onClick={() => setFolderPublicationOpen(true)}
+                    title={locale === "de" ? "Öffnet nur die Auswahl. Hochgeladen wird erst nach deiner Bestätigung in der Vorschau." : "Only opens the selection. Nothing is uploaded until you confirm in the preview."}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+                  >
+                    <FolderUp size={16} />
+                    <span>{folderPublicationLabel(locale)}</span>
+                  </button>
                   <button
                     type="button"
                     data-testid="change-folder"

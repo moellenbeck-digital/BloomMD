@@ -68,6 +68,43 @@ describe("desktop settings", () => {
     }]);
   });
 
+  test("keeps valid shared-folder bindings and drops unsafe ones", async () => {
+    const path = await settingsPath();
+    const binding = {
+      schemaVersion: 1 as const,
+      workspaceId: "workspace-1",
+      documentId: "document-1",
+      cloudFilename: "docs__a.md",
+      lastAcknowledgedMarkdownHash: "hash-1",
+      lastKnownCloudVersion: 1,
+      connectionState: "connected" as const,
+    };
+    const folder = {
+      id: "folder-1",
+      folderPath: "/Users/me/Notes",
+      profileId: "server-1",
+      workspaceId: "workspace-1",
+      strategy: "keep-cloud" as const,
+      excluded: ["drafts"],
+      publishedAt: "2026-11-04T10:00:00.000Z",
+      files: [
+        { relativePath: "docs/a.md", binding },
+        { relativePath: "../escape.md", binding },
+        { relativePath: "/abs.md", binding },
+        { relativePath: "bad.md", binding: { schemaVersion: 0 } },
+      ],
+    };
+    await writeFile(path, JSON.stringify({
+      sharedFolderBindings: [
+        folder,
+        { ...folder, id: "relative", folderPath: "Notes" },
+        { ...folder, id: "strategy", strategy: "overwrite" },
+      ],
+    }));
+
+    expect((await loadSettings(path)).sharedFolderBindings).toEqual([{ ...folder, files: [{ relativePath: "docs/a.md", binding }] }]);
+  });
+
   test("returns empty settings for malformed JSON", async () => {
     const path = await settingsPath();
     await writeFile(path, "not json");

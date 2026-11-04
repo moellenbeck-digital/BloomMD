@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const APP_SOURCE = join(ROOT, "mainview", "App.tsx");
 const BUN_SOURCE = join(ROOT, "bun", "index.ts");
+const FOLDER_DIALOG_SOURCE = join(ROOT, "mainview", "FolderPublicationDialog.tsx");
+const FOLDER_PUBLISH_SOURCE = join(ROOT, "bun", "folder-publish.ts");
 const FILE_CONTEXT_MENU_SOURCE = join(ROOT, "..", "..", "ui", "src", "components", "FileContextMenu.tsx");
 
 function compact(source: string): string {
@@ -252,6 +254,47 @@ describe("desktop mainview contract", () => {
     expect(main).toContain("getSharedSyncTicket: async ({ localFilename }) => {");
     expect(main).not.toContain("apiStore.create(safeLocalFilename");
     expect(main).not.toContain("const documentId = cloudDocument.frontmatter.id;");
+  });
+
+  test("publishes a local folder only through its own entry point and after a confirmed preview", async () => {
+    const renderer = compact(await readFile(APP_SOURCE, "utf8"));
+    const dialog = compact(await readFile(FOLDER_DIALOG_SOURCE, "utf8"));
+    const main = compact(await readFile(BUN_SOURCE, "utf8"));
+    const folderPublish = compact(await readFile(FOLDER_PUBLISH_SOURCE, "utf8"));
+
+    // A separate entry point with its own name; the single-file share keeps its button and dialog.
+    expect(renderer).toContain("data-testid=\"publish-folder-as-workspace\"");
+    expect(renderer).toContain("data-testid=\"desktop-share-local-document\"");
+    expect(renderer).toContain("<SharedDocumentDialog");
+    expect(renderer).toContain("<FolderPublicationDialog");
+    expect(renderer).toContain("folderPublicationOpen && connectionMode === \"local\"");
+    expect(dialog).toContain("Ordner als gemeinsamen Workspace veröffentlichen");
+    expect(dialog).toContain("Publish folder as a shared workspace");
+
+    // Choosing and previewing never upload; only the confirm button calls publishFolderAsWorkspace.
+    expect(dialog.match(/publishFolderAsWorkspace\(/g)).toHaveLength(1);
+    expect(dialog).toContain("onClick={() => void publish()}");
+    expect(dialog).toContain("data-testid=\"folder-publication-confirm\"");
+    expect(dialog).toContain("const confirmedUploads = preview.items.filter((item) => item.status === \"upload\" && !excluded.has(item.relativePath))");
+    expect(dialog).toContain("Nothing is read or uploaded until you confirm in the preview.");
+
+    // Bun side: preview and folder choice are read-only, the folder comes from the native dialog.
+    const previewHandler = main.slice(main.indexOf("previewFolderPublication: async"), main.indexOf("publishFolderAsWorkspace: async"));
+    expect(previewHandler).toContain("prepareFolderPublicationRequest(");
+    expect(previewHandler).not.toContain("publishFolderPlan");
+    expect(previewHandler).not.toContain(".create(");
+    expect(main).toContain("publicationFolder = resolve(selected);");
+    expect(main).toContain("if (!folderPath) throw new Error(\"PUBLICATION_FOLDER_NOT_SELECTED\");");
+    expect(main).toContain("if (workspace.role === \"viewer\") throw new Error(\"WORKSPACE_READ_ONLY\");");
+    expect(main).toContain("confirmed: confirmedUploads,");
+    expect(main).toContain("recordFolderBinding: (documentIds) => prepared.apiStore.recordSharedFolderBinding(\"bound\", documentIds),");
+
+    // Only Markdown names and IDs go to the cloud: no folder or relative path in any cloud call.
+    expect(folderPublish).toContain("input.cloud.create(item.uploadFilename, markdown)");
+    expect(folderPublish).toContain("input.cloud.recordFolderBinding(");
+    expect(folderPublish).not.toMatch(/input\.cloud\.\w+\([^)]*(relativePath|folderPath)/);
+    expect(main).not.toContain("apiStore.create(prepared.folderPath");
+    expect(main).not.toMatch(/recordSharedFolderBinding\([^)]*(folderPath|relativePath)/);
   });
 
   test("keeps one shared file on its Yjs provider while mirroring local watcher changes", async () => {

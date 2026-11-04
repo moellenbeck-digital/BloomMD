@@ -2,14 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AlertTriangle, ChevronDown, ChevronRight, CloudUpload, FileText, Folder, FolderUp, X } from "lucide-react";
 import type { SharedFolderBlockReason, SharedFolderConflictStrategy, SharedFolderPlanItem } from "@bloommd/core/shared-folder-publication";
 import type { DesktopConnectionProfile, DesktopFolderPublicationPreview, DesktopFolderPublicationResult, DesktopWorkspaceInfo } from "../shared/rpc-types";
-import {
-  choosePublicationFolder,
-  getConnectionMode,
-  listProfileWorkspaces,
-  previewFolderPublication,
-  publishFolderAsWorkspace,
-  selectOpenFolderForPublication,
-} from "./rpc";
+import type * as Rpc from "./rpc";
+
+/** The RPC calls the dialog needs; passed in so the dialog stays testable without the native bridge. */
+export type FolderPublicationApi = Pick<typeof Rpc,
+  | "getConnectionMode"
+  | "listProfileWorkspaces"
+  | "choosePublicationFolder"
+  | "selectOpenFolderForPublication"
+  | "previewFolderPublication"
+  | "publishFolderAsWorkspace"
+>;
 
 type Step = "folder" | "target" | "preview" | "result";
 type Locale = "de" | "en";
@@ -95,10 +98,12 @@ function selectableFiles(node: TreeNode): SharedFolderPlanItem[] {
 export function FolderPublicationDialog({
   profiles,
   locale,
+  api,
   onClose,
 }: {
   profiles: DesktopConnectionProfile[];
   locale: Locale;
+  api: FolderPublicationApi;
   onClose: () => void;
 }) {
   const de = locale === "de";
@@ -120,18 +125,18 @@ export function FolderPublicationDialog({
 
   useEffect(() => {
     let disposed = false;
-    void getConnectionMode()
+    void api.getConnectionMode()
       .then((mode) => { if (!disposed && mode.type === "local") setOpenFolder(mode.dir); })
       .catch((cause: unknown) => console.error("[BloomMD] Open folder could not be read:", cause));
     return () => { disposed = true; };
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     if (step !== "target" || !profileId) return;
     let disposed = false;
     setLoadingWorkspaces(true);
     setError(null);
-    void listProfileWorkspaces(profileId)
+    void api.listProfileWorkspaces(profileId)
       .then((context) => {
         if (disposed) return;
         setWorkspaces(context.workspaces);
@@ -149,13 +154,13 @@ export function FolderPublicationDialog({
       })
       .finally(() => { if (!disposed) setLoadingWorkspaces(false); });
     return () => { disposed = true; };
-  }, [de, profileId, step]);
+  }, [api, de, profileId, step]);
 
   const pickCurrentFolder = async () => {
     setBusy(true);
     setError(null);
     try {
-      const chosen = await selectOpenFolderForPublication();
+      const chosen = await api.selectOpenFolderForPublication();
       if (!chosen.path) throw new Error(describePublicationError(chosen.error, locale));
       setFolderPath(chosen.path);
       setStep("target");
@@ -170,7 +175,7 @@ export function FolderPublicationDialog({
     setBusy(true);
     setError(null);
     try {
-      const chosen = await choosePublicationFolder();
+      const chosen = await api.choosePublicationFolder();
       if (chosen.error) throw new Error(describePublicationError(chosen.error, locale));
       if (!chosen.path) return;
       setFolderPath(chosen.path);
@@ -188,7 +193,7 @@ export function FolderPublicationDialog({
     setBusy(true);
     setError(null);
     try {
-      const response = await previewFolderPublication({ profileId, workspaceId, strategy: nextStrategy, excluded: [] });
+      const response = await api.previewFolderPublication({ profileId, workspaceId, strategy: nextStrategy, excluded: [] });
       if (requestId !== latestPreview.current) return;
       if (!response.success || !response.preview) throw new Error(describePublicationError(response.error, locale));
       setPreview(response.preview);
@@ -198,7 +203,7 @@ export function FolderPublicationDialog({
     } finally {
       if (requestId === latestPreview.current) setBusy(false);
     }
-  }, [locale, profileId, workspaceId]);
+  }, [api, locale, profileId, workspaceId]);
 
   const changeStrategy = (next: SharedFolderConflictStrategy) => {
     setStrategy(next);
@@ -252,7 +257,7 @@ export function FolderPublicationDialog({
     setError(null);
     try {
       const confirmedUploads = preview.items.filter((item) => item.status === "upload" && !excluded.has(item.relativePath)).map((item) => item.relativePath);
-      const response = await publishFolderAsWorkspace({ profileId, workspaceId, strategy, excluded: [...excluded], confirmedUploads });
+      const response = await api.publishFolderAsWorkspace({ profileId, workspaceId, strategy, excluded: [...excluded], confirmedUploads });
       setResult(response);
       setStep("result");
     } catch (cause) {

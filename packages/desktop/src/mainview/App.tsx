@@ -3,7 +3,7 @@ import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
 import { lazy, Suspense, useEffect, useState, useCallback, useRef, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, CloudUpload, FolderUp, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
-import { FolderPublicationDialog, folderPublicationLabel } from "./FolderPublicationDialog";
+import { FolderPublicationDialog, folderPublicationLabel, type FolderPublicationApi } from "./FolderPublicationDialog";
 import {
   MindMapCanvas,
   ResizableEditor,
@@ -41,7 +41,7 @@ import {
   listRemoteWorkspaces, selectRemoteWorkspace,
   getConnectionMode, onConnectionModeChanged, getBuildInfo, onAboutRequested,
   consumeExternalFile, onExternalFileOpened,
-  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
+  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, choosePublicationFolder, selectOpenFolderForPublication, previewFolderPublication, publishFolderAsWorkspace, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
   submitFeedback, getUpdateState, checkForUpdate, downloadUpdate, applyUpdate, onUpdateStatus, setApplicationLocale,
 } from "./rpc";
 import { isChangedFileActive } from "../shared/file-change";
@@ -90,6 +90,15 @@ function documentWithRootTitle(doc: MindMapDocument, title: string): MindMapDocu
 function workspaceRoleLabel(role: DesktopWorkspaceInfo["role"], t: ReturnType<typeof useLocale>["t"]): string {
   return role === "owner" ? t.ownerRole : role === "editor" ? t.editorRole : t.viewerRole;
 }
+
+const FOLDER_PUBLICATION_API: FolderPublicationApi = {
+  getConnectionMode,
+  listProfileWorkspaces,
+  choosePublicationFolder,
+  selectOpenFolderForPublication,
+  previewFolderPublication,
+  publishFolderAsWorkspace,
+};
 
 function sharedBindingFromInfo(sharedDocument: DesktopSharedDocumentInfo): SharedDocumentBinding {
   return {
@@ -2010,6 +2019,7 @@ export function App() {
         <FolderPublicationDialog
           profiles={connectionProfiles.filter((profile) => profile.hasToken)}
           locale={locale}
+          api={FOLDER_PUBLICATION_API}
           onClose={() => setFolderPublicationOpen(false)}
         />
       )}

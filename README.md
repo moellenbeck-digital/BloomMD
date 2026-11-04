@@ -563,6 +563,8 @@ be used — the product claim is that Markdown stays intact, so the demo has to 
 
 BloomMD's long-term direction is an open, locally usable knowledge and action layer built on portable Markdown. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) describes this direction without making release commitments.
 
+The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) records ten possible expansion themes, their existing references, and the decisions still needed. It does not set release dates or commitments.
+
 The [public roadmap](https://bloommd.io/roadmap) summarizes work that is ready to share. Browse and report concrete requests in [GitHub Issues](https://github.com/moellenbeck-digital/BloomMD/issues); maintainers plan them in the internal project board.
 
 ## Contributing

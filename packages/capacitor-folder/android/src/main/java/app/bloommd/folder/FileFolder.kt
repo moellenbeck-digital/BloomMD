@@ -32,6 +32,8 @@ class FileFolder(private val root: File) : FolderBackend {
     override fun list(extensions: Set<String>, limit: Int): FolderListing {
         val base = base()
         val files = mutableListOf<FolderEntry>()
+        val folders = mutableListOf<String>()
+        var truncated = false
         val pending = ArrayDeque<Pair<File, String>>()
         pending.add(base to "")
         while (pending.isNotEmpty()) {
@@ -40,15 +42,18 @@ class FileFolder(private val root: File) : FolderBackend {
             for (child in children) {
                 val name = child.name
                 if (child.isDirectory) {
-                    if (!FolderRules.skipsFolder(name)) pending.add(child to "$prefix$name/")
+                    if (!FolderRules.skipsFolder(name)) {
+                        if (folders.size < limit) folders.add("$prefix$name") else truncated = true
+                        pending.add(child to "$prefix$name/")
+                    }
                     continue
                 }
                 if (FolderRules.isHidden(name) || !FolderRules.matchesExtension(name, extensions)) continue
-                if (files.size >= limit) return FolderListing(files, true)
+                if (files.size >= limit) return FolderListing(files, true, folders)
                 files.add(FolderEntry("$prefix$name", child.length(), child.lastModified()))
             }
         }
-        return FolderListing(files, false)
+        return FolderListing(files, truncated, folders)
     }
 
     override fun read(segments: List<String>): FolderText {
@@ -79,6 +84,15 @@ class FileFolder(private val root: File) : FolderBackend {
             throw error
         }
         file.lastModified()
+    }
+
+    override fun mkdir(segments: List<String>) {
+        synchronized(lock) {
+            val folder = target(segments)
+            if (folder.isDirectory) return
+            if (folder.exists()) throw FolderException(FolderError.EXISTS)
+            if (!folder.mkdirs() && !folder.isDirectory) throw IOException("The folder could not be created.")
+        }
     }
 
     override fun remove(segments: List<String>) {

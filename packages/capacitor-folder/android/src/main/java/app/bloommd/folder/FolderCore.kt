@@ -19,7 +19,11 @@ class FolderException(val error: FolderError) : Exception(error.message)
 /** One listed file; `path` is relative to the folder with "/" separators. */
 data class FolderEntry(val path: String, val size: Long, val modified: Long, val local: Boolean = true)
 
-data class FolderListing(val files: List<FolderEntry>, val truncated: Boolean)
+/**
+ * `folders` are all subfolders ("A", "A/B"), empty ones included and hidden ones or `node_modules`
+ * left out; they are the folders themselves, never placeholder files inside them.
+ */
+data class FolderListing(val files: List<FolderEntry>, val truncated: Boolean, val folders: List<String> = emptyList())
 
 data class FolderText(val data: String, val modified: Long)
 
@@ -80,4 +84,10 @@ interface FolderBackend {
     fun write(segments: List<String>, data: String, expectedModified: Double?, exclusive: Boolean): Long
 
     fun remove(segments: List<String>)
+
+    /**
+     * Creates the folder with its missing parents; an existing folder is not an error. A file with
+     * that name is EXISTS. Writes nothing into the folder.
+     */
+    fun mkdir(segments: List<String>)
 }

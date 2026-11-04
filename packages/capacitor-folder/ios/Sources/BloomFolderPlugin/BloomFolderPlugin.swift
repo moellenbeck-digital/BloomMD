@@ -17,6 +17,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         CAPPluginMethod(name: "current", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "forget", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "list", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "mkdir", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "read", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "write", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "remove", returnType: CAPPluginReturnPromise),
@@ -222,19 +223,35 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         let extensions = Set((call.getArray("extensions", String.self) ?? ["md", "markdown"]).map { $0.lowercased() })
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let (files, truncated): ([[String: Any]], Bool) = try self.withFolder { root in
-                    let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey, .fileSizeKey, .ubiquitousItemDownloadingStatusKey]
+                let (files, folders, truncated): ([[String: Any]], [String], Bool) = try self.withFolder { root in
+                    let keys: [URLResourceKey] = [.isDirectoryKey, .isPackageKey, .contentModificationDateKey, .fileSizeKey, .ubiquitousItemDownloadingStatusKey]
                     // Hidden entries are filtered below: iCloud placeholders of not yet downloaded
                     // files are hidden too, and must still be listed so they are not overwritten.
-                    guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return ([], false) }
+                    guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return ([], [], false) }
                     var result: [[String: Any]] = []
+                    var folders: [String] = []
                     var truncated = false
                     let base = root.standardizedFileURL.path
                     for case let url as URL in enumerator {
                         let values = try? url.resourceValues(forKeys: Set(keys))
                         let name = url.lastPathComponent
                         if values?.isDirectory == true {
-                            if name.hasPrefix(".") { enumerator.skipDescendants() }
+                            // Dot folders (.obsidian, .trash, .git) and node_modules never hold notes.
+                            if name.hasPrefix(".") || name == "node_modules" {
+                                enumerator.skipDescendants()
+                                continue
+                            }
+                            // Folders are listed whether or not they hold notes, so an empty one is
+                            // visible; the folder itself is all there is, no placeholder file.
+                            if values?.isPackage != true {
+                                if folders.count >= self.listLimit {
+                                    truncated = true
+                                } else {
+                                    var folder = String(url.standardizedFileURL.path.dropFirst(base.count))
+                                    if folder.hasPrefix("/") { folder.removeFirst() }
+                                    folders.append(folder)
+                                }
+                            }
                             continue
                         }
                         var file = url
@@ -263,9 +280,32 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
                             "local": local,
                         ])
                     }
-                    return (result, truncated)
+                    return (result, folders, truncated)
                 }
-                call.resolve(["files": files, "truncated": truncated])
+                call.resolve(["files": files, "folders": folders, "truncated": truncated])
+            } catch {
+                call.reject(self.message(error), (error as? FolderError)?.code)
+            }
+        }
+    }
+
+    /// Creates a folder with its missing parents inside the open folder. An existing folder is not an
+    /// error; a file with that name is (EXISTS). Nothing is written into the folder.
+    @objc func mkdir(_ call: CAPPluginCall) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try self.withFolder { root in
+                    let url = try self.target(root, call.getString("path"))
+                    if self.isDirectory(url) { return }
+                    if self.exists(url) { throw FolderError.exists }
+                    var failure: Error?
+                    var coordinationError: NSError?
+                    NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: [], error: &coordinationError) { createURL in
+                        do { try FileManager.default.createDirectory(at: createURL, withIntermediateDirectories: true) } catch { failure = error }
+                    }
+                    if let error = coordinationError ?? failure { throw error }
+                }
+                call.resolve()
             } catch {
                 call.reject(self.message(error), (error as? FolderError)?.code)
             }

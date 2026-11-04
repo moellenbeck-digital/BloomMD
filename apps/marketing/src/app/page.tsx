@@ -1051,79 +1051,6 @@ function WikiSection() {
   );
 }
 
-function BetaProgramSection() {
-  return (
-    <section id="pricing" className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Kostenlos — und bewusst noch klein.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Demo und Templates kannst du sofort ausprobieren. Desktop-Builds und das Obsidian-Plugin
-            kannst du ohne Konto laden. Für BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
-            registrierst du dich; wir wachsen bewusst langsam, damit wir Rückmeldungen beantworten können.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              icon: Check,
-              title: "Was du bekommst",
-              items: [
-                "Voller Funktionsumfang ohne Limits",
-                "Demo und Templates ohne Einladung",
-                "Web, macOS-, Omarchy/Linux-Desktop und Obsidian-Kompatibilität",
-                "LLM-Wiki-Werkzeuge und OKF-Bundles",
-                "Direkter Draht zu uns bei Bugs und Wünschen",
-              ],
-            },
-            {
-              icon: ShieldCheck,
-              title: "Was wir zusagen",
-              items: [
-                "Deine Dateien bleiben normales Markdown",
-                "Kein Verkauf oder Training mit deinen Inhalten",
-                "Export und Löschung jederzeit möglich",
-                "Preise kündigen wir vorher an, nicht rückwirkend",
-              ],
-            },
-            {
-              icon: RefreshCw,
-              title: "Was noch fehlt",
-              items: [
-                "Cloud-Zugang nur mit Registrierung",
-                "Die eigenständige Mobile-App und Windows-Desktop sind noch nicht öffentlich verfügbar",
-                "Der Agent-Workflow ist bewusst review-pflichtig",
-                "Rechne mit Bugs — und melde sie uns",
-              ],
-            },
-          ].map((card) => (
-            <div key={card.title} className="rounded-xl border border-[#E8E4DF] bg-[#FCFBFA] p-6">
-              <card.icon size={20} className="text-[#B64A1F]" />
-              <h3 className="mt-4 text-lg font-semibold">{card.title}</h3>
-              <ul className="mt-4 grid gap-2.5 text-sm leading-6 text-[#666666]">
-                {card.items.map((item) => (
-                  <li key={item} className="flex gap-2.5">
-                    <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#FF6B35]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-8 max-w-3xl text-sm leading-6 text-[#666666]">
-          Nach der Beta wird es eine kostenlose Stufe für lokales Arbeiten geben und eine bezahlte für Cloud- und
-          Team-Funktionen. Beta-Teilnehmer informieren wir vorher und rechnen nichts rückwirkend ab. Wenn du
-          die Cloud-Beta nutzen willst, registriere dich einfach — eine Einladung brauchst du nicht.
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState(0);
 
@@ -1226,39 +1153,7 @@ export default function LandingPage() {
       <LocalFirstSection />
       <WikiSection />
       <FeatureBento />
-      <BetaProgramSection />
       <AvailabilityOverview locale="de" />
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]">
-        <div className="mx-auto grid max-w-7xl gap-4 px-5 py-10 md:grid-cols-4">
-          {[
-            { icon: FileText, label: "Offene Markdown-Dateien" },
-            { icon: HardDrive, label: "Lokale Speicherung" },
-            { icon: Code2, label: "Git- und Editor-kompatibel" },
-            { icon: ShieldCheck, label: "Lokale Backups" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#E8E4DF] bg-white p-4">
-              <item.icon size={20} className="text-[#FF6B35]" aria-hidden="true" />
-              <span className="text-sm font-semibold">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFF4EE]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-5 py-14 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Jetzt testen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Registrieren, wenn du mehr willst.</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Konto nutzen. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <Link href="/demo" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">Demo testen <ArrowRight size={16} /></Link>
-            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Desktop herunterladen</Link>
-            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Obsidian-Status</Link>
-          </div>
-        </div>
-      </section>
       <FAQSection />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}

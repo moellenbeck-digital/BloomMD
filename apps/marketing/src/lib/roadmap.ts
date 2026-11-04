@@ -87,7 +87,19 @@ const boardStatusToPublicStatus: Record<string, RoadmapStatus | null> = {
   "In review": "In review",
 };
 
-const fallbackRoadmapIssues: RoadmapIssue[] = [];
+const fallbackRoadmapDrafts: Array<Omit<RoadmapIssue, "url">> = [
+  { number: 259, title: "Wissensmodell und Provenienz", description: "Portables Markdown-Modell für Quellen, Verantwortliche und überprüfbare Aussagen festlegen.", tags: ["Dokumentation"], status: "Planned" },
+  { number: 260, title: "Belegte Suche und Agentic RAG", description: "Einen Suchfall mit Zitaten, Rechteprüfung und Referenzfragen entscheiden.", tags: ["Workspace"], status: "Planned" },
+  { number: 261, title: "Sync und Offline", description: "Offline-Bearbeitung, Wiederaufnahme und sichtbare Konflikte eingrenzen.", tags: ["Sync"], status: "Planned" },
+  { number: 262, title: "Identität und Delegation", description: "Menschen- und Agentenrechte mit Widerruf und Audit definieren.", tags: ["Workspace"], status: "Planned" },
+  { number: 263, title: "Sicherheit und Governance", description: "Kontrollen aus einem konkreten Nutzungsszenario ableiten.", tags: ["Workspace"], status: "Planned" },
+  { number: 264, title: "Konnektoren und offene Schnittstellen", description: "Eine erste lesende Quelle mit klarer Quellhoheit auswählen.", tags: ["Sync"], status: "Planned" },
+  { number: 265, title: "Wissenslebenszyklus", description: "Review, Veraltung und Archivierung anhand des Pilots prüfen.", tags: ["Dokumentation"], status: "Planned" },
+  { number: 266, title: "Agenten-Workflows", description: "Eine Agentenaktion mit Freigabe, Grenzen und Rücknahme definieren.", tags: ["Workspace"], status: "Planned" },
+  { number: 267, title: "Transparenz und Vertrauen", description: "Quellen, Berechtigungen und Unsicherheit überprüfbar machen.", tags: ["Workspace"], status: "Planned" },
+  { number: 268, title: "Betrieb und Administration", description: "Gesundheit, Kosten, Limits, Backup und Restore eingrenzen.", tags: ["Workspace"], status: "Planned" },
+];
+const fallbackRoadmapIssues: RoadmapIssue[] = fallbackRoadmapDrafts.map((issue) => ({ ...issue, url: `https://github.com/moellenbeck-digital/BloomMD/issues/${issue.number}` }));
 
 const tagLabelMap: Record<string, RoadmapTag[]> = {
   desktop: ["Mac"],
@@ -269,7 +281,6 @@ function publicTagsFromLabels(labels: string[], title: string): RoadmapTag[] {
   if (normalizedTitle.includes("linux")) tagSet.add("Linux");
   if (normalizedTitle.includes("obsidian")) tagSet.add("Obsidian");
   if (normalizedTitle.includes("sync")) tagSet.add("Sync");
-  if (normalizedTitle.includes("roadmap")) tagSet.add("Feedback");
 
   return Array.from(tagSet).filter((tag) => roadmapFilters.includes(tag) || tag === "Beta" || tag === "Collaboration");
 }

@@ -561,7 +561,7 @@ be used — the product claim is that Markdown stays intact, so the demo has to 
 
 ## Roadmap
 
-BloomMD's long-term direction is an open knowledge and action layer built on portable Markdown. The [internal learnings pilot](https://github.com/moellenbeck-digital/BloomMD/issues/116) is its first backend use case. Local editing remains possible without cloud access; sync and carefully scoped external connections are early strategic work that users can opt into. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) separates this direction from shipped features and release commitments.
+BloomMD's long-term direction is an open, locally usable knowledge and action layer built on portable Markdown. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) describes this direction without making release commitments.
 
 The [public roadmap](https://bloommd.io/roadmap) summarizes work that is ready to share. Browse and report concrete requests in [GitHub Issues](https://github.com/moellenbeck-digital/BloomMD/issues); maintainers plan them in the internal project board.
 

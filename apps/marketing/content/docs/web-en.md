@@ -10,12 +10,11 @@ The Web app at `/app` has two deliberately different modes.
 
 ## Local folder and cloud at a glance
 
-| | Local folder in the browser | Cloud workspace |
-|---|---|---|
-| Account needed | not for the [browser demo](/demo?lang=en); the Web app at `/app` requires sign-in | yes |
-| Where the files live | in your folder on your computer | in the server's database |
-| Upload | no, nothing is uploaded | yes, files are imported |
-| Collaboration | no | yes, through the sync server |
+- **Local folder in the browser:** The files live in your folder on your computer. Nothing is uploaded
+  and there is no collaboration. The Web app at `/app` requires sign-in; only the
+  [browser demo](/demo?lang=en) works without an account.
+- **Cloud workspace:** The files live in the server's database. You need an account, files are
+  imported, and collaboration runs through the sync server.
 
 The full comparison is in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
 

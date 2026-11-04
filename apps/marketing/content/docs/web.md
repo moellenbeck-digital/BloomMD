@@ -10,12 +10,11 @@ Unter `/app`. Zwei Betriebsarten, die sich deutlich unterscheiden.
 
 ## Lokaler Ordner und Cloud im Überblick
 
-| | Lokaler Ordner im Browser | Cloud-Workspace |
-|---|---|---|
-| Konto nötig | nein für die [Browser-Demo](/demo); die Web-App unter `/app` verlangt Anmeldung | ja |
-| Wo liegen die Dateien | in deinem Ordner auf dem Rechner | in der Datenbank des Servers |
-| Upload | nein, nichts wird hochgeladen | ja, Dateien werden importiert |
-| Zusammenarbeit | nein | ja, über den Sync-Server |
+- **Lokaler Ordner im Browser:** Die Dateien liegen in deinem Ordner auf dem Rechner. Es wird nichts
+  hochgeladen und es gibt keine Zusammenarbeit. Die Web-App unter `/app` verlangt die Anmeldung; nur
+  die [Browser-Demo](/demo) kommt ohne Konto aus.
+- **Cloud-Workspace:** Die Dateien liegen in der Datenbank des Servers. Du brauchst ein Konto, Dateien
+  werden importiert, und Zusammenarbeit läuft über den Sync-Server.
 
 Die Gegenüberstellung ausführlich: [Lokal oder Cloud](/docs/lokal-oder-cloud).
 

@@ -12,13 +12,14 @@ ob du sie bewusst teilst — nie vom bloßen Öffnen.
 
 ## Auf einen Blick
 
-| Du arbeitest mit | Wo liegen die Dateien | Konto nötig | Upload | Zusammenarbeit |
-|---|---|---|---|---|
-| [Desktop-App](/docs/desktop), lokaler Ordner | auf deinem Rechner | nein | nein | nein |
-| [Web-App](/docs/web), lokaler Ordner im Browser | auf deinem Rechner | Anmeldung für `/app` | nein | nein |
-| [Browser-Demo](/demo) | im Browser, bis du sie herunterlädst | nein | nein | nein |
-| [Obsidian-Plugin](/obsidian) | in deinem Vault | nein | nein | nein |
-| [Web-App](/docs/web), Cloud-Workspace | in der Datenbank des Servers | ja | ja | ja |
+- **[Desktop-App](/docs/desktop), lokaler Ordner:** Dateien auf deinem Rechner, kein Konto, kein Upload,
+  keine Zusammenarbeit.
+- **[Web-App](/docs/web), lokaler Ordner im Browser:** Dateien auf deinem Rechner, Anmeldung für `/app`,
+  kein Upload, keine Zusammenarbeit.
+- **[Browser-Demo](/demo):** Markdown im Browser, bis du es herunterlädst; kein Konto, kein Upload.
+- **[Obsidian-Plugin](/obsidian):** Dateien in deinem Vault, kein Konto, kein Upload.
+- **[Web-App](/docs/web), Cloud-Workspace:** Dokumente in der Datenbank des Servers, Konto nötig,
+  Upload, Zusammenarbeit möglich.
 
 ## Was lokal bleibt
 

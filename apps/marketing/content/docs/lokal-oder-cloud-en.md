@@ -12,13 +12,15 @@ whether you deliberately share it — never on merely opening it.
 
 ## At a glance
 
-| You work with | Where the files live | Account needed | Upload | Collaboration |
-|---|---|---|---|---|
-| [Desktop app](/docs/desktop?lang=en), local folder | on your computer | no | no | no |
-| [Web app](/docs/web?lang=en), local folder in the browser | on your computer | sign-in for `/app` | no | no |
-| [Browser demo](/demo?lang=en) | in the browser until you download them | no | no | no |
-| [Obsidian plugin](/obsidian?lang=en) | in your vault | no | no | no |
-| [Web app](/docs/web?lang=en), cloud workspace | in the server's database | yes | yes | yes |
+- **[Desktop app](/docs/desktop?lang=en), local folder:** files on your computer, no account, no upload,
+  no collaboration.
+- **[Web app](/docs/web?lang=en), local folder in the browser:** files on your computer, sign-in for
+  `/app`, no upload, no collaboration.
+- **[Browser demo](/demo?lang=en):** Markdown in the browser until you download it; no account, no
+  upload.
+- **[Obsidian plugin](/obsidian?lang=en):** files in your vault, no account, no upload.
+- **[Web app](/docs/web?lang=en), cloud workspace:** documents in the server's database, account
+  needed, upload, collaboration possible.
 
 ## What stays local
 

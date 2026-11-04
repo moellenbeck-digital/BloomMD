@@ -5,7 +5,7 @@ const bound = (relativePath: string, hash = `hash-${relativePath}`): SharedFolde
   relativePath,
   documentId: `doc-${relativePath}`,
   cloudFilename: relativePath.split("/").join("__"),
-  lastAcknowledgedMarkdownHash: hash,
+  contentHash: hash,
 });
 const local = (relativePath: string, sizeBytes = 10) => ({ relativePath, sizeBytes });
 
@@ -52,6 +52,11 @@ describe("detectSharedFolderActivity", () => {
       hashes: { "moved/new.md": "h1" },
     });
     expect(result).toEqual([{ kind: "renamed", file: bound("old.md", "h1"), to: local("moved/new.md") }]);
+  });
+
+  test("a file published without a content fingerprint is never guessed as renamed", async () => {
+    const { result } = await detect({ bound: [{ ...bound("old.md"), contentHash: null }], local: ["new.md"], hashes: { "new.md": "hash-old.md" } });
+    expect(result.map((entry) => entry.kind)).toEqual(["removed", "new"]);
   });
 
   test("keeps new plus removed when the content differs or cannot be read", async () => {

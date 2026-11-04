@@ -58,6 +58,8 @@ export type FolderPublishSkipReason = "not-confirmed" | "too-large" | "unreadabl
 export interface FolderPublishedFile {
   relativePath: string;
   binding: SharedDocumentBinding;
+  /** Content fingerprint at publication; lets a later rename be recognised. Null when none was taken. */
+  contentHash: string | null;
 }
 
 export interface FolderPublishResult {
@@ -84,11 +86,13 @@ export async function publishFolderPlan(input: {
   confirmed: readonly string[];
   workspaceId: string;
   readMarkdown(relativePath: string): Promise<string>;
+  /** Fingerprint of the local file content, stored with the binding. */
+  fingerprintOf?(relativePath: string): Promise<string | null>;
   cloud: FolderPublishCloud;
 }): Promise<FolderPublishResult> {
   const confirmed = new Set(input.confirmed);
   const result: FolderPublishResult = { published: [], skipped: [], failed: [], rollbackFailures: [] };
-  const created: Array<{ relativePath: string; filePath: string; documentId: string; binding: SharedDocumentBinding }> = [];
+  const created: Array<{ relativePath: string; filePath: string; documentId: string; binding: SharedDocumentBinding; contentHash: string | null }> = [];
 
   for (const item of input.plan.items) {
     if (item.status !== "upload" || !item.uploadFilename) continue;
@@ -130,7 +134,13 @@ export async function publishFolderPlan(input: {
         markdownHash,
       });
       if (connected.kind !== "connected") throw new Error("SHARED_DOCUMENT_BINDING_FAILED");
-      created.push({ relativePath: item.relativePath, filePath: document.filePath, documentId, binding: connected.binding });
+      created.push({
+        relativePath: item.relativePath,
+        filePath: document.filePath,
+        documentId,
+        binding: connected.binding,
+        contentHash: input.fingerprintOf ? await input.fingerprintOf(item.relativePath) : null,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("[BloomMD] Folder publication upload failed:", message);
@@ -158,7 +168,7 @@ export async function publishFolderPlan(input: {
     return result;
   }
 
-  result.published = created.map(({ relativePath, binding }) => ({ relativePath, binding }));
+  result.published = created.map(({ relativePath, binding, contentHash }) => ({ relativePath, binding, contentHash }));
   return result;
 }
 

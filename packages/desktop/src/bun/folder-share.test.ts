@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { SharedDocumentBinding } from "@bloommd/core";
-import { applyFolderDecision, classifyAccessFailure, computeFolderActivity, markFolderRevoked, type FolderShareCloud } from "./folder-share";
+import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { FileStore, planSharedFolderPublication, serializeToMarkdown, type SharedDocumentBinding } from "@bloommd/core";
+import { publishFolderPlan, scanFolderForPublication } from "./folder-publish";
+import { applyFolderDecision, auditFolderUnbinding, classifyAccessFailure, createFolderFileHasher, computeFolderActivity, markFolderRevoked, type FolderShareCloud } from "./folder-share";
 import type { DesktopSharedFolderBinding } from "./settings";
 
 const binding = (relativePath: string, patch: Partial<SharedDocumentBinding> = {}): SharedDocumentBinding => ({
@@ -22,7 +26,7 @@ const folderOf = (paths: string[], patch: Partial<DesktopSharedFolderBinding> = 
   strategy: "keep-cloud",
   excluded: [],
   publishedAt: "2026-11-04T10:00:00.000Z",
-  files: paths.map((relativePath) => ({ relativePath, binding: binding(relativePath) })),
+  files: paths.map((relativePath) => ({ relativePath, binding: binding(relativePath), contentHash: "hash-" + relativePath })),
   state: "connected",
   knownPaths: [...paths],
   splitRenames: [],
@@ -62,6 +66,74 @@ const decide = (folder: DesktopSharedFolderBinding, decision: Parameters<typeof 
     cloud: extra.cloud ?? fakeCloud().cloud,
   });
 
+describe("folder lifecycle on a real folder", () => {
+  test("publish, then rename, delete and add files: the activity list follows and nothing is decided on its own", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "bloommd-folder-share-"));
+    try {
+      await mkdir(join(directory, "docs"), { recursive: true });
+      await writeFile(join(directory, "keep.md"), "# Keep\n\nstays\n");
+      await writeFile(join(directory, "old-name.md"), "# Renamed\n\nbody that moves\n");
+      await writeFile(join(directory, "docs", "gone.md"), "# Gone\n\nwill be deleted\n");
+
+      // Publish exactly like the app does, with a fake cloud.
+      const { cloud, calls } = fakeCloud();
+      const store = new FileStore({ baseDir: directory, backupsEnabled: false });
+      const scanned = await scanFolderForPublication(directory);
+      const plan = planSharedFolderPublication({ files: scanned, existingCloudFilenames: [], strategy: "keep-cloud" });
+      const published = await publishFolderPlan({
+        plan,
+        confirmed: scanned.map((file) => file.relativePath),
+        workspaceId: "ws-1",
+        readMarkdown: async (path) => serializeToMarkdown(await store.read(path)),
+        fingerprintOf: createFolderFileHasher(directory),
+        cloud,
+      });
+      expect(published.published).toHaveLength(3);
+      expect(published.published.every((file) => typeof file.contentHash === "string")).toBe(true);
+      const folder = folderOf([], { files: published.published, knownPaths: scanned.map((file) => file.relativePath) });
+      calls.created.length = 0;
+
+      // Nothing changed yet: an empty list.
+      const hasher = createFolderFileHasher(directory);
+      const unchanged = await computeFolderActivity({ folder, local: await scanFolderForPublication(directory), hashOf: hasher, cloudFilenames: [] });
+      expect(unchanged).toEqual([]);
+
+      // Rename a file (content untouched), delete one, add one, add a non-Markdown file.
+      await rename(join(directory, "old-name.md"), join(directory, "docs", "new-name.md"));
+      await rm(join(directory, "docs", "gone.md"));
+      await writeFile(join(directory, "fresh.md"), "# Fresh\n");
+      await writeFile(join(directory, "picture.png"), "binary");
+
+      const entries = await computeFolderActivity({
+        folder,
+        local: await scanFolderForPublication(directory),
+        hashOf: hasher,
+        cloudFilenames: published.published.map((file) => file.binding.cloudFilename),
+      });
+      expect(entries.map((entry) => [entry.kind, entry.kind === "renamed" ? `${entry.from}>${entry.to}` : entry.relativePath])).toEqual([
+        ["removed", "docs/gone.md"],
+        ["renamed", "old-name.md>docs/new-name.md"],
+        ["new", "fresh.md"],
+      ]);
+      expect(calls.created).toEqual([]);
+      expect(calls.deleted).toEqual([]);
+
+      // Only an explicit decision touches the cloud, and only that one entry.
+      const local = await scanFolderForPublication(directory);
+      const reassigned = await applyFolderDecision({ folder, decision: { kind: "renamed", from: "old-name.md", to: "docs/new-name.md", action: "reassign" }, local, cloudFilenames: [], readMarkdown: async () => "", cloud });
+      expect(reassigned.files.map((file) => file.relativePath).sort()).toEqual(["docs/gone.md", "docs/new-name.md", "keep.md"]);
+      expect(calls.deleted).toEqual([]);
+      const uploaded = await applyFolderDecision({ folder: reassigned, decision: { kind: "new", relativePath: "fresh.md", action: "upload" }, local, cloudFilenames: ["keep.md"], readMarkdown: async (path) => serializeToMarkdown(await store.read(path)), cloud });
+      expect(calls.created).toEqual(["fresh.md"]);
+      const removed = await applyFolderDecision({ folder: uploaded, decision: { kind: "removed", relativePath: "docs/gone.md", action: "remove-cloud" }, local, cloudFilenames: [], readMarkdown: async () => "", cloud });
+      expect(calls.deleted).toEqual(["docs__gone.md"]);
+      expect(await computeFolderActivity({ folder: removed, local, hashOf: hasher, cloudFilenames: [] })).toEqual([]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("classifyAccessFailure", () => {
   test("treats 401, 403 and 404 as revoked and everything else as unreachable", () => {
     expect(classifyAccessFailure(new Error("API workspace selection failed: 403 Forbidden"))).toBe("revoked");
@@ -69,6 +141,27 @@ describe("classifyAccessFailure", () => {
     expect(classifyAccessFailure(new Error("API workspace selection failed: 404 Not Found"))).toBe("revoked");
     expect(classifyAccessFailure(new Error("API workspaces failed: 503 Service Unavailable"))).toBe("unreachable");
     expect(classifyAccessFailure(new TypeError("fetch failed"))).toBe("unreachable");
+  });
+});
+
+describe("auditFolderUnbinding", () => {
+  test("audits all documents in chunks of 200", async () => {
+    const chunks: number[] = [];
+    const result = await auditFolderUnbinding(async (ids) => { chunks.push(ids.length); }, Array.from({ length: 450 }, (_, index) => `d${index}`));
+    expect(chunks).toEqual([200, 200, 50]);
+    expect(result).toEqual({ audited: 450, failed: 0 });
+  });
+
+  test("retries a rejected small chunk per document so one vanished document hides no other", async () => {
+    const result = await auditFolderUnbinding(async (ids) => { if (ids.includes("gone") ) throw new Error("not found"); }, ["a", "gone", "b"]);
+    expect(result).toEqual({ audited: 2, failed: 1 });
+  });
+
+  test("does not flood the audit route when a large chunk is rejected, and never throws", async () => {
+    let requests = 0;
+    const result = await auditFolderUnbinding(async () => { requests += 1; throw new Error("rate limited"); }, Array.from({ length: 100 }, (_, index) => `d${index}`));
+    expect(requests).toBe(1);
+    expect(result).toEqual({ audited: 0, failed: 100 });
   });
 });
 
@@ -195,7 +288,7 @@ describe("applyFolderDecision: renamed files", () => {
   test("reassign keeps the cloud document and its name and points it at the new path", async () => {
     const { cloud, calls } = fakeCloud();
     const next = await decide(folderOf(["old.md"], { splitRenames: ["new.md"] }), { kind: "renamed", from: "old.md", to: "moved/new.md", action: "reassign" }, { local: ["moved/new.md"], cloud });
-    expect(next.files).toEqual([{ relativePath: "moved/new.md", binding: binding("old.md") }]);
+    expect(next.files).toEqual([{ relativePath: "moved/new.md", binding: binding("old.md"), contentHash: "hash-old.md" }]);
     expect(next.knownPaths).toContain("moved/new.md");
     expect(calls).toEqual({ created: [], deleted: [], bound: [], unbound: [] });
   });

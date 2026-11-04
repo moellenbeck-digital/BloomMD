@@ -57,7 +57,7 @@ export interface DesktopSharedFolderBinding {
   /** Relative files or folders the person left out at publication time. */
   excluded: string[];
   publishedAt: string;
-  files: Array<{ relativePath: string; binding: SharedDocumentBinding }>;
+  files: Array<{ relativePath: string; binding: SharedDocumentBinding; contentHash?: string | null }>;
   /**
    * `revoked` once the server ended the access (or the role became viewer). The share then stops
    * syncing; local files stay as they are. Only disconnecting the folder share leaves this state.
@@ -148,7 +148,12 @@ function sanitizeSharedFolderBinding(value: unknown): DesktopSharedFolderBinding
     const candidate = file as { relativePath?: unknown; binding?: unknown };
     if (!isSafeRelativePath(candidate.relativePath)) continue;
     try {
-      files.push({ relativePath: candidate.relativePath, binding: validateSharedDocumentBinding(candidate.binding) });
+      const contentHash = (file as { contentHash?: unknown }).contentHash;
+      files.push({
+        relativePath: candidate.relativePath,
+        binding: validateSharedDocumentBinding(candidate.binding),
+        ...(typeof contentHash === "string" && contentHash.length > 0 ? { contentHash } : {}),
+      });
     } catch (error) {
       console.warn("[BloomMD] Ignoring an invalid shared folder file binding:", error instanceof Error ? error.message : error);
     }

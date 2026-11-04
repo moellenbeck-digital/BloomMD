@@ -11,8 +11,11 @@ export interface SharedFolderBoundFile {
   relativePath: string;
   documentId: string;
   cloudFilename: string;
-  /** Hash of the last Markdown both sides agreed on (`hashSharedDocumentMarkdown`). */
-  lastAcknowledgedMarkdownHash: string;
+  /**
+   * Fingerprint of the file content taken when the file was published. Null when unknown (older
+   * shares); such a file is never recognised as renamed and stays a removed plus a new file.
+   */
+  contentHash: string | null;
 }
 
 export interface SharedFolderRemovedEntry {
@@ -74,8 +77,9 @@ export async function detectSharedFolderActivity(input: SharedFolderActivityInpu
       if (hash) addedHashes.set(hash, [...(addedHashes.get(hash) ?? []), file]);
     }
     for (const file of removed) {
-      const sameRemoved = removed.filter((other) => other.lastAcknowledgedMarkdownHash === file.lastAcknowledgedMarkdownHash);
-      const matches = addedHashes.get(file.lastAcknowledgedMarkdownHash) ?? [];
+      if (!file.contentHash) continue;
+      const sameRemoved = removed.filter((other) => other.contentHash === file.contentHash);
+      const matches = addedHashes.get(file.contentHash) ?? [];
       const target = matches[0];
       if (sameRemoved.length === 1 && matches.length === 1 && target) renames.set(file.relativePath, { file, to: target });
     }

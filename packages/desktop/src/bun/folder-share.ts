@@ -1,32 +1,19 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   detectSharedFolderActivity,
   planSharedFolderPublication,
   transitionSharedDocumentState,
-  type SharedFolderBlockReason,
   type SharedFolderLocalFile,
 } from "@bloommd/core";
 import { publishFolderPlan, type FolderPublishCloud } from "./folder-publish";
+import type { DesktopFolderActivityEntry, DesktopFolderDecision } from "../shared/rpc-types";
 import type { DesktopSharedFolderBinding } from "./settings";
 
-/** What the person sees for one change in a published folder. Local paths stay in the desktop. */
-export type FolderActivityEntry =
-  | {
-      kind: "new";
-      relativePath: string;
-      sizeBytes: number;
-      /** `upload` can be confirmed; `conflict` and `blocked` can only be dismissed. */
-      status: "upload" | "conflict" | "blocked";
-      cloudFilename: string | null;
-      uploadFilename: string | null;
-      reason?: SharedFolderBlockReason;
-    }
-  | { kind: "removed"; relativePath: string; cloudFilename: string }
-  | { kind: "renamed"; from: string; to: string; sizeBytes: number; cloudFilename: string };
+export type FolderActivityEntry = DesktopFolderActivityEntry;
+export type FolderDecision = DesktopFolderDecision;
 
-export type FolderDecision =
-  | { kind: "new"; relativePath: string; action: "upload" | "ignore" }
-  | { kind: "removed"; relativePath: string; action: "keep-cloud" | "remove-cloud" }
-  | { kind: "renamed"; from: string; to: string; action: "reassign" | "split" };
 
 export interface FolderShareCloud extends FolderPublishCloud {
   recordFolderUnbinding(documentIds: string[]): Promise<void>;
@@ -72,7 +59,7 @@ export async function computeFolderActivity(input: {
       relativePath: file.relativePath,
       documentId: file.binding.documentId,
       cloudFilename: file.binding.cloudFilename,
-      lastAcknowledgedMarkdownHash: file.binding.lastAcknowledgedMarkdownHash,
+      contentHash: file.contentHash ?? null,
     })),
     knownPaths: new Set(folder.knownPaths),
     local: input.local,
@@ -103,6 +90,67 @@ export async function computeFolderActivity(input: {
   });
 }
 
+/** Content fingerprint of a raw file: line endings and surrounding blank space do not matter. */
+export function fingerprintFileContent(text: string): string {
+  return createHash("sha256").update(text.replace(/\r\n/g, "\n").trim()).digest("hex");
+}
+
+/**
+ * Fingerprint of a local file's raw content. A rename keeps the content but changes the file name,
+ * and BloomMD derives a missing title from that name, so the parsed Markdown cannot be compared.
+ * A file that cannot be read is simply not a rename candidate.
+ */
+export function createFolderFileHasher(folderPath: string): (relativePath: string) => Promise<string | null> {
+  return async (relativePath) => {
+    try {
+      return fingerprintFileContent(await readFile(join(folderPath, relativePath), "utf-8"));
+    } catch (error) {
+      console.warn("[BloomMD] A local folder file could not be compared for rename detection:", error instanceof Error ? error.message : error);
+      return null;
+    }
+  };
+}
+
+const UNBINDING_AUDIT_CHUNK = 200;
+/** A rejected chunk is retried per document only while that costs few requests (the audit route is rate limited). */
+const UNBINDING_AUDIT_RETRY_LIMIT = 20;
+
+/**
+ * Audits the end of a folder share. It never throws: the local binding is already gone when this
+ * runs, and a document deleted in the cloud meanwhile must not hide the audit of the others.
+ */
+export async function auditFolderUnbinding(
+  record: (documentIds: string[]) => Promise<void>,
+  documentIds: readonly string[],
+): Promise<{ audited: number; failed: number }> {
+  let audited = 0;
+  let failed = 0;
+  for (let start = 0; start < documentIds.length; start += UNBINDING_AUDIT_CHUNK) {
+    const chunk = documentIds.slice(start, start + UNBINDING_AUDIT_CHUNK);
+    try {
+      await record(chunk);
+      audited += chunk.length;
+      continue;
+    } catch (error) {
+      console.warn("[BloomMD] Folder share audit chunk was rejected:", error instanceof Error ? error.message : error);
+    }
+    if (chunk.length > UNBINDING_AUDIT_RETRY_LIMIT) {
+      failed += chunk.length;
+      continue;
+    }
+    for (const documentId of chunk) {
+      try {
+        await record([documentId]);
+        audited += 1;
+      } catch (error) {
+        console.warn("[BloomMD] Folder share audit failed for one document:", error instanceof Error ? error.message : error);
+        failed += 1;
+      }
+    }
+  }
+  return { audited, failed };
+}
+
 function withoutFile(folder: DesktopSharedFolderBinding, relativePath: string): DesktopSharedFolderBinding["files"] {
   return folder.files.filter((file) => file.relativePath !== relativePath);
 }
@@ -121,6 +169,7 @@ export async function applyFolderDecision(input: {
   local: readonly SharedFolderLocalFile[];
   cloudFilenames: readonly string[];
   readMarkdown(relativePath: string): Promise<string>;
+  fingerprintOf?(relativePath: string): Promise<string | null>;
   cloud: FolderShareCloud;
 }): Promise<DesktopSharedFolderBinding> {
   const { folder, decision, cloud } = input;
@@ -143,6 +192,7 @@ export async function applyFolderDecision(input: {
         confirmed: [decision.relativePath],
         workspaceId: folder.workspaceId,
         readMarkdown: input.readMarkdown,
+        ...(input.fingerprintOf ? { fingerprintOf: input.fingerprintOf } : {}),
         cloud,
       });
       const published = result.published[0];

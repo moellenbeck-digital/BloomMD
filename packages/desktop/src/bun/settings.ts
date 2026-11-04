@@ -2,6 +2,7 @@ import { chmod, readFile, rename, writeFile } from "node:fs/promises";
 import { isAbsolute, join, normalize } from "node:path";
 import { homedir } from "node:os";
 import { validateSharedDocumentBinding, type SharedDocumentBinding } from "@bloommd/core/shared-document-binding";
+import type { SharedFolderConflictStrategy } from "@bloommd/core/shared-folder-publication";
 import type { SecureStorage } from "./secure-storage";
 
 /** Explicit test isolation keeps native smoke runs away from the user's saved connections. */
@@ -41,11 +42,30 @@ export interface DesktopSharedDocumentBinding {
   binding: SharedDocumentBinding;
 }
 
+/**
+ * Desktop-only record of one deliberately published local folder.
+ *
+ * `folderPath` and every `relativePath` stay in this file; the cloud only knows the documents.
+ * Single-file shares keep their own list (`sharedDocumentBindings`) and are never merged into it.
+ */
+export interface DesktopSharedFolderBinding {
+  id: string;
+  folderPath: string;
+  profileId: string;
+  workspaceId: string;
+  strategy: SharedFolderConflictStrategy;
+  /** Relative files or folders the person left out at publication time. */
+  excluded: string[];
+  publishedAt: string;
+  files: Array<{ relativePath: string; binding: SharedDocumentBinding }>;
+}
+
 /** `remote` is a migration-only field and is never written back by saveSettings. */
 export interface DesktopSettings {
   profiles?: ConnectionProfile[];
   activeConnection?: ActiveConnection;
   sharedDocumentBindings?: DesktopSharedDocumentBinding[];
+  sharedFolderBindings?: DesktopSharedFolderBinding[];
   remote?: { url: string; accessToken: string };
   localDir?: string;
   feedbackInstallationId?: string;
@@ -96,12 +116,53 @@ function isDesktopSharedDocumentBinding(value: unknown): value is DesktopSharedD
   }
 }
 
+function isSafeRelativePath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0) return false;
+  const portable = value.replace(/\\/g, "/");
+  return !isAbsolute(normalize(value)) && !/^[A-Za-z]:\//.test(portable) && !portable.split("/").includes("..");
+}
+
+function sanitizeSharedFolderBinding(value: unknown): DesktopSharedFolderBinding | null {
+  if (!value || typeof value !== "object") return null;
+  const entry = value as Partial<DesktopSharedFolderBinding>;
+  if (typeof entry.id !== "string" || entry.id.length === 0) return null;
+  if (typeof entry.folderPath !== "string" || !isAbsolute(entry.folderPath)) return null;
+  if (typeof entry.profileId !== "string" || entry.profileId.length === 0) return null;
+  if (typeof entry.workspaceId !== "string" || entry.workspaceId.length === 0) return null;
+  if (entry.strategy !== "keep-cloud" && entry.strategy !== "suffix") return null;
+  if (typeof entry.publishedAt !== "string") return null;
+  if (!Array.isArray(entry.excluded) || !entry.excluded.every((path) => typeof path === "string")) return null;
+  if (!Array.isArray(entry.files)) return null;
+  const files: DesktopSharedFolderBinding["files"] = [];
+  for (const file of entry.files as unknown[]) {
+    if (!file || typeof file !== "object") continue;
+    const candidate = file as { relativePath?: unknown; binding?: unknown };
+    if (!isSafeRelativePath(candidate.relativePath)) continue;
+    try {
+      files.push({ relativePath: candidate.relativePath, binding: validateSharedDocumentBinding(candidate.binding) });
+    } catch (error) {
+      console.warn("[BloomMD] Ignoring an invalid shared folder file binding:", error instanceof Error ? error.message : error);
+    }
+  }
+  return {
+    id: entry.id,
+    folderPath: entry.folderPath,
+    profileId: entry.profileId,
+    workspaceId: entry.workspaceId,
+    strategy: entry.strategy,
+    excluded: [...entry.excluded],
+    publishedAt: entry.publishedAt,
+    files,
+  };
+}
+
 function sanitizeSettings(value: unknown): DesktopSettings {
   if (!value || typeof value !== "object") return {};
   const parsed = value as {
     profiles?: unknown;
     activeConnection?: unknown;
     sharedDocumentBindings?: unknown;
+    sharedFolderBindings?: unknown;
     remote?: { url?: unknown; accessToken?: unknown; apiKey?: unknown };
     localDir?: unknown;
     feedbackInstallationId?: unknown;
@@ -109,6 +170,9 @@ function sanitizeSettings(value: unknown): DesktopSettings {
   const profiles = Array.isArray(parsed.profiles) ? parsed.profiles.filter(isConnectionProfile) : undefined;
   const sharedDocumentBindings = Array.isArray(parsed.sharedDocumentBindings)
     ? parsed.sharedDocumentBindings.filter(isDesktopSharedDocumentBinding)
+    : undefined;
+  const sharedFolderBindings = Array.isArray(parsed.sharedFolderBindings)
+    ? parsed.sharedFolderBindings.map(sanitizeSharedFolderBinding).filter((entry): entry is DesktopSharedFolderBinding => entry !== null)
     : undefined;
   const active = parsed.activeConnection as { type?: unknown; profileId?: unknown } | undefined;
   const activeConnection: ActiveConnection | undefined = active?.type === "local"
@@ -125,6 +189,7 @@ function sanitizeSettings(value: unknown): DesktopSettings {
     ...(profiles && profiles.length > 0 ? { profiles } : {}),
     ...(activeConnection ? { activeConnection } : {}),
     ...(sharedDocumentBindings && sharedDocumentBindings.length > 0 ? { sharedDocumentBindings } : {}),
+    ...(sharedFolderBindings && sharedFolderBindings.length > 0 ? { sharedFolderBindings } : {}),
     ...(remote ? { remote } : {}),
     ...(typeof parsed.localDir === "string" ? { localDir: parsed.localDir } : {}),
     ...(typeof parsed.feedbackInstallationId === "string" ? { feedbackInstallationId: parsed.feedbackInstallationId } : {}),

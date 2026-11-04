@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { planSharedFolderPublication, SHARED_FOLDER_MAX_FILE_BYTES } from "@bloommd/core";
-import { publishFolderPlan, scanFolderForPublication, type FolderPublishCloud } from "./folder-publish";
+import { prepareFolderPublication, publishFolderPlan, scanFolderForPublication, singleFileSharesInsideFolder, type FolderPublishCloud } from "./folder-publish";
 
 const temporaryDirectories: string[] = [];
 
@@ -72,6 +72,36 @@ function fakeCloud(options: { failCreate?: string; failAudit?: boolean; failDele
 
 const planOf = (files: Array<[string, number]>, existing: string[] = [], strategy: "keep-cloud" | "suffix" = "keep-cloud") =>
   planSharedFolderPublication({ files: files.map(([relativePath, sizeBytes]) => ({ relativePath, sizeBytes })), existingCloudFilenames: existing, strategy });
+
+describe("prepareFolderPublication", () => {
+  const files = [{ relativePath: "a.md", sizeBytes: 3 }, { relativePath: "b.md", sizeBytes: 3 }, { relativePath: "c.md", sizeBytes: 3 }];
+
+  test("leaves out files that are already published or shared one by one and counts them", () => {
+    const prepared = prepareFolderPublication({
+      files,
+      excluded: [],
+      strategy: "keep-cloud",
+      existingCloudFilenames: ["a.md", "b.md"],
+      alreadyPublished: new Set(["a.md"]),
+      alreadyShared: new Set(["b.md", "a.md"]),
+    });
+    expect(prepared.plan.items.map((item) => [item.relativePath, item.status])).toEqual([["c.md", "upload"]]);
+    expect(prepared.alreadyPublished).toBe(1);
+    expect(prepared.alreadyShared).toBe(1);
+  });
+});
+
+describe("singleFileSharesInsideFolder", () => {
+  test("maps single-file shares to paths relative to the chosen folder", () => {
+    const inside = singleFileSharesInsideFolder("/Users/me/Notes", "/Users/me/Notes/Projects", ["Projects/a.md", "Projects/deep/b.md", "top.md", "../Other/c.md"]);
+    expect([...inside].sort()).toEqual(["a.md", "deep/b.md"]);
+  });
+
+  test("returns every share when the folder is the open workspace", () => {
+    const inside = singleFileSharesInsideFolder("/Users/me/Notes", "/Users/me/Notes", ["top.md", "sub/x.md"]);
+    expect([...inside].sort()).toEqual(["sub/x.md", "top.md"]);
+  });
+});
 
 describe("publishFolderPlan", () => {
   test("uploads only confirmed files, audits ids once and returns one binding per file", async () => {

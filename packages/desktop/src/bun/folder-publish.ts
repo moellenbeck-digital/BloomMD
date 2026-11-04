@@ -1,11 +1,13 @@
 import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
   createLocalSharedDocumentState,
   hashSharedDocumentMarkdown,
+  planSharedFolderPublication,
   SHARED_FOLDER_MAX_FILE_BYTES,
   transitionSharedDocumentState,
   type SharedDocumentBinding,
+  type SharedFolderConflictStrategy,
   type SharedFolderLocalFile,
   type SharedFolderPlan,
 } from "@bloommd/core";
@@ -158,4 +160,44 @@ export async function publishFolderPlan(input: {
 
   result.published = created.map(({ relativePath, binding }) => ({ relativePath, binding }));
   return result;
+}
+
+/**
+ * Plan for the folder as it is right now. Files that already belong to this folder's publication
+ * in the same workspace, or that were shared as a single file, are not offered again: a second
+ * upload would create a duplicate cloud document.
+ */
+export function prepareFolderPublication(input: {
+  files: readonly SharedFolderLocalFile[];
+  excluded: readonly string[];
+  strategy: SharedFolderConflictStrategy;
+  existingCloudFilenames: readonly string[];
+  alreadyPublished: ReadonlySet<string>;
+  alreadyShared: ReadonlySet<string>;
+}): { plan: SharedFolderPlan; alreadyPublished: number; alreadyShared: number } {
+  const candidates = input.files.filter((file) => !input.alreadyPublished.has(file.relativePath) && !input.alreadyShared.has(file.relativePath));
+  return {
+    plan: planSharedFolderPublication({
+      files: candidates,
+      excluded: input.excluded,
+      existingCloudFilenames: input.existingCloudFilenames,
+      strategy: input.strategy,
+    }),
+    alreadyPublished: input.files.filter((file) => input.alreadyPublished.has(file.relativePath)).length,
+    alreadyShared: input.files.filter((file) => !input.alreadyPublished.has(file.relativePath) && input.alreadyShared.has(file.relativePath)).length,
+  };
+}
+
+/**
+ * Relative POSIX paths, inside `folderPath`, of files that are shared one by one. The single-file
+ * registry is keyed relative to the open local workspace (`localRoot`).
+ */
+export function singleFileSharesInsideFolder(localRoot: string, folderPath: string, localFilenames: readonly string[]): Set<string> {
+  const inside = new Set<string>();
+  for (const localFilename of localFilenames) {
+    const relativePath = relative(folderPath, resolve(localRoot, localFilename));
+    if (relativePath === "" || relativePath.startsWith("..") || isAbsolute(relativePath)) continue;
+    inside.add(relativePath.split(sep).join("/"));
+  }
+  return inside;
 }

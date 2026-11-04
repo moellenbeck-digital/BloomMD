@@ -40,6 +40,13 @@ import {
 } from "@bloommd/core";
 import { ApiFileStore } from "./api-file-store";
 import { prepareFolderPublication, publishFolderPlan, scanFolderForPublication, singleFileSharesInsideFolder } from "./folder-publish";
+import {
+  findSharedLocalFile as findSharedLocalFileIn,
+  sharedDocumentBindingForFilename as sharedDocumentBindingForFilenameIn,
+  sharedDocumentInfo as sharedDocumentInfoIn,
+  sharedLocalFileInfo as sharedLocalFileInfoIn,
+  type SharedLocalFileMatch,
+} from "./shared-local-file";
 import { applyFolderDecision, auditFolderUnbinding, createFolderFileHasher, classifyAccessFailure, computeFolderActivity, markFolderRevoked, type FolderShareCloud } from "./folder-share";
 import { installApplicationMenu, setApplicationMenuLocale } from "./menu";
 import {
@@ -554,62 +561,19 @@ function connectionProfileError(error: unknown, fallback: string): string {
 }
 
 function sharedDocumentBindingForFilename(localFilename: string): DesktopSharedDocumentBinding | undefined {
-  return desktopSettings.sharedDocumentBindings?.find((entry) => entry.localFilename === localFilename);
+  return sharedDocumentBindingForFilenameIn(desktopSettings, localFilename);
 }
 
 function sharedDocumentInfo(entry: DesktopSharedDocumentBinding): import("../shared/rpc-types").DesktopSharedDocumentInfo {
-  const profile = desktopSettings.profiles?.find((candidate) => candidate.id === entry.profileId);
-  return {
-    localFilename: entry.localFilename,
-    profileId: entry.profileId,
-    profileName: profile?.name ?? "Unavailable profile",
-    workspaceId: entry.binding.workspaceId,
-    documentId: entry.binding.documentId,
-    cloudFilename: entry.binding.cloudFilename,
-    lastAcknowledgedMarkdownHash: entry.binding.lastAcknowledgedMarkdownHash,
-    lastKnownCloudVersion: entry.binding.lastKnownCloudVersion,
-    connectionState: entry.binding.connectionState,
-  };
+  return sharedDocumentInfoIn(desktopSettings, entry);
 }
 
-type SharedLocalFileMatch =
-  | { kind: "file"; entry: DesktopSharedDocumentBinding }
-  | { kind: "folder"; folder: DesktopSharedFolderBinding; file: DesktopSharedFolderBinding["files"][number] };
-
-/**
- * A local file is shared either on its own or as part of a published folder, never both. The
- * single-file registry is keyed relative to the open workspace folder; a published folder keeps
- * its own absolute root, so the open file is compared by its absolute path.
- */
 function findSharedLocalFile(localFilename: string): SharedLocalFileMatch | undefined {
-  const entry = sharedDocumentBindingForFilename(localFilename);
-  if (entry) return { kind: "file", entry };
-  const absolutePath = resolve(bloommdDir, localFilename);
-  for (const folder of desktopSettings.sharedFolderBindings ?? []) {
-    const relativePath = relative(folder.folderPath, absolutePath);
-    if (!relativePath || relativePath.startsWith("..") || isAbsolute(relativePath)) continue;
-    const portablePath = relativePath.split(sep).join("/");
-    const file = folder.files.find((candidate) => candidate.relativePath === portablePath);
-    if (file) return { kind: "folder", folder, file };
-  }
-  return undefined;
+  return findSharedLocalFileIn(desktopSettings, bloommdDir, localFilename);
 }
 
 function sharedLocalFileInfo(match: SharedLocalFileMatch, localFilename: string): import("../shared/rpc-types").DesktopSharedDocumentInfo {
-  if (match.kind === "file") return sharedDocumentInfo(match.entry);
-  const profile = desktopSettings.profiles?.find((candidate) => candidate.id === match.folder.profileId);
-  return {
-    localFilename,
-    profileId: match.folder.profileId,
-    profileName: profile?.name ?? "Unavailable profile",
-    workspaceId: match.file.binding.workspaceId,
-    documentId: match.file.binding.documentId,
-    cloudFilename: match.file.binding.cloudFilename,
-    lastAcknowledgedMarkdownHash: match.file.binding.lastAcknowledgedMarkdownHash,
-    lastKnownCloudVersion: match.file.binding.lastKnownCloudVersion,
-    connectionState: match.file.binding.connectionState,
-    folderShare: { id: match.folder.id, folderName: basename(match.folder.folderPath) },
-  };
+  return sharedLocalFileInfoIn(desktopSettings, match, localFilename);
 }
 
 async function replaceSharedLocalFileBinding(match: SharedLocalFileMatch, binding: SharedDocumentBinding): Promise<void> {

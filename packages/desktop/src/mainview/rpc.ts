@@ -1,5 +1,5 @@
 import Electrobun, { Electroview } from "electrobun/view";
-import type { BloomMDRPC, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus, NativeDialogMethod, NativeDialogStarted } from "../shared/rpc-types";
+import type { BloomMDRPC, DesktopFolderDecision, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus, NativeDialogMethod, NativeDialogStarted } from "../shared/rpc-types";
 import type { SharedFolderConflictStrategy } from "@bloommd/core/shared-folder-publication";
 import { RPC_MAX_REQUEST_TIME_MS } from "../shared/native-dialog";
 import { createNativeDialogClient } from "./native-dialog-client";
@@ -123,6 +123,22 @@ export async function selectOpenFolderForPublication() {
 
 export async function previewFolderPublication(input: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[] }) {
   return electrobun.rpc!.request.previewFolderPublication(input);
+}
+
+export async function listFolderShares(withActivity: boolean) {
+  return electrobun.rpc!.request.listFolderShares({ withActivity });
+}
+
+export async function getFolderActivity(folderId: string) {
+  return electrobun.rpc!.request.getFolderActivity({ folderId });
+}
+
+export async function resolveFolderActivity(folderId: string, decision: DesktopFolderDecision) {
+  return electrobun.rpc!.request.resolveFolderActivity({ folderId, decision });
+}
+
+export async function disconnectFolderShare(folderId: string) {
+  return electrobun.rpc!.request.disconnectFolderShare({ folderId });
 }
 
 export async function publishFolderAsWorkspace(input: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[]; confirmedUploads: string[] }) {

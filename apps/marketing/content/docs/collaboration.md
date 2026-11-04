@@ -148,10 +148,44 @@ Die Konfliktstrategie wählst du in der Vorschau. Keine Variante überschreibt e
 Dateien, die du schon einzeln geteilt oder aus diesem Ordner in denselben Workspace veröffentlicht
 hast, werden nicht noch einmal angeboten.
 
-> **Stand der Beta:** **Veröffentlichen** lädt die bestätigten Dateien einmal hoch und merkt sich
-> die Zuordnung lokal. Ein fortlaufender Abgleich des Ordners (neue, umbenannte oder gelöschte
-> Dateien, Aktivitätsliste, Ordnerfreigabe trennen) ist noch nicht Teil dieser Funktion; bis dahin
-> bleiben spätere lokale Änderungen lokal.
+### Der Ordner danach: Ordnerfreigaben und Aktivität
+
+**Veröffentlichen** lädt die bestätigten Dateien hoch und merkt sich die Zuordnung lokal. Danach
+erscheint in der Seitenleiste **Ordnerfreigaben**; ein Zähler zeigt, wie viele Änderungen auf deine
+Entscheidung warten. BloomMD zeigt Änderungen im Ordner nur an. Es lädt nichts hoch und löscht
+nichts von allein, in keine Richtung.
+
+Eine geöffnete Datei einer Ordnerfreigabe wird wie eine einzeln geteilte Datei mit dem
+Cloud-Dokument gespiegelt. Sie hat dort keinen eigenen „Freigabe trennen“-Knopf; getrennt wird nur
+die ganze Ordnerfreigabe.
+
+Die Aktivitätsliste einer Ordnerfreigabe kennt drei Arten von Einträgen:
+
+- **neu, noch nicht geteilt:** Eine Markdown-Datei, die es bei der Veröffentlichung noch nicht gab.
+  Sie wird erst nach **Hochladen** angelegt, unter dem Cloud-Namen nach dem Schema oben und mit der
+  Konfliktstrategie, die du bei der Veröffentlichung gewählt hast. Mit **Nicht teilen** verschwindet
+  der Eintrag, ohne dass etwas hochgeladen wird. Dateien mit Namenskonflikt oder ungeeignetem Namen
+  lassen sich nur ignorieren.
+- **lokal entfernt:** Eine veröffentlichte Datei fehlt im Ordner. Du entscheidest pro Eintrag:
+  **Cloud-Dokument behalten** (nur die lokale Zuordnung endet) oder **Cloud-Dokument entfernen**
+  (nach einer zweiten, ausdrücklichen Bestätigung). Ein Cloud-Dokument wird nie automatisch
+  gelöscht.
+- **lokal umbenannt:** Eine Datei fehlt unter dem alten Namen und es gibt genau eine neue Datei mit
+  demselben Inhalt. **Neu zuordnen** verbindet das vorhandene Cloud-Dokument (mit unverändertem
+  Cloud-Namen) mit dem neuen lokalen Pfad; **Als neue Datei behandeln** macht daraus „lokal
+  entfernt“ plus „neu“. Eine Umbenennung wird nur erkannt, wenn der Inhalt seit der
+  Veröffentlichung unverändert ist. Sonst erscheint „lokal entfernt“, und du kannst die Datei dort
+  selbst der neuen Datei zuordnen.
+
+**Zugriff entzogen:** Beendet der Server den Zugriff oder wird deine Rolle im Workspace zu Viewer,
+stoppt der Abgleich dieser Ordnerfreigabe. Die Ordnerfreigabe zeigt **Zugriff entzogen**, lokale
+Dateien bleiben unverändert (nichts wird gelöscht oder zurückgeschrieben), und Hochladen sowie
+Entfernen sind gesperrt. BloomMD prüft das beim Start, beim Öffnen der Ordnerfreigaben und beim
+Öffnen einer Datei der Ordnerfreigabe. Ein nicht erreichbarer Server gilt nicht als Entzug.
+
+**Ordnerfreigabe trennen:** Beendet nur die lokale Bindung. Weder lokale Dateien noch
+Cloud-Dokumente werden gelöscht. Die Trennung wird im Workspace-Audit festgehalten, sofern der
+Server erreichbar ist und der Zugriff noch besteht; bei entzogenem Zugriff bleibt sie lokal.
 
 ## Zwei Personen in der Web-App
 

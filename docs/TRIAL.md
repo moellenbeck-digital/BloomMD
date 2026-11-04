@@ -1,7 +1,7 @@
 # Testaccount: 30 Tage, Hinweis-Mails, Sperre nach Ablauf (#274)
 
 Der kostenlose Testaccount gilt 30 Tage ab E-Mail-Bestätigung. Die Texte dazu stehen in den
-Datenschutzerklärungen (`apps/app` und `apps/marketing`, je `datenschutz/page.tsx`) und in den AGB.
+Datenschutzerklärungen (`apps/app` und `apps/marketing`, je `datenschutz/page.tsx`) und in den AGB. Fristen und Konto-Löschung: `docs/LOESCHKONZEPT.md`.
 
 ## Regeln
 

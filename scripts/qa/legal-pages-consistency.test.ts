@@ -33,16 +33,33 @@ describe("legal pages are maintained twice (apps/app and apps/marketing)", () =>
     for (const [title, block] of marketing) expect(app.get(title)).toBe(block);
   });
 
-  test("the retention section of the privacy policy is the same in both apps", () => {
-    const title = 'en ? "Retention and deletion" : "Speicherdauer und Löschung"';
-    const marketing = sections(page("marketing", "datenschutz")).get(title);
-    expect(marketing).toBeDefined();
-    expect(sections(page("app", "datenschutz")).get(title)).toBe(marketing as string);
+  test("the withdrawal page and the legal notice have the same sections and text in both apps", () => {
+    for (const name of ["widerruf", "impressum"]) {
+      const marketing = sections(page("marketing", name));
+      const app = sections(page("app", name));
+      expect(marketing.size).toBeGreaterThanOrEqual(5);
+      expect([...app.keys()]).toEqual([...marketing.keys()]);
+      for (const [title, block] of marketing) expect(app.get(title)).toBe(block);
+    }
   });
 
-  test("terms and license no longer speak of M1, the beta or invited testers", () => {
+  test("the retention and recipients sections of the privacy policy are the same in both apps", () => {
+    for (const title of ['en ? "Retention and deletion" : "Speicherdauer und Löschung"', 'en ? "Recipients and processors" : "Empfänger und Auftragsverarbeiter"']) {
+      const marketing = sections(page("marketing", "datenschutz")).get(title);
+      expect(marketing).toBeDefined();
+      expect(sections(page("app", "datenschutz")).get(title)).toBe(marketing as string);
+    }
+  });
+
+  test("both apps share the legal profile helpers", () => {
+    const helper = (source: string) => source.match(/export function hasLegalValue[\s\S]*?\n}\n/)?.[0];
+    expect(helper(read("apps/app/src/lib/legal.ts"))).toBeDefined();
+    expect(helper(read("apps/app/src/lib/legal.ts"))).toBe(helper(read("apps/marketing/src/lib/legal.ts")));
+  });
+
+  test("terms, license and withdrawal no longer speak of M1, the beta or invited testers", () => {
     for (const app of ["app", "marketing"] as const) {
-      for (const name of ["agb", "lizenz"]) {
+      for (const name of ["agb", "lizenz", "widerruf"]) {
         expect(page(app, name)).not.toMatch(/\bM1\b|[Bb]eta|eingeladene Tester|invited testers/);
       }
     }
@@ -73,6 +90,10 @@ describe("retention periods named in the privacy policy match the code", () => {
     expect(read("apps/app/src/lib/unconfirmed-accounts.ts")).toContain("UNCONFIRMED_ACCOUNT_RETENTION_DAYS = 7;");
     expect(retention).toContain("7 Tage nach der Registrierung");
     expect(page("app", "agb")).toContain("nach 7 Tagen gelöscht");
+  });
+
+  test("the privacy policy no longer speaks of M1", () => {
+    for (const app of ["app", "marketing"] as const) expect(page(app, "datenschutz")).not.toMatch(/\bM1\b/);
   });
 
   test("the trial period named in the terms matches the trial code", () => {

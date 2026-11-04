@@ -70,6 +70,8 @@ Prüfung nötig.
   angemeldet den Link **„Konto verwalten oder löschen“** (öffnet `https://bloommd.app/account`,
   Abschnitt „Account dauerhaft löschen“: E-Mail und Passwort bestätigen, löscht persönliche
   Workspaces, Cloud-Dokumente, Views, Sessions und Berechtigungen, `apps/app/src/app/api/account/delete`).
+  Die vollständige Liste (auch was beim Löschen nicht entfernt wird) steht im Abschnitt „Speicherdauer und Löschung“
+  der Datenschutzerklärung und in `docs/LOESCHKONZEPT.md` (Ticket #199, Entwurf).
 - [ ] **Privacy Manifest:** vorhanden ([Archiv #502](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/502)) – E-Mail und andere Nutzerinhalte wie oben; Required-
   Reason-APIs `FileTimestamp` (C617.1, 3B52.1) und `UserDefaults` (CA92.1). Nach dem Archivieren in
   Xcode *Generate Privacy Report* prüfen.
@@ -83,6 +85,9 @@ Prüfung nötig.
   **Lösch-URL:** `https://bloommd.app/account` (Abschnitt „Account dauerhaft löschen“; nach Anmeldung,
   ohne App nutzbar). Alternativ per E-Mail an die Adresse aus dem Impressum – im Formular als
   zweiten Weg nennen, weil die Löschung auf der Website ein Passwort verlangt.
+  Für Angaben zu Daten, die nach der Löschung bleiben, gilt `docs/LOESCHKONZEPT.md`: Sicherheitsprotokoll (ohne Kontobezug,
+  365 Tage), Feedback-Nachrichten aus der Web-App (ohne Kontobezug, im Repo ohne automatische Löschung) und ein früherer
+  Wartelisten-Eintrag (90 Tage nach der Einladungs-E-Mail). Das Formular erst nach der Entscheidung der Admins dazu ausfüllen.
 - [ ] **Kontoerstellung:** „Die App ermöglicht Nutzern, ein Konto zu erstellen“ → über die Website
   (Anmelde-Browser), Methode „Benutzername und Passwort“; Lösch-URL wie oben.
 - [ ] **Datentypen** (jeweils *erhoben: ja*, *geteilt: nein*, *nur flüchtig verarbeitet: nein*,

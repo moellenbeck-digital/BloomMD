@@ -42,8 +42,8 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
         <p>{en ? "Markdown files are processed locally by the local-first core. Data is transmitted to BloomMD only when an optional sync or cloud service is actively used." : "Markdown-Dateien werden im local-first Kern lokal verarbeitet. Eine Übertragung an BloomMD erfolgt nur, wenn ein optionaler Sync- oder Cloud-Dienst aktiv genutzt wird."}</p>
       </LegalSection>
 
-      <LegalSection title={en ? "No payments in M1" : "Keine Zahlungen in M1"}>
-        <p>{en ? "The free trial account in M1 offers no paid plans, collects no payment data and provides no checkout. Payment providers become relevant only if BloomMD explicitly offers paid features later." : "Beim kostenlosen Testaccount in M1 werden keine kostenpflichtigen Pläne angeboten, keine Zahlungsdaten erhoben und kein Checkout bereitgestellt. Zahlungsdienstleister werden erst relevant, wenn BloomMD später kostenpflichtige Funktionen ausdrücklich anbietet."}</p>
+      <LegalSection title={en ? "No payments" : "Keine Zahlungen"}>
+        <p>{en ? "The free trial account offers no paid plans, collects no payment data and provides no checkout. Payment providers become relevant only if BloomMD explicitly offers paid features later." : "Beim kostenlosen Testaccount werden keine kostenpflichtigen Pläne angeboten, keine Zahlungsdaten erhoben und kein Checkout bereitgestellt. Zahlungsdienstleister werden erst relevant, wenn BloomMD später kostenpflichtige Funktionen ausdrücklich anbietet."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Transactional email with Resend" : "Transaktions-E-Mails mit Resend"}>
@@ -120,6 +120,18 @@ export default async function DatenschutzPage({ searchParams }: { searchParams: 
           Vor der Bestätigung der Adresse, der Wahl eines Passworts und der Zustimmung zu Datenschutzerklärung und AGB über diesen Link kann sich
           niemand anmelden. Ein nicht aktivierter Account wird {WAITLIST_PURGE_RETENTION_DAYS} Tage nach dieser E-Mail gelöscht.
         </>}</p>
+      </LegalSection>
+
+      <LegalSection title={en ? "Recipients and processors" : "Empfänger und Auftragsverarbeiter"}>
+        <p>{en ? "These service providers receive data from BloomMD for the purposes named here:" : "Diese Dienstleister erhalten Daten von BloomMD für die hier genannten Zwecke:"}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>{en ? "Email delivery (Resend): for account emails such as email confirmation, password reset and the reminder emails of the trial period, Resend receives the recipient address and the subject and content of the email. Content of your Markdown files is not part of these emails." : "E-Mail-Versand (Resend): Für Konto-E-Mails wie E-Mail-Bestätigung, Passwort-Zurücksetzen und die Hinweis-E-Mails zum Testzeitraum erhält Resend die Empfängeradresse sowie Betreff und Inhalt der E-Mail. Inhalte deiner Markdown-Dateien sind nicht Teil dieser E-Mails."}</li>
+          <li>{en ? "Error monitoring (Sentry): if error monitoring is set up in the deployment, Sentry receives technical error reports. BloomMD does not send personal default data (sendDefaultPii is off) and cleans the events before they are sent." : "Fehlerüberwachung (Sentry): Ist die Fehlerüberwachung im Deployment eingerichtet, erhält Sentry technische Fehlermeldungen. BloomMD überträgt dabei keine personenbezogenen Standarddaten (sendDefaultPii ist aus) und bereinigt die Ereignisse vor dem Versand."}</li>
+          <li>{en ? "Web analytics (Plausible, PostHog): Plausible runs as an instance under the domain plausible.moellenbeck-digital.io, without cookies or persistent identifiers. PostHog is optional and only loaded after consent. What is collected is described under “Error monitoring and product analytics”." : "Reichweitenmessung (Plausible, PostHog): Plausible läuft als Instanz unter der Domain plausible.moellenbeck-digital.io, ohne Cookies und persistente Identifikatoren. PostHog ist optional und wird nur nach Einwilligung geladen. Was erfasst wird, steht unter „Fehlerüberwachung und Produktanalyse“."}</li>
+          <li>{en ? "Feedback (GitHub, object storage): if the feedback function is set up, a ticket is created at GitHub from your feedback. It contains your message, your email address and account ID, a contact address if you gave one, the page you were on, and browser and version details. Attachments (screenshot, video) are stored in an object storage and linked from the ticket." : "Feedback (GitHub, Objektspeicher): Ist die Feedback-Funktion eingerichtet, wird aus deinem Feedback ein Ticket bei GitHub angelegt. Es enthält deine Nachricht, deine E-Mail-Adresse und Konto-ID, eine Kontaktadresse, falls du eine angegeben hast, die aufgerufene Seite sowie Browser- und Versionsangaben. Anhänge (Screenshot, Video) werden in einem Objektspeicher abgelegt und im Ticket verlinkt."}</li>
+          <li>{en ? "Members of your workspaces and everyone who knows a share link you created see the content you share there (see “Share links (read-only)”)." : "Mitglieder deiner Workspaces und alle, die einen von dir erzeugten Share-Link kennen, sehen die Inhalte, die du dort teilst (siehe „Share-Links (nur lesen)“)."}</li>
+        </ul>
+        <p>{en ? "Payment service providers become relevant only if BloomMD offers paid features (see “No payments”)." : "Zahlungsdienstleister werden erst relevant, wenn BloomMD kostenpflichtige Funktionen anbietet (siehe „Keine Zahlungen“)."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Retention and deletion" : "Speicherdauer und Löschung"}>

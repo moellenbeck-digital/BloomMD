@@ -307,7 +307,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
                             if exclusive, self.exists(writeURL) { throw FolderError.exists }
                             try self.verifyUnchanged(writeURL, expectedModified: expectedModified)
                             try data.write(to: writeURL, atomically: true, encoding: .utf8)
-                            written = ((try? writeURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000
+                            written = self.modifiedMillis(writeURL) ?? 0
                         } catch {
                             failure = error
                         }
@@ -341,6 +341,14 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         }
     }
 
+    /// Modification time in ms since epoch, read from the file system on every call. A URL caches the
+    /// resource values it has read, so a URL that lives on (the opened file) would report the time from
+    /// before a write, and the next save would compare against a stale time.
+    private func modifiedMillis(_ url: URL) -> Double? {
+        guard let date = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date else { return nil }
+        return date.timeIntervalSince1970 * 1000
+    }
+
     /// Reads the file coordinated: waits for iCloud to download it and for other writers
     /// (Obsidian, iCloud sync) to finish.
     private func coordinatedRead(_ url: URL) throws -> (String, Double) {
@@ -351,7 +359,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: [], error: &coordinationError) { readURL in
             do {
                 text = try String(contentsOf: readURL, encoding: .utf8)
-                modified = ((try? readURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000
+                modified = self.modifiedMillis(readURL) ?? 0
             } catch {
                 failure = error
             }
@@ -369,8 +377,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         if let expectedModified {
             // Deleted (or not downloaded any more) elsewhere counts as changed elsewhere.
             guard FileManager.default.fileExists(atPath: url.path) else { throw FolderError.conflict }
-            if let current = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
-               abs(current.timeIntervalSince1970 * 1000 - expectedModified) > 1 {
+            if let current = modifiedMillis(url), abs(current - expectedModified) > 1 {
                 throw FolderError.conflict
             }
         }
@@ -451,7 +458,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
                     do {
                         try self.verifyUnchanged(writeURL, expectedModified: expectedModified)
                         try self.replaceAtomically(writeURL, with: data)
-                        written = ((try? writeURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000
+                        written = self.modifiedMillis(writeURL) ?? 0
                     } catch {
                         failure = error
                     }

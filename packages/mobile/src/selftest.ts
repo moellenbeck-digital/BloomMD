@@ -340,10 +340,18 @@ export async function runSelfTest(
     return "Extern.md as file, Linsen.md in Uni/Physik/Optik";
   });
 
+  const passed = checks.every((entry) => entry.ok);
+  let result = JSON.stringify({ at: new Date().toISOString(), passed, checks }, null, 2);
+  if (!passed) {
+    // The CI step prints this file: lines that start with `::error` become annotations, so the failed
+    // checks stay readable without access to the job log. Only a failed run gets them; a passed one is plain JSON.
+    const failed = checks.filter((entry) => !entry.ok).map((entry) => `${entry.name}: ${entry.detail ?? "failed"}`);
+    result += `\n${failed.map((line) => `::error title=Self-test check failed::${line.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A")}`).join("\n")}\n`;
+  }
   await Filesystem.writeFile({
     directory: APP_DIRECTORY,
     path: "selftest-result.json",
-    data: JSON.stringify({ at: new Date().toISOString(), passed: checks.every((entry) => entry.ok), checks }, null, 2),
+    data: result,
     encoding: Encoding.UTF8,
   });
 }

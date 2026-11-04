@@ -450,13 +450,7 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
                 NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { writeURL in
                     do {
                         try self.verifyUnchanged(writeURL, expectedModified: expectedModified)
-                        // Only the file itself is reachable, not its folder: write beside it in the
-                        // system's replacement directory and swap, which stays atomic.
-                        let directory = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: writeURL, create: true)
-                        defer { try? FileManager.default.removeItem(at: directory) }
-                        let temporary = directory.appendingPathComponent(writeURL.lastPathComponent)
-                        try data.write(to: temporary, atomically: false, encoding: .utf8)
-                        _ = try FileManager.default.replaceItemAt(writeURL, withItemAt: temporary)
+                        try self.replaceAtomically(writeURL, with: data)
                         written = ((try? writeURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000
                     } catch {
                         failure = error
@@ -467,6 +461,20 @@ public class BloomFolderPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
             } catch {
                 call.reject(self.message(error), (error as? FolderError)?.code)
             }
+        }
+    }
+
+    /// Replaces a file in one step. Only the file itself may be reachable, not its folder, so the
+    /// new content is written in the system's replacement directory and swapped in; where that is
+    /// not available the plain atomic write of Foundation is used.
+    private func replaceAtomically(_ url: URL, with text: String) throws {
+        if let directory = try? FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: url, create: true) {
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let temporary = directory.appendingPathComponent(url.lastPathComponent)
+            try text.write(to: temporary, atomically: false, encoding: .utf8)
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+        } else {
+            try text.write(to: url, atomically: true, encoding: .utf8)
         }
     }
 

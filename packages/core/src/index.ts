@@ -80,6 +80,15 @@ export {
   type SharedFolderPlanTotals,
 } from "./shared-folder-publication";
 export {
+  detectSharedFolderActivity,
+  type SharedFolderActivityEntry,
+  type SharedFolderActivityInput,
+  type SharedFolderBoundFile,
+  type SharedFolderNewEntry,
+  type SharedFolderRemovedEntry,
+  type SharedFolderRenamedEntry,
+} from "./shared-folder-activity";
+export {
   WorkspaceSyncClient,
   type WorkspaceSyncFetch,
   type WorkspaceSyncClientConfig,

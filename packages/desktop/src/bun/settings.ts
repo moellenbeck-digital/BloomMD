@@ -58,6 +58,15 @@ export interface DesktopSharedFolderBinding {
   excluded: string[];
   publishedAt: string;
   files: Array<{ relativePath: string; binding: SharedDocumentBinding }>;
+  /**
+   * `revoked` once the server ended the access (or the role became viewer). The share then stops
+   * syncing; local files stay as they are. Only disconnecting the folder share leaves this state.
+   */
+  state: "connected" | "revoked";
+  /** Every relative path the person has seen: published, excluded, blocked, conflicting or dismissed. */
+  knownPaths: string[];
+  /** New paths that must not be matched as a rename of a removed file. */
+  splitRenames: string[];
 }
 
 /** `remote` is a migration-only field and is never written back by saveSettings. */
@@ -144,6 +153,10 @@ function sanitizeSharedFolderBinding(value: unknown): DesktopSharedFolderBinding
       console.warn("[BloomMD] Ignoring an invalid shared folder file binding:", error instanceof Error ? error.message : error);
     }
   }
+  const stringList = (value: unknown): string[] | null =>
+    Array.isArray(value) && value.every((path) => typeof path === "string") ? [...value as string[]] : null;
+  // Entries written before the activity list existed know only what they published and excluded.
+  const knownPaths = stringList(entry.knownPaths) ?? [...files.map((file) => file.relativePath), ...entry.excluded];
   return {
     id: entry.id,
     folderPath: entry.folderPath,
@@ -153,6 +166,9 @@ function sanitizeSharedFolderBinding(value: unknown): DesktopSharedFolderBinding
     excluded: [...entry.excluded],
     publishedAt: entry.publishedAt,
     files,
+    state: entry.state === "revoked" ? "revoked" : "connected",
+    knownPaths,
+    splitRenames: stringList(entry.splitRenames) ?? [],
   };
 }
 

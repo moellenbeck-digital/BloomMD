@@ -1,5 +1,5 @@
 import type { RPCSchema } from "electrobun/bun";
-import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, NoteRevision, SharedDocumentBinding } from "@bloommd/core";
+import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, NoteRevision, SharedDocumentBinding, SharedFolderConflictStrategy, SharedFolderPlanItem, SharedFolderPlanTotals } from "@bloommd/core";
 
 export interface SerializedDocument {
   filePath: string;
@@ -59,6 +59,33 @@ export interface DesktopSharedDocumentInfo {
   lastAcknowledgedMarkdownHash: string;
   lastKnownCloudVersion: number;
   connectionState: "connected" | "offline" | "conflict" | "revoked";
+}
+
+/**
+ * Preview of publishing one local folder as a shared workspace. It lives only in the desktop
+ * process and the webview: local paths in it never reach the server.
+ */
+export interface DesktopFolderPublicationPreview {
+  /** Absolute path as chosen in the native dialog; shown to the person, never sent anywhere. */
+  folderPath: string;
+  workspace: DesktopWorkspaceInfo;
+  strategy: SharedFolderConflictStrategy;
+  items: SharedFolderPlanItem[];
+  totals: SharedFolderPlanTotals;
+  /** Files of this folder already published to this workspace; not offered again. */
+  alreadyPublished: number;
+  /** Files of this folder already shared one by one; not offered again. */
+  alreadyShared: number;
+}
+
+export interface DesktopFolderPublicationResult {
+  success: boolean;
+  error?: string;
+  published: number;
+  skipped: Array<{ relativePath: string; reason: "not-confirmed" | "too-large" | "unreadable" }>;
+  failed: Array<{ relativePath: string; error: string }>;
+  /** Files whose cloud document could not be removed again after a failed audit. */
+  rollbackFailures: string[];
 }
 
 export interface DesktopBuildInfo {
@@ -175,6 +202,8 @@ export interface LinkPreviewResult {
 export interface NativeDialogResults {
   chooseDirectory: { path: string | null; error?: string };
   chooseResourceFile: { path: string | null; error?: string };
+  /** Picks the folder to publish as a shared workspace; unlike `chooseDirectory` it switches nothing. */
+  choosePublicationFolder: { path: string | null; error?: string };
   importFile: SerializedDocument | { filePath: null; error?: string };
 }
 
@@ -236,6 +265,25 @@ export type BloomMDRPC = {
       importFile: {
         params: { dialogId: string };
         response: NativeDialogStarted;
+      };
+      choosePublicationFolder: {
+        params: { dialogId: string };
+        response: NativeDialogStarted;
+      };
+      /** Proposes the open workspace folder for publication. Only remembers the choice; nothing is read or sent. */
+      selectOpenFolderForPublication: {
+        params: Record<string, never>;
+        response: { path: string | null; error?: string };
+      };
+      /** Reads the chosen folder and the target workspace's file names; uploads nothing. */
+      previewFolderPublication: {
+        params: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[] };
+        response: { success: boolean; preview?: DesktopFolderPublicationPreview; error?: string };
+      };
+      /** Uploads exactly `confirmedUploads`, the files the preview showed as uploadable. */
+      publishFolderAsWorkspace: {
+        params: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[]; confirmedUploads: string[] };
+        response: DesktopFolderPublicationResult;
       };
       createMindmap: {
         params: { filename: string; markdown: string };

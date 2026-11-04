@@ -34,8 +34,10 @@ import {
   transitionSharedDocumentState,
   validateSharedDocumentBinding,
   type MindMapNode,
+  type SharedFolderConflictStrategy,
 } from "@bloommd/core";
 import { ApiFileStore } from "./api-file-store";
+import { prepareFolderPublication, publishFolderPlan, scanFolderForPublication, singleFileSharesInsideFolder } from "./folder-publish";
 import { installApplicationMenu, setApplicationMenuLocale } from "./menu";
 import {
   loadSettings,
@@ -47,6 +49,7 @@ import {
   type ConnectionProfile,
   type DesktopSettings,
   type DesktopSharedDocumentBinding,
+  type DesktopSharedFolderBinding,
 } from "./settings";
 import { createSecureStorage, SecureStorageUnavailableError, type SecureStorage } from "./secure-storage";
 import { validateAndActivateConnection } from "./connection-profile-flow";
@@ -91,6 +94,12 @@ let mode: ConnectionMode = { type: "local", dir: bloommdDir };
 let reconnectFailedProfile: { profileId: string; name: string; url: string } | null = null;
 const secureStorage: SecureStorage = createSecureStorage();
 let desktopSettings: DesktopSettings = {};
+/**
+ * The folder the person picked (or confirmed as the open one) for "publish folder as shared
+ * workspace". Preview and publish read only this folder, so the webview can never point them at a
+ * path that was not chosen through the native dialog or the explicit "use open folder" step.
+ */
+let publicationFolder: string | null = null;
 let mainWindow: BrowserWindow | null = null;
 let pendingExternalFilename: string | null = null;
 let pendingExternalKind: "file" | "folder" | null = null;
@@ -727,6 +736,107 @@ async function runChooseDirectory() {
   }
 }
 
+/** Picks the folder to publish. Unlike `runChooseDirectory` it changes nothing about the open workspace. */
+async function runChoosePublicationFolder() {
+  if (isRemote()) return { path: null };
+
+  try {
+    const paths = await Utils.openFileDialog({
+      startingFolder: bloommdDir,
+      canChooseFiles: false,
+      canChooseDirectory: true,
+      allowsMultipleSelection: false,
+    });
+    const selected = firstSelectedPath(paths);
+    if (!selected) return { path: null };
+
+    const info = await stat(selected);
+    if (!info.isDirectory()) return { path: null, error: "Selected path is not a directory." };
+
+    publicationFolder = resolve(selected);
+    return { path: publicationFolder };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[BloomMD] choosePublicationFolder error:", message);
+    return { path: null, error: message };
+  }
+}
+
+/** Saved profile + workspace for a folder publication; viewer workspaces are refused like for a single file. */
+async function connectPublicationTarget(profileId: string, workspaceId: string) {
+  const profile = profileById(profileId);
+  const accessToken = await secureStorage.get(profile.tokenRef);
+  if (!accessToken) throw new Error("No access token is stored for this profile.");
+
+  const apiStore = new ApiFileStore({ baseUrl: profile.url, accessToken });
+  await apiStore.listWorkspaces();
+  const workspaceContext = await apiStore.selectWorkspace(workspaceId);
+  const workspace = workspaceContext.workspace;
+  if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
+  if (workspace.role === "viewer") throw new Error("WORKSPACE_READ_ONLY");
+  return { apiStore, workspace };
+}
+
+/** Reads the chosen folder and the target's file names and plans the upload. Uploads nothing. */
+async function prepareFolderPublicationRequest(input: {
+  profileId: string;
+  workspaceId: string;
+  strategy: unknown;
+  excluded: unknown;
+}) {
+  if (isRemote()) throw new Error("FOLDER_PUBLICATION_LOCAL_ONLY");
+  const folderPath = publicationFolder;
+  if (!folderPath) throw new Error("PUBLICATION_FOLDER_NOT_SELECTED");
+  if (input.strategy !== "keep-cloud" && input.strategy !== "suffix") throw new Error("INVALID_CONFLICT_STRATEGY");
+  const strategy: SharedFolderConflictStrategy = input.strategy === "suffix" ? "suffix" : "keep-cloud";
+  if (!Array.isArray(input.excluded) || !input.excluded.every((entry): entry is string => typeof entry === "string")) {
+    throw new Error("INVALID_EXCLUSIONS");
+  }
+  const excluded: string[] = input.excluded;
+
+  const { apiStore, workspace } = await connectPublicationTarget(input.profileId, input.workspaceId);
+  const [files, cloudFiles] = await Promise.all([scanFolderForPublication(folderPath), apiStore.list()]);
+  const alreadyPublished = new Set((desktopSettings.sharedFolderBindings ?? [])
+    .filter((entry) => entry.folderPath === folderPath && entry.profileId === input.profileId && entry.workspaceId === input.workspaceId)
+    .flatMap((entry) => entry.files.map((file) => file.relativePath)));
+  const alreadyShared = singleFileSharesInsideFolder(bloommdDir, folderPath, (desktopSettings.sharedDocumentBindings ?? []).map((entry) => entry.localFilename));
+  const prepared = prepareFolderPublication({
+    files,
+    excluded,
+    strategy,
+    existingCloudFilenames: cloudFiles.map((file) => file.filename),
+    alreadyPublished,
+    alreadyShared,
+  });
+  return { ...prepared, folderPath, apiStore, workspace, strategy, excluded };
+}
+
+async function rememberPublishedFolder(input: {
+  folderPath: string;
+  profileId: string;
+  workspaceId: string;
+  strategy: DesktopSharedFolderBinding["strategy"];
+  excluded: string[];
+  files: DesktopSharedFolderBinding["files"];
+}): Promise<void> {
+  const bindings = desktopSettings.sharedFolderBindings ?? [];
+  const existing = bindings.find((entry) => entry.folderPath === input.folderPath && entry.profileId === input.profileId && entry.workspaceId === input.workspaceId);
+  const published = new Set(input.files.map((file) => file.relativePath));
+  const next: DesktopSharedFolderBinding = {
+    id: existing?.id ?? `folder-${crypto.randomUUID()}`,
+    folderPath: input.folderPath,
+    profileId: input.profileId,
+    workspaceId: input.workspaceId,
+    strategy: input.strategy,
+    excluded: input.excluded,
+    publishedAt: new Date().toISOString(),
+    files: [...(existing?.files.filter((file) => !published.has(file.relativePath)) ?? []), ...input.files],
+  };
+  await persistDesktopSettings({
+    sharedFolderBindings: existing ? bindings.map((entry) => entry.id === existing.id ? next : entry) : [...bindings, next],
+  });
+}
+
 async function runChooseResourceFile(kind: "file" | "pdf") {
   if (isRemote()) {
     return { path: null, error: "Resource files can currently only be selected for local workspaces." };
@@ -945,6 +1055,92 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
 
       importFile: ({ dialogId }) =>
         startNativeDialog(dialogId, "importFile", runImportFile, (message) => mainRPC.send.nativeDialogResult(message)),
+
+      choosePublicationFolder: ({ dialogId }) =>
+        startNativeDialog(dialogId, "choosePublicationFolder", runChoosePublicationFolder, (message) => mainRPC.send.nativeDialogResult(message)),
+
+      selectOpenFolderForPublication: async () => {
+        if (isRemote()) return { path: null, error: "FOLDER_PUBLICATION_LOCAL_ONLY" };
+        publicationFolder = resolve(bloommdDir);
+        return { path: publicationFolder };
+      },
+
+      previewFolderPublication: async ({ profileId, workspaceId, strategy, excluded }) => {
+        try {
+          const prepared = await prepareFolderPublicationRequest({ profileId, workspaceId, strategy, excluded });
+          return {
+            success: true,
+            preview: {
+              folderPath: prepared.folderPath,
+              workspace: prepared.workspace,
+              strategy: prepared.strategy,
+              items: prepared.plan.items,
+              totals: prepared.plan.totals,
+              alreadyPublished: prepared.alreadyPublished,
+              alreadyShared: prepared.alreadyShared,
+            },
+          };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder could not be previewed.");
+          console.error("[BloomMD] Folder publication preview failed:", message);
+          return { success: false, error: message };
+        }
+      },
+
+      publishFolderAsWorkspace: async ({ profileId, workspaceId, strategy, excluded, confirmedUploads }) => {
+        const nothing = { published: 0, skipped: [], failed: [], rollbackFailures: [] };
+        try {
+          if (!Array.isArray(confirmedUploads) || !confirmedUploads.every((entry) => typeof entry === "string")) {
+            throw new Error("INVALID_CONFIRMATION");
+          }
+          const prepared = await prepareFolderPublicationRequest({ profileId, workspaceId, strategy, excluded });
+          const folderStore = new FileStore({ baseDir: prepared.folderPath, backupsEnabled: false });
+          const result = await publishFolderPlan({
+            plan: prepared.plan,
+            confirmed: confirmedUploads,
+            workspaceId,
+            readMarkdown: async (relativePath) => serializeToMarkdown(await folderStore.read(relativePath)),
+            cloud: {
+              create: (filename, markdown) => prepared.apiStore.create(filename, markdown),
+              delete: (filename) => prepared.apiStore.delete(filename),
+              recordFolderBinding: (documentIds) => prepared.apiStore.recordSharedFolderBinding("bound", documentIds),
+            },
+          });
+
+          let error: string | undefined;
+          if (result.auditError) {
+            error = result.rollbackFailures.length > 0 ? "SHARE_AUDIT_FAILED_CLOUD_DOCUMENTS_CREATED" : "SHARE_AUDIT_FAILED";
+          } else if (result.published.length === 0) {
+            error = "NOTHING_PUBLISHED";
+          } else {
+            try {
+              await rememberPublishedFolder({
+                folderPath: prepared.folderPath,
+                profileId,
+                workspaceId,
+                strategy: prepared.strategy,
+                excluded: prepared.excluded,
+                files: result.published,
+              });
+            } catch (persistError) {
+              console.error("[BloomMD] Published folder could not be remembered locally:", persistError);
+              error = "FOLDER_BINDING_NOT_SAVED";
+            }
+          }
+          return {
+            success: !result.auditError && result.published.length > 0,
+            ...(error ? { error } : {}),
+            published: result.published.length,
+            skipped: result.skipped,
+            failed: result.failed,
+            rollbackFailures: result.rollbackFailures,
+          };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder could not be published.");
+          console.error("[BloomMD] Folder publication failed:", message);
+          return { success: false, error: message, ...nothing };
+        }
+      },
 
       /**
        * Creates a folder in the local workspace.

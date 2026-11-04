@@ -162,18 +162,20 @@ describe("desktop RPC wiring", () => {
     expect(bun).not.toContain("Infinity");
   });
 
-  test("routes exactly the three native dialogs through the dialog client", async () => {
+  test("routes exactly the four native dialogs through the dialog client", async () => {
     const view = await readFile(join(SRC, "mainview", "rpc.ts"), "utf8");
     const bun = await readFile(join(SRC, "bun", "index.ts"), "utf8");
 
     expect(view).toContain('return nativeDialogs.open("chooseDirectory");');
     expect(view).toContain('return nativeDialogs.open("chooseResourceFile", { kind });');
     expect(view).toContain('return nativeDialogs.open("importFile");');
+    expect(view).toContain('return nativeDialogs.open("choosePublicationFolder");');
     expect(view).toContain("nativeDialogResult: (message) => {");
-    expect(view).not.toMatch(/request\.(chooseDirectory|chooseResourceFile|importFile)\(/);
+    expect(view).not.toMatch(/request\.(chooseDirectory|chooseResourceFile|importFile|choosePublicationFolder)\(/);
     expect(bun).toContain('startNativeDialog(dialogId, "chooseDirectory"');
     expect(bun).toContain('startNativeDialog(dialogId, "chooseResourceFile"');
     expect(bun).toContain('startNativeDialog(dialogId, "importFile"');
-    expect(bun).not.toMatch(/(?:chooseDirectory|chooseResourceFile|importFile): async/);
+    expect(bun).toContain('startNativeDialog(dialogId, "choosePublicationFolder"');
+    expect(bun).not.toMatch(/(?:chooseDirectory|chooseResourceFile|importFile|choosePublicationFolder): async/);
   });
 });

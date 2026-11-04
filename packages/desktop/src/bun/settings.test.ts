@@ -71,20 +71,20 @@ describe("desktop settings", () => {
   test("keeps valid shared-folder bindings and drops unsafe ones", async () => {
     const path = await settingsPath();
     const binding = {
-      schemaVersion: 1,
+      schemaVersion: 1 as const,
       workspaceId: "workspace-1",
       documentId: "document-1",
       cloudFilename: "docs__a.md",
       lastAcknowledgedMarkdownHash: "hash-1",
       lastKnownCloudVersion: 1,
-      connectionState: "connected",
+      connectionState: "connected" as const,
     };
     const folder = {
       id: "folder-1",
       folderPath: "/Users/me/Notes",
       profileId: "server-1",
       workspaceId: "workspace-1",
-      strategy: "keep-cloud",
+      strategy: "keep-cloud" as const,
       excluded: ["drafts"],
       publishedAt: "2026-11-04T10:00:00.000Z",
       files: [

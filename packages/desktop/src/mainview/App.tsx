@@ -2,7 +2,8 @@ import { FileChangeQueue } from "./file-change-queue";
 import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
 import { lazy, Suspense, useEffect, useState, useCallback, useRef, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, CloudUpload, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CloudUpload, FolderUp, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { FolderPublicationDialog, folderPublicationLabel } from "./FolderPublicationDialog";
 import {
   MindMapCanvas,
   ResizableEditor,
@@ -208,6 +209,7 @@ export function App() {
   const [forwardNavigationAvailable, setForwardNavigationAvailable] = useState(false);
   const [sharedDocument, setSharedDocument] = useState<DesktopSharedDocumentInfo | null>(null);
   const [sharedDocumentDialogOpen, setSharedDocumentDialogOpen] = useState(false);
+  const [folderPublicationOpen, setFolderPublicationOpen] = useState(false);
   const sharedMirrorRef = useRef<{ localFilename: string; mirror: SharedDocumentMirror } | null>(null);
 
   const clearForwardNavigation = useCallback(() => {
@@ -2004,6 +2006,13 @@ export function App() {
           onResolveConflict={resolveSharedDocumentConflict}
         />
       )}
+      {folderPublicationOpen && connectionMode === "local" && (
+        <FolderPublicationDialog
+          profiles={connectionProfiles.filter((profile) => profile.hasToken)}
+          locale={locale}
+          onClose={() => setFolderPublicationOpen(false)}
+        />
+      )}
 
       {/* Main area */}
       {reconnectFailedUrl && (
@@ -2202,6 +2211,16 @@ export function App() {
                 </>
               ) : (
                 <>
+                  <button
+                    type="button"
+                    data-testid="publish-folder-as-workspace"
+                    onClick={() => setFolderPublicationOpen(true)}
+                    title={locale === "de" ? "Öffnet nur die Auswahl. Hochgeladen wird erst nach deiner Bestätigung in der Vorschau." : "Only opens the selection. Nothing is uploaded until you confirm in the preview."}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+                  >
+                    <FolderUp size={16} />
+                    <span>{folderPublicationLabel(locale)}</span>
+                  </button>
                   <button
                     type="button"
                     data-testid="change-folder"

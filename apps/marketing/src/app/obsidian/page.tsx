@@ -82,7 +82,7 @@ export default async function ObsidianPage({ searchParams }: { searchParams: Pro
               ))}
             </ol>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href={RELEASE_URL} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+              <a href={RELEASE_URL} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311]">
                 {copy.release} <Download size={16} aria-hidden="true" />
               </a>
               <a href={`${MIRROR_URL}#beta-via-brat`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#D4CFC8] px-4 text-sm font-semibold hover:bg-[#F2F0ED]">

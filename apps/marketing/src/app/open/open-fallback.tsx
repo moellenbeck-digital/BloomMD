@@ -16,7 +16,7 @@ export function OpenFallback({ locale, appUrl }: { locale: MarketingLocale; appU
     <LegalPage title={en ? "BloomMD app not installed" : "BloomMD-App nicht installiert"} eyebrow={en ? "Open in BloomMD" : "In BloomMD öffnen"} locale={locale} path="/open">
       <p>{en ? "This link is meant to open a mind map in the BloomMD app, but the app did not open." : "Dieser Link soll eine Mindmap in der BloomMD-App öffnen, die App hat sich aber nicht geöffnet."}</p>
       <div className="flex flex-wrap gap-3">
-        <Link href={withMarketingLocale("/download", locale)} className={`${button} bg-[#FF6B35] text-white hover:bg-[#B64A1F]`}>
+        <Link href={withMarketingLocale("/download", locale)} className={`${button} bg-[#B94316] text-white hover:bg-[#B64A1F]`}>
           <Download size={16} aria-hidden="true" />
           {en ? "Download BloomMD" : "BloomMD herunterladen"}
         </Link>

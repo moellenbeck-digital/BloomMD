@@ -234,7 +234,7 @@ export function DemoClient({ templates, initialTemplate, locale }: DemoClientPro
             <button
               type="button"
               onClick={downloadMarkdown}
-              className="inline-flex h-10 items-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white hover:bg-[#E95F2F]"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#B94316] px-3 text-sm font-semibold text-white hover:bg-[#963311]"
             >
               <Download size={16} />
               {copy.download}
@@ -334,7 +334,7 @@ export function DemoClient({ templates, initialTemplate, locale }: DemoClientPro
                 <SkipForward size={16} />
                 {copy.skip}
               </button>
-              <button type="button" onClick={closeGuided} className="inline-flex h-10 items-center rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+              <button type="button" onClick={closeGuided} className="inline-flex min-h-11 items-center rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311]">
                 {copy.start}
               </button>
             </div>

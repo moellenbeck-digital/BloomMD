@@ -12,6 +12,10 @@ import { BROWSER_LOCALE, capture, LOCALES, readFixtureVault, type Locale } from 
 
 const PASSWORD = "Docs-Screenshots-12345";
 const FIXTURE = readFixtureVault();
+/** A few notes of the fixture vault: the full vault makes an unreadable overview map. */
+const SMALL_FOLDER = Object.fromEntries(
+  Object.entries(FIXTURE).filter(([path]) => /^(Konzepte|Personen|Buch\/Teil-1)\//.test(path)),
+);
 
 function uniqueEmail(label: string) {
   return `docs-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}@bloommd.local`;
@@ -32,7 +36,7 @@ async function prepare(page: Page, locale: Locale) {
 /** Registers a throw-away account through the bypass and lands in `/app`. */
 async function signUpAndOpenApp(page: Page, locale: Locale, label: string) {
   await prepare(page, locale);
-  await page.goto(`/signup?next=%2Fapp&lang=${locale}`);
+  await page.goto(`/signup?next=${encodeURIComponent(`/app?lang=${locale}`)}&lang=${locale}`);
   await page.getByTestId("signup-form").locator('input[name="name"]').fill("Docs");
   await page.getByTestId("signup-form").locator('input[name="email"]').fill(uniqueEmail(label));
   await page.getByTestId("signup-form").locator('input[name="password"]').fill(PASSWORD);
@@ -152,7 +156,7 @@ for (const locale of LOCALES) {
     });
 
     test("web app with an opened Markdown map", async ({ page }) => {
-      await installFolderMock(page, FIXTURE, "test-vault");
+      await installFolderMock(page, SMALL_FOLDER, "test-vault");
       await signUpAndOpenApp(page, locale, "map");
       await page.getByTestId("open-browser-workspace").click();
       await expect(page.getByTestId("workspace-readonly")).toBeVisible();
@@ -163,12 +167,34 @@ for (const locale of LOCALES) {
       await capture(page, "web-app-map", locale);
     });
 
+    test("template picker in the new-file dialog", async ({ page }) => {
+      await installFolderMock(page, SMALL_FOLDER, "test-vault");
+      await signUpAndOpenApp(page, locale, "templates");
+      await page.getByTestId("open-browser-workspace").click();
+      await page.getByTestId("workspace-readonly").click();
+      await expect(page.getByTestId("workspace-readonly")).toHaveCount(0);
+      await page.getByTestId("create-file").click();
+      const dialog = page.getByTestId("create-entry-dialog");
+      await expect(dialog).toBeVisible();
+      await page.getByTestId("create-entry-template").selectOption({ value: "lecture" });
+      await page.getByTestId("create-entry-name").fill(locale === "de" ? "Vorlesung Graphen" : "Lecture graphs");
+      await capture(page, "templates", locale);
+    });
+
+    test("sync status of a map in the cloud workspace", async ({ page }) => {
+      await signUpAndOpenApp(page, locale, "sync");
+      await expect(page.getByTestId("sync-status")).toContainText(locale === "de" ? "Synchronisiert" : "Synced");
+      await capture(page, "sync-status", locale);
+    });
+
     test("open a local folder: read-only notice", async ({ page }) => {
-      await installFolderMock(page, FIXTURE, "test-vault");
+      await installFolderMock(page, SMALL_FOLDER, "test-vault");
       await signUpAndOpenApp(page, locale, "folder");
       await page.getByTestId("open-browser-workspace").click();
       await expect(page.getByTestId("workspace-readonly")).toBeVisible();
-      await expect(page.getByText("Graphentheorie").first()).toBeVisible();
+      await page.getByLabel("Local workspace file").selectOption("Konzepte/Graphentheorie.md");
+      await expect(page.locator('[data-node-label="Graphentheorie"]').first()).toBeVisible();
+      await expect(page.getByTestId("workspace-readonly")).toBeVisible();
       await capture(page, "web-open-folder", locale);
     });
   });

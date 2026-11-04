@@ -32,9 +32,10 @@ import {
 import { KNOWLEDGE_TEMPLATES, knowledgeTemplate, templateFrontmatter } from "@bloommd/core/knowledge-templates";
 import { buildWorkspaceIndex } from "@bloommd/core/workspace-index";
 import { backlinksFor } from "@bloommd/core/workspace-search";
-import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
+import { accessFor, CloudKnowledgeStore, foldName, nodeStateFiles, safeSegment, safeVaultPath, type KnowledgeDocument, type KnowledgeStore, VaultKnowledgeStore } from "./knowledge-store";
 import type { CloudChange } from "./cloud-agent";
-import { INGEST_SOURCE_REF, IngestSourceDuplicateError, normalizeKnowledgeTitle, planIngestInMap } from "./ingest-in-map";
+import { HUB_TYPE, hubEntryNodes, hubTitle, isHubMarkdown, newHubNodes, type HubEntry } from "./ingest-hub";
+import { assertIngestDepth, INGEST_MAX_DEPTH, INGEST_SOURCE_REF, IngestSourceDuplicateError, normalizeKnowledgeTitle, planIngestInMap } from "./ingest-in-map";
 
 export interface ChangeMeta {
   reason?: string;
@@ -98,7 +99,7 @@ const INGEST_PARENT_REF = "quellen";
 const SOURCE_REF_MAX = 300;
 const BLOOM_COMMENT_RE = /<!--\s*bloommd:/i;
 
-export { IngestSourceDuplicateError, normalizeKnowledgeTitle };
+export { INGEST_MAX_DEPTH, IngestSourceDuplicateError, normalizeKnowledgeTitle };
 
 /** A map with the same title already exists in the target area; `path` is that map. */
 export class IngestDuplicateError extends Error {
@@ -127,12 +128,28 @@ export interface IngestInput extends ChangeMeta {
   nodes?: KnowledgeNodeInput[];
 }
 
+/** What `ingest` did to the hub of the area (see `ingest-hub.ts`). */
+export interface IngestHub {
+  path: string;
+  title: string;
+  /** `proposed`: the owner has to review the hub change like the map. */
+  mode: "written" | "proposed";
+  /** The hub did not exist and was created. */
+  created: boolean;
+  /** A link to the map was added; false when the hub already had it. */
+  linked: boolean;
+  changeId?: string;
+  proposalId?: string;
+}
+
 export interface IngestResult extends CommitResult {
   area: string;
   /** With `inMap`: the section nodes that already existed (matched by title, left as they are). */
   matched?: Array<{ titel: string; id: string }>;
-  /** With `inMap`: what was left out on purpose (ambiguous titles or relation targets, ignored content). */
+  /** What was left out on purpose (with `inMap`: ambiguous titles or relation targets, ignored content) and what went wrong with the area hub. */
   hinweise?: string[];
+  /** The area hub the ingest keeps up; absent when there is none to keep (no area, or the target map is the hub itself) or when it could not be written (then `hinweise` says why). */
+  hub?: IngestHub;
   /** With `inMap`: title of the source node that was added. */
   sourceTitle?: string;
   /** Id of the `kind: source` node that holds the original text. */
@@ -552,14 +569,14 @@ export class KnowledgeService {
   /** `createMap` under the name of `tool` in the log; `guard` runs under the area lock, before a path is taken. */
   private createMapAs(
     tool: string,
-    input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; frontmatter?: KnowledgeFrontmatterInput } & ChangeMeta,
+    input: { area: string; title: string; template?: string; nodes?: KnowledgeNodeInput[]; tags?: string[]; frontmatter?: KnowledgeFrontmatterInput; fixedFrontmatter?: Record<string, string> } & ChangeMeta,
     guard?: (area: string) => Promise<void>,
   ): Promise<CommitResult> {
     const template = input.template ? knowledgeTemplate(input.template) : null;
     if (input.template && !template) throw new Error(`Unknown template "${input.template}".`);
     const area = input.area.trim() || template?.area || "";
     const date = today();
-    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date, frontmatter: templateFrontmatter(template, { date }) });
+    const base = newKnowledgeMap({ title: input.title, area, tags: input.tags, source: input.source, date, frontmatter: { ...templateFrontmatter(template, { date }), ...input.fixedFrontmatter } });
     const withFrontmatter = input.frontmatter ? applyKnowledgeFrontmatter(base, input.frontmatter) : { markdown: base, fields: [] };
     const change = { ...applyKnowledgeNodes(withFrontmatter.markdown, [...(template?.skeleton ?? []), ...(input.nodes ?? [])]), ...(withFrontmatter.fields.length > 0 ? { frontmatter: withFrontmatter.fields } : {}) };
     // One lock per area: two maps with the same title must not both get the same free path.
@@ -597,6 +614,7 @@ export class KnowledgeService {
     if (!title) throw new KnowledgeInputError("A map needs a title.");
 
     const { sections, sourceRef, characters, citation } = checkIngestMaterial(input);
+    assertIngestDepth(sections, (handle) => (handle === INGEST_PARENT_REF || template.skeleton.some((node) => node.ref === handle) ? 1 : undefined));
     const hasSources = template.skeleton.some((node) => node.ref === INGEST_PARENT_REF);
     const nodes: KnowledgeNodeInput[] = [
       ...(hasSources ? [] : [{ ref: INGEST_PARENT_REF, title: "Quellen", kind: "source" as const }]),
@@ -610,11 +628,56 @@ export class KnowledgeService {
       async (target) => {
         // A vault names its maps by file name, which is the title as safeSegment writes it.
         const wanted = new Set([normalizeKnowledgeTitle(title), normalizeKnowledgeTitle(safeSegment(title))]);
-        const same = (await this.store.list()).find((entry) => entry.available !== false && foldName(entry.area) === foldName(target) && wanted.has(normalizeKnowledgeTitle(entry.title)));
-        if (same) throw new IngestDuplicateError(same.path, same.title, target);
+        // The area hub carries the name of its area; it is no duplicate of a map with that title.
+        for (const entry of await this.store.list()) {
+          if (entry.available === false || foldName(entry.area) !== foldName(target) || !wanted.has(normalizeKnowledgeTitle(entry.title))) continue;
+          if (normalizeKnowledgeTitle(entry.title) === normalizeKnowledgeTitle(hubTitle(target)) && (await this.readIfHub(entry.path))) continue;
+          throw new IngestDuplicateError(entry.path, entry.title, target);
+        }
       },
     );
-    return { ...result, area, sourceNode: result.ids[INGEST_SOURCE_REF] ?? "", characters, sections: sections.length };
+    const hub = await this.keepHub(this.areaOf(result.path) || area, { path: result.path, title }, citation, input.reason);
+    return { ...result, area, sourceNode: result.ids[INGEST_SOURCE_REF] ?? "", characters, sections: sections.length, ...hub };
+  }
+
+  /** The document when it is an area hub (`type: hub`), else null. */
+  private async readIfHub(path: string): Promise<KnowledgeDocument | null> {
+    const document = await this.store.read(path).catch(() => null);
+    return document && isHubMarkdown(document.markdown) ? document : null;
+  }
+
+  /**
+   * Keeps the hub of `area` up after an ingest wrote (or proposed) `map`: creates the hub when it is
+   * missing, else adds the link below "Maps" unless it is there already. Same tool, rights, proposal
+   * and undo as the map; a failure (no rights for the hub, a changed hub) never fails the ingest, it
+   * becomes a hint. Returns the fields to merge into the `IngestResult`.
+   */
+  private async keepHub(area: string, map: { path: string; title: string }, source: string, reason?: string): Promise<{ hub?: IngestHub; hinweise?: string[] }> {
+    const title = hubTitle(area);
+    if (!title) return {};
+    const entry: HubEntry = { title: map.title, link: this.store.kind === "vault" ? (map.path.split("/").pop() ?? map.title).replace(/\.md$/i, "") : map.title };
+    try {
+      let hub: KnowledgeDocument | null = null;
+      for (const candidate of await this.store.list()) {
+        if (candidate.available === false || foldName(candidate.area) !== foldName(area) || normalizeKnowledgeTitle(candidate.title) !== normalizeKnowledgeTitle(title)) continue;
+        hub = await this.readIfHub(candidate.path);
+        if (hub) break;
+      }
+      if (hub?.path === map.path) return {};
+      const meta = { tool: "bloommd_ingest", source, reason: `Bereichs-Hub ${title}: ${reason ?? `Link auf ${map.title}`}` };
+      if (!hub) {
+        const created = await this.createMapAs("bloommd_ingest", { area, title, nodes: newHubNodes(entry), fixedFrontmatter: { type: HUB_TYPE }, source, reason: meta.reason });
+        return { hub: { path: created.path, title, mode: created.mode, created: true, linked: true, ...(created.changeId ? { changeId: created.changeId } : {}), ...(created.proposalId ? { proposalId: created.proposalId } : {}) }, hinweise: [`Bereichs-Hub „${title}“ ${created.mode === "proposed" ? "vorgeschlagen" : "angelegt"}: ${created.path}.`] };
+      }
+      const nodes = hubEntryNodes(hub.markdown, entry);
+      if (nodes.length === 0) return { hub: { path: hub.path, title, mode: "written", created: false, linked: false } };
+      const hubPath = hub.path;
+      const version = hub.version;
+      const updated = await this.withLock(hubPath, () => this.updateMapNow({ path: hubPath, version, nodes, ...meta }));
+      return { hub: { path: updated.path, title, mode: updated.mode, created: false, linked: true, ...(updated.changeId ? { changeId: updated.changeId } : {}), ...(updated.proposalId ? { proposalId: updated.proposalId } : {}) }, hinweise: [`Bereichs-Hub „${title}“: Link auf „${map.title}“ ${updated.mode === "proposed" ? "vorgeschlagen" : "ergänzt"}.`] };
+    } catch (error) {
+      return { hinweise: [`Bereichs-Hub „${title}“ nicht gepflegt (${error instanceof Error ? error.message : String(error)}); die Map selbst ist gespeichert.`] };
+    }
   }
 
   /**
@@ -635,11 +698,13 @@ export class KnowledgeService {
         throw new KnowledgeInputError(`Die Ziel-Map "${inMap}" gibt es nicht oder sie ist nicht lesbar (${error instanceof Error ? error.message : String(error)}). Nichts wurde geschrieben.`);
       });
       const plan = planIngestInMap({ path: document.path, markdown: document.markdown, sections, citation, sourceRef, sourceDate });
+      const mapTitle = outlineMarkdown(document.markdown).title;
       const nodes: KnowledgeNodeInput[] = [
         ...plan.nodes,
         { ref: INGEST_SOURCE_REF, parent: plan.sourceParent, title: plan.sourceTitle, kind: "source", citation, ...sourceUrl(sourceRef), content: sourceContent(input.text) },
       ];
       const result = await this.updateMapNow({ path: document.path, version: document.version, nodes, tool: "bloommd_ingest", source: citation, reason: input.reason ?? `Ingest in bestehende Map ${document.path}` });
+      const hub: { hub?: IngestHub; hinweise?: string[] } = isHubMarkdown(document.markdown) ? {} : await this.keepHub(this.areaOf(result.path), { path: result.path, title: mapTitle }, citation, input.reason);
       return {
         ...result,
         // Refs the plan made up (nodes without a ref, a missing "Quellen") are not the caller's business.
@@ -650,7 +715,8 @@ export class KnowledgeService {
         characters,
         sections: sections.length,
         matched: plan.matched,
-        hinweise: plan.hinweise,
+        ...hub,
+        hinweise: [...plan.hinweise, ...(hub.hinweise ?? [])],
       };
     });
   }

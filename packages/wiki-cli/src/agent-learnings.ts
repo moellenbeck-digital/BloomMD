@@ -857,7 +857,9 @@ async function ingest(service: KnowledgeService, parsed: Parsed, deps: LearningD
       quellknoten: result.sourceNode,
       zeichen: result.characters,
       abschnitte: result.sections,
-      ...(inMap ? { quellentitel: result.sourceTitle, zugeordnet: result.matched, neu: result.created.length, hinweise: result.hinweise } : {}),
+      ...(inMap ? { quellentitel: result.sourceTitle, zugeordnet: result.matched, neu: result.created.length } : {}),
+      ...(result.hub ? { hub: { pfad: result.hub.path, titel: result.hub.title, modus: result.hub.mode === "proposed" ? "vorgeschlagen" : "geschrieben", angelegt: result.hub.created, verlinkt: result.hub.linked, ...(result.hub.changeId ? { aenderung: result.hub.changeId } : {}), ...(result.hub.proposalId ? { vorschlag: result.hub.proposalId } : {}) } } : {}),
+      ...(inMap || result.hinweise?.length ? { hinweise: result.hinweise ?? [] } : {}),
       ids: result.ids,
     };
   } catch (error) {

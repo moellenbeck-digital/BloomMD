@@ -702,6 +702,9 @@ function LocalFirstAndWikiSection() {
             BloomMD reads and writes Open Knowledge Format bundles: Markdown pages, source hashes, trust signals and explicit approval before agent proposals are applied.
           </p>
           <p className="mt-4 text-sm leading-6 text-[#666666]">
+            Our <Link href="/en/roadmap" className="font-semibold text-[#B94316] underline-offset-4 hover:underline">knowledge platform roadmap</Link> outlines sources and sync, rights and cited search, and later agent workflows. The learnings pilot is the first internal backend use case; local Markdown remains the core.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-[#666666]">
             This works through BloomMD and OpenClaw without Bun, a terminal, or access to a source checkout.
           </p>
           <Link href="/docs/okf-wiki?lang=en" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#1F1D1B] px-4 text-sm font-semibold text-[#1F1D1B] transition hover:border-[#B64A1F] hover:text-[#B64A1F]">

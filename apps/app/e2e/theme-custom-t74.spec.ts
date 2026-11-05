@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page, type Request } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 
 /**
  * Ticket #74 — eigene Farbthemen (Oberflächentests des Testers, alle Fälle tragen @t74).
@@ -11,7 +11,9 @@ import { expect, test, type APIRequestContext, type Page, type Request } from "@
  * Nicht prüfbar: der Vergleich "Akzentelemente ändern sich sichtbar" geschieht über den Token
  * `--color-bloom` und den berechneten Hintergrund/Text von <body>, nicht über einen Pixelvergleich.
  *
- * Testdaten: ein Konto `e2e-t74-…@bloommd.local` und eine Karte `t74-…md`; beides wird in `afterAll` entfernt.
+ * Testdaten: ein Konto `e2e-t74-…@bloommd.local` (Testmodus-Sitzung; `POST /api/account/delete` antwortet dort mit 401,
+ * eine Löschung ist nicht möglich — wie bei den übrigen Specs). Karten werden nicht angelegt (das Dev-System speichert im Dateimodus und lehnt `POST /api/mindmaps` mit 500 ab); die Sichtprüfung
+ * nutzt die vorhandene Beispielkarte „TypeScript Basics“ nur lesend.
  */
 
 const PASSWORD = "Testpass12345";
@@ -20,8 +22,7 @@ const SAME_ORIGIN_HEADERS = { Origin: BASE_URL };
 const STORAGE_KEY = "bloommd-theme-custom";
 const RUN_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const EMAIL = `e2e-t74-${RUN_ID}@bloommd.local`;
-const MAP_FILENAME = `t74-${RUN_ID}.md`;
-const MAP_TITLE = `Theme Prüfkarte t74 ${RUN_ID}`;
+const MAP_TITLE = "TypeScript Basics";
 
 const PRESETS = {
   ocean: { name: "Ocean", base: "light", accent: "#0B5FA5", surface: "#F4F8FB", ink: "#12202B" },
@@ -35,57 +36,14 @@ type PresetId = keyof typeof PRESETS;
 test.use({ locale: "de-DE" });
 test.describe.configure({ mode: "serial" });
 
-let api: APIRequestContext;
-
 test.beforeAll(async ({ playwright }) => {
-  api = await playwright.request.newContext({ baseURL: BASE_URL });
+  const api = await playwright.request.newContext({ baseURL: BASE_URL });
   const signup = await api.post("/api/auth/signup", {
     headers: SAME_ORIGIN_HEADERS,
     form: { name: "E2E T74", email: EMAIL, password: PASSWORD, acceptTerms: "1", next: "/app" },
     maxRedirects: 0,
   });
   expect(signup.status()).toBe(303);
-
-  const now = new Date().toISOString();
-  const markdown = [
-    "---",
-    `title: ${MAP_TITLE}`,
-    `id: ${MAP_FILENAME.replace(/[^a-z0-9]/gi, "-")}`,
-    `created: "${now}"`,
-    `updated: "${now}"`,
-    "tags:",
-    "  - e2e",
-    "layout:",
-    "  direction: LR",
-    "---",
-    "",
-    `# ${MAP_TITLE} <!-- bloommd:id=t74-root -->`,
-    "",
-    "Quelle: [Beispiel](https://example.com/reference). Ein **fetter** und ein `Code`-Abschnitt.",
-    "",
-    "## Kind A <!-- bloommd:id=t74-a -->",
-    "",
-    "Text im Kindknoten mit [[#t74-b|Verweis]].",
-    "",
-    "## Kind B <!-- bloommd:id=t74-b -->",
-    "",
-    "Zweiter Knoten.",
-  ].join("\n");
-  const created = await api.post("/api/mindmaps", { headers: SAME_ORIGIN_HEADERS, data: { filename: MAP_FILENAME, markdown } });
-  expect(created.ok()).toBe(true);
-});
-
-test.afterAll(async () => {
-  if (!api) return;
-  await api.delete(`/api/mindmaps/${encodeURIComponent(MAP_FILENAME)}`, { headers: SAME_ORIGIN_HEADERS }).catch(() => undefined);
-  // Das Konto entfernt sich über die eigene Löschroute; nur das selbst angelegte Konto.
-  await api
-    .post("/api/account/delete", {
-      headers: SAME_ORIGIN_HEADERS,
-      form: { confirmation: EMAIL, password: PASSWORD },
-      maxRedirects: 0,
-    })
-    .catch(() => undefined);
   await api.dispose();
 });
 
@@ -166,11 +124,10 @@ test("Kriterium 2: Vorlage wählen und speichern ändert Oberfläche, Text und A
   expect(await token(page, "--color-surface")).toBe(PRESETS.midnight.surface);
   expect(await token(page, "--color-ink")).toBe(PRESETS.midnight.ink);
   expect(await token(page, "--color-bloom")).toBe(PRESETS.midnight.accent);
-  const after = await bodyColors(page);
-  expect(after.background).toBe(rgb(PRESETS.midnight.surface));
-  expect(after.color).toBe(rgb(PRESETS.midnight.ink));
-  expect(after.background).not.toBe(before.background);
-  expect(after.color).not.toBe(before.color);
+  // Die Farben laufen über eine CSS-Transition, daher abwarten statt sofort lesen.
+  await expect.poll(() => bodyColors(page)).toEqual({ background: rgb(PRESETS.midnight.surface), color: rgb(PRESETS.midnight.ink) });
+  expect(before.background).not.toBe(rgb(PRESETS.midnight.surface));
+  expect(before.color).not.toBe(rgb(PRESETS.midnight.ink));
   // Akzent: ein Element, das den Akzent-Token verwendet, löst ihn auf den gespeicherten Wert auf.
   const accentResolved = await page.evaluate(() => {
     const probe = document.createElement("span");
@@ -207,7 +164,7 @@ test("Kriterium 3: Theme bleibt nach Reload erhalten, auch beim Laden ohne Stand
   expect(states.length).toBeGreaterThan(0);
   // Nach dem ersten Frame nie das Standard-Theme (leerer Token) und nie dunkel.
   for (const state of states) expect(state).toBe(`${PRESETS.ocean.surface}|false`);
-  expect((await bodyColors(page)).background).toBe(rgb(PRESETS.ocean.surface));
+  await expect.poll(async () => (await bodyColors(page)).background).toBe(rgb(PRESETS.ocean.surface));
 });
 
 test("Kriterium 4: zu wenig Textkontrast wird abgelehnt, Gegenbeispiel wird gespeichert @t74", async ({ page }) => {
@@ -266,7 +223,7 @@ test("Kriterium 6: ungültiger Hex-Wert „blau“ zeigt Hex-Hinweis, nichts wir
   await expect(page.getByTestId("theme-custom-dialog")).toBeVisible();
   expect(await stored(page)).toBeNull();
   expect(await token(page, "--color-bloom")).toBe("");
-  expect(await bodyColors(page)).toEqual(before);
+  await expect.poll(() => bodyColors(page)).toEqual(before);
 });
 
 test("Kriterium 7: Standard-Theme wiederherstellen (Dialog und Menü), auch nach Reload @t74", async ({ page }) => {
@@ -285,12 +242,12 @@ test("Kriterium 7: Standard-Theme wiederherstellen (Dialog und Menü), auch nach
   expect(await stored(page)).toBeNull();
   expect(await token(page, "--color-surface")).toBe("");
   expect(await isDark(page)).toBe(true);
-  expect(await bodyColors(page)).toEqual(plain);
+  await expect.poll(() => bodyColors(page)).toEqual(plain);
   await page.reload();
   await expect(page.locator("#mindmap-canvas")).toBeVisible();
   expect(await stored(page)).toBeNull();
   expect(await isDark(page)).toBe(true);
-  expect(await bodyColors(page)).toEqual(plain);
+  await expect.poll(() => bodyColors(page)).toEqual(plain);
 
   // Über das Menü.
   await applyPreset(page, "sepia");
@@ -302,7 +259,7 @@ test("Kriterium 7: Standard-Theme wiederherstellen (Dialog und Menü), auch nach
   await expect(page.locator("#mindmap-canvas")).toBeVisible();
   expect(await stored(page)).toBeNull();
   expect(await isDark(page)).toBe(true);
-  expect(await bodyColors(page)).toEqual(plain);
+  await expect.poll(() => bodyColors(page)).toEqual(plain);
   expect(await page.evaluate(() => window.localStorage.getItem("bloommd-theme"))).toBe("dark");
 });
 
@@ -321,7 +278,7 @@ test("Kriterium 8: Hell/Dunkel-Umschalter funktioniert und setzt ein eigenes The
   await openHelpMenu(page);
   await page.getByTestId("toolbar-theme").click();
   await expect.poll(() => isDark(page)).toBe(true);
-  expect((await bodyColors(page)).background).toBe("rgb(17, 17, 17)");
+  await expect.poll(async () => (await bodyColors(page)).background).toBe("rgb(17, 17, 17)");
   await openHelpMenu(page);
   await page.getByTestId("toolbar-theme").click();
   await expect.poll(() => isDark(page)).toBe(false);
@@ -361,7 +318,11 @@ test("Kriterium 9: Dialog per Tastatur bedienbar, Escape schließt ohne Speicher
   // Fokus startet im Dialog (erste Vorlage); Tab folgt der DOM-Reihenfolge und bleibt im Dialog (Fokusfalle).
   const focusables = await dialog.evaluate((root) => {
     const selector = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
-    return Array.from(root.querySelectorAll<HTMLElement>(selector)).map(
+    // Radios einer Gruppe: per Tab erreichbar ist nur die gewählte (Browserverhalten), die andere per Pfeiltaste.
+    const tabbable = Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(
+      (el) => !(el instanceof HTMLInputElement && el.type === "radio" && !el.checked),
+    );
+    return tabbable.map(
       (el) => el.getAttribute("data-testid") ?? el.getAttribute("aria-label") ?? el.tagName,
     );
   });
@@ -433,6 +394,8 @@ test("Kriterium 10: keine Theme-Daten an einen Server, Speicherung nur in localS
 
 interface Finding {
   kind: "text-kontrast" | "helle-flaeche-im-dunklen-theme";
+  /** Ohne Messwerte, um Funde zwischen Standard-Theme und Vorlage zu vergleichen. */
+  key: string;
   detail: string;
 }
 
@@ -486,12 +449,12 @@ async function scanReadability(page: Page, dark: boolean): Promise<Finding[]> {
       return rect.width > 1 && rect.height > 1 && rect.bottom > 0 && rect.right > 0;
     };
 
-    const findings: Array<{ kind: "text-kontrast" | "helle-flaeche-im-dunklen-theme"; detail: string }> = [];
+    const findings: Array<{ kind: "text-kontrast" | "helle-flaeche-im-dunklen-theme"; key: string; detail: string }> = [];
     const seen = new Set<string>();
-    const add = (kind: "text-kontrast" | "helle-flaeche-im-dunklen-theme", detail: string) => {
-      if (seen.has(`${kind}${detail}`) || findings.length >= 25) return;
-      seen.add(`${kind}${detail}`);
-      findings.push({ kind, detail });
+    const add = (kind: "text-kontrast" | "helle-flaeche-im-dunklen-theme", key: string, detail: string) => {
+      if (seen.has(`${kind}|${key}`) || findings.length >= 40) return;
+      seen.add(`${kind}|${key}`);
+      findings.push({ kind, key, detail });
     };
 
     for (const el of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
@@ -507,7 +470,7 @@ async function scanReadability(page: Page, dark: boolean): Promise<Finding[]> {
           const value = ratio(effective, bg);
           if (value < 3) {
             const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 30);
-            add("text-kontrast", `${describe(el)} „${text}“ ${value.toFixed(2)}:1 (Text ${style.color} auf ${bg.map((n) => Math.round(n)).slice(0, 3).join(",")})`);
+            add("text-kontrast", `${describe(el)} „${text}“`, `${describe(el)} „${text}“ ${value.toFixed(2)}:1 (Text ${style.color} auf ${bg.map((n) => Math.round(n)).slice(0, 3).join(",")})`);
           }
         }
       }
@@ -515,7 +478,7 @@ async function scanReadability(page: Page, dark: boolean): Promise<Finding[]> {
         const own = parse(style.backgroundColor);
         const rect = el.getBoundingClientRect();
         if (own && own[3] > 0.9 && lum(own) > 0.6 && rect.width >= 40 && rect.height >= 16 && !el.closest("img, [data-allow-light-surface]")) {
-          add("helle-flaeche-im-dunklen-theme", `${describe(el)} ${style.backgroundColor} ${Math.round(rect.width)}×${Math.round(rect.height)}`);
+          add("helle-flaeche-im-dunklen-theme", `${describe(el)} ${Math.round(rect.width)}×${Math.round(rect.height)}`, `${describe(el)} ${style.backgroundColor} ${Math.round(rect.width)}×${Math.round(rect.height)}`);
         }
       }
     }
@@ -523,67 +486,100 @@ async function scanReadability(page: Page, dark: boolean): Promise<Finding[]> {
   }, dark);
 }
 
+/** Geht die Hauptansichten durch und liefert alle Funde, je Fund mit Ansicht. */
+async function walkViews(page: Page, label: string, dark: boolean, testInfo: import("@playwright/test").TestInfo) {
+  const findings: Array<Finding & { view: string }> = [];
+  const check = async (view: string) => {
+    // Die Farben laufen über eine CSS-Transition, daher kurz abwarten.
+    await page.waitForTimeout(700);
+    await testInfo.attach(`${label}-${view}`, { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
+    for (const finding of await scanReadability(page, dark)) findings.push({ ...finding, view });
+  };
+
+  // Arbeitsbereich mit geöffneter Beispielkarte.
+  await check("arbeitsbereich");
+
+  // Befehlspalette mit Treffer.
+  await page.keyboard.press("Control+K");
+  await expect(page.getByTestId("command-palette-input")).toBeVisible();
+  await page.getByTestId("command-palette-input").fill(MAP_TITLE);
+  await expect(page.getByTestId("command-palette-item-mindmap").first()).toBeVisible();
+  await check("befehlspalette");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("command-palette-input")).toBeHidden();
+
+  // Knoten gewählt + Aktionsleiste, dann Editor.
+  const root = page.locator('[data-testid="mindmap-node"][data-node-label="TypeScript"]').first();
+  await expect(root).toBeVisible();
+  await root.click();
+  await expect(page.getByTestId("node-action-open-editor")).toBeVisible();
+  await check("knoten-aktionen");
+  await page.getByTestId("node-action-open-editor").click();
+  await expect(page.getByTestId("node-editor")).toBeVisible();
+  await check("editor");
+
+  // Hilfemenü.
+  await page.getByTestId("toolbar-help-menu").click();
+  await expect(page.getByTestId("toolbar-theme-custom")).toBeVisible();
+  await check("hilfemenue");
+
+  // Über-Dialog.
+  await page.getByTestId("toolbar-about").click();
+  await expect(page.getByTestId("about-dialog")).toBeVisible();
+  await check("ueber-dialog");
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("about-dialog")).toBeHidden();
+
+  // Theme-Dialog, auch mit sichtbarem Fehlerhinweis.
+  await openThemeDialog(page);
+  await check("theme-dialog");
+  await page.getByTestId("theme-custom-name").fill("");
+  await page.getByTestId("theme-custom-save").click();
+  await expect(page.getByTestId("theme-custom-error")).toBeVisible();
+  await check("theme-dialog-fehler");
+  await page.keyboard.press("Escape");
+  return findings;
+}
+
+const baseline: Partial<Record<"light" | "dark", Set<string>>> = {};
+const keyOf = (f: Finding & { view: string }) => `${f.view}|${f.kind}|${f.key}`;
+
+// Referenz: dieselben Ansichten ohne eigenes Theme. Was dort schon auffällt, geht nicht auf das Ticket zurück.
+for (const base of ["light", "dark"] as const) {
+  test(`Kriterium 11: Referenz Standard-Theme ${base === "light" ? "hell" : "dunkel"} (ohne eigenes Theme) @t74`, async ({ page }, testInfo) => {
+    test.setTimeout(120_000);
+    await page.addInitScript((value) => window.localStorage.setItem("bloommd-theme", value), base);
+    await login(page);
+    expect(await token(page, "--color-surface")).toBe("");
+    expect(await isDark(page)).toBe(base === "dark");
+    const findings = await walkViews(page, `standard-${base}`, base === "dark", testInfo);
+    baseline[base] = new Set(findings.map(keyOf));
+    await testInfo.attach(`standard-${base}-funde.txt`, {
+      body: findings.map((f) => `[${f.view}] ${f.kind}: ${f.detail}`).join("\n") || "keine",
+      contentType: "text/plain",
+    });
+    console.log(`Referenz ${base}: ${findings.length} Fund(e)\n${findings.map((f) => `  [${f.view}] ${f.kind}: ${f.detail}`).join("\n")}`);
+  });
+}
+
 for (const id of Object.keys(PRESETS) as PresetId[]) {
   test(`Kriterium 11: Sichtprüfung Vorlage ${PRESETS[id].name} — Hauptansichten lesbar @t74`, async ({ page }, testInfo) => {
     test.setTimeout(120_000);
-    const dark = PRESETS[id].base === "dark";
-    const findings: string[] = [];
-    const check = async (view: string) => {
-      await page.waitForTimeout(250);
-      const shot = await page.screenshot({ fullPage: false });
-      await testInfo.attach(`${id}-${view}`, { body: shot, contentType: "image/png" });
-      for (const finding of await scanReadability(page, dark)) findings.push(`[${id}/${view}] ${finding.kind}: ${finding.detail}`);
-    };
-
+    const base = PRESETS[id].base;
     await login(page);
     await applyPreset(page, id);
     expect(await token(page, "--color-surface")).toBe(PRESETS[id].surface);
 
-    // Arbeitsbereich vor dem Öffnen einer Karte.
-    await check("arbeitsbereich");
+    const findings = await walkViews(page, id, base === "dark", testInfo);
+    const known = baseline[base] ?? new Set<string>();
+    const fresh = findings.filter((f) => !known.has(keyOf(f)));
+    const lines = findings.map((f) => `${known.has(keyOf(f)) ? "(auch im Standard-Theme)" : "NEU"} [${f.view}] ${f.kind}: ${f.detail}`);
+    console.log(`Vorlage ${PRESETS[id].name}: ${findings.length} Fund(e), davon ${fresh.length} neu\n${lines.map((l) => `  ${l}`).join("\n")}`);
+    await testInfo.attach(`${id}-funde.txt`, { body: lines.join("\n") || "keine", contentType: "text/plain" });
 
-    // Befehlspalette mit Treffer.
-    await page.keyboard.press("Control+K");
-    await expect(page.getByTestId("command-palette-input")).toBeVisible();
-    await page.getByTestId("command-palette-input").fill(MAP_TITLE);
-    await expect(page.getByTestId("command-palette-item-mindmap").first()).toBeVisible();
-    await check("befehlspalette");
-
-    // Karte.
-    await page.getByTestId("command-palette-item-mindmap").first().click();
-    const root = page.locator(`[data-node-label="${MAP_TITLE}"]`).first();
-    await expect(root).toBeVisible();
-    await check("karte");
-
-    // Knoten gewählt + Aktionsleiste, dann Editor.
-    await root.click();
-    await expect(page.getByTestId("node-action-open-editor")).toBeVisible();
-    await check("knoten-aktionen");
-    await page.getByTestId("node-action-open-editor").click();
-    await expect(page.getByTestId("node-editor")).toBeVisible();
-    await check("editor");
-
-    // Hilfemenü.
-    await page.getByTestId("toolbar-help-menu").click();
-    await expect(page.getByTestId("toolbar-theme-custom")).toBeVisible();
-    await check("hilfemenue");
-
-    // Über-Dialog.
-    await page.getByTestId("toolbar-about").click();
-    await expect(page.getByTestId("about-dialog")).toBeVisible();
-    await check("ueber-dialog");
-    await page.keyboard.press("Escape");
-    await expect(page.getByTestId("about-dialog")).toBeHidden();
-
-    // Theme-Dialog selbst (mit Fehlerhinweis sichtbar, damit auch der Fehlerzustand geprüft wird).
-    await openThemeDialog(page);
-    await check("theme-dialog");
-    await fillColors(page, { surface: PRESETS[id].surface, ink: PRESETS[id].surface });
-    await page.getByTestId("theme-custom-save").click();
-    await expect(page.getByTestId("theme-custom-error")).toBeVisible();
-    await check("theme-dialog-fehler");
-    await page.keyboard.press("Escape");
-
-    expect(findings, `Unlesbare oder helle Stellen unter Vorlage ${PRESETS[id].name}`).toEqual([]);
+    expect(
+      fresh.map((f) => `[${f.view}] ${f.kind}: ${f.detail}`),
+      `Unlesbare oder helle Stellen, die erst unter Vorlage ${PRESETS[id].name} auftreten`,
+    ).toEqual([]);
   });
 }

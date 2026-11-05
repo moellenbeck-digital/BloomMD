@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DUPLICATE_TRIAL_ERROR } from "../../../../lib/auth-copy";
 import { consumeAuthToken, markEmailVerified } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { parseWorkspaceInviteHandoff } from "../../../../lib/invite-intent";
@@ -22,7 +23,12 @@ export async function GET(request: Request) {
       return NextResponse.redirect(appRedirectUrl(`/login?${params.toString()}`, request.url), 303);
     }
 
-    await markEmailVerified(consumed.userId);
+    // A second trial for the same mailbox is refused (#277). The owner holds the mail, so saying why is no leak.
+    if ((await markEmailVerified(consumed.userId)) === "duplicate-trial") {
+      const params = new URLSearchParams({ error: DUPLICATE_TRIAL_ERROR, lang });
+      if (invite) params.set("invite", invite);
+      return NextResponse.redirect(appRedirectUrl(`/login?${params.toString()}`, request.url), 303);
+    }
     const params = new URLSearchParams({ verified: "1", lang });
     if (invite) params.set("invite", invite);
     return NextResponse.redirect(appRedirectUrl(`/login?${params.toString()}`, request.url), 303);

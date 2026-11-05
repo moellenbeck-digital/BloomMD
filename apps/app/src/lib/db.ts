@@ -1,4 +1,5 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
+import { canonicalEmail } from "./email-canonical";
 import { TRIAL_DAYS, TRIAL_REMINDER_DAYS, TRIAL_REMINDER_KINDS, type TrialReminderKind } from "./trial";
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
@@ -215,6 +216,8 @@ async function verifyMarketSchema() {
         ('bloom_users', 'trial_legacy'),
         ('bloom_users', 'trial_ends_at'),
         ('bloom_users', 'locale'),
+        ('bloom_users', 'email_canonical'),
+        ('bloom_users', 'trial_guarded'),
         ('bloom_stripe_events', 'processed_at'),
         ('bloom_stripe_events', 'processing_started_at'),
         ('bloom_stripe_events', 'attempts'),
@@ -292,7 +295,7 @@ async function verifyMarketSchema() {
       )
   `;
   if (
-    Number((columns[0] as { count?: number } | undefined)?.count ?? 0) !== 79
+    Number((columns[0] as { count?: number } | undefined)?.count ?? 0) !== 81
   ) {
     throw new Error(
       "BloomMD database migration is incomplete: required columns are missing.",
@@ -979,6 +982,23 @@ async function createMarketSchema() {
       check (kind in ('15', '23'))
     )
   `;
+
+  // Protection against several free trials for one mailbox; see db/014_email_canonical.sql, which explains the statements.
+  await sql`
+    alter table bloom_users add column if not exists email_canonical text generated always as (
+      case
+        when position('@' in email) = 0 then lower(email)
+        when substring(lower(email) from '@([^@]*)$') in ('gmail.com', 'googlemail.com') then
+          coalesce(nullif(replace(split_part(regexp_replace(lower(email), '@[^@]*$', ''), '+', 1), '.', ''), ''), regexp_replace(lower(email), '@[^@]*$', '')) || '@gmail.com'
+        else
+          coalesce(nullif(split_part(regexp_replace(lower(email), '@[^@]*$', ''), '+', 1), ''), regexp_replace(lower(email), '@[^@]*$', '')) || '@' || substring(lower(email) from '@([^@]*)$')
+      end
+    ) stored
+  `;
+  await sql`alter table bloom_users add column if not exists trial_guarded boolean not null default false`;
+  await sql`alter table bloom_users alter column trial_guarded set default true`;
+  await sql`create index if not exists bloom_users_email_canonical_idx on bloom_users (email_canonical) where email_verified_at is not null`;
+  await sql`create unique index if not exists bloom_users_trial_canonical_idx on bloom_users (email_canonical) where email_verified_at is not null and trial_guarded`;
 }
 
 export interface WorkspaceRecord {
@@ -3302,6 +3322,7 @@ type AuditEventType =
   | "auth_token.consumed"
   | "auth_token.issued"
   | "email.verified"
+  | "email.verification_blocked"
   | "password.changed"
   | "waitlist_account.prepared"
   | "waitlist_account.activated"
@@ -3923,23 +3944,77 @@ export async function consumeAuthToken(input: {
   return { userId: row.user_id, email: row.email };
 }
 
-export async function markEmailVerified(userId: string) {
-  if (!isDatabaseConfigured()) return;
-  const dbUserId = normalizeUuid(userId);
-  if (!dbUserId) return;
+/** Postgres error code of a unique violation; here: the second confirmed guarded account of one mailbox (#277). */
+function isUniqueViolation(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "23505");
+}
+
+/**
+ * Is there a confirmed account with the same canonical address but another address (#277)? Only
+ * confirmed accounts count: an unconfirmed one must not be able to occupy somebody else's address.
+ */
+export async function hasConfirmedMailboxTwin(email: string): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
   await ensureMarketSchema();
 
-  await getSql()`
-    update bloom_users
-    set email_verified_at = coalesce(email_verified_at, now()),
-      trial_ends_at = coalesce(trial_ends_at, coalesce(email_verified_at, now()) + (${TRIAL_DAYS} * interval '1 day')),
-      updated_at = now()
-    where id = ${dbUserId}
+  const rows = await getSql()`
+    select 1 as twin
+    from bloom_users
+    where email_canonical = ${canonicalEmail(email)}
+      and lower(email) <> ${email.trim().toLowerCase()}
+      and email_verified_at is not null
+    limit 1
   `;
+  return rows.length > 0;
+}
+
+/**
+ * Confirms the address of an account and starts its trial. A guarded account (created since
+ * migration 014) is not confirmed, and gets no trial, while another account with the same canonical
+ * address is already confirmed (#277). The check is part of the update, and the partial unique index
+ * bloom_users_trial_canonical_idx decides when two such accounts are confirmed at the same time:
+ * the second one fails with a unique violation and counts as "duplicate-trial" as well.
+ */
+export async function markEmailVerified(userId: string): Promise<"ok" | "duplicate-trial"> {
+  if (!isDatabaseConfigured()) return "ok";
+  const dbUserId = normalizeUuid(userId);
+  if (!dbUserId) return "ok";
+  await ensureMarketSchema();
+
+  let rows: readonly unknown[];
+  try {
+    rows = await getSql()`
+      update bloom_users u
+      set email_verified_at = coalesce(u.email_verified_at, now()),
+        trial_ends_at = coalesce(u.trial_ends_at, coalesce(u.email_verified_at, now()) + (${TRIAL_DAYS} * interval '1 day')),
+        updated_at = now()
+      where u.id = ${dbUserId}
+        and (
+          u.email_verified_at is not null
+          or not u.trial_guarded
+          or not exists (
+            select 1 from bloom_users o
+            where o.email_canonical = u.email_canonical and o.id <> u.id and o.email_verified_at is not null
+          )
+        )
+      returning u.id
+    `;
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    rows = [];
+  }
+  if (rows.length === 0) {
+    // Nothing updated: an unknown account stays a no-op, a blocked one is reported.
+    const known = await getSql()`select 1 as known from bloom_users where id = ${dbUserId}`;
+    if (known.length === 0) return "ok";
+    await recordAuditEvent({ actorUserId: dbUserId, eventType: "email.verification_blocked", details: { reason: "duplicate-trial" } });
+    return "duplicate-trial";
+  }
   await recordAuditEvent({
     actorUserId: dbUserId,
     eventType: "email.verified",
   });
+  return "ok";
 }
 
 export async function updatePasswordForEmail(input: {
@@ -4190,44 +4265,82 @@ export async function isPreparedWaitlistAccount(user: { id: string; passwordHash
  * password is set and the address confirmed. The token proves the address, so a password somebody
  * else set through the signup form in the meantime is replaced. A confirmed account is never
  * changed. Returns null for an unknown, used or expired token, or when nothing may be activated.
+ *
+ * Like markEmailVerified, this is a confirmation that starts a trial: when another account of the
+ * same mailbox is already confirmed (#277), the account is not activated and the result says
+ * "duplicate-trial".
  */
-export async function activateWaitlistAccount(input: { token: string; passwordHash: string }) {
+export async function activateWaitlistAccount(input: { token: string; passwordHash: string }): Promise<{ userId: string; email: string } | { blocked: "duplicate-trial" } | null> {
   if (!isDatabaseConfigured()) return null;
   await ensureMarketSchema();
 
-  const rows = await getSql()`
-    with consumed as (
-      update bloom_auth_tokens
-      set consumed_at = now()
-      where token_hash = ${hashAuthToken(input.token)}
-        and purpose = 'waitlist_activation'
-        and consumed_at is null
-        and expires_at > now()
-      returning user_id
-    ), activated as (
-      update bloom_users u
-      set password_hash = ${input.passwordHash}, email_verified_at = now(),
-        trial_ends_at = coalesce(u.trial_ends_at, now() + (${TRIAL_DAYS} * interval '1 day')),
-        updated_at = now()
+  let rows: readonly unknown[];
+  try {
+    rows = await getSql()`
+      with consumed as (
+        update bloom_auth_tokens
+        set consumed_at = now()
+        where token_hash = ${hashAuthToken(input.token)}
+          and purpose = 'waitlist_activation'
+          and consumed_at is null
+          and expires_at > now()
+        returning user_id
+      ), activated as (
+        update bloom_users u
+        set password_hash = ${input.passwordHash}, email_verified_at = now(),
+          trial_ends_at = coalesce(u.trial_ends_at, now() + (${TRIAL_DAYS} * interval '1 day')),
+          updated_at = now()
+        from consumed c
+        where u.id = c.user_id
+          and u.email_verified_at is null
+          and exists (
+            select 1 from bloom_waitlist_transfers w
+            where w.user_id = u.id and w.invited_at is not null and w.activated_at is null
+          )
+          and (
+            not u.trial_guarded
+            or not exists (
+              select 1 from bloom_users o
+              where o.email_canonical = u.email_canonical and o.id <> u.id and o.email_verified_at is not null
+            )
+          )
+        returning u.id, u.email
+      ), marked as (
+        update bloom_waitlist_transfers w
+        set activated_at = now()
+        from activated a
+        where w.user_id = a.id
+        returning w.user_id
+      )
+      select a.id, a.email, c.user_id as consumed_user_id
       from consumed c
-      where u.id = c.user_id
-        and u.email_verified_at is null
-        and exists (
-          select 1 from bloom_waitlist_transfers w
-          where w.user_id = u.id and w.invited_at is not null and w.activated_at is null
-        )
-      returning u.id, u.email
-    ), marked as (
-      update bloom_waitlist_transfers w
-      set activated_at = now()
-      from activated a
-      where w.user_id = a.id
-      returning w.user_id
-    )
-    select a.id, a.email from activated a
-  `;
-  const row = rows[0] as { id: string; email: string } | undefined;
+      left join activated a on a.id = c.user_id
+    `;
+  } catch (error) {
+    // Two guarded accounts of one mailbox confirmed at the same moment: the unique index let the
+    // other one win, and nothing of this statement (the token included) was applied.
+    if (isUniqueViolation(error)) return { blocked: "duplicate-trial" };
+    throw error;
+  }
+  const row = rows[0] as { id: string | null; email: string | null; consumed_user_id: string } | undefined;
   if (!row) return null;
+  if (!row.id || !row.email) {
+    // The token is used up, nothing was activated. Tell a mailbox duplicate apart from the usual reasons.
+    const blocked = await getSql()`
+      select 1 as blocked
+      from bloom_users u
+      where u.id = ${row.consumed_user_id}
+        and u.email_verified_at is null
+        and u.trial_guarded
+        and exists (
+          select 1 from bloom_users o
+          where o.email_canonical = u.email_canonical and o.id <> u.id and o.email_verified_at is not null
+        )
+    `;
+    if (blocked.length === 0) return null;
+    await recordAuditEvent({ actorUserId: row.consumed_user_id, eventType: "email.verification_blocked", details: { reason: "duplicate-trial" } });
+    return { blocked: "duplicate-trial" };
+  }
   await recordAuditEvent({ actorUserId: row.id, eventType: "auth_token.consumed", targetType: "auth_token" });
   await recordAuditEvent({ actorUserId: row.id, eventType: "waitlist_account.activated" });
   await recordAuditEvent({ actorUserId: row.id, eventType: "email.verified" });

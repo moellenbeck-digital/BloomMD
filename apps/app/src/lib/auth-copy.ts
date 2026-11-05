@@ -30,6 +30,8 @@ export const VERIFICATION_NOT_SENT_ERROR = "Bestätigungs-E-Mail konnte nicht ge
 export const SIGNUP_UNAVAILABLE_ERROR = "Die Registrierung ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
 /** Activation link of a prepared waitlist account (#105): unknown, used, expired, or the account is already active. */
 export const ACTIVATION_LINK_INVALID_ERROR = "Der Aktivierungslink ist ungültig oder abgelaufen.";
+/** Confirming would start a second trial for one mailbox (#277): another address variant of it is already confirmed. */
+export const DUPLICATE_TRIAL_ERROR = "Für dieses Postfach gibt es bereits einen bestätigten Testaccount (auch Schreibweisen wie name+zusatz@… oder Punkte bei Gmail gehören zum selben Postfach). Bitte melde dich mit diesem Konto an; dieses Konto wurde nicht bestätigt.";
 export const MAIL_UNAVAILABLE_ERROR = "Der E-Mail-Versand ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
 
 export function localizeAuthError(value: string, locale: AuthLocale) {
@@ -56,6 +58,7 @@ export function localizeAuthError(value: string, locale: AuthLocale) {
     [SIGNUP_UNAVAILABLE_ERROR]: "Sign-up is temporarily unavailable. Please try again later.",
     [MAIL_UNAVAILABLE_ERROR]: "Sending email is temporarily unavailable. Please try again later.",
     [ACTIVATION_LINK_INVALID_ERROR]: "This activation link is invalid or expired.",
+    [DUPLICATE_TRIAL_ERROR]: "A confirmed trial account already exists for this mailbox (spellings such as name+tag@… or dots in Gmail addresses belong to the same mailbox). Please sign in with that account; this account was not confirmed.",
     [SIGNUP_CONSENT_REQUIRED_ERROR]: "Please accept the privacy policy and the terms.",
     "Zu viele Versuche. Bitte warte kurz und versuche es erneut.": "Too many attempts. Please wait a moment and try again.",
     "Bitte lade die Seite neu und versuche es erneut.": "Reload the page and try again.",

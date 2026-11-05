@@ -51,6 +51,20 @@ describe("legal pages are maintained twice (apps/app and apps/marketing)", () =>
     }
   });
 
+  test("the trial sections of the privacy policy (reminders, abuse protection) are the same in both apps", () => {
+    for (const title of ['en ? "Reminder emails during the trial period" : "Hinweis-E-Mails zum Testzeitraum"', 'en ? "Abuse protection for the trial account" : "Missbrauchsschutz Testaccount"']) {
+      const marketing = sections(page("marketing", "datenschutz")).get(title);
+      expect(marketing).toBeDefined();
+      expect(sections(page("app", "datenschutz")).get(title)).toBe(marketing as string);
+    }
+  });
+
+  test("the abuse protection section names the canonical address, purpose, legal basis and deletion with the account (#277)", () => {
+    const block = sections(page("app", "datenschutz")).get('en ? "Abuse protection for the trial account" : "Missbrauchsschutz Testaccount"') ?? "";
+    for (const text of ["kanonische Form", "Zweck: Schutz vor Missbrauch", "Art. 6 Abs. 1 lit. f DSGVO", "mit dem Konto gelöscht", "Punkte in diesem Teil entfernt"]) expect(block).toContain(text);
+    for (const text of ["canonical form", "Purpose: protection against abuse", "Art. 6(1)(f) GDPR", "deleted together with the account", "the dots in that part are removed"]) expect(block).toContain(text);
+  });
+
   test("both apps share the legal profile helpers", () => {
     const helper = (source: string) => source.match(/export function hasLegalValue[\s\S]*?\n}\n/)?.[0];
     expect(helper(read("apps/app/src/lib/legal.ts"))).toBeDefined();

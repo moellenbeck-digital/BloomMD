@@ -17,6 +17,19 @@ versions through `0.5.12` remain MIT licensed. Its public mirror is generated fr
 `plugins/obsidian` and includes Core and Ink snapshots under the same ELv2 terms.
 Both license texts accompany future plugin release snapshots.
 
+## Data transmission to the BloomMD operator
+
+The hosted app on `bloommd.app` sends anonymous usage statistics (page views as route patterns,
+a fixed list of usage events, no identifiers, no cookies) to a Plausible instance of the
+operator. It is on by default and is switched off with `BLOOMMD_PLAUSIBLE_DISABLED=true`.
+
+An installation operated by anyone else does not send browser statistics to the operator, whatever
+its configuration: the browser only tracks on the host `BLOOMMD_PLAUSIBLE_DOMAIN` (default
+`bloommd.app`), and a different domain sends only to a target the operator of that installation
+set explicitly (`BLOOMMD_PLAUSIBLE_TARGET_URL`). There is currently no server-side signal from
+customer installations to the operator; if one is added, it will be described here and in the
+README before it ships. Details and variables: README, section "Usage statistics (Plausible)".
+
 ## Artifact checks for future releases
 
 | Artifact | License evidence |

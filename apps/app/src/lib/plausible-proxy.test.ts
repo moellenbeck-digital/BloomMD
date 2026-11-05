@@ -185,6 +185,7 @@ describe("fail-safe: the target is not reachable, slow or broken", () => {
     expect(response.status).toBe(202);
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/ECONNREFUSED|ConnectionRefused/);
   });
 
   test("timeout and DNS failure: 202, and the log stays at one line over many failures", async () => {

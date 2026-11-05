@@ -40,6 +40,25 @@ function reportFailureOnce(target: string, reason: string) {
   console.warn(`[BloomMD] Plausible-Ziel ${target} nicht erreichbar (${reason}); weitere Ausfälle werden nicht protokolliert.`);
 }
 
+type WithCode = { code?: unknown; cause?: unknown; errors?: unknown };
+
+function errorCode(error: unknown, depth = 0): string | null {
+  if (typeof error !== "object" || error === null || depth > 3) return null;
+  const { code, cause, errors } = error as WithCode;
+  if (typeof code === "string") return code;
+  const nested = Array.isArray(errors) ? errors : [];
+  for (const inner of [cause, ...nested]) {
+    const found = errorCode(inner, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** fetch reports an unreachable target as a bare TypeError; the useful code (ECONNREFUSED, ENOTFOUND) is nested inside it. */
+function failureReason(error: unknown): string {
+  return errorCode(error) ?? (error instanceof Error ? error.name : "Fehler");
+}
+
 /** For tests: the log line is once per process, so each test needs a fresh state. */
 export function resetPlausibleFailureLog() {
   failureReported = false;
@@ -126,7 +145,7 @@ export async function proxyPlausibleEvent(request: Request, env: Env = process.e
     void upstream.body?.cancel().catch(() => undefined);
     if (!upstream.ok) reportFailureOnce(config.targetUrl, `HTTP ${upstream.status}`);
   } catch (error) {
-    reportFailureOnce(config.targetUrl, error instanceof Error ? error.name : "Fehler");
+    reportFailureOnce(config.targetUrl, failureReason(error));
   }
   return plain(202);
 }

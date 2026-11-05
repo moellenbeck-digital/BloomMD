@@ -2,13 +2,16 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const buildRoot = join(process.cwd(), ".next");
+// Plausible runs first-party: script and events go through our own origin (/_plausible/...) to the Ops
+// instance, so the CSP needs no foreign host. NEXT_PUBLIC_* values are inlined at build time; a build
+// without them ships no tracking at all, which is what this check guards against.
 const requiredValues = [
   "bloommd.io",
-  "https://plausible.moellenbeck-digital.io/js/script.js",
-  "https://plausible.moellenbeck-digital.io",
+  "/_plausible/js/script.js",
+  "/_plausible",
   "/api/event",
 ];
-const forbiddenValues = ["/_plausible/js/script.js", "/_plausible/api/event"];
+const forbiddenValues = ["plausible.moellenbeck-digital.io"];
 const textExtensions = new Set([".html", ".js", ".json", ".map", ".txt"]);
 
 async function collectTextFiles(directory: string): Promise<string[]> {
@@ -48,4 +51,4 @@ for (const value of forbiddenValues) {
   }
 }
 
-console.log(`Marketing production bundle contains direct Plausible endpoints and no legacy paths (${files.length} text files checked).`);
+console.log(`Marketing production bundle contains the first-party Plausible endpoints and no legacy host (${files.length} text files checked).`);

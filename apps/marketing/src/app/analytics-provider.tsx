@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ensurePlausibleStub, getPlausibleConfig, isPlausibleConfigured } from "../lib/plausible";
+import { ensurePlausibleStub, getPlausibleConfig, isPlausibleConfigured, isPlausibleHostAllowed } from "../lib/plausible";
 import { ANALYTICS_CONSENT_KEY, isMarketingAnalyticsConfigured, scrubMarketingAnalyticsEvent } from "../lib/telemetryPrivacy";
 
 type Consent = "accepted" | "rejected" | null;
@@ -22,7 +22,7 @@ function analyticsEnabled() {
 function PlausibleScript() {
   useEffect(() => {
     const config = getPlausibleConfig();
-    if (!config) return;
+    if (!config || !isPlausibleHostAllowed(config.domain, window.location.hostname)) return;
     if (document.querySelector('script[data-bloommd-plausible="true"]')) return;
 
     ensurePlausibleStub();

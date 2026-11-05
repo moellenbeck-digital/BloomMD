@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import CookiesPage from "./cookies/page";
 import DatenschutzPage from "./datenschutz/page";
 import ImpressumPage from "./impressum/page";
 import { hasLegalValue, LEGAL_STATUS } from "../lib/legal";
@@ -106,6 +107,18 @@ describe("Datenschutzerklärung", () => {
     expect(en).toContain("Recipients and processors");
     expect(en).toContain("An expired trial account is currently not deleted automatically");
     for (const name of ["Resend", "Sentry", "Plausible", "GitHub"]) expect(en).toContain(name);
+  });
+
+  test("names the Plausible instance of Ops and the flow through the own domain, not the former host", async () => {
+    for (const html of [await render(DatenschutzPage(page())), await render(DatenschutzPage(page("en")))]) {
+      expect(html).toContain("plausible.ops.moellenbeck-digital.io");
+      expect(html).toContain("bloommd.io/_plausible/");
+      expect(html).not.toContain("plausible.moellenbeck-digital.io");
+    }
+    for (const html of [await render(CookiesPage(page())), await render(CookiesPage(page("en")))]) {
+      expect(html).toContain("bloommd.io/_plausible/");
+      expect(html).not.toMatch(/direct configuration|Direktkonfiguration/);
+    }
   });
 
   test("does not leave placeholders for the owner in the public text", async () => {

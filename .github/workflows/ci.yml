@@ -276,14 +276,21 @@ jobs:
           NEXT_PUBLIC_SITE_URL: http://localhost:3211
           NEXT_PUBLIC_MARKETING_URL: http://localhost:3211
           NEXT_PUBLIC_APP_URL: https://bloommd.app
-          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: bloommd.io
-          NEXT_PUBLIC_PLAUSIBLE_SRC: https://plausible.moellenbeck-digital.io/js/script.js
-          NEXT_PUBLIC_PLAUSIBLE_API_HOST: https://plausible.moellenbeck-digital.io
+          # The script only loads on the configured domain; this server is reached as localhost.
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: localhost
+          NEXT_PUBLIC_PLAUSIBLE_SRC: /_plausible/js/script.js
+          NEXT_PUBLIC_PLAUSIBLE_API_HOST: /_plausible
           NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg
           BLOOMMD_REQUIRE_AUTH: "1"
           BLOOMMD_WAITLIST_ADMIN_USER: admin
           BLOOMMD_WAITLIST_ADMIN_PASSWORD: secret
         run: bun run build
+      - name: Verify the Plausible values in the marketing bundle
+        working-directory: apps/marketing
+        env:
+          # Must match the build step above: the check compares the baked-in domain with this value.
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: localhost
+        run: bun run verify:plausible-build
       - name: Run marketing production end-to-end tests
         working-directory: apps/marketing
         env:

@@ -1,67 +1,105 @@
 // TEMPORARY (Ticket #284): Wiederholungsschleife mit Event-Protokoll. Vor dem Merge entfernen.
 import { expect, test } from "bun:test";
-import { appendFileSync } from "node:fs";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir, platform, arch } from "node:os";
+import { tmpdir, platform, arch, cpus } from "node:os";
 import { watchWorkspace } from "./workspace-watcher";
 
-type Run = { variant: string; i: number; ok: boolean; readyMs: number; writeMs: number; events: string[]; addLatencyMs: number | null };
+type Mode = { name: string; delayMs: number; probe: boolean };
+type Run = { mode: string; i: number; ok: boolean; readyMs: number; writeMs: number; addMs: number | null; probes: number; events: string[] };
 
-const ITERATIONS = 40;
-const logLines: string[] = [];
-const log = (line: string) => { logLines.push(line); console.log(`REPRO ${line}`); };
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const notices: string[] = [];
+const escape = (s: string) => s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+const notice = (title: string, body: string) => { notices.push(title); console.log(`::notice title=${escape(title)}::${escape(body)}`); };
 
-async function once(variant: "immediate" | "after50ms", i: number): Promise<Run> {
+async function once(mode: Mode, i: number): Promise<Run> {
   const root = await mkdtemp(join(tmpdir(), "bloommd-watch-repro-"));
   await mkdir(join(root, "nested"));
   const t0 = performance.now();
   const at = () => Math.round(performance.now() - t0);
   const events: string[] = [];
-  let seen: (() => void) | undefined;
-  const watcher = watchWorkspace(root, (file, kind) => { events.push(`${at()}ms ${kind}:${file}`); seen?.(); });
-  let addAt: number | null = null;
-  let writeAt = -1;
+  const listeners = new Set<() => void>();
+  const watcher = watchWorkspace(root, (file, kind) => { events.push(`${at()}ms ${kind}:${file}`); listeners.forEach((l) => l()); });
+  const until = (done: () => boolean, ms: number) => new Promise<boolean>((resolve) => {
+    const finish = (r: boolean) => { clearTimeout(timer); listeners.delete(check); resolve(r); };
+    const check = () => { if (done()) finish(true); };
+    const timer = setTimeout(() => finish(false), ms);
+    listeners.add(check);
+    check();
+  });
+  const has = (v: string) => events.some((e) => e.endsWith(` ${v}`));
+  let probes = 0;
   try {
     await new Promise<void>((resolve, reject) => { watcher.once("ready", resolve); watcher.once("error", reject); });
     const readyMs = at();
-    if (variant === "after50ms") await new Promise((r) => setTimeout(r, 50));
-    writeAt = at();
-    await writeFile(join(root, "nested/Note.MARKDOWN"), "# First\n");
-    const ok = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => resolve(false), 5000);
-      seen = () => { if (events.some((e) => e.endsWith("add:nested/Note.MARKDOWN"))) { addAt = at(); clearTimeout(timer); resolve(true); } };
-      seen();
-    });
-    return { variant, i, ok, readyMs, writeMs: writeAt, events, addLatencyMs: addAt === null ? null : addAt - writeAt };
+    if (mode.delayMs > 0) await sleep(mode.delayMs);
+    if (mode.probe) {
+      let live = false;
+      for (let attempt = 1; attempt <= 6 && !live; attempt++) {
+        probes = attempt;
+        await writeFile(join(root, `nested/Probe-${attempt}.md`), "# Probe\n");
+        live = await until(() => events.some((e) => /add:nested\/Probe-\d+\.md$/.test(e)), 1500);
+      }
+      if (!live) return { mode: mode.name, i, ok: false, readyMs, writeMs: at(), addMs: null, probes, events };
+    }
+    const writeMs = at();
+    const path = join(root, "nested/Note.MARKDOWN");
+    await writeFile(path, "# First\n");
+    let ok = await until(() => has("add:nested/Note.MARKDOWN"), mode.probe ? 5000 : 3000);
+    const addMs = ok ? at() : null;
+    if (ok && mode.probe) {
+      await writeFile(path, "# Changed\n");
+      ok = await until(() => has("change:nested/Note.MARKDOWN"), 5000);
+      if (ok) { await unlink(path); ok = await until(() => has("unlink:nested/Note.MARKDOWN"), 5000); }
+    }
+    return { mode: mode.name, i, ok, readyMs, writeMs, addMs, probes, events };
   } finally {
     await watcher.close();
     await rm(root, { recursive: true, force: true });
   }
 }
 
-test("repro #284: add after ready, repeated", async () => {
-  log(`env platform=${platform()} arch=${arch()} bun=${Bun.version} node=${process.versions.node} iterations=${ITERATIONS}`);
-  const runs: Run[] = [];
-  for (const variant of ["immediate", "after50ms"] as const) {
-    for (let i = 1; i <= ITERATIONS; i++) {
-      const run = await once(variant, i);
-      runs.push(run);
-      log(`${variant} #${i} ok=${run.ok} ready@${run.readyMs}ms write@${run.writeMs}ms addLatency=${run.addLatencyMs}ms events=[${run.events.join(" | ")}]`);
-    }
+const line = (r: Run) => `${r.mode} #${r.i} ok=${r.ok} ready@${r.readyMs} write@${r.writeMs} add@${r.addMs} probes=${r.probes} events=[${r.events.join(" | ")}]`;
+const stats = (runs: Run[]) => {
+  const lat = runs.filter((r) => r.addMs !== null).map((r) => r.addMs! - r.writeMs).sort((a, b) => a - b);
+  return `${runs.filter((r) => r.ok).length}/${runs.length} ok, add latency after write min/median/max=${lat[0]}/${lat[Math.floor(lat.length / 2)]}/${lat[lat.length - 1]}ms`;
+};
+
+test("repro #284: delay sweep, parallel load, probe fix", async () => {
+  const header = `platform=${platform()} arch=${arch()} cpus=${cpus().length} bun=${Bun.version} node=${process.versions.node}`;
+  const all: Run[] = [];
+  const summary: string[] = [header];
+
+  // 1. Verzögerungsreihe (sequentiell, nur Add): Ausfallquote über Wartezeit nach `ready`.
+  for (const delayMs of [0, 2, 5, 10, 20, 50]) {
+    const mode: Mode = { name: `seq-delay${delayMs}`, delayMs, probe: false };
+    const runs: Run[] = [];
+    for (let i = 1; i <= 25; i++) runs.push(await once(mode, i));
+    all.push(...runs);
+    summary.push(`${mode.name}: ${stats(runs)}`);
   }
-  // gleichzeitig laufende Watcher (CPU-/IO-Last wie auf einem geteilten Runner)
-  const parallel = await Promise.all(Array.from({ length: 12 }, (_, i) => once("immediate", 1000 + i)));
-  for (const run of parallel) { runs.push({ ...run, variant: "immediate-parallel12" }); log(`immediate-parallel12 #${run.i} ok=${run.ok} ready@${run.readyMs}ms write@${run.writeMs}ms addLatency=${run.addLatencyMs}ms events=[${run.events.join(" | ")}]`); }
-  const summary = ["immediate", "after50ms", "immediate-parallel12"].map((v) => {
-    const r = runs.filter((x) => x.variant === v);
-    const lat = r.map((x) => x.addLatencyMs).filter((x): x is number => x !== null).sort((a, b) => a - b);
-    return `${v}: ${r.filter((x) => x.ok).length}/${r.length} ok, add latency min/median/max=${lat[0]}/${lat[Math.floor(lat.length / 2)]}/${lat[lat.length - 1]}ms`;
-  });
-  summary.forEach((s) => log(`SUMMARY ${s}`));
-  const stepSummary = process.env.GITHUB_STEP_SUMMARY;
-  if (stepSummary) appendFileSync(stepSummary, `### #284 watcher repro\n\n\`\`\`\n${logLines.join("\n")}\n\`\`\`\n`);
-  const failed = runs.filter((x) => !x.ok);
-  // Das Protokoll steht bewusst in der Fehlermeldung, damit es auch aus der Prüfungsausgabe lesbar ist.
-  expect(failed.length, `REPRO-PROTOKOLL\n${summary.join("\n")}\nFehlschläge:\n${failed.map((f) => `${f.variant} #${f.i} ready@${f.readyMs} write@${f.writeMs} events=[${f.events.join(" | ")}]`).join("\n")}`).toBe(0);
-}, 300000);
+  // 2. Parallel (12 Watcher gleichzeitig, mehrere Runden): ohne Verzögerung, mit 50 ms, mit Probe-Fix (vollständiger Ablauf).
+  for (const mode of [{ name: "par12-delay0", delayMs: 0, probe: false }, { name: "par12-delay50", delayMs: 50, probe: false }, { name: "par12-probe", delayMs: 0, probe: true }] as Mode[]) {
+    const runs: Run[] = [];
+    for (let round = 0; round < 3; round++) runs.push(...(await Promise.all(Array.from({ length: 12 }, (_, i) => once(mode, round * 12 + i + 1)))));
+    all.push(...runs);
+    summary.push(`${mode.name}: ${stats(runs)}`);
+  }
+  // 3. Probe-Fix sequentiell, vollständiger Ablauf (add, change, unlink), 40 Läufe.
+  const fixMode: Mode = { name: "seq-probe", delayMs: 0, probe: true };
+  const fixRuns: Run[] = [];
+  for (let i = 1; i <= 40; i++) fixRuns.push(await once(fixMode, i));
+  all.push(...fixRuns);
+  summary.push(`${fixMode.name}: ${stats(fixRuns)}; probes needed: ${[1, 2, 3, 4, 5, 6].map((n) => `${n}x=${fixRuns.filter((r) => r.probes === n).length}`).join(" ")}`);
+
+  notice("#284 summary", summary.join("\n"));
+  const missed = all.filter((r) => !r.ok && !r.mode.endsWith("probe"));
+  const failedFix = all.filter((r) => !r.ok && r.mode.endsWith("probe"));
+  const chunk = (rs: Run[], size: number) => Array.from({ length: Math.ceil(rs.length / size) }, (_, k) => rs.slice(k * size, (k + 1) * size));
+  chunk(missed, 25).slice(0, 4).forEach((c, k) => notice(`#284 missed adds ${k + 1}`, c.map(line).join("\n")));
+  if (failedFix.length) notice("#284 FIX FAILED", failedFix.slice(0, 20).map(line).join("\n"));
+  // Beispielzeilen erfolgreicher Läufe (Event-Reihenfolge und Zeitstempel).
+  notice("#284 sample ok runs", all.filter((r) => r.ok).filter((_, k) => k % 40 === 0).slice(0, 8).map(line).join("\n"));
+  expect(failedFix.length, `Probe-Fix fehlgeschlagen:\n${summary.join("\n")}`).toBe(0);
+}, 900000);

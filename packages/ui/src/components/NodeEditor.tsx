@@ -1183,6 +1183,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   // The on-screen keyboard opens after the focus event and shrinks the viewport, so reveal the field
   // again once the viewport changed (or after a moment, where the browser reports no resize).
   const keepFocusedFieldVisible = (event: ReactFocusEvent<HTMLElement>) => {
+    // Only touch screens have an on-screen keyboard; with a mouse the editor never needs to scroll by itself.
+    if (!window.matchMedia?.("(pointer: coarse)").matches) return;
     const target = event.target;
     revealFocusedField(target);
     const revealAgain = () => {

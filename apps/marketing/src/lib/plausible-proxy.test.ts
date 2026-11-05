@@ -53,12 +53,12 @@ describe("Plausible event proxy", () => {
 
     expect(response.status).toBe(202);
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe("https://plausible.ops.moellenbeck-digital.io/api/event");
-    expect(calls[0].init?.method).toBe("POST");
-    const headers = new Headers(calls[0].init?.headers);
+    expect(calls[0]?.url).toBe("https://plausible.ops.moellenbeck-digital.io/api/event");
+    expect(calls[0]?.init?.method).toBe("POST");
+    const headers = new Headers(calls[0]?.init?.headers);
     expect(headers.get("user-agent")).toBe("Mozilla/5.0 Test");
     expect(headers.get("x-forwarded-for")).toBe("203.0.113.7");
-    expect(new TextDecoder().decode(calls[0].init?.body as ArrayBuffer)).toBe(eventBody);
+    expect(new TextDecoder().decode(calls[0]?.init?.body as ArrayBuffer)).toBe(eventBody);
   });
 
   test("never forwards cookies, authorization or internal headers", () => {
@@ -90,7 +90,7 @@ describe("Plausible event proxy", () => {
   test("uses the configured target", async () => {
     const { calls, fetchImpl } = recordingFetch(() => new Response("ok", { status: 202 }));
     await proxyPlausibleEvent(eventRequest(), { PLAUSIBLE_PROXY_TARGET: "http://127.0.0.1:4399" }, fetchImpl);
-    expect(calls[0].url).toBe("http://127.0.0.1:4399/api/event");
+    expect(calls[0]?.url).toBe("http://127.0.0.1:4399/api/event");
   });
 
   test("rejects oversized bodies without calling the instance", async () => {
@@ -116,7 +116,7 @@ describe("Plausible script proxy", () => {
     const { calls, fetchImpl } = recordingFetch(() => new Response("/* plausible */", { status: 200, headers: { "content-type": "application/javascript", "set-cookie": "x=1" } }));
     const response = await proxyPlausibleScript({}, fetchImpl);
 
-    expect(calls[0].url).toBe("https://plausible.ops.moellenbeck-digital.io/js/script.js");
+    expect(calls[0]?.url).toBe("https://plausible.ops.moellenbeck-digital.io/js/script.js");
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/javascript");
     expect(response.headers.get("cache-control")).toBe("public, max-age=3600");

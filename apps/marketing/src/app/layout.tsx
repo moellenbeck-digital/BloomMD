@@ -6,7 +6,7 @@ import "./globals.css";
 
 const rootMetadata = marketingMetadata({
   title: "BloomMD – Markdown visuell strukturieren",
-  description: "Offene Markdown-Dateien als interaktive visuelle Wissensräume. Local-first, portabel und ohne Lock-in.",
+  description: "Offene Markdown-Dateien als visuelle Maps. Lokale Agenten machen Vorschläge; du prüfst und gibst Änderungen frei.",
   path: "/",
   languages: {
     de: "/",

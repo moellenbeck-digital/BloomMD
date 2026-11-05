@@ -5,6 +5,7 @@ import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../../components/availability-overview";
+import { AgentWorkflowSection } from "../../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../../components/knowledge-vision-section";
 import {
   ArrowRight,
@@ -37,7 +38,7 @@ const marketingBuildInfo = getBuildInfo("marketing", { publicOnly: true });
 const headerNavItems = [
   { label: "Product", href: "#product" },
   { label: "Demo", href: "/demo?lang=en" },
-  { label: "Vision", href: "#vision" },
+  { label: "Agents", href: "#agenten" },
   { label: "Roadmap", href: "/en/roadmap" },
   { label: "Download", href: "/download?lang=en" },
   { label: "Free trial", href: "#beta" },
@@ -829,6 +830,7 @@ function Footer() {
       links: [
         { label: "Desktop", href: "/download?lang=en" },
         { label: "Obsidian", href: "/obsidian?lang=en" },
+        { label: "Agents", href: "#agenten" },
         { label: "Knowledge platform", href: "#vision" },
       ],
     },
@@ -965,6 +967,7 @@ export function EnglishLandingPage() {
       </section>
 
       <ProductProofSection />
+      <AgentWorkflowSection locale="en" />
       <KnowledgeVisionSection locale="en" />
 
       <AudiencePaths />

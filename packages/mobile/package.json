@@ -6,9 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node ../../scripts/check-vite-bundle.mjs dist 1600000 1500000",
+    "build": "vite build && node ../../scripts/check-vite-bundle.mjs dist 800000 40000",
     "preview": "vite preview",
     "test": "bun test src/*.test.ts scripts/*.test.ts store/*.test.ts",
+    "test:touch": "playwright test --config e2e/playwright.config.ts",
     "ios:version": "bun scripts/ios-version.ts",
     "store:check": "bun store/check-metadata.ts",
     "cap:sync": "cap sync",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@capacitor/cli": "8.5.1",
     "@mdxeditor/editor": "^4.2.5",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",

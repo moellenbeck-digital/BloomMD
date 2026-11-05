@@ -437,6 +437,7 @@
       "devDependencies": {
         "@capacitor/cli": "8.5.1",
         "@mdxeditor/editor": "^4.2.5",
+        "@playwright/test": "^1.62.1",
         "@tailwindcss/vite": "^4.3.3",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.4",

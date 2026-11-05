@@ -48,6 +48,8 @@ import {
   type RootRenameEvent,
   useTheme,
   requestNodeFocus,
+  useVisualViewport,
+  VIEWPORT_ROOT_CLASS,
   type ToolbarHandle,
   type AboutBuildInfo,
   ConflictDialog,
@@ -411,6 +413,7 @@ export default function Home() {
    */
   const [notice, setNotice] = useState<AppNotice | null>(null);
   const [fileBrowserOpen, setFileBrowserOpen] = useState(false);
+  useVisualViewport();
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCanRestore, setHistoryCanRestore] = useState(true);
@@ -2254,7 +2257,7 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-dvh flex items-center justify-center">
         <div
           suppressHydrationWarning
           className="text-[var(--color-ink-faint)] text-lg font-[var(--font-display,Outfit,sans-serif)]"
@@ -2267,7 +2270,7 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center">
+      <div className="h-dvh flex items-center justify-center">
         <div className="text-red-500">{error}</div>
       </div>
     );
@@ -2310,12 +2313,13 @@ export default function Home() {
     : undefined;
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--color-surface)]">
+    <div className={`${VIEWPORT_ROOT_CLASS} flex flex-col bg-[var(--color-surface)]`} data-testid="app-root">
       {/* Header */}
       <header className="relative z-40 h-13 shrink-0 overflow-visible border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] flex items-center px-2 sm:px-4">
         <button
           onClick={() => setFileBrowserOpen(true)}
-          className="mr-3 p-2 rounded-lg hover:bg-[var(--color-surface-sunken)] transition-colors text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+          data-testid="open-file-browser"
+          className="mr-3 p-2 pointer-coarse:p-[13px] rounded-lg hover:bg-[var(--color-surface-sunken)] transition-colors text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
           title={copy.fileBrowser}
         >
           <Menu size={18} />
@@ -2329,7 +2333,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => setAboutOpen(true)}
-          className="ml-2 flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] sm:hidden"
+          className="ml-2 flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] sm:hidden"
           title={t.aboutTitle}
           aria-label={t.aboutTitle}
           data-testid="mobile-about"
@@ -2356,7 +2360,7 @@ export default function Home() {
                   onChange={(event) =>
                     setWorkspaceNameDraft(event.target.value)
                   }
-                  className="h-8 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs font-semibold text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
+                  className="h-8 pointer-coarse:h-11 w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs font-semibold text-[var(--color-ink)] outline-none focus:border-[#FF6B35]"
                   aria-label={
                     locale === "en"
                       ? "Cloud workspace name"
@@ -2367,7 +2371,7 @@ export default function Home() {
                 />
                 <button
                   type="submit"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50"
+                  className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50"
                   aria-label={
                     locale === "en"
                       ? "Save workspace name"
@@ -2385,7 +2389,7 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
+                  className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]"
                   aria-label={
                     locale === "en" ? "Cancel rename" : "Umbenennen abbrechen"
                   }
@@ -2409,7 +2413,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setWorkspaceAgentOpen(true)}
-              className="flex h-8 w-8 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+              className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
               title={
                 locale === "en" ? "Assign OpenClaw" : "OpenClaw beauftragen"
               }
@@ -2443,7 +2447,7 @@ export default function Home() {
               disabled={!canNavigateBack}
               title={`${copy.backToWorkspace} (Cmd/Ctrl+←)`}
               aria-label={copy.backToWorkspace}
-              className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               <ArrowLeft size={14} aria-hidden="true" />
             </button>
@@ -2454,7 +2458,7 @@ export default function Home() {
               disabled={!canNavigateForward}
               title={`${copy.forwardToFile} (Cmd/Ctrl+→)`}
               aria-label={copy.forwardToFile}
-              className="flex h-7 w-7 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-35"
+              className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-35"
             >
               <ArrowRight size={14} aria-hidden="true" />
             </button>
@@ -2464,7 +2468,7 @@ export default function Home() {
               aria-pressed={mapView === "document"}
               onClick={() => setMapView("document")}
               title={copy.documentView}
-              className={`h-7 rounded px-2 text-xs font-semibold transition ${
+              className={`h-7 pointer-coarse:h-11 rounded px-2 text-xs font-semibold transition ${
                 mapView === "document"
                   ? "bg-[var(--color-surface-raised)] text-[var(--color-ink)] shadow-sm"
                   : "text-[var(--color-ink-faint)]"
@@ -2480,7 +2484,7 @@ export default function Home() {
                 if (!handleBackToWorkspace()) setMapView("workspace");
               }}
               title={copy.workspaceView}
-              className={`h-7 rounded px-2 text-xs font-semibold transition ${
+              className={`h-7 pointer-coarse:h-11 rounded px-2 text-xs font-semibold transition ${
                 mapView === "workspace"
                   ? "bg-[var(--color-surface-raised)] text-[var(--color-ink)] shadow-sm"
                   : "text-[var(--color-ink-faint)]"
@@ -2493,7 +2497,7 @@ export default function Home() {
               data-testid="create-folder"
               onClick={() => setCreateKind("folder")}
               title={copy.createFolder}
-              className="h-7 rounded px-2 text-xs font-semibold text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+              className="h-7 pointer-coarse:h-11 rounded px-2 text-xs font-semibold text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
             >
               {copy.createFolder}
             </button>
@@ -2502,7 +2506,7 @@ export default function Home() {
               data-testid="create-file"
               onClick={() => setCreateKind("file")}
               title={copy.createFile}
-              className="h-7 rounded px-2 text-xs font-semibold text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+              className="h-7 pointer-coarse:h-11 rounded px-2 text-xs font-semibold text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
             >
               {copy.createFile}
             </button>
@@ -2512,7 +2516,7 @@ export default function Home() {
               aria-pressed={healthOpen}
               onClick={() => setHealthOpen((open) => !open)}
               title={copy.check}
-              className={`h-7 rounded px-2 text-xs font-semibold transition ${
+              className={`h-7 pointer-coarse:h-11 rounded px-2 text-xs font-semibold transition ${
                 healthOpen
                   ? "bg-[var(--color-surface-raised)] text-[var(--color-ink)] shadow-sm"
                   : "text-[var(--color-ink-faint)]"
@@ -2559,7 +2563,7 @@ export default function Home() {
                 onClick={() => void handleBackToWorkspace()}
                 title={`${tabBackLabel} (Cmd/Ctrl+←)`}
                 aria-label={tabBackLabel}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded text-[var(--color-ink-faint)] transition hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
               >
                 <ArrowLeft size={14} aria-hidden="true" />
               </button>
@@ -2591,7 +2595,7 @@ export default function Home() {
                         event.preventDefault();
                         requestTabClose(tab.key);
                       }}
-                      className={`flex max-w-40 items-center gap-1.5 rounded-l-md border border-r-0 py-1 pl-2.5 pr-1 text-xs font-medium transition-colors ${tabShell(active)}`}
+                      className={`flex max-w-40 items-center gap-1.5 rounded-l-md border border-r-0 py-1 pointer-coarse:min-h-11 pl-2.5 pr-1 text-xs font-medium transition-colors ${tabShell(active)}`}
                       title={`${tab.title} — ${tab.filename}`}
                       data-testid="mindmap-tab"
                       data-filename={tab.filename}
@@ -2622,7 +2626,7 @@ export default function Home() {
                     onClick={() => requestTabClose(tab.key)}
                     aria-label={`${copy.closeTab}: ${tab.title}`}
                     title={`${copy.closeTab}: ${tab.title}`}
-                    className={`mr-1 flex w-6 items-center justify-center rounded-r-md border border-l-0 text-xs transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${tabShell(tab.key === activeTabKey)}`}
+                    className={`mr-1 flex w-6 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-r-md border border-l-0 text-xs transition-colors hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent ${tabShell(tab.key === activeTabKey)}`}
                   >
                     <X size={12} aria-hidden="true" />
                   </button>
@@ -2636,7 +2640,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => void chooseBrowserWorkspace()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+              className="flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
               title="Open local Markdown folder"
               aria-label="Open local Markdown folder"
               data-testid="open-browser-workspace"
@@ -2662,7 +2666,7 @@ export default function Home() {
                         ? "This folder is read-only. Click to request write access."
                         : "Dieser Ordner ist nur zum Lesen freigegeben. Klicken, um Schreibzugriff anzufragen."
                     }
-                    className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
+                    className="inline-flex h-7 pointer-coarse:h-11 shrink-0 items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-400"
                   >
                     {copy.readOnly}
                   </button>
@@ -2676,7 +2680,7 @@ export default function Home() {
                       : ""
                   }
                   onChange={(event) => void openLocalFile(event.target.value)}
-                  className="hidden h-8 max-w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)] md:block"
+                  className="hidden h-8 pointer-coarse:h-11 max-w-44 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)] md:block"
                   title={browserWorkspaceName}
                   aria-label="Local workspace file"
                 >
@@ -2712,7 +2716,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => void toolbarRef.current?.triggerSave()}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] sm:hidden"
+            className="flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] sm:hidden"
             title={copy.save}
             aria-label={copy.save}
           >

@@ -339,6 +339,20 @@ body {
   color: var(--color-bloom) !important;
 }
 
+/* Touch targets: React Flow's zoom buttons are 26 px by default. Coarse pointers (fingers) get 44 px, see docs/MOBILE-MATRIX.md. */
+@media (pointer: coarse) {
+  .react-flow__controls-button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* MDXEditor's toolbar (bold, lists, link, ...) is 28 px by default. It scrolls sideways when it gets wider. */
+  .mdxeditor [role="toolbar"] button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+}
+
 /* MDXEditor overrides */
 .mdxeditor {
   font-family: var(--font-body) !important;

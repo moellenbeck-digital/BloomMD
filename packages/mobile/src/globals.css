@@ -87,6 +87,12 @@ body {
   color: var(--color-bloom) !important;
 }
 
+/* MDXEditor's toolbar (bold, lists, link, ...) is 28 px by default: 44 px for fingers. It scrolls sideways when it gets wider. */
+.mdxeditor [role="toolbar"] button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
 .mdxeditor {
   font-family: var(--font-body) !important;
 }

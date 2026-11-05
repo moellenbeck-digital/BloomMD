@@ -43,6 +43,7 @@ import type { RootRenameEvent } from "../hooks/useMindMapLayout";
 import { dropTargetToMoveIntent, findCanvasDropTarget, type CanvasDropTarget } from "../utils/canvas-drag";
 import { isNodeVisibleInViewport, focusNodeElement, isCurrentNodeFocusRequest, type NodeFocusRequest } from "../utils/nodeFocus";
 import { useLocale } from "../i18n/LocaleContext";
+import { CANVAS_ZOOM_VAR } from "../utils/canvas-zoom";
 
 const nodeTypes: NodeTypes = { mindmap: MindMapNode };
 const edgeTypes: EdgeTypes = { mindmap: MindMapEdge };
@@ -54,7 +55,7 @@ interface SavedLocalView extends LocalViewState {
 }
 
 function iconButton(active = false): string {
-  return `flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${active
+  return `flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md border transition-colors ${active
     ? "border-[#FF6B35] bg-[#FFF4EE] text-[#C94D20]"
     : "border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`;
 }
@@ -217,6 +218,10 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const fittedDocumentRef = useRef<string | null>(null);
   const pendingFocusRef = useRef<NodeFocusRequest | null>(null);
   const { fitView, getNode, getViewport, setCenter, setViewport } = useReactFlow();
+  // Node controls cancel the zoom on touch screens (see `CANVAS_ZOOM_VAR`), so the variable follows every viewport change.
+  const publishZoom = useCallback((_event: unknown, viewport: Viewport) => {
+    window.document.getElementById("mindmap-canvas")?.style.setProperty(CANVAS_ZOOM_VAR, String(viewport.zoom));
+  }, []);
   const viewStorageKey = `bloommd:views:${document?.frontmatter.id || document?.filePath || "none"}`;
   const documentViewKey = document ? `${document.frontmatter.id}:${document.filePath}` : null;
 
@@ -370,7 +375,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
       <label className="sr-only" htmlFor="edge-mode">{t.edgeMode}</label>
-      <select id="edge-mode" className="h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
+      <select id="edge-mode" className="h-8 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
         <option value="hierarchy">{t.structure}</option>
         <option value="links">{t.links}</option>
         <option value="backlinks">{t.backlinks}</option>
@@ -385,7 +390,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <button type="button" className={iconButton()} onClick={() => pasteBranches()} title={t.pasteBranches} aria-label={t.pasteBranches} data-testid="canvas-paste"><ClipboardPaste size={16} /></button>
       <button type="button" className={iconButton()} onClick={saveLocalView} title={t.saveLocalView} aria-label={t.saveLocalView}><BookmarkPlus size={16} /></button>
       {savedViews.length > 0 && <>
-        <select className="h-8 max-w-32 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={selectedViewId} onChange={(event) => { setSelectedViewId(event.target.value); loadView(event.target.value); }} aria-label={t.loadSavedView}><option value="" disabled>{t.views}</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
+        <select className="h-8 pointer-coarse:h-11 max-w-32 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={selectedViewId} onChange={(event) => { setSelectedViewId(event.target.value); loadView(event.target.value); }} aria-label={t.loadSavedView}><option value="" disabled>{t.views}</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
         <button type="button" className={iconButton()} disabled={!selectedViewId} onClick={() => renameView(selectedViewId)} title={t.renameSavedView} aria-label={t.renameSavedView}><Pencil size={15} /></button>
         <button type="button" className={iconButton()} disabled={!selectedViewId} onClick={() => { deleteView(selectedViewId); setSelectedViewId(""); }} title={t.deleteSavedView} aria-label={t.deleteSavedView}><Trash2 size={15} /></button>
       </>}
@@ -410,7 +415,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       {modeToolbar}
       {(layoutPending || layoutFailed) && <div role="status" className="absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-md bg-[var(--color-surface-raised)] px-3 py-2 text-sm text-[var(--color-ink)] shadow-md">
         {layoutPending ? t.layoutInProgress : t.layoutFailed}
-        {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline">{t.retryLayout}</button>}
+        {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline pointer-coarse:min-h-11 pointer-coarse:min-w-11">{t.retryLayout}</button>}
       </div>}
       {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
@@ -445,6 +450,8 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
 
             setSelectedNodeIds(orderedIds);
             }}
+            onInit={(instance) => publishZoom(null, instance.getViewport())}
+            onMove={publishZoom}
             onNodeDragStart={onNodeDragStart}
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
@@ -457,6 +464,8 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             deleteKeyCode={null}
             selectionKeyCode="Shift"
             multiSelectionKeyCode="Shift"
+            // Touch (docs/MOBILE-MATRIX.md): with `panOnDrag === true` one finger pans on empty space and drags a node on a node,
+            // so `selectionOnDrag` draws no selection box there. Pinch zooms; `zoomOnDoubleClick` stays off for double-tap rename.
             selectionOnDrag
             panOnDrag
             panOnScroll
@@ -475,7 +484,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
               <Panel position="top-center" className="mt-14">
                 <div role="status" className="flex items-center gap-3 rounded-md border border-[#FF6B35] bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs text-[var(--color-ink)] shadow-md">
                   <span>{statusMessage}</span>
-                  <button type="button" onClick={() => setStatusMessage(null)} aria-label={t.dismissMessage} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">×</button>
+                  <button type="button" onClick={() => setStatusMessage(null)} aria-label={t.dismissMessage} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] pointer-coarse:min-h-11 pointer-coarse:min-w-11">×</button>
                 </div>
               </Panel>
             )}

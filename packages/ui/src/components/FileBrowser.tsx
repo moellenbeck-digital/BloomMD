@@ -350,7 +350,7 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
           </h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--color-ink-faint)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
+            className="w-7 h-7 pointer-coarse:h-11 pointer-coarse:w-11 rounded-lg flex items-center justify-center text-[var(--color-ink-faint)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="2" y1="2" x2="12" y2="12" />
@@ -366,7 +366,7 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
           tabIndex={0}
           onKeyDown={onKeyDown}
         >
-          <label className="mb-3 flex h-10 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[var(--color-ink-muted)]">
+          <label className="mb-3 flex h-10 pointer-coarse:h-11 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[var(--color-ink-muted)]">
             <Search size={16} />
             <input
               value={query}
@@ -459,7 +459,7 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
                 <button
                   type="button"
                   onClick={() => toggleFavorite(entry.filename)}
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-surface-raised)] ${
+                  className={`flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md hover:bg-[var(--color-surface-raised)] ${
                     isFavorite ? "text-[#FF6B35]" : "text-[var(--color-ink-faint)]"
                   }`}
                   title={isFavorite ? t.removeFavorite : t.favorite}

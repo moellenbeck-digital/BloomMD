@@ -122,6 +122,32 @@ bun test ../../packages/ui/src/utils/visual-viewport.test.ts
 
 `e2e/mobile-matrix.spec.ts` (Testmarke `@t66`) und `visual-viewport.test.ts`.
 
+### Touch-Ansichten der gebauten Mobile-Assets (Ticket 68)
+
+Der Workflow `.github/workflows/mobile.yml` (Job `touch-views`) baut `packages/mobile` mit dem Bundle-Budget,
+liefert `dist` mit `vite preview` aus und öffnet es mit den Geräteprofilen iPhone SE, iPad (Hochformat) und
+Pixel 5 (Chromium, Touch-Emulation). Je Gerät und Ansicht (leerer Start, Karte, Knoten gewählt, Editor,
+Dateibrowser): kein horizontaler Überlauf, jedes bedienbare Element mindestens 44 px (dieselben Ausnahmen wie
+oben), der Editor öffnet sich aus der Karte und das Textfeld nimmt einen Tipp an. Verstöße machen den Lauf rot;
+Screenshot und Trace der betroffenen Ansicht hängen als Artefakt `mobile-touch-views` am Lauf. Die Job-Summary
+nennt Messwerte je Ansicht und was nicht geprüft wird.
+
+```bash
+cd packages/mobile
+bun run build && bun run test:touch
+```
+
+Die Größenprüfung `smallTargets` ist aus `apps/app/e2e/mobile-matrix.spec.ts` nach
+`packages/mobile/e2e/touch-helpers.ts` kopiert, damit das @t66-Spec unverändert bleibt. Ändern sich die Regeln,
+beide Stellen anpassen.
+
+Die App läuft im Browser ohne Capacitor-Plugins: Ordnerwahl, Keychain, Teilen und App-Links fehlen, die Notizen
+liegen im Browser-Speicher (App-Ordner), die Demo-Notiz kommt über „Importieren“. **Nicht geprüft** von dieser
+Prüfung: die native Hülle (dafür `ios.yml` und `android.yml` mit Selbsttest), WebKit-Darstellung (die iOS-Profile
+laufen auf Chromium), Querformat, Tastatur und Gesten der Capacitor-App, Anmeldung, Notizen aus einem echten
+Ordner. Das steht auch in der Job-Summary.
+
+
 Gegen ein laufendes System läuft die Matrix mit der Standard-Config `playwright.config.ts` und dem Projekt
 `chromium-mobile` (Pixel 5). Die Testsystem-Config `playwright.testsystem.config.ts` kennt nur Desktop Chrome
 und schließt `mobile-matrix.spec.ts` aus; mit ihr lässt sich die Matrix nicht ausführen.
@@ -191,6 +217,13 @@ Gefunden, nicht behoben. Jede ist als Folge-Ticket gemeldet, nicht stillschweige
 9. **Die CI führt die Matrix nicht aus.** `ci.yml` listet für `chromium-mobile` nur `e2e/mobile-smoke.spec.ts`.
    Folge-Ticket-Vorschlag: `e2e/mobile-matrix.spec.ts` in den Schritt „Run app Chromium end-to-end tests“
    aufnehmen. Das ist eine Änderung an der Pipeline und gehört nicht in dieses Ticket.
+
+10. **Capacitor-App: Die Schließen-Schaltfläche des Editor-Sheets nimmt keinen Tipp an.** Sie ist `absolute`
+    ohne `z-index`; der Kopf des `NodeEditor` (`relative`, steht später im DOM) liegt darüber, `elementFromPoint`
+    in der Mitte der Schaltfläche liefert den Kopf (iPhone SE, iPad, Pixel 5 im Build). Die Größenprüfung
+    überspringt verdeckte Elemente (siehe Ausnahmen) und sieht es deshalb nicht. Abhilfe: Schaltfläche mit `z-10`.
+    Test: `test.fixme("the close button of the editor sheet takes the tap")` in
+    `packages/mobile/e2e/touch-views.spec.ts`. Zusammenhang mit Abweichung 5.
 
 ## Stand
 

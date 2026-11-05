@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ACTIVATION_LINK_INVALID_ERROR, SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR } from "../../../../lib/auth-copy";
+import { ACTIVATION_LINK_INVALID_ERROR, DUPLICATE_TRIAL_ERROR, SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR } from "../../../../lib/auth-copy";
 import { activateWaitlistAccount } from "../../../../lib/db";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { hashPassword } from "../../../../lib/passwordAuth";
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
     if (form.get(SIGNUP_CONSENT_FIELD) !== "1") throw new Error(SIGNUP_CONSENT_REQUIRED_ERROR);
     const passwordHash = hashPassword(String(form.get("password") || ""));
     const activated = token ? await activateWaitlistAccount({ token, passwordHash }) : null;
+    if (activated && "blocked" in activated) throw new Error(DUPLICATE_TRIAL_ERROR);
     if (!activated) throw new Error(ACTIVATION_LINK_INVALID_ERROR);
 
     const params = new URLSearchParams({ verified: "1", lang });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createHash, randomUUID } from "node:crypto";
-import { ACTIVATION_LINK_INVALID_ERROR, localizeAuthError, SIGNUP_CONSENT_REQUIRED_ERROR } from "../../../lib/auth-copy";
+import { ACTIVATION_LINK_INVALID_ERROR, DUPLICATE_TRIAL_ERROR, localizeAuthError, SIGNUP_CONSENT_REQUIRED_ERROR } from "../../../lib/auth-copy";
 import { resetMailBudgetForTests } from "../../../lib/mail-budget";
 import { resetMemoryRateLimitsForTests } from "../../../lib/request-security";
 import { WAITLIST_ACTIVATION_TTL_DAYS } from "../../../lib/waitlist-transfer-constants";
@@ -73,6 +73,8 @@ mock.module("../../../lib/db", () => ({
     match.consumed = true;
     const user = [...users.values()].find((entry) => entry.id === match.userId);
     if (!user || user.emailVerifiedAt || !user.transfer?.invited || user.transfer.activated) return null;
+    // Stands for another confirmed account of the same mailbox (#277); the SQL runs in the integration test.
+    if (user.email.startsWith("twin")) return { blocked: "duplicate-trial" as const };
     user.passwordHash = input.passwordHash;
     user.emailVerifiedAt = new Date().toISOString();
     user.transfer.activated = true;
@@ -286,6 +288,18 @@ describe("activation", () => {
 
     expect(location(replay)).toContain(ACTIVATION_LINK_INVALID_ERROR);
     expect(user.passwordHash).toBe(hash);
+  });
+
+  test("a second account of a mailbox is not activated and the person is told why (#277)", async () => {
+    const { user, token } = prepare("twin+list@example.test");
+
+    const response = await activate(formRequest("/api/auth/activate-account", activation(token)));
+
+    expect(response.status).toBe(303);
+    expect(new URL(response.headers.get("location")!).pathname).toBe("/activate");
+    expect(new URL(response.headers.get("location")!).searchParams.get("error")).toBe(DUPLICATE_TRIAL_ERROR);
+    expect(user.emailVerifiedAt).toBeNull();
+    expect(user.passwordHash).toBeNull();
   });
 
   test("unknown and empty tokens are refused with the same message", async () => {

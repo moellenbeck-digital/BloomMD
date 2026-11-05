@@ -53,6 +53,17 @@ Gelöscht werden nur Passwort-Konten, die nie bestätigt wurden (also nie angeme
 
 Einladungen **an** eine Adresse (Workspace-Einladung, Beta-Einladung) hängen an der Mailadresse und nicht am Konto. Sie bleiben gültig; wer sich nach der Löschung erneut registriert, kann sie annehmen. Eine Mitgliedschaft entsteht erst, nachdem sich jemand angemeldet hat, und das setzt eine bestätigte Adresse voraus. Ein unbestätigtes Konto kann also keine Mitgliedschaft haben; die Prüfung steht trotzdem in der Abfrage, falls sich das einmal ändert.
 
+## Mehrfach-Testkonten (#277)
+
+Eine Person soll mit Schreibweisen desselben Postfachs nicht mehrere Testzeiträume bekommen. Datensparsam: keine neue Datenquelle, niemand wird dauerhaft ausgeschlossen.
+
+- **Kanonische Adresse** (`canonicalEmail`, `apps/app/src/lib/email-canonical.ts`): Kleinbuchstaben; `+tag` im Lokalteil entfällt (alle Domains); bei `gmail.com`/`googlemail.com` zusätzlich Punkte im Lokalteil weg und `googlemail.com` → `gmail.com`; andere Domains behalten ihre Punkte; ein sonst leerer Lokalteil bleibt unverändert. Gespeichert als generierte Spalte `bloom_users.email_canonical` (Migration `014_email_canonical.sql`, `db:migrate` vor dem Ausrollen). Sie rechnet dieselben Regeln in SQL; beide Stellen müssen zusammen geändert werden (der Integrationstest `mailbox-trial-db` prüft die Übereinstimmung).
+- **Bestand:** Die Migration füllt alle Konten, ändert sonst nichts und scheitert nicht an alten Kollisionen. `trial_guarded` ist für Bestandskonten `false`, für neue `true`. Nur geschützte Konten werden bei der Bestätigung geprüft und liegen im partiellen Unique-Index `bloom_users_trial_canonical_idx` (kanonische Adresse, bestätigt, geschützt); der Index lässt sich deshalb auf beliebigen Daten anlegen.
+- **Signup:** Gibt es ein *bestätigtes* Konto mit gleicher kanonischer, aber anderer Adresse, wird kein Konto angelegt und keine Mail gesendet (kein Mail-Budget); die Antwort ist dieselbe wie bei einer bereits bestätigten Adresse (`verification=sent`). Unbestätigte Konten blockieren nicht.
+- **Bestätigung** (`markEmailVerified`, Waitlist-Aktivierung): Prüfung und Bestätigung sind ein SQL-Statement; kommen zwei Bestätigungen gleichzeitig, entscheidet der Unique-Index (zweite gilt als „duplicate-trial“). Das blockierte Konto bekommt keinen Testzeitraum und wird nicht bestätigt; die Person sieht eine verständliche Meldung. Audit-Ereignis `email.verification_blocked`.
+- **Rate-Limit:** Das Konto-Limit des Signups zählt je kanonischer Adresse (weiter gehasht). Resend-Verification und Passwort-Reset unverändert.
+- **Nicht abgedeckt:** Wegwerf-Domains, andere Postfächer derselben Person, Löschen und Neu-Registrieren (die Spalte verschwindet mit dem Konto, ein neues Konto startet einen neuen Testzeitraum).
+
 ## Gewählte Grenzwerte
 
 - **60 Mails je Stunde, 300 je Tag** sind die Vorschlagswerte aus dem Ticket. Sie begrenzen den Schaden eines Angriffs mit vielen Adressen auf höchstens 300 Mails am Tag (Kosten und Absender-Ruf bei Resend), ohne die Limits je Konto (5 je Stunde) und je Quelladresse (20 je Stunde) zu ersetzen.

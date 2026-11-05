@@ -1,6 +1,7 @@
 // Job summary of the touch views (#68): what was measured, with what result, and what was not checked.
 // Reads the rows touch-views.spec.ts writes and prints Markdown; the workflow appends it to $GITHUB_STEP_SUMMARY.
 import { existsSync, readFileSync } from "node:fs";
+import { notCheckedLines } from "../scripts/ci-summary-text.mjs";
 
 const rowsFile = new URL("../test-results/summary-rows.jsonl", import.meta.url);
 const rows = existsSync(rowsFile)
@@ -22,11 +23,11 @@ lines.push(
   "",
   "**Known deviation, not asserted** (`test.fixme`): the close button of the editor sheet is covered by the editor header and takes no tap (`docs/MOBILE-MATRIX.md`, deviation 10).",
   "",
-  "**Not checked here:**",
-  "- the native shell: Capacitor plugins (folder picker, keychain, share sheet, app links), the iOS and Android builds and their self-tests run in `ios.yml` and `android.yml`;",
-  "- WebKit rendering (the iPhone and iPad profiles run on Chromium) and real Safari or WKWebView behaviour;",
-  "- landscape, the on-screen keyboard, gestures (pan, pinch) and the cloud sign-in: gestures and keyboard are covered for the web app by the @t66 specs, the rest is on the manual list in `docs/MOBILE-MATRIX.md`;",
-  "- notes from a real folder: the demo note is imported into the browser's storage.",
-  "",
+  ...notCheckedLines([
+    "the native shell: Capacitor plugins (folder picker, keychain, share sheet, app links); the iOS and Android builds and their self-tests run in `ios.yml` and `android.yml`",
+    "WebKit rendering (the iPhone and iPad profiles run on Chromium)",
+    "landscape, gestures (pan, pinch) and the cloud sign-in: gestures and keyboard are covered for the web app by the @t66 specs, the rest is on the manual list in `docs/MOBILE-MATRIX.md`",
+    "notes from a real folder: the demo note is imported into the browser storage",
+  ]),
 );
 process.stdout.write(`${lines.join("\n")}\n`);

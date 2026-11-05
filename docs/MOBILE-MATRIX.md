@@ -147,6 +147,16 @@ Prüfung: die native Hülle (dafür `ios.yml` und `android.yml` mit Selbsttest),
 laufen auf Chromium), Querformat, Tastatur und Gesten der Capacitor-App, Anmeldung, Notizen aus einem echten
 Ordner. Das steht auch in der Job-Summary.
 
+Auch `ios.yml` und `android.yml` schreiben eine Job-Summary (`packages/mobile/scripts/ci-summary.mjs`): der
+tatsächliche Stand je Schritt (bestanden, fehlgeschlagen, nicht gelaufen), das Artefakt oder der Grund, warum es
+keines gibt, und „Nicht geprüft“. Der Text dazu steht an einer Stelle (`scripts/ci-summary-text.mjs`) und gilt
+auch für `mobile.yml`. Emulator und Simulator fangen Layout-Fehler und Abstürze, sonst nichts. `ios.yml` lädt
+die Simulator-App (Selbsttest-Build) als Zip `ios-simulator-app` hoch.
+
+Das Bundle-Budget der Mobile-App ruft `check-vite-bundle.mjs` mit `--require-lazy` auf: Fehlt der
+`NodeEditor`-Chunk, schlägt der Build fehl, statt die Lazy-Prüfung still zu überspringen. Die Desktop-App ruft
+das Skript ohne Schalter auf und verhält sich wie vorher.
+
 
 Gegen ein laufendes System läuft die Matrix mit der Standard-Config `playwright.config.ts` und dem Projekt
 `chromium-mobile` (Pixel 5). Die Testsystem-Config `playwright.testsystem.config.ts` kennt nur Desktop Chrome

@@ -1,18 +1,17 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { checkPlausibleBundle, DEFAULT_PLAUSIBLE_DOMAIN, describePlausibleBundleReport, type BundleFile } from "../src/lib/plausible-bundle-check";
 
-const buildRoot = join(process.cwd(), ".next");
 // Plausible runs first-party: script and events go through our own origin (/_plausible/...) to the Ops
 // instance, so the CSP needs no foreign host. NEXT_PUBLIC_* values are inlined at build time; a build
-// without them ships no tracking at all, which is what this check guards against.
-const requiredValues = [
-  "bloommd.io",
-  "/_plausible/js/script.js",
-  "/_plausible",
-  "/api/event",
-];
-const forbiddenValues = ["plausible.moellenbeck-digital.io"];
+// without them ships no tracking at all, which is what this check guards against. The logic lives in
+// src/lib/plausible-bundle-check.ts (unit-tested); this script only reads the build and prints the proof.
+const buildRoot = join(process.cwd(), ".next");
+const clientRoot = join(buildRoot, "static");
 const textExtensions = new Set([".html", ".js", ".json", ".map", ".txt"]);
+// The domain the build was made for: the Dockerfile default, or the value of the build environment (CI builds
+// with `localhost` for the end-to-end tests). An explicitly empty value is an error, not a fallback.
+const expectedDomain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN ?? DEFAULT_PLAUSIBLE_DOMAIN;
 
 async function collectTextFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -35,20 +34,16 @@ async function collectTextFiles(directory: string): Promise<string[]> {
   return files;
 }
 
-const files = await collectTextFiles(buildRoot);
-const contents = await Promise.all(files.map(async (path) => readFile(path, "utf8")));
-const bundle = contents.join("\n");
+const paths = await collectTextFiles(buildRoot);
+const allFiles: BundleFile[] = await Promise.all(paths.map(async (path) => ({ path: relative(process.cwd(), path), text: await readFile(path, "utf8") })));
+const clientFiles = allFiles.filter((file) => file.path.startsWith(relative(process.cwd(), clientRoot)) && file.path.endsWith(".js"));
 
-for (const value of requiredValues) {
-  if (!bundle.includes(value)) {
-    throw new Error(`Marketing production bundle is missing Plausible value: ${value}`);
-  }
+const report = checkPlausibleBundle({ clientFiles, allFiles, expectedDomain });
+console.log(`Plausible bundle check (expected domain "${expectedDomain}", ${clientFiles.length} client chunks, ${allFiles.length} text files):`);
+for (const line of describePlausibleBundleReport(report, expectedDomain, allFiles.length)) console.log(`  ${line}`);
+
+if (report.errors.length > 0) {
+  for (const error of report.errors) console.error(`  ERROR: ${error}`);
+  throw new Error("Marketing production bundle fails the Plausible check.");
 }
-
-for (const value of forbiddenValues) {
-  if (bundle.includes(value)) {
-    throw new Error(`Marketing production bundle contains legacy Plausible value: ${value}`);
-  }
-}
-
-console.log(`Marketing production bundle contains the first-party Plausible endpoints and no legacy host (${files.length} text files checked).`);
+console.log("Marketing production bundle carries the first-party Plausible config and no legacy host.");

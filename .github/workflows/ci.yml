@@ -287,6 +287,9 @@ jobs:
         run: bun run build
       - name: Verify the Plausible values in the marketing bundle
         working-directory: apps/marketing
+        env:
+          # Must match the build step above: the check compares the baked-in domain with this value.
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: localhost
         run: bun run verify:plausible-build
       - name: Run marketing production end-to-end tests
         working-directory: apps/marketing

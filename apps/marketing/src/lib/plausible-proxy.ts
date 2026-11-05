@@ -5,6 +5,17 @@
  * Only what Plausible needs is forwarded (User-Agent and the client IP from X-Forwarded-For, for
  * country and device; the content type of the event). Cookies, Authorization and everything else the
  * browser sent to bloommd.io stay here.
+ *
+ * Why a route handler and not a rewrite in next.config.mjs (Next 16.4.2): a rewrite does pass User-Agent and
+ * X-Forwarded-For on, but (1) headers() are not applied to external rewrites, so `Cache-Control: no-store` for
+ * the event POST cannot be set, and (2) it forwards every request header, cookies included, to the target.
+ * The pattern is the one of /_desktop-updates: src/proxy.ts maps the public path to an internal segment
+ * (/plausible-proxy/...) that is not reachable from outside.
+ *
+ * Why the NEXT_PUBLIC_PLAUSIBLE_* defaults are in the Dockerfile and not in CI build args: the CI builds no
+ * production image with args, so a default only in CI left the image with empty values (no tracking). The
+ * Dockerfile defaults hold for every image, and scripts/verify-plausible-build.ts fails the build when the
+ * baked-in domain is empty, wrong or not in the chunk with the script path.
  */
 
 export const DEFAULT_PLAUSIBLE_PROXY_TARGET = "https://plausible.ops.moellenbeck-digital.io";

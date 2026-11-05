@@ -33,7 +33,7 @@ async function rawStart(): Promise<{ ok: boolean; line: string }> {
 
 // --- Chokidar über watchWorkspace --------------------------------------------------------------
 type Run = { mode: string; i: number; ok: boolean; readyMs: number; writeMs: number; addMs: number | null; probes: number; recovered: string; events: string[] };
-async function once(mode: "baseline" | "probe", i: number): Promise<Run> {
+async function once(mode: "baseline" | "delay20" | "probe", i: number): Promise<Run> {
   const root = await tmp();
   await mkdir(join(root, "nested"));
   const t0 = performance.now();
@@ -47,6 +47,7 @@ async function once(mode: "baseline" | "probe", i: number): Promise<Run> {
   try {
     await new Promise<void>((resolve, reject) => { watcher.once("ready", resolve); watcher.once("error", reject); });
     const readyMs = at();
+    if (mode === "delay20") await new Promise((r) => setTimeout(r, 20));
     if (mode === "probe") {
       let live = false;
       for (let attempt = 1; attempt <= 6 && !live; attempt++) {
@@ -61,7 +62,7 @@ async function once(mode: "baseline" | "probe", i: number): Promise<Run> {
     await writeFile(path, "# First\n");
     const ok = await until(listeners, () => has("add:nested/Note.MARKDOWN"), 3000);
     const addMs = ok ? at() : null;
-    if (!ok && mode === "baseline") {
+    if (!ok && mode !== "probe") {
       // Erholt sich der Watcher? 1. gleiche Datei erneut schreiben, 2. neue Datei anlegen.
       await writeFile(path, "# Rewritten\n");
       if (await until(listeners, () => has("add:nested/Note.MARKDOWN"), 3000)) recovered = `rewrite@${at()}`;
@@ -79,22 +80,29 @@ async function once(mode: "baseline" | "probe", i: number): Promise<Run> {
 const line = (r: Run) => `${r.mode} #${r.i} ok=${r.ok} ready@${r.readyMs} write@${r.writeMs} add@${r.addMs} probes=${r.probes} recovered=${r.recovered} events=[${r.events.join(" | ")}]`;
 const lat = (runs: Run[]) => { const l = runs.filter((r) => r.addMs !== null).map((r) => r.addMs! - r.writeMs).sort((a, b) => a - b); return `add latency after write min/median/max=${l[0]}/${l[Math.floor(l.length / 2)]}/${l[l.length - 1]}ms`; };
 
-test("repro #284: raw fs.watch, chokidar baseline vs probe gating", async () => {
+test("repro #284: interleaved baseline / delay20 / probe gating", async () => {
   const summary = [`platform=${platform()} arch=${arch()} cpus=${cpus().length} bun=${Bun.version} node=${process.versions.node}`];
   const raw: Array<{ ok: boolean; line: string }> = [];
-  for (let i = 0; i < 500; i++) raw.push(await rawStart());
-  summary.push(`raw fs.watch, write right after call: ${raw.filter((r) => r.ok).length}/${raw.length} ok`);
   const baseline: Run[] = [];
-  for (let i = 1; i <= 600; i++) baseline.push(await once("baseline", i));
-  summary.push(`chokidar baseline (write right after ready, add only): ${baseline.filter((r) => r.ok).length}/${baseline.length} ok, ${lat(baseline)}`);
+  const delayed: Run[] = [];
   const probe: Run[] = [];
-  for (let i = 1; i <= 800; i++) probe.push(await once("probe", i));
+  // Verschränkt statt nacheinander, damit Reihenfolge/Runner-Aufwärmen die Modi nicht unterschiedlich treffen.
+  for (let i = 1; i <= 400; i++) {
+    raw.push(await rawStart());
+    baseline.push(await once("baseline", i));
+    delayed.push(await once("delay20", i));
+    probe.push(await once("probe", i));
+  }
+  summary.push(`raw fs.watch, write right after call: ${raw.filter((r) => r.ok).length}/${raw.length} ok`);
+  summary.push(`chokidar baseline (write right after ready, add only): ${baseline.filter((r) => r.ok).length}/${baseline.length} ok, ${lat(baseline)}`);
+  summary.push(`chokidar delay20 (20 ms after ready, add only): ${delayed.filter((r) => r.ok).length}/${delayed.length} ok, ${lat(delayed)}`);
   summary.push(`chokidar probe gating, then Note add: ${probe.filter((r) => r.ok).length}/${probe.length} ok; probes needed: ${[1, 2, 3, 4, 5, 6].map((n) => `${n}x=${probe.filter((r) => r.probes === n).length}`).join(" ")}; ${lat(probe)}`);
 
   notice("#284 summary", summary.join("\n"));
   const baseFails = baseline.filter((r) => !r.ok);
   notice("#284 raw fs.watch misses", raw.filter((r) => !r.ok).slice(0, 6).map((r) => r.line).join("\n") || "none");
   notice("#284 chokidar baseline misses", baseFails.slice(0, 12).map(line).join("\n") || "none");
+  notice("#284 chokidar delay20 misses", delayed.filter((r) => !r.ok).slice(0, 12).map(line).join("\n") || "none");
   notice("#284 probe runs that needed >1 probe", probe.filter((r) => r.probes > 1 || !r.ok).slice(0, 12).map(line).join("\n") || "none");
   notice("#284 sample ok runs", [...baseline.filter((r) => r.ok).slice(0, 2), ...probe.filter((r) => r.ok).slice(0, 2)].map(line).join("\n"));
   // Absichtlich rot: beendet den Job früh; das Protokoll steht in den Annotationen. TEMP.

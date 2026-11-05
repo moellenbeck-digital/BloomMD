@@ -20,6 +20,10 @@
       "import": "./src/export/map-export-core.ts",
       "types": "./src/export/map-export-core.ts"
     },
+    "./theme-boot": {
+      "import": "./src/utils/theme-boot.ts",
+      "types": "./src/utils/theme-boot.ts"
+    },
     "./visible-layout": {
       "import": "./src/hooks/visible-layout.ts",
       "types": "./src/hooks/visible-layout.ts"

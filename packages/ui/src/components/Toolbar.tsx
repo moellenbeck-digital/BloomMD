@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useState, type MouseEvent, type ReactNode } from "react";
-import { AlertTriangle, FilePlus, History, FilePlus2, FolderPlus, Upload, Download, FileText, ListTree, FileDown, ImageDown, Shapes, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
+import { AlertTriangle, FilePlus, History, FilePlus2, FolderPlus, Upload, Download, FileText, ListTree, FileDown, ImageDown, Shapes, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Palette, RotateCcw, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
 import { importOpml, isWorkspaceMindMap, OpmlError, parseFile, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
 import { MapExportError } from "../export/capture-map";
 import { buildTextExport, downloadExportFile, EXPORT_FORMATS, type ExportFile, type ExportFormat } from "../export/export-file";
@@ -9,6 +9,7 @@ import { exportMapFile } from "../export/run-map-export";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
 import { useTheme } from "../hooks/useTheme";
+import { ThemeCustomDialog } from "./ThemeCustomDialog";
 
 interface ToolbarProps {
   onReload?: () => void;
@@ -121,7 +122,8 @@ const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 p
 
 export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onDeliverExport, onShareLink, onOpenHistory }, ref) {
   const { t, locale, toggleLocale } = useLocale();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, customTheme, saveCustomTheme, resetCustomTheme } = useTheme();
+  const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const document = useMindMapStore((s) => s.document);
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setStorageMetadata = useMindMapStore((s) => s.setStorageMetadata);
@@ -526,11 +528,27 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           <button type="button" role="menuitem" data-testid="toolbar-theme" onClick={toggleTheme} className={toolbarMenuItemClass}>
             {theme === "light" ? <Moon size={16} aria-hidden="true" /> : <Sun size={16} aria-hidden="true" />}<span>{theme === "light" ? t.darkMode : t.lightMode}</span>
           </button>
+          <button type="button" role="menuitem" data-testid="toolbar-theme-custom" onClick={() => setThemeDialogOpen(true)} className={toolbarMenuItemClass}>
+            <Palette size={16} aria-hidden="true" /><span>{t.themeCustom}</span>
+          </button>
+          {customTheme && (
+            <button type="button" role="menuitem" data-testid="toolbar-theme-reset" onClick={resetCustomTheme} className={toolbarMenuItemClass}>
+              <RotateCcw size={16} aria-hidden="true" /><span>{t.themeReset}</span>
+            </button>
+          )}
           <button type="button" role="menuitem" data-testid="toolbar-locale" onClick={toggleLocale} className={toolbarMenuItemClass}>
             <Languages size={16} aria-hidden="true" /><span>{t.language}</span><kbd className="ml-auto font-[var(--font-mono,monospace)] text-[10px] text-[var(--color-ink-faint)]">{locale === "de" ? "EN" : "DE"}</kbd>
           </button>
         </ToolbarMenu>
       )}
+      <ThemeCustomDialog
+        open={themeDialogOpen}
+        current={customTheme}
+        base={theme}
+        onSave={saveCustomTheme}
+        onReset={resetCustomTheme}
+        onClose={() => setThemeDialogOpen(false)}
+      />
     </div>
   );
 });

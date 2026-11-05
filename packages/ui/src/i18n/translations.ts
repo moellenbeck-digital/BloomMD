@@ -541,6 +541,26 @@ export interface Translations {
   theme: string;
   lightMode: string;
   darkMode: string;
+  themeCustom: string;
+  themeCustomTitle: string;
+  themeCustomDescription: string;
+  themePresets: string;
+  themeName: string;
+  themeBase: string;
+  themeAccent: string;
+  themeSurface: string;
+  themeInk: string;
+  themeOptionalHint: string;
+  themeAuto: string;
+  themePickColor: string;
+  themeContrastInk: string;
+  themeContrastAccent: string;
+  themeSave: string;
+  themeReset: string;
+  themeErrorName: string;
+  themeErrorHex: string;
+  themeErrorInk: string;
+  themeErrorAccent: string;
   // Language
   language: string;
 }
@@ -1079,6 +1099,26 @@ export const translations: Record<Locale, Translations> = {
     theme: "Design",
     lightMode: "Hell",
     darkMode: "Dunkel",
+    themeCustom: "Eigenes Theme…",
+    themeCustomTitle: "Eigenes Theme",
+    themeCustomDescription: "Wähle eine Vorlage oder lege Farben selbst fest. Text und Akzent müssen auf der Oberfläche gut lesbar bleiben, sonst wird das Theme nicht gespeichert. Die Auswahl bleibt nur in diesem Browser.",
+    themePresets: "Vorlagen",
+    themeName: "Name",
+    themeBase: "Basis",
+    themeAccent: "Akzentfarbe",
+    themeSurface: "Oberfläche (optional)",
+    themeInk: "Text (optional)",
+    themeOptionalHint: "Hex-Wert wie #B94316. Leer lassen für den Standard der Basis.",
+    themeAuto: "automatisch",
+    themePickColor: "Farbe wählen",
+    themeContrastInk: "Text auf Oberfläche: %ratio%:1 (mindestens 4,5:1)",
+    themeContrastAccent: "Akzent auf Oberfläche: %ratio%:1 (mindestens 3:1)",
+    themeSave: "Theme speichern",
+    themeReset: "Standard-Theme wiederherstellen",
+    themeErrorName: "Bitte einen Namen mit 1 bis 40 Zeichen eingeben.",
+    themeErrorHex: "Das ist kein gültiger Hex-Wert. Erlaubt sind z. B. #B94316 oder #B41.",
+    themeErrorInk: "Der Text hat auf dieser Oberfläche nur %ratio%:1 Kontrast, nötig sind 4,5:1. Wähle einen dunkleren oder helleren Text oder eine andere Oberfläche.",
+    themeErrorAccent: "Der Akzent hat auf dieser Oberfläche nur %ratio%:1 Kontrast, nötig sind 3:1. Wähle einen kräftigeren Akzent oder eine andere Oberfläche.",
     language: "Sprache",
   },
   en: {
@@ -1614,6 +1654,26 @@ export const translations: Record<Locale, Translations> = {
     theme: "Theme",
     lightMode: "Light",
     darkMode: "Dark",
+    themeCustom: "Custom theme…",
+    themeCustomTitle: "Custom theme",
+    themeCustomDescription: "Pick a preset or choose your own colours. Text and accent must stay clearly readable on the surface, otherwise the theme is not saved. Your choice stays in this browser only.",
+    themePresets: "Presets",
+    themeName: "Name",
+    themeBase: "Base",
+    themeAccent: "Accent colour",
+    themeSurface: "Surface (optional)",
+    themeInk: "Text (optional)",
+    themeOptionalHint: "Hex value like #B94316. Leave empty for the base default.",
+    themeAuto: "automatic",
+    themePickColor: "Pick colour",
+    themeContrastInk: "Text on surface: %ratio%:1 (at least 4.5:1)",
+    themeContrastAccent: "Accent on surface: %ratio%:1 (at least 3:1)",
+    themeSave: "Save theme",
+    themeReset: "Restore default theme",
+    themeErrorName: "Please enter a name of 1 to 40 characters.",
+    themeErrorHex: "That is not a valid hex value. Use something like #B94316 or #B41.",
+    themeErrorInk: "Text on this surface has only %ratio%:1 contrast, 4.5:1 is required. Choose darker or lighter text, or another surface.",
+    themeErrorAccent: "The accent on this surface has only %ratio%:1 contrast, 3:1 is required. Choose a stronger accent, or another surface.",
     language: "Language",
   },
 };

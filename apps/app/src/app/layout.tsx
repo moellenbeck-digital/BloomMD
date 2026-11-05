@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { THEME_BOOT_SCRIPT } from "@bloommd/ui/theme-boot";
 import { AnalyticsProvider } from "./analytics-provider";
 import { getAppLocale } from "../lib/locale";
 import "./globals.css";
@@ -56,10 +57,14 @@ export default async function RootLayout({
           "light" or "dark", anything else falls through to the system preference. Getting that
           wrong reintroduces the flash it exists to prevent: the script would pick one theme and
           the effect the other.
+
+          A stored custom theme (`bloommd-theme-custom`) is applied on top, with the same checks and
+          colour derivation as `useTheme`; an invalid value is ignored. The script text lives in
+          `@bloommd/ui/theme-boot`, where a test runs it against the hook's code.
         */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem("bloommd-theme");var d=s==="dark"||s==="light"?s==="dark":matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d)}catch(e){}})();`,
+            __html: THEME_BOOT_SCRIPT,
           }}
         />
       </head>

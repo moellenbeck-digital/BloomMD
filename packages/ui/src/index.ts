@@ -22,6 +22,19 @@ export { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 export { layoutMindMap, type MindMapNodeData, type EdgeMode, type EdgeRelation, type RootRenameEvent } from "./hooks/useMindMapLayout";
 export { LocaleProvider, useLocale } from "./i18n/LocaleContext";
 export { useTheme, type Theme } from "./hooks/useTheme";
+export {
+  THEME_PRESETS,
+  contrastRatio,
+  deriveCustomTokens,
+  isHexColor,
+  validateCustomTheme,
+  type CustomTheme,
+  type CustomThemeError,
+  type CustomThemeValidation,
+  type ThemeBase,
+  type ThemePreset,
+} from "./utils/theme-custom";
+export { ThemeCustomDialog, type ThemeCustomDialogProps } from "./components/ThemeCustomDialog";
 export { requestNodeFocus } from "./utils/nodeFocus";
 export { type Locale, type Translations } from "./i18n/translations";
 export { SyncProvider } from "./sync/SyncProvider";

@@ -257,7 +257,7 @@ test.describe("marketing release contracts", () => {
     await page.getByRole("button", { name: "Navigation öffnen" }).click();
     const menu = page.locator("#mobile-navigation");
     await expect(menu).toBeVisible();
-    for (const label of ["Produkt", "Demo", "Vision", "Roadmap", "Download", "Testaccount", "Hilfe", "Templates", "Obsidian", "FAQ", "Login", "Jetzt registrieren"]) {
+    for (const label of ["Produkt", "Demo", "Agenten", "Roadmap", "Download", "Testaccount", "Hilfe", "Templates", "Obsidian", "FAQ", "Login", "Jetzt registrieren"]) {
       await expect(menu.getByText(label, { exact: true }).first()).toBeVisible();
     }
 

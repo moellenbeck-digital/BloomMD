@@ -79,7 +79,7 @@ export function relativeLuminance(hex: string): number {
   const [r, g, b] = toRgb(hex).map((channel) => {
     const s = channel / 255;
     return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-  });
+  }) as [number, number, number];
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
@@ -94,7 +94,7 @@ export function contrastRatio(a: string, b: string): number {
 export function mixColors(from: string, to: string, amount: number): string {
   const a = toRgb(from);
   const b = toRgb(to);
-  return toHex(a.map((channel, index) => channel + (b[index] - channel) * amount));
+  return toHex(a.map((channel, index) => channel + ((b[index] ?? channel) - channel) * amount));
 }
 
 /** The ink for a surface when the user did not pick one: the base default if readable, else black or white. */
@@ -117,7 +117,7 @@ export function resolveCustomColors(theme: CustomTheme): { accent: string; surfa
 /** `ink` blended towards the surface as far as `maxAmount` allows while it stays AA on every layer. */
 function softInk(ink: string, layers: string[], maxAmount: number): string {
   for (let step = Math.round(maxAmount * 20); step > 0; step -= 1) {
-    const candidate = mixColors(ink, layers[0], step / 20);
+    const candidate = mixColors(ink, layers[0] ?? ink, step / 20);
     if (layers.every((layer) => contrastRatio(candidate, layer) >= MIN_TEXT_CONTRAST)) return candidate;
   }
   return ink;

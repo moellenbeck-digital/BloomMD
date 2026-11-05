@@ -12,7 +12,6 @@ import {
   contrastRatio,
   normalizeHex,
   resolveCustomColors,
-  validateCustomTheme,
   type CustomTheme,
   type CustomThemeError,
   type CustomThemeValidation,
@@ -139,6 +138,7 @@ function ThemeCustomDialogBody({ current, base, onSave, onReset, onClose }: Them
     if (items.length === 0) return;
     const first = items[0];
     const last = items[items.length - 1];
+    if (!first || !last) return;
     const active = globalThis.document.activeElement;
     if (event.shiftKey && active === first) {
       event.preventDefault();

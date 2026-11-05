@@ -28,7 +28,7 @@ Ausgeschlossen sind (Projekt `chromium`):
 | `open-signup.spec.ts` | braucht eigene Server-Umgebung (`playwright.open-signup.config.ts`) |
 | `collaboration.spec.ts` | braucht eigene Server-Umgebung (`playwright.collaboration.config.ts`) |
 | `visual-regression.spec.ts` | eigene Config und Snapshots (`playwright.visual.config.ts`) |
-| `mobile-smoke.spec.ts` | Mobile-Projekt; die Testsystem-Config hat nur Desktop Chrome |
+| `mobile-smoke.spec.ts`, `mobile-matrix.spec.ts` | Mobile-Projekt (`chromium-mobile`, Pixel 5); die Testsystem-Config hat nur Desktop Chrome. Die Matrix und ihre manuelle Liste: `docs/MOBILE-MATRIX.md` |
 
 `theme-matrix.spec.ts` bleibt drin: Die Standard-Config führt es auch im Projekt `chromium` aus (nicht nur im Mobile-Projekt), hier läuft es entsprechend nur in Desktop Chrome.
 

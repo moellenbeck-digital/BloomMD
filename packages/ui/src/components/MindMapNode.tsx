@@ -29,6 +29,7 @@ import { nodeResourceIssue } from "./node-panel-model";
 import { getPresenceInitials, getPresenceLabel } from "../sync/presence";
 import { useLocale } from "../i18n/LocaleContext";
 import { cancelPendingNodeFocus, requestNodeFocus } from "../utils/nodeFocus";
+import { COUNTER_ZOOM_CLASS } from "../utils/canvas-zoom";
 
 interface LevelStyle {
   bg: string;
@@ -381,7 +382,7 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
       ) : (
         <div className={`flex items-center justify-center gap-2 font-semibold tracking-tight ${isRoot ? "text-base" : "text-sm"}`}>
           {metadata?.kind === "task" ? (
-            <button type="button" disabled={readOnly} onClick={toggleTask} className="nodrag shrink-0" title={t.toggleTask} aria-label={t.toggleTask}>{metadata.status === "done" ? <CheckSquare size={15} /> : <Square size={15} />}</button>
+            <button type="button" disabled={readOnly} onClick={toggleTask} className="nodrag shrink-0 pointer-coarse:-m-[15px] pointer-coarse:p-[15px]" title={t.toggleTask} aria-label={t.toggleTask}>{metadata.status === "done" ? <CheckSquare size={15} /> : <Square size={15} />}</button>
           ) : metadata?.kind && metadata.kind !== "topic" ? <KindIcon size={15} className="shrink-0" aria-hidden="true" /> : null}
           <span className={`truncate ${metadata?.kind === "task" && metadata.status === "done" ? "line-through opacity-70" : ""}`}>{nodeData.label}</span>
         </div>
@@ -449,33 +450,42 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
 
       {hasChildren && (
         <button
+          type="button"
           onClick={onToggle}
+          data-testid="node-toggle-children"
           className={`
-            absolute -right-3.5 top-1/2 -translate-y-1/2
-            w-7 h-7 rounded-full
-            bg-white border-2
-            text-xs font-bold
-            flex items-center justify-center
-            transition-all duration-150 z-10
-            ${nodeData.collapsed
-              ? "border-[#FF6B35] text-[#FF6B35] hover:bg-[#FFF4EE]"
-              : "border-[#D4CFC8] text-[var(--color-ink-faint)] hover:border-[#FF6B35] hover:text-[#FF6B35]"}
+            group absolute -right-3.5 top-1/2 -translate-y-1/2
+            flex h-7 w-7 items-center justify-center
+            pointer-coarse:-right-[30px] pointer-coarse:h-11 pointer-coarse:w-11 pointer-coarse:justify-start pointer-coarse:origin-left
+            ${COUNTER_ZOOM_CLASS}
+            z-10
           `}
         >
-          {nodeData.collapsed ? `+${nodeData.childCount}` : "−"}
+          <span
+            className={`
+              flex h-7 w-7 items-center justify-center rounded-full
+              bg-white border-2 text-xs font-bold
+              transition-all duration-150
+              ${nodeData.collapsed
+                ? "border-[#FF6B35] text-[#FF6B35] group-hover:bg-[#FFF4EE]"
+                : "border-[#D4CFC8] text-[var(--color-ink-faint)] group-hover:border-[#FF6B35] group-hover:text-[#FF6B35]"}
+            `}
+          >
+            {nodeData.collapsed ? `+${nodeData.childCount}` : "−"}
+          </span>
         </button>
       )}
 
       {isSelected && !editing && (
         <div
           data-testid="node-action-toolbar"
-          className="absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-lg"
+          className={`absolute left-1/2 top-full z-20 mt-2 flex -translate-x-1/2 ${COUNTER_ZOOM_CLASS} pointer-coarse:origin-top items-center gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-lg`}
           onClick={(e) => e.stopPropagation()}
         >
           {!readOnly && <button
             type="button"
             onClick={createChild}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+            className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
             title={t.addChild}
             aria-label={t.addChild}
             data-testid="node-action-add-child"
@@ -486,7 +496,7 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
             <button
               type="button"
               onClick={createSibling}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+              className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
               title={t.addSibling}
               aria-label={t.addSibling}
               data-testid="node-action-add-sibling"
@@ -497,7 +507,7 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
           <button
             type="button"
             onClick={openEditor}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+            className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
             title={t.editNodeContent}
             aria-label={t.editNodeContent}
             data-testid="node-action-open-editor"
@@ -507,7 +517,7 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
           {nodeData.onAskAgent && (
             <button
               type="button"
-              className={`nodrag nopan relative flex h-7 w-7 items-center justify-center rounded-md hover:bg-[var(--color-surface-sunken)] ${agentHasProposal ? "text-[#C94D20]" : "text-[var(--color-ink-muted)] hover:text-[#FF6B35]"}`}
+              className={`nodrag nopan relative flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md hover:bg-[var(--color-surface-sunken)] ${agentHasProposal ? "text-[#C94D20]" : "text-[var(--color-ink-muted)] hover:text-[#FF6B35]"}`}
               title={agentHasProposal ? "Agent-Vorschlag prüfen" : "Agent für diesen Knoten fragen"}
               aria-label={agentHasProposal ? "Agent-Vorschlag prüfen" : "Agent für diesen Knoten fragen"}
               data-testid="node-action-ask-agent"
@@ -523,12 +533,12 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
               )}
             </button>
           )}
-          {sourceFile && <button type="button" onClick={() => openWorkspaceSource(sourceFile)} className="nodrag nopan px-2 text-xs" data-testid="node-action-open-source">{t.openSourceFile}</button>}
+          {sourceFile && <button type="button" onClick={() => openWorkspaceSource(sourceFile)} className="nodrag nopan px-2 text-xs pointer-coarse:min-h-11" data-testid="node-action-open-source">{t.openSourceFile}</button>}
           {metadata && !(sourceFile && metadata.kind === "file" && metadata.file === sourceFile) && metadata.kind !== "topic" && metadata.kind !== "task" && metadata.kind !== "decision" && (
             <button
               type="button"
               onClick={openResource}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+              className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
               title={t.openResource}
               aria-label={t.openResource}
               data-testid="node-action-open-resource"

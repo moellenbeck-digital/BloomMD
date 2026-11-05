@@ -9,6 +9,8 @@ import {
   HelpModal,
   InkAttachmentsContext,
   requestNodeFocus,
+  useVisualViewport,
+  VIEWPORT_ROOT_FILL_CLASS,
   useMindMapStore,
   useLocale,
   buildTextExport,
@@ -128,6 +130,7 @@ function exportEntries(t: ReturnType<typeof useLocale>["t"]): Record<ExportForma
 
 export function App() {
   const { t, locale } = useLocale();
+  useVisualViewport();
   const authText = AUTH_TEXT[locale === "en" ? "en" : "de"];
   const text = shellText(locale);
   // Callbacks read the current language without being recreated when it changes.
@@ -721,7 +724,7 @@ export function App() {
 
   return (
     <InkAttachmentsContext.Provider value={inkAttachments}>
-    <div className="h-full flex flex-col bg-[#FAFAFA]">
+    <div className={`${VIEWPORT_ROOT_FILL_CLASS} flex flex-col bg-[#FAFAFA]`}>
       <input ref={fileInputRef} type="file" accept=".md,.markdown,.opml,text/markdown,text/plain,text/x-opml+xml,text/xml" className="hidden" onChange={handleImport} />
       {/* Header — compact for mobile */}
       <header className="h-12 border-b border-[#E8E4DF] bg-white flex items-center px-3 shrink-0">
@@ -790,7 +793,7 @@ export function App() {
         <div role="alert" className="flex items-start gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-800">
           <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label={text.closeError} title={text.closeError} className="grid h-7 w-7 shrink-0 place-items-center rounded"><X size={15} aria-hidden="true" /></button>
+          <button type="button" onClick={() => setError(null)} aria-label={text.closeError} title={text.closeError} className="grid h-11 w-11 -my-2 shrink-0 place-items-center rounded"><X size={15} aria-hidden="true" /></button>
         </div>
       )}
 
@@ -846,7 +849,7 @@ export function App() {
                     <button type="button" onClick={() => void signOut()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#E8E4DF] text-xs font-semibold"><LogOut size={15} aria-hidden="true" />{authText.signOut}</button>
                   </div>
                   {/* Accounts can be created in the sign-in browser, so deleting one must be reachable from the app (App Store 5.1.1(v)). */}
-                  <button type="button" onClick={() => void Browser.open({ url: `${account.serverUrl}/account?lang=${locale === "en" ? "en" : "de"}`, presentationStyle: "popover" })} className="min-h-9 text-left text-[11px] font-semibold text-[#666] underline underline-offset-2" data-testid="mobile-manage-account">{text.manageAccount}</button>
+                  <button type="button" onClick={() => void Browser.open({ url: `${account.serverUrl}/account?lang=${locale === "en" ? "en" : "de"}`, presentationStyle: "popover" })} className="min-h-11 text-left text-[11px] font-semibold text-[#666] underline underline-offset-2" data-testid="mobile-manage-account">{text.manageAccount}</button>
                 </>
               ) : (
                 <>
@@ -854,10 +857,10 @@ export function App() {
                   <button type="button" onClick={() => void startSignIn()} disabled={signingIn} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] text-xs font-semibold text-white disabled:opacity-50" data-testid="mobile-sign-in"><LogIn size={15} aria-hidden="true" />{signingIn ? authText.signingIn : authText.signIn}</button>
                   <p className="text-[11px] leading-4 text-[#999]">{authText.signInHint}</p>
                   <details className="text-xs">
-                    <summary className="min-h-9 cursor-pointer py-2 font-semibold text-[#666]">{authText.advanced}</summary>
+                    <summary className="min-h-11 cursor-pointer py-2 font-semibold text-[#666]">{authText.advanced}</summary>
                     <label className="grid gap-1 text-[11px] font-semibold text-[#666]">
                       {authText.serverLabel}
-                      <input value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} placeholder={DEFAULT_SERVER} className="h-10 rounded-md border border-[#E8E4DF] px-2 text-xs font-normal" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+                      <input value={remoteUrl} onChange={(event) => setRemoteUrl(event.target.value)} placeholder={DEFAULT_SERVER} className="h-11 rounded-md border border-[#E8E4DF] px-2 text-xs font-normal" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                     </label>
                     <p className="mt-1 text-[11px] leading-4 text-[#999]">{authText.serverHint}</p>
                   </details>
@@ -883,7 +886,7 @@ export function App() {
                 <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 py-1 font-mono text-[11px] text-[#666]">
                   <li className="flex items-center">
                     {shownFolder
-                      ? <button type="button" onClick={() => setFolderPath("")} className="min-h-9 rounded px-1 active:bg-[#F5F3F0]">{store.kind === "app" ? text.onThisDevice : store.name}</button>
+                      ? <button type="button" onClick={() => setFolderPath("")} className="min-h-11 rounded px-1 active:bg-[#F5F3F0]">{store.kind === "app" ? text.onThisDevice : store.name}</button>
                       : <span aria-current="page" className="px-1 font-semibold text-[#1A1A1A]">{store.kind === "app" ? text.onThisDevice : store.name}</span>}
                   </li>
                   {pathSteps(shownFolder).map((step, index, steps) => (
@@ -891,7 +894,7 @@ export function App() {
                       <ChevronRight size={11} className="shrink-0 text-[#999]" aria-hidden="true" />
                       {index === steps.length - 1
                         ? <span aria-current="page" className="truncate px-1 font-semibold text-[#1A1A1A]">{step.name}</span>
-                        : <button type="button" onClick={() => setFolderPath(step.path)} className="min-h-9 truncate rounded px-1 active:bg-[#F5F3F0]">{step.name}</button>}
+                        : <button type="button" onClick={() => setFolderPath(step.path)} className="min-h-11 truncate rounded px-1 active:bg-[#F5F3F0]">{step.name}</button>}
                     </li>
                   ))}
                 </ol>
@@ -988,7 +991,7 @@ export function App() {
 
         {/* Mobile bottom sheet editor */}
         {selectedNodeId && editorVisible && (
-          <div className="absolute inset-x-0 bottom-0 z-30 max-h-[50dvh] bg-white border-t border-[#E8E4DF] rounded-t-2xl shadow-[0_-4px_24px_rgba(26,26,26,0.1)] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] lg:static lg:z-auto lg:h-full lg:max-h-none lg:w-[400px] lg:shrink-0 lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none" data-testid="mobile-node-editor">
+          <div className="absolute inset-x-0 bottom-0 z-30 max-h-[min(50dvh,calc(var(--bloommd-viewport-height,100dvh)-3rem))] bg-white border-t border-[#E8E4DF] rounded-t-2xl shadow-[0_-4px_24px_rgba(26,26,26,0.1)] flex flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] lg:static lg:z-auto lg:h-full lg:max-h-none lg:w-[400px] lg:shrink-0 lg:rounded-none lg:border-t-0 lg:border-l lg:shadow-none" data-testid="mobile-node-editor">
             {/* Drag handle */}
             <div className="flex justify-center py-2 shrink-0">
               <div className="w-10 h-1 rounded-full bg-[#D4CFC8]" />

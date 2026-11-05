@@ -36,6 +36,8 @@ export {
 } from "./utils/theme-custom";
 export { ThemeCustomDialog, type ThemeCustomDialogProps } from "./components/ThemeCustomDialog";
 export { requestNodeFocus } from "./utils/nodeFocus";
+export { useVisualViewport } from "./hooks/useVisualViewport";
+export { VIEWPORT_ROOT_CLASS, VIEWPORT_ROOT_FILL_CLASS } from "./utils/visual-viewport";
 export { type Locale, type Translations } from "./i18n/translations";
 export { SyncProvider } from "./sync/SyncProvider";
 export { SyncStatus } from "./components/SyncStatus";

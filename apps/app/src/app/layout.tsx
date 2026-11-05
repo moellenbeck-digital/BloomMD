@@ -1,9 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { THEME_BOOT_SCRIPT } from "@bloommd/ui/theme-boot";
 import { AnalyticsProvider } from "./analytics-provider";
 import { getAppLocale } from "../lib/locale";
 import "./globals.css";
+
+// The on-screen keyboard shrinks the page (not only the visual viewport) where the browser supports it,
+// so the editor stays above the keyboard. Safari ignores this; `useVisualViewport` covers it.
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = getAppLocale((await headers()).get("x-bloommd-locale"));

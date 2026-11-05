@@ -44,12 +44,12 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       // A project-level testIgnore replaces the top-level one, so separate-suite specs repeat here.
-      testIgnore: [/mobile-smoke\.spec\.ts/, /wiki\.spec\.ts/, /beta-gate\.spec\.ts/, /open-signup\.spec\.ts/, /collaboration\.spec\.ts/, /visual-regression\.spec\.ts/],
+      testIgnore: [/mobile-(smoke|matrix)\.spec\.ts/, /wiki\.spec\.ts/, /beta-gate\.spec\.ts/, /open-signup\.spec\.ts/, /collaboration\.spec\.ts/, /visual-regression\.spec\.ts/],
     },
     {
       name: "chromium-mobile",
       use: { ...devices["Pixel 5"] },
-      testMatch: /mobile-smoke\.spec\.ts/,
+      testMatch: /mobile-(smoke|matrix)\.spec\.ts/,
     },
     {
       name: "chromium-mobile-themes",

@@ -1,7 +1,7 @@
 "use client";
 
 import { workspaceSourceFile, openWorkspaceSource } from "../utils/workspaceSource";
-import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -53,6 +53,7 @@ import "./NodeEditor.css";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
 import { requestNodeFocus } from "../utils/nodeFocus";
+import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
 import { restoreWikiLinks } from "../utils/wiki-links-escape";
 import type { Translations } from "../i18n/translations";
@@ -753,18 +754,18 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             </span>
           )}
         </div>
-        <h2 className={`${embedded ? "text-lg" : "text-xl"} font-semibold font-[var(--font-display,Outfit,sans-serif)] text-[var(--color-ink)] tracking-tight truncate`}>
+        <h2 className={`${embedded ? "text-lg" : "text-xl"} font-semibold font-[var(--font-display,Outfit,sans-serif)] text-[var(--color-ink)] tracking-tight truncate pointer-coarse:pr-16`}>
           {selectedNode.title}
         </h2>
         {readOnly && <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">{isWorkspaceDocument ? t.workspaceOverviewReadOnly : t.readOnlyMessage}</p>}
-        {sourceFile && <button type="button" className="mt-2 underline" onClick={() => openWorkspaceSource(sourceFile)}>{t.openSourceFile}</button>}
-        {!readOnly && selectedNode.id !== document?.rootId && <button type="button" onClick={() => { deleteNodeAction(selectedNode.id); setEditorVisible(false); }} className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50" title={t.deleteNodeBranch} aria-label={t.deleteNodeBranch} data-testid="node-editor-delete"><Trash2 size={16} /></button>}
+        {sourceFile && <button type="button" className="mt-2 underline pointer-coarse:min-h-11" onClick={() => openWorkspaceSource(sourceFile)}>{t.openSourceFile}</button>}
+        {!readOnly && selectedNode.id !== document?.rootId && <button type="button" onClick={() => { deleteNodeAction(selectedNode.id); setEditorVisible(false); }} className="absolute right-5 top-5 flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-red-600 hover:bg-red-50" title={t.deleteNodeBranch} aria-label={t.deleteNodeBranch} data-testid="node-editor-delete"><Trash2 size={16} /></button>}
       </div>
 
       <div className={`${embedded ? "px-4 py-3" : "px-5 py-4"} grid gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]`} data-testid="node-metadata-editor">
         <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
           {t.nodeType}
-          <select value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
+          <select value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
             {nodeKindOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -820,8 +821,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 <div className="mt-1 truncate text-sm font-medium text-[var(--color-ink)]">{resourcePath || t.noFileSelected}</div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={chooseResourceFile} className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><FileText size={15} />{t.chooseFile}</button>
-                <button type="button" onClick={openTypedResource} disabled={!resourcePath} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={15} />{t.open}</button>
+                <button type="button" onClick={chooseResourceFile} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><FileText size={15} />{t.chooseFile}</button>
+                <button type="button" onClick={openTypedResource} disabled={!resourcePath} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={15} />{t.open}</button>
               </div>
               <p className="text-xs leading-5 text-[var(--color-ink-muted)]">
                 {kind === "file"
@@ -868,9 +869,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             <div className="grid gap-2" data-testid="node-url-panel">
               <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
                 URL
-                <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
+                <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
               </label>
-              <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+              <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 {previewLoading ? <LoaderCircle size={15} className="animate-spin" /> : <ExternalLink size={15} />}
                 {previewLoading ? t.loadPreview : t.loadWebsitePreview}
               </button>
@@ -888,13 +889,13 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             </div>
           )}
           {(kind === "web" || kind === "source") && metadataDraft.url.trim() && (
-            <button type="button" onClick={openTypedResource} className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><ExternalLink size={15} />{t.openUrl}</button>
+            <button type="button" onClick={openTypedResource} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><ExternalLink size={15} />{t.openUrl}</button>
           )}
         </div>
         {kind === "portal" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.targetMap}
-            <select value={metadataDraft.file} onChange={(event) => { setMetadataDraft((draft) => ({ ...draft, file: event.target.value })); updateMetadata({ file: event.target.value }); }} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-portal-map-select">
+            <select value={metadataDraft.file} onChange={(event) => { setMetadataDraft((draft) => ({ ...draft, file: event.target.value })); updateMetadata({ file: event.target.value }); }} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-portal-map-select">
               <option value="">{t.selectMap}</option>
               {mapOptions.map((map) => <option key={map.filename} value={map.filename}>{map.frontmatter.title || map.filename}</option>)}
             </select>
@@ -903,37 +904,37 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
         {kind === "portal" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.targetNode}
-            <input value={metadataDraft.targetNodeId} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, targetNodeId: event.target.value }))} onBlur={() => commitMetadataField("targetNodeId")} placeholder={t.optional} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
+            <input value={metadataDraft.targetNodeId} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, targetNodeId: event.target.value }))} onBlur={() => commitMetadataField("targetNodeId")} placeholder={t.optional} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
           </label>
         )}
         {kind === "source" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.citation}
-            <input value={metadataDraft.citation} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, citation: event.target.value }))} onBlur={() => commitMetadataField("citation")} placeholder={t.citationPlaceholder} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
+            <input value={metadataDraft.citation} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, citation: event.target.value }))} onBlur={() => commitMetadataField("citation")} placeholder={t.citationPlaceholder} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
           </label>
         )}
         {kind === "task" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.status}
-            <select value={metadata?.status ?? "open"} onChange={(event) => updateMetadata({ status: event.target.value as NonNullable<MindMapNodeMetadata["status"]> })} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-status"><option value="open">{t.openStatus}</option><option value="in_progress">{t.inProgressStatus}</option><option value="done">{t.doneStatus}</option></select>
+            <select value={metadata?.status ?? "open"} onChange={(event) => updateMetadata({ status: event.target.value as NonNullable<MindMapNodeMetadata["status"]> })} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-status"><option value="open">{t.openStatus}</option><option value="in_progress">{t.inProgressStatus}</option><option value="done">{t.doneStatus}</option></select>
           </label>
         )}
         {kind === "task" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.dueDate}
-            <input type="date" value={metadataDraft.due} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, due: event.target.value }))} onBlur={() => commitMetadataField("due")} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-due" />
+            <input type="date" value={metadataDraft.due} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, due: event.target.value }))} onBlur={() => commitMetadataField("due")} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-due" />
           </label>
         )}
         {(kind === "task" || kind === "decision") && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {kind === "task" ? t.responsible : t.decidedBy}
-            <input value={metadataDraft.assignee} maxLength={120} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, assignee: event.target.value }))} onBlur={() => commitMetadataField("assignee")} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-assignee" />
+            <input value={metadataDraft.assignee} maxLength={120} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, assignee: event.target.value }))} onBlur={() => commitMetadataField("assignee")} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-assignee" />
           </label>
         )}
         {kind === "decision" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.decisionStatus}
-            <select value={metadata?.decision ?? "proposed"} onChange={(event) => updateMetadata({ decision: event.target.value as NonNullable<MindMapNodeMetadata["decision"]> })} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]"><option value="proposed">{t.proposedStatus}</option><option value="accepted">{t.acceptedStatus}</option><option value="rejected">{t.rejectedStatus}</option></select>
+            <select value={metadata?.decision ?? "proposed"} onChange={(event) => updateMetadata({ decision: event.target.value as NonNullable<MindMapNodeMetadata["decision"]> })} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]"><option value="proposed">{t.proposedStatus}</option><option value="accepted">{t.acceptedStatus}</option><option value="rejected">{t.rejectedStatus}</option></select>
           </label>
         )}
       </div>
@@ -946,7 +947,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
 
       {(linkResources.length > 0 || mapLinkResources.length > 0 || pdfLinkResources.length > 0 || backlinks.length > 0 || workspaceReferences.length > 0) && (
         <details open className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-          <summary className="cursor-pointer list-none px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.linksAndReferences}</summary>
+          <summary className="cursor-pointer list-none px-5 py-3 pointer-coarse:py-[14px] text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.linksAndReferences}</summary>
           <div
             data-testid="node-resource-panel"
             className={`${embedded ? "px-4 py-3" : "px-5 py-4"}`}
@@ -971,7 +972,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                     </div>
                     {/^https?:\/\//i.test(resource.url) && ["image", "video", "audio"].includes(resource.kind) && (
                       <details className="mt-2 text-xs text-[var(--color-ink-muted)]">
-                        <summary className="cursor-pointer select-none hover:text-[var(--color-ink)]">{t.preview}</summary>
+                        <summary className="cursor-pointer select-none pointer-coarse:py-[14px] hover:text-[var(--color-ink)]">{t.preview}</summary>
                         {resource.kind === "image" && <img src={resource.url} alt={resource.label} loading="lazy" className="mt-2 max-h-48 max-w-full rounded-md border border-[var(--color-border)] object-contain" />}
                         {resource.kind === "video" && <video src={resource.url} controls preload="metadata" className="mt-2 max-h-48 max-w-full rounded-md border border-[var(--color-border)]" />}
                         {resource.kind === "audio" && <audio src={resource.url} controls preload="metadata" className="mt-2 max-w-full" />}
@@ -981,7 +982,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   <button
                     type="button"
                     onClick={() => copyUrl(resource.url)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
                     title={t.copyLink}
                     aria-label={`${t.copyLink}: ${resource.url}`}
                   >
@@ -990,7 +991,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   <button
                     type="button"
                     onClick={() => openUrl(resource.url)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
                     title={t.openLink}
                     aria-label={`${t.openLink}: ${resource.url}`}
                   >
@@ -1127,7 +1128,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       {/* Editor */}
       {showPrimaryMarkdownEditor ? (
         <details open className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="node-content-panel">
-          <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
+          <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 pointer-coarse:py-[14px] text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
           <div className="min-h-0 flex-1 overflow-y-auto">
             <VisualsContext.Provider value={visualsContext}>
             <MDXEditor
@@ -1179,14 +1180,26 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     </>
   );
 
+  // The on-screen keyboard opens after the focus event and shrinks the viewport, so reveal the field
+  // again once the viewport changed (or after a moment, where the browser reports no resize).
+  const keepFocusedFieldVisible = (event: ReactFocusEvent<HTMLElement>) => {
+    const target = event.target;
+    revealFocusedField(target);
+    const revealAgain = () => {
+      if (window.document.activeElement === target) revealFocusedField(target);
+    };
+    window.visualViewport?.addEventListener("resize", revealAgain, { once: true });
+    window.setTimeout(revealAgain, 400);
+  };
+
   const viewerDialog = viewer ? <LazyVisualViewer kind={viewer.kind} src={viewer.src} alt={viewer.alt} actions={viewer.actions} onClose={() => setViewer(null)} /> : null;
 
   if (embedded) {
-    return <div className="flex flex-col overflow-hidden h-full">{content}{viewerDialog}</div>;
+    return <div className="flex flex-col overflow-hidden h-full" onFocus={keepFocusedFieldVisible}>{content}{viewerDialog}</div>;
   }
 
   return (
-    <aside className="h-full bg-[var(--color-surface-raised)] flex flex-col overflow-hidden">
+    <aside className="h-full bg-[var(--color-surface-raised)] flex flex-col overflow-hidden" onFocus={keepFocusedFieldVisible}>
       {content}
       {viewerDialog}
     </aside>

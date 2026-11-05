@@ -93,7 +93,7 @@ function ToolbarMenu({ label, Icon, testId, children }: ToolbarMenuProps) {
         aria-expanded={open}
         data-testid={testId}
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
+        className={`inline-flex h-9 pointer-coarse:h-11 pointer-coarse:min-w-11 items-center justify-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
           open
             ? "border-[var(--color-border-strong)] bg-[var(--color-surface-sunken)] text-[var(--color-ink)]"
             : "border-transparent text-[var(--color-ink-muted)] hover:border-[var(--color-border)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
@@ -118,7 +118,7 @@ function ToolbarMenu({ label, Icon, testId, children }: ToolbarMenuProps) {
   );
 }
 
-const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
+const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 py-2 pointer-coarse:min-h-11 text-left text-sm text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]";
 
 export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onDeliverExport, onShareLink, onOpenHistory }, ref) {
   const { t, locale, toggleLocale } = useLocale();
@@ -356,7 +356,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
         type="button"
         data-testid="toolbar-new"
         onClick={onNew}
-        className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+        className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
         title={`${t.newMindmap} (Cmd+N)`}
         aria-label={t.newMindmap}
       >
@@ -368,7 +368,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
         onClick={onSave}
         disabled={!document || saving}
         className={`
-          p-2 rounded-lg transition-all duration-150
+          p-2 pointer-coarse:p-[13px] rounded-lg transition-all duration-150
           ${saveError
             ? "text-red-600 bg-red-50 dark:bg-red-950/30"
             : saved
@@ -387,7 +387,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
         type="button"
         data-testid="toolbar-import"
         onClick={onImport}
-        className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+        className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
         title={`${t.importMd} (Cmd+I)`}
         aria-label={t.importMd}
       >
@@ -402,7 +402,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           aria-expanded={exportOpen}
           onClick={() => void onExport()}
           disabled={!document}
-          className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={`${t.exportMenu} (Cmd+E)`}
           aria-label={t.exportMenu}
         >
@@ -445,7 +445,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           data-testid="toolbar-share-link"
           onClick={() => void onShareLink()}
           disabled={!document}
-          className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={t.shareReadOnlyLink}
           aria-label={t.shareReadOnlyLink}
         >
@@ -458,7 +458,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           data-testid="toolbar-history"
           onClick={onOpenHistory}
           disabled={!document}
-          className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={t.historyAction}
           aria-label={t.historyAction}
         >
@@ -471,7 +471,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           data-testid="toolbar-reload"
           onClick={onReload}
           disabled={!document}
-          className="p-2 rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={`${t.reload} (Cmd+R)`}
           aria-label={t.reload}
         >
@@ -483,7 +483,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           type="button"
           data-testid="toolbar-create-from-template"
           onClick={onCreateFromTemplate}
-          className="p-2 rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={t.newFromTemplate}
           aria-label={t.newFromTemplate}
         >
@@ -495,7 +495,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           type="button"
           data-testid="toolbar-create-folder"
           onClick={onCreateFolder}
-          className="p-2 rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={t.newFolder}
           aria-label={t.newFolder}
         >
@@ -508,7 +508,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           type="button"
           data-testid="toolbar-search"
           onClick={onToggleCommandPalette}
-          className="p-2 rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={`${t.commandPalette} (Cmd+K)`}
           aria-label={t.commandPalette}
         >

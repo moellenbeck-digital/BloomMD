@@ -52,7 +52,7 @@ export function FileContextMenu({ x, y, filename, title, onShare, onRename, onDe
             <>
               <button
                 onClick={() => { onShare(filename); onClose(); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 pointer-coarse:min-h-11 text-sm text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
                 data-testid="file-context-share"
               >
                 <CloudUpload size={14} className="text-[var(--color-primary)]" />
@@ -63,7 +63,7 @@ export function FileContextMenu({ x, y, filename, title, onShare, onRename, onDe
           )}
           <button
             onClick={() => { onRename(filename, title); onClose(); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 pointer-coarse:min-h-11 text-sm text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] transition-colors"
             data-testid="file-context-rename"
           >
             <Pencil size={14} className="text-[var(--color-ink-faint)]" />
@@ -72,7 +72,7 @@ export function FileContextMenu({ x, y, filename, title, onShare, onRename, onDe
           <div className="mx-2.5 my-1 h-px bg-[var(--color-border)]" />
           <button
             onClick={() => setConfirmingDelete(true)}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 pointer-coarse:min-h-11 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
             data-testid="file-context-delete"
           >
             <Trash2 size={14} />
@@ -88,14 +88,14 @@ export function FileContextMenu({ x, y, filename, title, onShare, onRename, onDe
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="flex-1 px-2.5 py-1.5 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] transition-colors"
+              className="flex-1 px-2.5 py-1.5 pointer-coarse:min-h-11 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] transition-colors"
               data-testid="file-context-cancel-delete"
             >
               {t.cancel}
             </button>
             <button
               onClick={() => { onDelete(filename, title); onClose(); }}
-              className="flex-1 px-2.5 py-1.5 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium"
+              className="flex-1 px-2.5 py-1.5 pointer-coarse:min-h-11 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium"
               data-testid="file-context-confirm-delete"
             >
               {t.deleteMindmap}

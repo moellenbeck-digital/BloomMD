@@ -244,6 +244,7 @@ jobs:
           --project=chromium-mobile
           e2e/accessibility.spec.ts
           e2e/auth-shortcuts.spec.ts
+          e2e/theme-custom.spec.ts
           e2e/release-contracts.spec.ts
           e2e/mobile-smoke.spec.ts
           e2e/workspace-agent-node.spec.ts

@@ -32,6 +32,19 @@ Ausgeschlossen sind (Projekt `chromium`):
 
 `theme-matrix.spec.ts` bleibt drin: Die Standard-Config führt es auch im Projekt `chromium` aus (nicht nur im Mobile-Projekt), hier läuft es entsprechend nur in Desktop Chrome.
 
+Die beiden Mobile-Specs laufen mit der Testsystem-Config nicht (sie hat nur Desktop Chrome). Gegen ein laufendes
+System starten sie mit der Standard-Config und dem Projekt `chromium-mobile`, solange `CI` nicht gesetzt ist (dann
+nutzt Playwright den erreichbaren Server unter `PLAYWRIGHT_BASE_URL` statt einen eigenen zu starten):
+
+```bash
+cd apps/app
+PLAYWRIGHT_BASE_URL=http://app.bloommd-test.svc.cluster.local:3000 bunx playwright test --project=chromium-mobile --grep @t66
+```
+
+`--grep @t66` wählt die Matrix; für `mobile-smoke.spec.ts` stattdessen den Dateinamen angeben.
+
+Die CI führt davon bisher nur `mobile-smoke.spec.ts` aus (`.github/workflows/ci.yml`).
+
 ## Tests einem Ticket zuordnen
 
 Neue Specs für ein Ticket tragen `@t<nr>` im Testtitel, z. B. `test("Einladung bleibt sichtbar @t147", …)`.

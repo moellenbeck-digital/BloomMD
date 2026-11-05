@@ -115,31 +115,49 @@ Seite, iOS Safari und WKWebView verkleinern nur den sichtbaren Ausschnitt (`visu
 ```bash
 cd apps/app
 bun run test:e2e -- --project=chromium-mobile e2e/mobile-matrix.spec.ts
-# gegen ein laufendes System: nicht möglich (nur Projekt chromium), die Matrix läuft nur im Mobile-Projekt
+# gegen ein laufendes System (Testmodus, siehe e2e/README.md), mit der Standard-Config:
+PLAYWRIGHT_BASE_URL=<system> bunx playwright test --project=chromium-mobile --grep @t66
 bun test ../../packages/ui/src/utils/visual-viewport.test.ts
 ```
 
-`e2e/mobile-matrix.spec.ts` (Testmarke `@t66`) und `visual-viewport.test.ts`. Die CI führt die Matrix mit dem
-Projekt `chromium-mobile` aus.
+`e2e/mobile-matrix.spec.ts` (Testmarke `@t66`) und `visual-viewport.test.ts`.
+
+Gegen ein laufendes System läuft die Matrix mit der Standard-Config `playwright.config.ts` und dem Projekt
+`chromium-mobile` (Pixel 5). Die Testsystem-Config `playwright.testsystem.config.ts` kennt nur Desktop Chrome
+und schließt `mobile-matrix.spec.ts` aus; mit ihr lässt sich die Matrix nicht ausführen.
+
+Die CI führt die Matrix derzeit **nicht** aus: `.github/workflows/ci.yml` listet für das Projekt
+`chromium-mobile` nur `e2e/mobile-smoke.spec.ts`. Vorschlag für ein Folge-Ticket: `e2e/mobile-matrix.spec.ts` in
+den Schritt „Run app Chromium end-to-end tests“ aufnehmen (siehe Abweichung 9).
 
 ## Manuell (echtes Gerät)
 
 Emulation kann das nicht: echte Tastatur, Momentum-Scrollen, Berechtigungsdialoge, Safari-Eigenheiten.
-**Datum und Gerät beim Abarbeiten eintragen.** Diese Liste ist manuell.
+**Datum und Gerät beim Abarbeiten eintragen.** Jede Zeile ist manuell (Spalte „Art“); keine davon läuft
+automatisch.
 
-| Bereich | Prüfung | Datum | Gerät | Ergebnis |
-|---|---|---|---|---|
-| Tastatur, Android Chrome (Web-App) | Knoten wählen, Editor öffnen, in den Text tippen: Feld und Cursor bleiben über der Tastatur sichtbar |  |  |  |
-| Tastatur, iOS Safari (Web-App) | wie oben; Kopfzeile bleibt sichtbar, kein weißer Streifen unter der Seite nach dem Schließen der Tastatur |  |  |  |
-| Tastatur, Capacitor Android | Bottom-Sheet öffnen, in den Text tippen: Feld sichtbar; Tastatur schließen: Sheet hat wieder die alte Höhe |  |  |  |
-| Tastatur, Capacitor iOS | wie oben; Sheet bleibt über der Tastatur (WKWebView ohne Keyboard-Plugin) |  |  |  |
-| Tastatur, Umbenennen am Knoten | Doppeltippen auf einen Knoten: Eingabefeld im Knoten bleibt sichtbar (liegt in der Karte, nicht im Editor) |  |  |  |
-| Gesten | Pinch und Zwei-Finger-Verschieben fühlen sich flüssig an (Momentum, kein Ruckeln) auf Telefon und Tablet |  |  |  |
-| Gesten, Safari iOS | Pinch auf der Karte zoomt nicht die Seite; Doppeltipp zoomt nicht |  |  |  |
-| Zielgrößen | Aktionsleiste, Aufklapp-Griff, Zoom-Steuerung, Tab-Leiste mit dem Daumen treffen, ohne Nachbarn zu erwischen |  |  |  |
-| Dateibrowser | Datei lange drücken: Kontextmenü (Umbenennen, Löschen) erscheint (Android) |  |  |  |
-| Ausrichtung | Drehen im Editor und im Drawer: nichts bricht aus dem Bild, Eingabe bleibt erhalten |  |  |  |
-| Splitscreen (iPad, Android) | Fenster schmal ziehen: Kopfzeile ohne Überlauf, Editor bedienbar |  |  |  |
+| Art | Bereich | Prüfung | Datum | Gerät | Ergebnis |
+|---|---|---|---|---|---|
+| manuell | Tastatur, Android Chrome (Web-App) | Knoten wählen, Editor öffnen, in den Text tippen: Feld und Cursor bleiben über der Tastatur sichtbar |  |  |  |
+| manuell | Tastatur, iOS Safari (Web-App) | wie oben; Kopfzeile bleibt sichtbar, kein weißer Streifen unter der Seite nach dem Schließen der Tastatur |  |  |  |
+| manuell | Tastatur, Capacitor Android | Bottom-Sheet öffnen, in den Text tippen: Feld sichtbar; Tastatur schließen: Sheet hat wieder die alte Höhe |  |  |  |
+| manuell | Tastatur, Capacitor iOS | wie oben; Sheet bleibt über der Tastatur (WKWebView ohne Keyboard-Plugin) |  |  |  |
+| manuell | Tastatur, Umbenennen am Knoten | Doppeltippen auf einen Knoten: Eingabefeld im Knoten bleibt sichtbar (liegt in der Karte, nicht im Editor) |  |  |  |
+| manuell | Gesten | Pinch und Zwei-Finger-Verschieben fühlen sich flüssig an (Momentum, kein Ruckeln) auf Telefon und Tablet |  |  |  |
+| manuell | Gesten, Safari iOS | Pinch auf der Karte zoomt nicht die Seite; Doppeltipp zoomt nicht |  |  |  |
+| manuell | Zielgrößen | Aktionsleiste, Aufklapp-Griff, Zoom-Steuerung, Tab-Leiste mit dem Daumen treffen, ohne Nachbarn zu erwischen |  |  |  |
+| manuell | Dateibrowser | Datei lange drücken: Kontextmenü (Umbenennen, Löschen) erscheint (Android) |  |  |  |
+| manuell | Ausrichtung | Drehen im Editor und im Drawer: nichts bricht aus dem Bild, Eingabe bleibt erhalten |  |  |  |
+| manuell | Splitscreen (iPad, Android) | Fenster schmal ziehen: Kopfzeile ohne Überlauf, Editor bedienbar |  |  |  |
+| manuell | Berechtigung, Capacitor iOS: Ordner öffnen | „Ordner öffnen“ zeigt die Dateien-App (`UIDocumentPickerViewController`, `BloomFolderPlugin.swift`). Der Zugriff wird als Security-Scope-Lesezeichen gespeichert, daher fragt die App nach einem Neustart nicht erneut. Prüfen: Auswahl, Abbrechen (App bleibt unverändert), Neustart (Ordner bleibt offen, kein neuer Dialog), Ordner in iCloud (Hinweis „wird geladen“) |  |  |  |
+| manuell | Berechtigung, Capacitor Android: Ordner öffnen | „Ordner öffnen“ zeigt den Systemdialog des Storage Access Framework (`ACTION_OPEN_DOCUMENT_TREE`); die Freigabe bleibt über `takePersistableUriPermission` bestehen (`BloomFolderPlugin.kt`). Prüfen: Auswahl und Freigabe, Ablehnen (App bleibt unverändert), Neustart (kein neuer Dialog), Ordner auf SD-Karte oder Cloud-Anbieter |  |  |  |
+| manuell | Berechtigung, Capacitor: Datei importieren | „Importieren“ öffnet die Systemauswahl (`<input type="file">` für `.md`, `.markdown`, `.opml`; Android: Dokumentenauswahl, iOS: Dateien). Die Auswahl selbst ist die Freigabe, die App fragt keine Berechtigung an. Prüfen: Datei wählen, Abbrechen |  |  |  |
+| manuell | Berechtigung, Capacitor: Teilen und Export | Teilen öffnet das System-Teilen-Blatt (`@capacitor/share`) mit einer Datei im App-Cache. Kein Berechtigungsdialog der App. Prüfen: Export als Markdown und PDF teilen und in Dateien/Mail ablegen |  |  |  |
+| manuell | Berechtigung, Capacitor: App-Speicher und Kontoanmeldung | Kein Dialog erwartet. Notizen liegen im App-Speicher (iOS `Documents`, Android `Data`), das Android-Manifest verlangt nur `INTERNET`, `Info.plist` enthält keinen `…UsageDescription`-Schlüssel (keine Kamera, Fotos, Mikrofon, Standort). Die Anmeldung läuft im Systembrowser (`@capacitor/browser`) und kehrt über `bloommd://auth` zurück; ob das System dafür eine Rückfrage zeigt, ist hier zu prüfen und einzutragen. Prüfen: Erststart, Notiz anlegen und speichern, Anmelden und Zurückkehren: kein Berechtigungsdialog, in den Systemeinstellungen der App keine Berechtigung aufgelistet |  |  |  |
+| manuell | Berechtigung, Web-App: Datei-Auswahl | Datei importieren (Toolbar), Datei für eine Ressource wählen (Editor) und Screenshots im Feedback-Dialog (`accept="image/png,image/jpeg,image/webp"`) öffnen die Systemauswahl. Der Code setzt kein `capture`-Attribut und fordert die Kamera nicht selbst an. Prüfen: Wenn die Auswahl auf dem Gerät Kamera oder Fotos als Quelle anbietet und danach eine Berechtigungsfrage kommt, ist das ein Dialog des Systems; Ergebnis eintragen |  |  |  |
+| manuell | Berechtigung, Web-App: lokaler Ordner | „Lokalen Markdown-Ordner öffnen“ ruft `showDirectoryPicker` (File System Access, `mode: "readwrite"`) auf und fragt bei schreibgeschützten Ordnern Schreibzugriff an (`requestPermission`); die Schaltfläche erscheint nur, wo die Funktion existiert, und in der Kopfzeile erst ab 768 px Breite. Prüfen: auf Telefon- und Tablet-Browsern, ob die Schaltfläche erscheint; wenn ja Ordnerdialog, Schreibzugriff ablehnen und erteilen; wenn nein, „nicht angeboten“ eintragen |  |  |  |
+| manuell | Berechtigung, Web-App: Zwischenablage | „Link kopieren“, Freigabelink und Zugriffstoken schreiben mit `navigator.clipboard.writeText`; gelesen wird nie. Fehler werden still verschluckt (`.catch`). Prüfen: iOS Safari und Android Chrome kopieren nach dem Tipp ohne Dialog; bei Fehler die Wirkung eintragen |  |  |  |
+| manuell | Berechtigung, Web-App und Capacitor: nicht angefordert | Kamera, Mikrofon, Standort und Benachrichtigungen werden nirgends angefordert (kein `getUserMedia`, `geolocation`, `Notification` in `apps/app/src`, `packages/ui/src`, `packages/mobile/src`). Prüfen: Der Browser (Seiteninfo) und die Systemeinstellungen der App zeigen nach einer Sitzung mit Karte, Editor, Import und Teilen keine Berechtigungsanfrage |  |  |  |
 
 ## Abweichungen
 
@@ -169,6 +187,10 @@ Gefunden, nicht behoben. Jede ist als Folge-Ticket gemeldet, nicht stillschweige
 8. **Selten bedienbare Ränder, nicht gemessen:** Dialoge der Web-App außer dem Anlegen-Dialog (Feedback, Verlauf,
    Konflikte, Theme, Befehlspalette), Marketing-Seiten und die Demo. Sie liegen außerhalb der drei Komponenten des
    Tickets und stehen nicht in der automatischen Prüfung.
+
+9. **Die CI führt die Matrix nicht aus.** `ci.yml` listet für `chromium-mobile` nur `e2e/mobile-smoke.spec.ts`.
+   Folge-Ticket-Vorschlag: `e2e/mobile-matrix.spec.ts` in den Schritt „Run app Chromium end-to-end tests“
+   aufnehmen. Das ist eine Änderung an der Pipeline und gehört nicht in dieses Ticket.
 
 ## Stand
 

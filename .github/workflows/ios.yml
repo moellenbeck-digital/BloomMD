@@ -49,17 +49,21 @@ jobs:
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
       - name: Unit tests (app and folder plugin)
+        id: unit
         working-directory: packages/mobile
         run: bun run test
       - name: Build web assets with the simulator self-test
+        id: web
         working-directory: packages/mobile
         env:
           VITE_BLOOMMD_SELFTEST: "1"
         run: bun run build
       - name: Sync Capacitor iOS project
+        id: sync
         working-directory: packages/mobile
         run: bunx cap sync ios
       - name: Build for the iOS simulator
+        id: build
         working-directory: packages/mobile/ios/App
         run: |
           set -euo pipefail
@@ -69,6 +73,7 @@ jobs:
             CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build | tail -20
           # Ad-hoc signed: the keychain check fails with -34018 in an unsigned simulator build.
       - name: Run the self-test on an iPad simulator
+        id: selftest
         run: |
           set -euo pipefail
           # Newest iOS runtime, and the newest iPad Pro that runtime supports (old models are not).
@@ -92,12 +97,51 @@ jobs:
           cat "$data/Documents/selftest-result.json"
           jq -e '.passed == true' "$data/Documents/selftest-result.json"
       - name: Keep the simulator screenshot
+        id: screenshot
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ipad-selftest
           path: ${{ runner.temp }}/ipad-selftest.png
           if-no-files-found: ignore
+      # The self-test build of the app (VITE_BLOOMMD_SELFTEST=1), ad-hoc signed, for the simulator. If the build
+      # failed there is no App.app and no artifact; the job summary says so.
+      - name: Zip the simulator app
+        id: zip
+        if: always()
+        run: |
+          app="$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
+          if [ -d "$app" ]; then
+            ditto -c -k --keepParent "$app" "$RUNNER_TEMP/ios-simulator-app.zip"
+          else
+            echo "::notice::No simulator app was built, so there is no ios-simulator-app artifact."
+          fi
+      - name: Keep the simulator app
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ios-simulator-app
+          path: ${{ runner.temp }}/ios-simulator-app.zip
+          if-no-files-found: ignore
+      - name: Job summary
+        if: always()
+        working-directory: packages/mobile
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          node scripts/ci-summary.mjs --title "iOS: simulator build and self-test (iPad)" \
+            --step unit="Unit tests (app and folder plugin)" \
+            --step web="Web assets with the self-test" \
+            --step sync="Capacitor iOS sync" \
+            --step build="Simulator build (xcodebuild)" \
+            --step selftest="Self-test on the iPad simulator" \
+            --step screenshot="Screenshot upload" \
+            --step zip="Zip of the simulator app" \
+            --artifact-name ios-simulator-app --artifact-file "$RUNNER_TEMP/ios-simulator-app.zip" --artifact-step upload \
+            --artifact-missing "the simulator build did not produce an App.app (see the build step above)." \
+            --extra "the iPhone form factor (the self-test runs on an iPad simulator only)" \
+            --extra "signed builds and the TestFlight upload (ios-release.yml)" >> "$GITHUB_STEP_SUMMARY"
 
   release-build:
     runs-on: macos-26
@@ -110,15 +154,19 @@ jobs:
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
       - name: Xcode version matches package.json
+        id: xcode
         working-directory: packages/mobile
         run: bun scripts/ios-version.ts --check
       - name: Build web assets (no self-test)
+        id: web
         working-directory: packages/mobile
         run: bun run build
       - name: Sync Capacitor iOS project
+        id: sync
         working-directory: packages/mobile
         run: bunx cap sync ios
       - name: Build Release for iOS devices (unsigned)
+        id: build
         working-directory: packages/mobile/ios/App
         run: |
           set -euo pipefail
@@ -126,5 +174,20 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO build | tail -20
       - name: Check the Release app
+        id: check
         working-directory: packages/mobile
         run: scripts/check-ios-release.sh "$RUNNER_TEMP/dd/Build/Products/Release-iphoneos/App.app"
+      - name: Job summary
+        if: always()
+        working-directory: packages/mobile
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          node scripts/ci-summary.mjs --title "iOS: unsigned release build" \
+            --step xcode="Xcode version matches package.json" \
+            --step web="Web assets (no self-test)" \
+            --step sync="Capacitor iOS sync" \
+            --step build="Release build for devices (unsigned)" \
+            --step check="Release app check (scripts/check-ios-release.sh)" \
+            --extra "starting the unsigned release app (it is built and inspected, never run)" \
+            --extra "signing, the store review checks and the TestFlight upload (ios-release.yml)" >> "$GITHUB_STEP_SUMMARY"

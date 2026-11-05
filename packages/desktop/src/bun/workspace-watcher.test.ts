@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import type { Stats } from "node:fs";
 import { ignoreWorkspaceWatchPath, watchWorkspace } from "./workspace-watcher";
 
 test("watcher excludes hidden directories and dependency trees", () => {
@@ -9,6 +10,20 @@ test("watcher excludes hidden directories and dependency trees", () => {
   expect(ignoreWorkspaceWatchPath("/vault", "/vault/node_modules/a.md")).toBe(true);
   expect(ignoreWorkspaceWatchPath("/vault", "/vault")).toBe(false);
   expect(ignoreWorkspaceWatchPath("/vault", "/vault/notes")).toBe(false);
+});
+
+test("watcher path filter keeps Markdown in any case and works without stats", () => {
+  const file = { isFile: () => true, isDirectory: () => false } as Stats;
+  const directory = { isFile: () => false, isDirectory: () => true } as Stats;
+  // chokidar first asks without stats (path only), then again with stats from the scan.
+  for (const name of ["a.md", "a.MD", "a.markdown", "nested/Note.MARKDOWN"]) {
+    expect(ignoreWorkspaceWatchPath("/vault", `/vault/${name}`)).toBe(false);
+    expect(ignoreWorkspaceWatchPath("/vault", `/vault/${name}`, file)).toBe(false);
+  }
+  expect(ignoreWorkspaceWatchPath("/vault", "/vault/a.txt", file)).toBe(true);
+  expect(ignoreWorkspaceWatchPath("/vault", "/vault/nested", directory)).toBe(false);
+  expect(ignoreWorkspaceWatchPath("/vault", "/vault/.git/b.md", file)).toBe(true);
+  expect(ignoreWorkspaceWatchPath("/vault", "/vault/nested/node_modules/b.md", file)).toBe(true);
 });
 
 test("recursive watcher delivers Markdown additions, changes and removals", async () => {

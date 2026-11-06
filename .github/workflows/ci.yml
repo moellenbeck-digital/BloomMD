@@ -253,6 +253,15 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             playwright-chromium-${{ runner.os }}-
+      # PackageKit is not needed in CI. In runs 42179754419 (touch-views) and 42179754589
+      # (full-e2e) all 6 attempts of `apt-get install -y --no-install-recommends libasound2t64 ...`
+      # hung for 120 s, and in each of them a packagekitd (/usr/libexec/packagekitd) that had started
+      # seconds before ran next to the stuck apt-get. Jobs without it installed in 10 to 21 s (#307).
+      # The cause inside apt is not proven: if a hang still happens, the annotation names wchan,
+      # children and lock owners.
+      - name: Stop PackageKit before apt runs
+        timeout-minutes: 2
+        run: sudo systemctl mask --now packagekit.service || echo "::warning title=PackageKit::could not mask packagekit.service"
       # Two steps instead of `playwright install --with-deps`: the browser cache above only covers
       # the browser download, while the apt part runs on every job. Each part retries on its own, and
       # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut

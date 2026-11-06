@@ -23,7 +23,7 @@ afterEach(() => rmSync(base, { recursive: true, force: true }));
 
 /**
  * A fake command. `plan` has one entry per attempt: `ok`, `hang`, `orphan`, `orphan-apt`,
- * `needs-idle-apt` or a line to print before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
+ * `orphan-apt-long`, `needs-idle-apt` or a line to print before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
  * session (like the root-owned apt-get behind sudo) ignores SIGTERM and keeps the inherited
  * stdout open after the parent is gone. `orphan-apt` is the same, but the leftover child is a
  * fake `apt-get` (a script that sleeps) that keeps the dpkg lock for 3 s after the attempt was cut
@@ -45,6 +45,7 @@ case "$step" in
   ok) echo "fake: ok"; exit 0 ;;
   hang) sleep 30 ;;
   orphan-apt) echo "fake: apt-get stuck"; setsid "${base}/${holderName}" 3 & wait ;;
+  orphan-apt-long) echo "fake: apt-get stuck"; setsid "${base}/${holderName}" 20 & wait ;;
   needs-idle-apt)
     # Shell builtins only: a loop that forks cat for every process takes seconds on a busy runner.
     for dir in /proc/[0-9]*; do
@@ -175,13 +176,33 @@ describe("ci-retry-network", () => {
     expect(result.output).toContain("::notice title=Fake::apt/dpkg idle after");
   });
 
-  test("a cut-off attempt leaves apt running: the next attempt waits for it instead of hitting the dpkg lock", () => {
-    const result = run(fakeCommand(["orphan-apt", "needs-idle-apt"]), ["--timeout", "1", "--lock-wait", "10"]);
+  test("terminates the apt-get a cut-off attempt left behind, then the next attempt gets the lock", () => {
+    const started = Date.now();
+    const result = run(fakeCommand(["orphan-apt-long", "needs-idle-apt"]), ["--timeout", "1", "--lock-wait", "2"]);
     expect(result.code).toBe(0);
     expect(attemptsMade()).toBe(2);
-    expect(result.output).toMatch(new RegExp(`::warning title=Fake::attempt 1/3 failed \\(no result within 1s.*\\[still running: ${holderName}\\(pid \\d+`));
-    expect(result.output).toContain("::warning title=Fake::waiting up to 10s for apt/dpkg to be idle");
+    expect(Date.now() - started).toBeLessThan(15000);
+    expect(result.output).toMatch(new RegExp(`::warning title=Fake::attempt 1/3 failed \\(no result within 1s.*\\[still running: ${holderName}\\(pid \\d+, \\d+s: `));
+    expect(result.output).toMatch(new RegExp(`::warning title=Fake::terminating apt processes left behind by the failed attempt: ${holderName}\\(pid \\d+`));
+    expect(result.output).not.toContain("waiting up to");
     expect(result.output).toContain("fake: apt idle, installed");
+  });
+
+  test("leaves an apt process alone that was already running before the attempt", () => {
+    const command = fakeCommand(["hang", "ok"]);
+    const holder = Bun.spawn([join(base, holderName), "8"]);
+    const result = run(command, ["--timeout", "1", "--lock-wait", "1"]);
+    let alive = true;
+    try {
+      process.kill(holder.pid, 0);
+    } catch {
+      alive = false;
+    }
+    holder.kill();
+    expect(result.code).toBe(0);
+    expect(attemptsMade()).toBe(2);
+    expect(alive).toBe(true);
+    expect(result.output).not.toContain("terminating apt processes");
   });
 
   test("without --lock-wait the lock error is retried as before (no waiting)", () => {

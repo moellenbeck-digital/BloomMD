@@ -258,12 +258,15 @@ jobs:
       # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut
       # off per attempt instead of eating the whole 10 minutes; every failed attempt is a
       # ::warning:: in the log with the last apt error line, and the last failure is a hard red
-      # (#141). A cut-off attempt leaves the root-owned apt-get running; it keeps the dpkg lock, and
-      # an immediate retry failed with "Unable to acquire the dpkg frontend lock" (#307). So the
-      # system-dependencies step waits up to 120 s before every attempt until apt/dpkg is idle and
-      # names the holder in a warning. Worst case 3 x (120 s wait + 120 s attempt) + 2 x 15 s pause =
-      # 750 s, hence the 15-minute step limit. The cache key is the same as in mobile.yml (one Playwright version, set by bun.lock),
-      # so a run on main fills the cache for both workflows.
+      # (#141). A cut-off attempt does not stop the root-owned apt-get: it keeps the dpkg lock, and an
+      # immediate retry failed with "Unable to acquire the dpkg frontend lock". In runs 42172271748
+      # and 42178351349 that apt-get was the one of the first attempt itself, still running after
+      # 385 s, next to a packagekitd (#307). With --lock-wait the system-dependencies step ends the
+      # apt processes a failed attempt left behind (never dpkg), waits up to 120 s before every
+      # attempt until apt/dpkg is idle, and names every process in a warning. Worst case
+      # 3 x (120 s wait + 120 s attempt + 5 s ending) + 2 x 15 s pause = 765 s, hence the 15-minute
+      # step limit. The cache key is the same as in mobile.yml (one Playwright version, set by
+      # bun.lock), so a run on main fills the cache for both workflows.
       - name: Install Playwright system dependencies
         working-directory: apps/app
         timeout-minutes: 15

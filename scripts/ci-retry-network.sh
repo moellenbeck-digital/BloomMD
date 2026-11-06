@@ -20,12 +20,18 @@
 # end of the output and the attempt timeout never takes effect: the step then runs into its own
 # step timeout without a single annotation (runs 40512358219 and 42048082284, #307).
 #
-# apt/dpkg lock: cutting off an attempt does not stop the root-owned apt-get behind sudo, it keeps
-# running and holds the dpkg lock, so a retry right after fails at once with "Unable to acquire the
-# dpkg frontend lock" (run 42172271748, #307). A fresh runner can also still be busy with
-# unattended-upgrades. With --lock-wait N the script waits before every attempt, for at most N
-# seconds, until no apt/dpkg process is running, and names the processes it waits for in a
-# `::warning::`. After N seconds it says so and tries anyway. Default 0: no waiting.
+# apt/dpkg lock: cutting off an attempt does not stop the root-owned apt-get behind sudo. It keeps
+# running, holds the dpkg lock, and a retry right after fails at once with "Unable to acquire the
+# dpkg frontend lock". Runs 42172271748 and 42178351349 (#307): the holder was the apt-get of the
+# first attempt itself, still running after 385 s, next to a packagekitd that started 5 s earlier.
+# Waiting does not help against that, so with --lock-wait N the script
+#   1. terminates the apt processes (never dpkg) that appeared during a failed attempt and are
+#      still running (SIGTERM, after 5 s SIGKILL, with `sudo -n` when they belong to root), and
+#      names them in a `::warning::`;
+#   2. before every attempt waits at most N seconds until no apt/dpkg process is running (a fresh
+#      runner can still be busy with unattended-upgrades, dpkg may be finishing), naming what it
+#      waits for; after N seconds it says so and tries anyway.
+# Default 0: neither terminates nor waits.
 #
 # Annotations: a failed attempt names the last apt or network error line of the output. A timeout
 # lists the processes still running afterwards and the tail of /var/log/dpkg.log.
@@ -96,10 +102,10 @@ last_error_line() {
   printf ' [%s]' "$line"
 }
 
-# Running apt/dpkg processes as `name(pid N, Ns)`, space separated, empty if none. Reads /proc
+# Running apt/dpkg processes, one line each: `pid comm age-in-seconds command line`. Reads /proc
 # directly: ps and pgrep are not guaranteed, and root-owned processes are visible there.
-apt_holders() {
-  local dir comm stat rest uptime started out=""
+apt_scan() {
+  local dir comm stat rest uptime started cmd
   local -a fields
   read -r uptime _ </proc/uptime
   for dir in /proc/[0-9]*; do
@@ -111,9 +117,49 @@ apt_holders() {
     read -r -a fields <<<"$rest"
     [ "${fields[0]:-Z}" = "Z" ] && continue
     started="${fields[19]:-0}"
-    out="$out${out:+ }$comm(pid ${dir#/proc/}, $(( ${uptime%.*} - started / clock_ticks ))s)"
+    cmd="$(tr '\0' ' ' <"$dir/cmdline" 2>/dev/null)"
+    echo "${dir#/proc/} $comm $(( ${uptime%.*} - started / clock_ticks )) ${cmd:0:80}"
   done
+}
+
+# The same as `name(pid N, Ns: command line)`, space separated, empty if none.
+apt_holders() {
+  local pid comm age cmd out=""
+  while read -r pid comm age cmd; do
+    out="$out${out:+ }$comm(pid $pid, ${age}s: ${cmd% })"
+  done < <(apt_scan)
   printf '%s' "$out"
+}
+
+# Process ids of the running apt/dpkg processes, one per line.
+apt_pids() {
+  local pid _rest
+  while read -r pid _rest; do echo "$pid"; done < <(apt_scan)
+}
+
+signal_pid() {
+  kill "-$1" "$2" 2>/dev/null && return 0
+  command -v sudo >/dev/null 2>&1 && sudo -n kill "-$1" "$2" 2>/dev/null
+}
+
+# After a failed attempt: terminate the apt processes (not dpkg) that were not running before the
+# attempt started (ids in $1, one per line). Returns after they are gone or SIGKILLed.
+reap_apt_leftovers() {
+  local before="$1" pid comm age cmd names="" pids=() waited
+  while read -r pid comm age cmd; do
+    case "$comm" in dpkg*) continue ;; esac
+    grep -qx "$pid" <<<"$before" && continue
+    names="$names${names:+ }$comm(pid $pid, ${age}s)"
+    pids+=("$pid")
+  done < <(apt_scan)
+  [ "${#pids[@]}" -gt 0 ] || return 0
+  echo "::warning title=$label::terminating apt processes left behind by the failed attempt: $names"
+  for pid in "${pids[@]}"; do signal_pid TERM "$pid"; done
+  for waited in 1 2 3 4 5; do
+    sleep 1
+    grep -qxFf <(apt_pids) <<<"$(printf '%s\n' "${pids[@]}")" || return 0
+  done
+  for pid in "${pids[@]}"; do signal_pid KILL "$pid"; done
 }
 
 # Before an attempt: wait for apt/dpkg to be idle, at most --lock-wait seconds.
@@ -137,6 +183,11 @@ wait_for_apt_idle() {
 # After a timeout: what is still running and what dpkg logged last, as a collapsed log group.
 hang_diagnostics() {
   echo "::group::[$label] state after the timeout"
+  local pid comm age cmd wchan
+  while read -r pid comm age cmd; do
+    read -r wchan <"/proc/$pid/wchan" 2>/dev/null || wchan="?"
+    echo "$comm pid $pid, running ${age}s, waiting in kernel function: $wchan, command: $cmd"
+  done < <(apt_scan)
   if command -v ps >/dev/null 2>&1; then
     ps -eo pid,ppid,etimes,user:12,stat,args --sort=start_time 2>/dev/null | grep -Ei 'apt|dpkg|playwright|sudo|unattended|needrestart|PID' | grep -v 'grep -Ei' | cut -c1-220
   fi
@@ -147,9 +198,11 @@ hang_diagnostics() {
   echo "::endgroup::"
 }
 
+before=""
 attempt=1
 while true; do
   wait_for_apt_idle
+  [ "$lock_wait" -gt 0 ] && before="$(apt_pids)"
   echo "[$label] attempt $attempt/$attempts (timeout ${attempt_timeout}s): $*"
   : >"$log"
   timeout -k 10 "$attempt_timeout" "$@" >"$log" 2>&1 </dev/null &
@@ -182,6 +235,8 @@ while true; do
     echo "::error title=$label::failed with exit code $status; not a network or package-source error, not retried${evidence}"
     exit "$status"
   fi
+
+  [ "$lock_wait" -gt 0 ] && reap_apt_leftovers "$before"
 
   if [ "$attempt" -ge "$attempts" ]; then
     echo "::error title=$label::attempt $attempt/$attempts failed ($reason); giving up${evidence}"

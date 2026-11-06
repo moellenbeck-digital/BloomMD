@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+- CI Playwright-Install (Ticket 307, Nacharbeit): Nach einem abgebrochenen Versuch läuft das root-eigene `apt-get` weiter und hält die dpkg-Sperre, der nächste Versuch scheiterte sofort mit „Unable to acquire the dpkg frontend lock“. Der Wrapper wartet jetzt vor jedem Versuch bis zu 120 Sekunden, bis apt/dpkg frei ist, und nennt den haltenden Prozess in einer Warnung.
+- CI Playwright install (ticket 307, follow-up): after a cut-off attempt the root-owned `apt-get` keeps running and holds the dpkg lock, so the next attempt failed at once with "Unable to acquire the dpkg frontend lock". The wrapper now waits up to 120 seconds before every attempt until apt/dpkg is idle and names the holding process in a warning.
 - CI stabilisiert (Ticket 307): Der Wrapper `scripts/ci-retry-network.sh` für den Playwright-Install schneidet einen hängenden Versuch jetzt nach dem Versuchs-Timeout wirklich ab (bisher hielt ein überlebender Kindprozess die Ausgabe offen, und der Schritt lief bis zum 10-Minuten-Limit). Eine fehlgeschlagene apt-/Netzwerk-Prüfung nennt die letzte Fehlerzeile in der Annotation, `ci.yml` und `mobile.yml` teilen sich den Playwright-Cache-Schlüssel, und `CONTRIBUTING.md` hält fest, dass rote Läufe als Fehler gelten.
 - CI stabilised (ticket 307): the `scripts/ci-retry-network.sh` wrapper around the Playwright install now really cuts off a hung attempt after the attempt timeout (before, a surviving child process kept the output open and the step ran into the 10-minute limit). A failed apt or network check names the last error line in the annotation, `ci.yml` and `mobile.yml` share one Playwright cache key, and `CONTRIBUTING.md` states that red runs count as failures.
 

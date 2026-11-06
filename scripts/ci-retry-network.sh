@@ -2,7 +2,7 @@
 #
 # Runs a CI command with a bounded retry for network and package-source failures only (#141).
 #
-#   scripts/ci-retry-network.sh [--label NAME] [--attempts N] [--timeout SECONDS] [--pause SECONDS] -- COMMAND...
+#   scripts/ci-retry-network.sh [--label NAME] [--attempts N] [--timeout SECONDS] [--pause SECONDS] [--lock-wait SECONDS] -- COMMAND...
 #
 # Why: installs that fetch from apt mirrors or the Playwright CDN sometimes hang until the whole
 # step times out (about 10 minutes) instead of failing fast. Every attempt gets its own timeout,
@@ -20,6 +20,13 @@
 # end of the output and the attempt timeout never takes effect: the step then runs into its own
 # step timeout without a single annotation (runs 40512358219 and 42048082284, #307).
 #
+# apt/dpkg lock: cutting off an attempt does not stop the root-owned apt-get behind sudo, it keeps
+# running and holds the dpkg lock, so a retry right after fails at once with "Unable to acquire the
+# dpkg frontend lock" (run 42172271748, #307). A fresh runner can also still be busy with
+# unattended-upgrades. With --lock-wait N the script waits before every attempt, for at most N
+# seconds, until no apt/dpkg process is running, and names the processes it waits for in a
+# `::warning::`. After N seconds it says so and tries anyway. Default 0: no waiting.
+#
 # Annotations: a failed attempt names the last apt or network error line of the output. A timeout
 # lists the processes still running afterwards and the tail of /var/log/dpkg.log.
 #
@@ -31,6 +38,7 @@ label="command"
 attempts=3
 attempt_timeout=120
 pause=15
+lock_wait=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -38,6 +46,7 @@ while [ "$#" -gt 0 ]; do
     --attempts) attempts="${2:?--attempts needs a value}"; shift 2 ;;
     --timeout) attempt_timeout="${2:?--timeout needs a value}"; shift 2 ;;
     --pause) pause="${2:?--pause needs a value}"; shift 2 ;;
+    --lock-wait) lock_wait="${2:?--lock-wait needs a value}"; shift 2 ;;
     --) shift; break ;;
     *) echo "::error::ci-retry-network: unknown option $1" >&2; exit 2 ;;
   esac
@@ -47,8 +56,8 @@ if [ "$#" -eq 0 ]; then
   echo "::error::ci-retry-network: no command given (use -- COMMAND...)" >&2
   exit 2
 fi
-case "$attempts$attempt_timeout$pause" in
-  *[!0-9]*) echo "::error::ci-retry-network: --attempts, --timeout and --pause must be whole numbers" >&2; exit 2 ;;
+case "$attempts$attempt_timeout$pause$lock_wait" in
+  *[!0-9]*) echo "::error::ci-retry-network: --attempts, --timeout, --pause and --lock-wait must be whole numbers" >&2; exit 2 ;;
 esac
 if [ "$attempts" -lt 1 ] || [ "$attempt_timeout" -lt 1 ]; then
   echo "::error::ci-retry-network: --attempts and --timeout must be at least 1" >&2
@@ -58,6 +67,11 @@ fi
 # Output that marks a transient network or package-source problem. Deliberately narrow:
 # "Unable to locate package", unknown flags or compiler errors are real failures.
 network_pattern='Temporary failure resolving|Could not resolve|Could not connect|Failed to fetch|Unable to fetch some archives|Connection (timed out|reset|refused|failed)|Network is unreachable|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ESOCKETTIMEDOUT|socket hang up|getaddrinfo|Hash Sum mismatch|Mirror sync in progress|Release file .* is not valid yet|Download failed|Timeout was reached|Bad Gateway|Service Unavailable|Gateway Time-?out|HTTP/[0-9.]+ 5[0-9][0-9]|status code 5[0-9][0-9]|(error|Err:[0-9]+).*https?://.* 5[0-9][0-9]|Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory'
+# Process names (/proc/PID/comm, 15 characters at most) that hold the apt/dpkg lock. Overridable
+# for the tests.
+apt_holders_pattern="${CI_RETRY_APT_HOLDERS:-^(apt|apt-get|apt-cache|aptitude|dpkg|dpkg-preconfigu|unattended-upgr|apt\.systemd\.dai|apt-daily|apt-daily-upgr|packagekitd|needrestart)$}"
+clock_ticks="$(getconf CLK_TCK 2>/dev/null || echo 100)"
+
 # Lines worth quoting in an annotation: apt's own E:/Err: lines first, otherwise the network match.
 error_line_pattern='^(E|Err:[0-9]+|W): |^Err:[0-9]+ '
 
@@ -82,6 +96,44 @@ last_error_line() {
   printf ' [%s]' "$line"
 }
 
+# Running apt/dpkg processes as `name(pid N, Ns)`, space separated, empty if none. Reads /proc
+# directly: ps and pgrep are not guaranteed, and root-owned processes are visible there.
+apt_holders() {
+  local dir comm stat rest uptime started out=""
+  local -a fields
+  read -r uptime _ </proc/uptime
+  for dir in /proc/[0-9]*; do
+    [ "${dir#/proc/}" = "$$" ] && continue
+    read -r comm <"$dir/comm" 2>/dev/null || continue
+    [[ "$comm" =~ $apt_holders_pattern ]] || continue
+    stat="$(<"$dir/stat")" 2>/dev/null || continue
+    rest="${stat##*) }"
+    read -r -a fields <<<"$rest"
+    [ "${fields[0]:-Z}" = "Z" ] && continue
+    started="${fields[19]:-0}"
+    out="$out${out:+ }$comm(pid ${dir#/proc/}, $(( ${uptime%.*} - started / clock_ticks ))s)"
+  done
+  printf '%s' "$out"
+}
+
+# Before an attempt: wait for apt/dpkg to be idle, at most --lock-wait seconds.
+wait_for_apt_idle() {
+  [ "$lock_wait" -gt 0 ] || return 0
+  local holders began="$SECONDS"
+  holders="$(apt_holders)"
+  [ -n "$holders" ] || return 0
+  echo "::warning title=$label::waiting up to ${lock_wait}s for apt/dpkg to be idle; running: $holders"
+  while [ $((SECONDS - began)) -lt "$lock_wait" ]; do
+    sleep 1
+    holders="$(apt_holders)"
+    if [ -z "$holders" ]; then
+      echo "::notice title=$label::apt/dpkg idle after $((SECONDS - began))s"
+      return 0
+    fi
+  done
+  echo "::warning title=$label::apt/dpkg still busy after ${lock_wait}s ($holders); trying anyway"
+}
+
 # After a timeout: what is still running and what dpkg logged last, as a collapsed log group.
 hang_diagnostics() {
   echo "::group::[$label] state after the timeout"
@@ -97,6 +149,7 @@ hang_diagnostics() {
 
 attempt=1
 while true; do
+  wait_for_apt_idle
   echo "[$label] attempt $attempt/$attempts (timeout ${attempt_timeout}s): $*"
   : >"$log"
   timeout -k 10 "$attempt_timeout" "$@" >"$log" 2>&1 </dev/null &
@@ -118,6 +171,8 @@ while true; do
   fi
 
   evidence="$(last_error_line)"
+  holders="$(apt_holders)"
+  [ -z "$holders" ] || evidence="$evidence [still running: $holders]"
   if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
     reason="no result within ${attempt_timeout}s (hung network or package source)"
     hang_diagnostics

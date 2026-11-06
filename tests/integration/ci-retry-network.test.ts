@@ -3,7 +3,7 @@
  * Runs the real script against small fake commands that count their own attempts.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -18,10 +18,12 @@ beforeEach(() => {
 afterEach(() => rmSync(base, { recursive: true, force: true }));
 
 /**
- * A fake command. `plan` has one entry per attempt: `ok`, `hang`, `orphan` or a line to print
- * before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
+ * A fake command. `plan` has one entry per attempt: `ok`, `hang`, `orphan`, `orphan-apt`,
+ * `needs-idle-apt` or a line to print before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
  * session (like the root-owned apt-get behind sudo) ignores SIGTERM and keeps the inherited
- * stdout open after the parent is gone. The attempt counter lives in a file so every attempt sees its number.
+ * stdout open after the parent is gone. `orphan-apt` is the same, but the leftover child is a
+ * fake `apt-get` (an alias of sleep) that keeps the dpkg lock for 3 s after the attempt was cut
+ * off. `needs-idle-apt` fails like apt does while a fake apt-get is running and succeeds otherwise. The attempt counter lives in a file so every attempt sees its number.
  */
 function fakeCommand(plan: string[]): string {
   const counter = join(base, "counter");
@@ -38,12 +40,23 @@ step=$(sed -n "\${n}p" "${planFile}")
 case "$step" in
   ok) echo "fake: ok"; exit 0 ;;
   hang) sleep 30 ;;
+  orphan-apt) echo "fake: apt-get stuck"; setsid "${base}/fake-apt-get" 3 & wait ;;
+  needs-idle-apt)
+    for comm in /proc/[0-9]*/comm; do
+      stat="$(cat "\${comm%comm}stat" 2>/dev/null)"; stat="\${stat##*) }"
+      [ "\${stat:0:1}" = "Z" ] && continue
+      if [ "$(cat "$comm" 2>/dev/null)" = "fake-apt-get" ]; then
+        echo "E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?"; exit 1
+      fi
+    done
+    echo "fake: apt idle, installed"; exit 0 ;;
   orphan) echo "fake: apt-get stuck"; setsid bash -c 'trap "" TERM; exec sleep 8' & wait ;;
   *) echo "$step"; exit 1 ;;
 esac
 `,
   );
   chmodSync(command, 0o755);
+  symlinkSync(Bun.which("sleep") ?? "/usr/bin/sleep", join(base, "fake-apt-get"));
   return command;
 }
 
@@ -55,6 +68,7 @@ function run(command: string, options: string[] = []): { code: number; output: s
   const proc = Bun.spawnSync(["bash", script, "--label", "Fake", "--pause", "0", ...options, "--", command], {
     stdout: "pipe",
     stderr: "pipe",
+    env: { ...process.env, CI_RETRY_APT_HOLDERS: "^fake-apt-get$" },
   });
   return { code: proc.exitCode, output: proc.stdout.toString() + proc.stderr.toString() };
 }
@@ -138,9 +152,52 @@ describe("ci-retry-network", () => {
     expect(result.output).toContain("::warning title=Fake::attempt 1/3 failed");
   });
 
+  test("waits for a running apt before the first attempt, names it, and then runs once", () => {
+    const command = fakeCommand(["needs-idle-apt"]);
+    const holder = Bun.spawn([join(base, "fake-apt-get"), "3"]);
+    const started = Date.now();
+    const result = run(command, ["--lock-wait", "10"]);
+    holder.kill();
+    expect(result.code).toBe(0);
+    expect(attemptsMade()).toBe(1);
+    expect(Date.now() - started).toBeGreaterThan(1500);
+    expect(result.output).toMatch(/::warning title=Fake::waiting up to 10s for apt\/dpkg to be idle; running: fake-apt-get\(pid \d+/);
+    expect(result.output).toContain("::notice title=Fake::apt/dpkg idle after");
+  });
+
+  test("a cut-off attempt leaves apt running: the next attempt waits for it instead of hitting the dpkg lock", () => {
+    const result = run(fakeCommand(["orphan-apt", "needs-idle-apt"]), ["--timeout", "1", "--lock-wait", "10"]);
+    expect(result.code).toBe(0);
+    expect(attemptsMade()).toBe(2);
+    expect(result.output).toMatch(/::warning title=Fake::attempt 1\/3 failed \(no result within 1s.*\[still running: fake-apt-get\(pid \d+/);
+    expect(result.output).toContain("::warning title=Fake::waiting up to 10s for apt/dpkg to be idle");
+    expect(result.output).toContain("fake: apt idle, installed");
+  });
+
+  test("without --lock-wait the lock error is retried as before (no waiting)", () => {
+    const result = run(fakeCommand(["orphan-apt", "needs-idle-apt", "needs-idle-apt"]), ["--timeout", "1", "--attempts", "3"]);
+    expect(result.code).toBe(1);
+    expect(result.output).not.toContain("waiting up to");
+    expect(result.output).toContain("::error title=Fake::attempt 3/3 failed");
+  });
+
+  test("gives up waiting after the budget, says so and still tries", () => {
+    const command = fakeCommand(["needs-idle-apt"]);
+    const holder = Bun.spawn([join(base, "fake-apt-get"), "5"]);
+    const started = Date.now();
+    const result = run(command, ["--lock-wait", "1", "--attempts", "1"]);
+    const elapsed = Date.now() - started;
+    holder.kill();
+    expect(result.code).toBe(1);
+    expect(result.output).toMatch(/::warning title=Fake::apt\/dpkg still busy after 1s \(fake-apt-get\(pid \d+.*\); trying anyway/);
+    expect(result.output).toContain("::error title=Fake::attempt 1/1 failed");
+    expect(elapsed).toBeLessThan(4500);
+  });
+
   test("rejects a missing command and bad numbers", () => {
     expect(Bun.spawnSync(["bash", script], { stdout: "pipe", stderr: "pipe" }).exitCode).toBe(2);
     expect(Bun.spawnSync(["bash", script, "--attempts", "x", "--", "true"], { stdout: "pipe", stderr: "pipe" }).exitCode).toBe(2);
     expect(Bun.spawnSync(["bash", script, "--attempts", "0", "--", "true"], { stdout: "pipe", stderr: "pipe" }).exitCode).toBe(2);
+    expect(Bun.spawnSync(["bash", script, "--lock-wait", "x", "--", "true"], { stdout: "pipe", stderr: "pipe" }).exitCode).toBe(2);
   });
 });

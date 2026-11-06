@@ -57,13 +57,14 @@ jobs:
           restore-keys: |
             playwright-chromium-${{ runner.os }}-
       # Same cache key, two steps and retries as the end-to-end job in ci.yml: the browser cache only
-      # covers the download, the system packages are installed on every run.
+      # covers the download, the system packages are installed on every run. The wait for apt/dpkg
+      # (--lock-wait) and the 15-minute limit are explained in ci.yml.
       - name: Install Playwright system dependencies
         working-directory: packages/mobile
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: >-
           "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
-          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15
+          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15 --lock-wait 120
           -- ./node_modules/.bin/playwright install-deps chromium
       - name: Install Playwright browser
         working-directory: packages/mobile

@@ -262,7 +262,7 @@ Browser folder workspaces never enter this cloud path: the selected directory ha
 ## Installation
 
 ```bash
-# Node.js 22 and Bun 1.3.x
+# Node.js 22 and Bun 1.4.x
 bun install
 
 # Web

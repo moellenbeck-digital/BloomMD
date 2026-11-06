@@ -1,5 +1,5 @@
 # The plugin is built separately so the runtime stays the official OpenClaw image.
-FROM oven/bun:1.3.14-alpine AS plugin-build
+FROM oven/bun:1.4.4-alpine AS plugin-build
 WORKDIR /workspace
 COPY package.json bun.lock ./
 COPY apps/app/package.json apps/app/package.json

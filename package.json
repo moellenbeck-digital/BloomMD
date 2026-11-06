@@ -109,5 +109,8 @@
   },
   "devDependencies": {
     "playwright-core": "1.62.1"
+  },
+  "patchedDependencies": {
+    "electrobun@1.18.1": "patches/electrobun@1.18.1.patch"
   }
 }

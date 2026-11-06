@@ -5,6 +5,7 @@
 FROM oven/bun:1.4.4 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
+COPY patches patches
 COPY packages/core/package.json packages/core/package.json
 COPY packages/agent-runtime/package.json packages/agent-runtime/package.json
 COPY packages/wiki-cli/package.json packages/wiki-cli/package.json

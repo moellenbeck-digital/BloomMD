@@ -544,6 +544,9 @@
       "version": "0.4.4",
     },
   },
+  "patchedDependencies": {
+    "electrobun@1.18.1": "patches/electrobun@1.18.1.patch",
+  },
   "overrides": {
     "@types/bun": "1.4.4",
     "@xmldom/xmldom": "0.9.12",

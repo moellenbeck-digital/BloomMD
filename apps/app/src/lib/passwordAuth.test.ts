@@ -20,7 +20,7 @@ describe("isAuthRequired defaults", () => {
   const setEnv = (requireAuth: string | undefined, nodeEnv: string) => {
     if (requireAuth === undefined) delete process.env.BLOOMMD_REQUIRE_AUTH;
     else process.env.BLOOMMD_REQUIRE_AUTH = requireAuth;
-    Object.defineProperty(process.env, "NODE_ENV", { value: nodeEnv, configurable: true });
+    Object.defineProperty(process.env, "NODE_ENV", { value: nodeEnv, configurable: true, enumerable: true, writable: true });
   };
 
   afterEach(() => {

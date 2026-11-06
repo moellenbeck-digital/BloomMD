@@ -175,6 +175,29 @@ jobs:
           done
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E '^bloommd-' | sort
           echo "::notice title=bun --version in images::plugin-build=$(docker run --rm --entrypoint bun bloommd-openclaw-plugin-build:ci --version) app-deps=$(docker run --rm --entrypoint bun bloommd-app-deps:ci --version) runner=$(bun --version)"
+      - name: TEMPORARY image size comparison (#304)
+        run: |
+          set -euo pipefail
+          for variant in before after; do
+            if [ "$variant" = before ]; then
+              sed 's#FROM oven/bun:[0-9.a-z-]* AS deps#FROM oven/bun:1.3.14 AS deps#' Dockerfile > /tmp/Dockerfile.variant
+              sed 's#FROM oven/bun:[0-9.a-z-]* AS plugin-build#FROM oven/bun:1.3.14-alpine AS plugin-build#' deploy/openclaw/Dockerfile > deploy/openclaw/Dockerfile.variant
+            else
+              cp Dockerfile /tmp/Dockerfile.variant
+              cp deploy/openclaw/Dockerfile deploy/openclaw/Dockerfile.variant
+            fi
+            sizes=""
+            for target in deps workspace sync app marketing; do
+              docker build --file /tmp/Dockerfile.variant --target "$target" --tag "size-check:${variant}-${target}" . >/dev/null
+              sizes="${sizes} ${target}=$(docker image inspect --format '{{.Size}}' "size-check:${variant}-${target}")"
+            done
+            docker build --file deploy/openclaw/Dockerfile.variant --target plugin-build --tag "size-check:${variant}-plugin-build" . >/dev/null
+            sizes="${sizes} openclaw-builder=$(docker image inspect --format '{{.Size}}' "size-check:${variant}-plugin-build")"
+            docker build --file deploy/openclaw/Dockerfile.variant --tag "size-check:${variant}-openclaw" . >/dev/null
+            sizes="${sizes} openclaw-final=$(docker image inspect --format '{{.Size}}' "size-check:${variant}-openclaw")"
+            echo "::notice title=size ${variant}::${sizes}"
+            docker system prune --all --force >/dev/null
+          done
 
   full-e2e:
     runs-on: ubuntu-latest

@@ -253,19 +253,35 @@ jobs:
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             playwright-chromium-${{ runner.os }}-
+      # PackageKit is not needed in CI. In runs 42179754419 (touch-views) and 42179754589
+      # (full-e2e) all 6 attempts of `apt-get install -y --no-install-recommends libasound2t64 ...`
+      # hung for 120 s, and in each of them a packagekitd (/usr/libexec/packagekitd) that had started
+      # seconds before ran next to the stuck apt-get. Jobs without it installed in 10 to 21 s (#307).
+      # The cause inside apt is not proven: if a hang still happens, the annotation names wchan,
+      # children and lock owners.
+      - name: Stop PackageKit before apt runs
+        timeout-minutes: 2
+        run: sudo systemctl mask --now packagekit.service || echo "::warning title=PackageKit::could not mask packagekit.service"
       # Two steps instead of `playwright install --with-deps`: the browser cache above only covers
       # the browser download, while the apt part runs on every job. Each part retries on its own, and
       # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut
       # off per attempt instead of eating the whole 10 minutes; every failed attempt is a
       # ::warning:: in the log with the last apt error line, and the last failure is a hard red
-      # (#141). The cache key is the same as in mobile.yml (one Playwright version, set by bun.lock),
-      # so a run on main fills the cache for both workflows.
+      # (#141). A cut-off attempt does not stop the root-owned apt-get: it keeps the dpkg lock, and an
+      # immediate retry failed with "Unable to acquire the dpkg frontend lock". In runs 42172271748
+      # and 42178351349 that apt-get was the one of the first attempt itself, still running after
+      # 385 s, next to a packagekitd (#307). With --lock-wait the system-dependencies step ends the
+      # apt processes a failed attempt left behind (never dpkg), waits up to 120 s before every
+      # attempt until apt/dpkg is idle, and names every process in a warning. Worst case
+      # 3 x (120 s wait + 120 s attempt + 5 s ending) + 2 x 15 s pause = 765 s, hence the 15-minute
+      # step limit. The cache key is the same as in mobile.yml (one Playwright version, set by
+      # bun.lock), so a run on main fills the cache for both workflows.
       - name: Install Playwright system dependencies
         working-directory: apps/app
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: >-
           "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
-          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15
+          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15 --lock-wait 120
           -- ./node_modules/.bin/playwright install-deps chromium
       - name: Install Playwright browser
         working-directory: apps/app

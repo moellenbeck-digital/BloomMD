@@ -34,7 +34,8 @@
 # Default 0: neither terminates nor waits.
 #
 # Annotations: a failed attempt names the last apt or network error line of the output. A timeout
-# lists the processes still running afterwards and the tail of /var/log/dpkg.log.
+# lists the processes still running afterwards with command line, where they wait (wchan), their
+# children and the owners of the apt/dpkg lock files, plus the tail of /var/log/dpkg.log in the log.
 #
 # Exit code: 0 on success, otherwise the exit code of the last attempt (124 after a timeout).
 
@@ -180,6 +181,35 @@ wait_for_apt_idle() {
   echo "::warning title=$label::apt/dpkg still busy after ${lock_wait}s ($holders); trying anyway"
 }
 
+# One line of kernel-level context for a hung apt: where each apt process waits (wchan), its
+# children, and which process holds the apt/dpkg lock files (inode match in /proc/locks).
+hang_detail() {
+  local pid comm age cmd wchan kids out="" dir child_comm child_stat child_rest file inode lock_pid lock_dev lock_comm
+  local -a fields
+  while read -r pid comm age cmd; do
+    read -r wchan <"/proc/$pid/wchan" 2>/dev/null || wchan="?"
+    kids=""
+    for dir in /proc/[0-9]*; do
+      child_stat="$(<"$dir/stat")" 2>/dev/null || continue
+      child_rest="${child_stat##*) }"
+      read -r -a fields <<<"$child_rest"
+      [ "${fields[1]:-}" = "$pid" ] || continue
+      read -r child_comm <"$dir/comm" 2>/dev/null || continue
+      kids="$kids${kids:+,}$child_comm(${dir#/proc/})"
+    done
+    out="$out${out:+; }$comm pid $pid wchan=${wchan:-0} children=${kids:-none}"
+  done < <(apt_scan)
+  for file in /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock; do
+    inode="$(stat -c %i "$file" 2>/dev/null)" || continue
+    while read -r _ _ _ _ lock_pid lock_dev _; do
+      [[ "$lock_dev" == *":$inode" ]] || continue
+      read -r lock_comm <"/proc/$lock_pid/comm" 2>/dev/null || lock_comm="?"
+      out="$out${out:+; }${file#/var/} held by $lock_comm pid $lock_pid"
+    done </proc/locks
+  done
+  printf '%s' "${out:0:700}"
+}
+
 # After a timeout: what is still running and what dpkg logged last, as a collapsed log group.
 hang_diagnostics() {
   echo "::group::[$label] state after the timeout"
@@ -228,6 +258,8 @@ while true; do
   [ -z "$holders" ] || evidence="$evidence [still running: $holders]"
   if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
     reason="no result within ${attempt_timeout}s (hung network or package source)"
+    detail="$(hang_detail)"
+    [ -z "$detail" ] || evidence="$evidence [detail: $detail]"
     hang_diagnostics
   elif grep -Eiq "$network_pattern" "$log"; then
     reason="network or package-source error (exit code $status)"

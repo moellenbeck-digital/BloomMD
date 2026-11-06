@@ -186,6 +186,7 @@ describe("ci-retry-network", () => {
     expect(result.output).toMatch(new RegExp(`::warning title=Fake::terminating apt processes left behind by the failed attempt: ${holderName}\\(pid \\d+`));
     expect(result.output).not.toContain("waiting up to");
     expect(result.output).toContain("fake: apt idle, installed");
+    expect(result.output).toMatch(new RegExp(`\\[detail: ${holderName} pid \\d+ wchan=\\S+ children=`));
   });
 
   test("leaves an apt process alone that was already running before the attempt", () => {

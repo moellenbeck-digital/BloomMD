@@ -10,9 +10,13 @@ import { join, resolve } from "node:path";
 const script = join(resolve(import.meta.dir, "..", ".."), "scripts", "ci-retry-network.sh");
 
 let base = "";
+// Process name of the fake apt-get. Unique per test (comm holds 15 characters at most), so that
+// processes of other test runs on the same machine are never mistaken for it.
+let holderName = "";
 
 beforeEach(() => {
   base = mkdtempSync(join(tmpdir(), "bloommd-ci-retry-"));
+  holderName = `fa-${base.slice(-6)}`;
 });
 
 afterEach(() => rmSync(base, { recursive: true, force: true }));
@@ -40,14 +44,16 @@ step=$(sed -n "\${n}p" "${planFile}")
 case "$step" in
   ok) echo "fake: ok"; exit 0 ;;
   hang) sleep 30 ;;
-  orphan-apt) echo "fake: apt-get stuck"; setsid "${base}/fake-apt-get" 3 & wait ;;
+  orphan-apt) echo "fake: apt-get stuck"; setsid "${base}/${holderName}" 3 & wait ;;
   needs-idle-apt)
-    for comm in /proc/[0-9]*/comm; do
-      stat="$(cat "\${comm%comm}stat" 2>/dev/null)"; stat="\${stat##*) }"
+    # Shell builtins only: a loop that forks cat for every process takes seconds on a busy runner.
+    for dir in /proc/[0-9]*; do
+      read -r comm <"$dir/comm" 2>/dev/null || continue
+      [ "$comm" = "${holderName}" ] || continue
+      read -r stat <"$dir/stat" 2>/dev/null || continue
+      stat="\${stat##*) }"
       [ "\${stat:0:1}" = "Z" ] && continue
-      if [ "$(cat "$comm" 2>/dev/null)" = "fake-apt-get" ]; then
-        echo "E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?"; exit 1
-      fi
+      echo "E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?"; exit 1
     done
     echo "fake: apt idle, installed"; exit 0 ;;
   orphan) echo "fake: apt-get stuck"; setsid bash -c 'trap "" TERM; exec sleep 8' & wait ;;
@@ -58,7 +64,7 @@ esac
   chmodSync(command, 0o755);
   // A script, not a symlink to sleep: comm of a script is its file name, while a symlinked
   // multi-call coreutils (uutils on newer Ubuntu runners) refuses to run under an unknown name.
-  const fakeApt = join(base, "fake-apt-get");
+  const fakeApt = join(base, holderName);
   writeFileSync(fakeApt, `#!${Bun.which("bash") ?? "/bin/bash"}\nsleep "$1"\n`);
   chmodSync(fakeApt, 0o755);
   return command;
@@ -72,7 +78,7 @@ function run(command: string, options: string[] = []): { code: number; output: s
   const proc = Bun.spawnSync(["bash", script, "--label", "Fake", "--pause", "0", ...options, "--", command], {
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, CI_RETRY_APT_HOLDERS: "^fake-apt-get$" },
+    env: { ...process.env, CI_RETRY_APT_HOLDERS: `^${holderName}$` },
   });
   return { code: proc.exitCode, output: proc.stdout.toString() + proc.stderr.toString() };
 }
@@ -158,14 +164,14 @@ describe("ci-retry-network", () => {
 
   test("waits for a running apt before the first attempt, names it, and then runs once", () => {
     const command = fakeCommand(["needs-idle-apt"]);
-    const holder = Bun.spawn([join(base, "fake-apt-get"), "3"]);
+    const holder = Bun.spawn([join(base, holderName), "3"]);
     const started = Date.now();
     const result = run(command, ["--lock-wait", "10"]);
     holder.kill();
     expect(result.code).toBe(0);
     expect(attemptsMade()).toBe(1);
     expect(Date.now() - started).toBeGreaterThan(1500);
-    expect(result.output).toMatch(/::warning title=Fake::waiting up to 10s for apt\/dpkg to be idle; running: fake-apt-get\(pid \d+/);
+    expect(result.output).toMatch(new RegExp(`::warning title=Fake::waiting up to 10s for apt/dpkg to be idle; running: ${holderName}\\(pid \\d+`));
     expect(result.output).toContain("::notice title=Fake::apt/dpkg idle after");
   });
 
@@ -173,7 +179,7 @@ describe("ci-retry-network", () => {
     const result = run(fakeCommand(["orphan-apt", "needs-idle-apt"]), ["--timeout", "1", "--lock-wait", "10"]);
     expect(result.code).toBe(0);
     expect(attemptsMade()).toBe(2);
-    expect(result.output).toMatch(/::warning title=Fake::attempt 1\/3 failed \(no result within 1s.*\[still running: fake-apt-get\(pid \d+/);
+    expect(result.output).toMatch(new RegExp(`::warning title=Fake::attempt 1/3 failed \\(no result within 1s.*\\[still running: ${holderName}\\(pid \\d+`));
     expect(result.output).toContain("::warning title=Fake::waiting up to 10s for apt/dpkg to be idle");
     expect(result.output).toContain("fake: apt idle, installed");
   });
@@ -187,13 +193,13 @@ describe("ci-retry-network", () => {
 
   test("gives up waiting after the budget, says so and still tries", () => {
     const command = fakeCommand(["needs-idle-apt"]);
-    const holder = Bun.spawn([join(base, "fake-apt-get"), "5"]);
+    const holder = Bun.spawn([join(base, holderName), "5"]);
     const started = Date.now();
     const result = run(command, ["--lock-wait", "1", "--attempts", "1"]);
     const elapsed = Date.now() - started;
     holder.kill();
     expect(result.code).toBe(1);
-    expect(result.output).toMatch(/::warning title=Fake::apt\/dpkg still busy after 1s \(fake-apt-get\(pid \d+.*\); trying anyway/);
+    expect(result.output).toMatch(new RegExp(`::warning title=Fake::apt/dpkg still busy after 1s \\(${holderName}\\(pid \\d+.*\\); trying anyway`));
     expect(result.output).toContain("::error title=Fake::attempt 1/1 failed");
     expect(elapsed).toBeLessThan(4500);
   });

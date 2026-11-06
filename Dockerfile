@@ -2,7 +2,7 @@
 
 # Dependencies only: no build metadata (SHA, time) and no sources, so this stage and its install
 # layer keep the same cache key and digest across commits until bun.lock or a package.json changes.
-FROM oven/bun:1.4.4 AS deps
+FROM oven/bun:1.4.4-slim AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY patches patches

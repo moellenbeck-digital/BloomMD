@@ -3,7 +3,7 @@
  * Runs the real script against small fake commands that count their own attempts.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -22,7 +22,7 @@ afterEach(() => rmSync(base, { recursive: true, force: true }));
  * `needs-idle-apt` or a line to print before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
  * session (like the root-owned apt-get behind sudo) ignores SIGTERM and keeps the inherited
  * stdout open after the parent is gone. `orphan-apt` is the same, but the leftover child is a
- * fake `apt-get` (an alias of sleep) that keeps the dpkg lock for 3 s after the attempt was cut
+ * fake `apt-get` (a script that sleeps) that keeps the dpkg lock for 3 s after the attempt was cut
  * off. `needs-idle-apt` fails like apt does while a fake apt-get is running and succeeds otherwise. The attempt counter lives in a file so every attempt sees its number.
  */
 function fakeCommand(plan: string[]): string {
@@ -56,7 +56,11 @@ esac
 `,
   );
   chmodSync(command, 0o755);
-  symlinkSync(Bun.which("sleep") ?? "/usr/bin/sleep", join(base, "fake-apt-get"));
+  // A script, not a symlink to sleep: comm of a script is its file name, while a symlinked
+  // multi-call coreutils (uutils on newer Ubuntu runners) refuses to run under an unknown name.
+  const fakeApt = join(base, "fake-apt-get");
+  writeFileSync(fakeApt, `#!${Bun.which("bash") ?? "/bin/bash"}\nsleep "$1"\n`);
+  chmodSync(fakeApt, 0o755);
   return command;
 }
 

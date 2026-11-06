@@ -94,7 +94,12 @@ describe("desktop shared document ↔ sync integration", () => {
     cleanups.push(() => server.stop(true));
     cleanups.push(() => serverDoc.destroy());
 
-    const desktopDoc = documentToYDoc(parseFile("shared.md", initialMarkdown));
+    // The desktop starts without history and receives the cloud document through the provider, as
+    // the app does. Building it from the same Markdown would create a second, independent Yjs
+    // history whose first writes race the server's by client id: the local update then lost the
+    // conflict about every other run.
+    const DocConstructor = serverDoc.constructor as new () => typeof serverDoc;
+    const desktopDoc = new DocConstructor();
     cleanups.push(() => desktopDoc.destroy());
     let localFileMarkdown = initialMarkdown;
     let localPublishCalls = 0;
@@ -129,6 +134,7 @@ describe("desktop shared document ↔ sync integration", () => {
     cleanups.push(() => provider.destroy());
     provider.connect();
     await waitFor(() => statuses.includes("connected") && room.clients.size === 1, "Desktop provider did not connect to sync server.");
+    await waitFor(() => yDocToDocument(desktopDoc).nodes.size > 0, "Desktop did not receive the cloud document.");
 
     const localMarkdown = markdown("Local update", "Written by the desktop file watcher.");
     // A watcher only notifies after the user has already saved this Markdown to disk.

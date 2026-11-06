@@ -53,11 +53,11 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-mobile-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            playwright-mobile-${{ runner.os }}-
-      # Same two steps and retries as the end-to-end job in ci.yml: the browser cache only covers the
-      # download, the system packages are installed on every run.
+            playwright-chromium-${{ runner.os }}-
+      # Same cache key, two steps and retries as the end-to-end job in ci.yml: the browser cache only
+      # covers the download, the system packages are installed on every run.
       - name: Install Playwright system dependencies
         working-directory: packages/mobile
         timeout-minutes: 10

@@ -18,8 +18,10 @@ beforeEach(() => {
 afterEach(() => rmSync(base, { recursive: true, force: true }));
 
 /**
- * A fake command. `plan` has one entry per attempt: `ok`, `hang` or a line to print before
- * exiting with code 1. The attempt counter lives in a file so every attempt sees its number.
+ * A fake command. `plan` has one entry per attempt: `ok`, `hang`, `orphan` or a line to print
+ * before exiting with code 1. `orphan` mimics `playwright install-deps`: a child in its own
+ * session (like the root-owned apt-get behind sudo) ignores SIGTERM and keeps the inherited
+ * stdout open after the parent is gone. The attempt counter lives in a file so every attempt sees its number.
  */
 function fakeCommand(plan: string[]): string {
   const counter = join(base, "counter");
@@ -36,6 +38,7 @@ step=$(sed -n "\${n}p" "${planFile}")
 case "$step" in
   ok) echo "fake: ok"; exit 0 ;;
   hang) sleep 30 ;;
+  orphan) echo "fake: apt-get stuck"; setsid bash -c 'trap "" TERM; exec sleep 8' & wait ;;
   *) echo "$step"; exit 1 ;;
 esac
 `,
@@ -101,6 +104,38 @@ describe("ci-retry-network", () => {
     expect(result.code).toBe(124);
     expect(attemptsMade()).toBe(2);
     expect(result.output).toContain("::error title=Fake::attempt 2/2 failed");
+  });
+
+  test("a hung attempt is cut off in time even when a child outlives it and keeps the output open", () => {
+    const command = fakeCommand(["orphan"]);
+    const started = Date.now();
+    const result = run(command, ["--timeout", "1", "--attempts", "1"]);
+    const elapsed = Date.now() - started;
+    expect(result.code).toBe(124);
+    expect(result.output).toContain("::error title=Fake::attempt 1/1 failed (no result within 1s");
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  test("shows the last apt or network error line in the annotation", () => {
+    const result = run(fakeCommand(["E: Failed to fetch http://archive.ubuntu.com/pool/x.deb  503  Service Unavailable"]), [
+      "--attempts",
+      "1",
+    ]);
+    expect(result.code).toBe(1);
+    expect(result.output).toMatch(/::error title=Fake::attempt 1\/1 failed .*E: Failed to fetch http:\/\/archive\.ubuntu\.com\/pool\/x\.deb/);
+  });
+
+  test("shows the last apt error line when an error is not retried", () => {
+    const result = run(fakeCommand(["E: Unable to locate package libdoesnotexist"]));
+    expect(result.code).toBe(1);
+    expect(result.output).toMatch(/::error title=Fake::failed with exit code 1;.*E: Unable to locate package libdoesnotexist/);
+  });
+
+  test("retries when another process holds the dpkg lock", () => {
+    const result = run(fakeCommand(["E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 1234 (unattended-upgr)", "ok"]));
+    expect(result.code).toBe(0);
+    expect(attemptsMade()).toBe(2);
+    expect(result.output).toContain("::warning title=Fake::attempt 1/3 failed");
   });
 
   test("rejects a missing command and bad numbers", () => {

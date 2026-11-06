@@ -14,6 +14,15 @@
 # like a network or package-source problem (a missing package, a bad argument, a code error) is
 # not retried at all and fails at once.
 #
+# Hangs: the command writes to a log file, not to a pipe, and the wrapper only waits for the command
+# itself. With `timeout ... | tee` a child that outlives the killed command (for example the
+# root-owned apt-get behind sudo, which ignores the signal) keeps the pipe open, tee never sees the
+# end of the output and the attempt timeout never takes effect: the step then runs into its own
+# step timeout without a single annotation (runs 40512358219 and 42048082284, #307).
+#
+# Annotations: a failed attempt names the last apt or network error line of the output. A timeout
+# lists the processes still running afterwards and the tail of /var/log/dpkg.log.
+#
 # Exit code: 0 on success, otherwise the exit code of the last attempt (124 after a timeout).
 
 set -uo pipefail
@@ -48,16 +57,58 @@ fi
 
 # Output that marks a transient network or package-source problem. Deliberately narrow:
 # "Unable to locate package", unknown flags or compiler errors are real failures.
-network_pattern='Temporary failure resolving|Could not resolve|Could not connect|Failed to fetch|Unable to fetch some archives|Connection (timed out|reset|refused|failed)|Network is unreachable|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ESOCKETTIMEDOUT|socket hang up|getaddrinfo|Hash Sum mismatch|Mirror sync in progress|Release file .* is not valid yet|Download failed|Timeout was reached|Bad Gateway|Service Unavailable|Gateway Time-?out|HTTP/[0-9.]+ 5[0-9][0-9]|status code 5[0-9][0-9]|(error|Err:[0-9]+).*https?://.* 5[0-9][0-9]'
+network_pattern='Temporary failure resolving|Could not resolve|Could not connect|Failed to fetch|Unable to fetch some archives|Connection (timed out|reset|refused|failed)|Network is unreachable|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ESOCKETTIMEDOUT|socket hang up|getaddrinfo|Hash Sum mismatch|Mirror sync in progress|Release file .* is not valid yet|Download failed|Timeout was reached|Bad Gateway|Service Unavailable|Gateway Time-?out|HTTP/[0-9.]+ 5[0-9][0-9]|status code 5[0-9][0-9]|(error|Err:[0-9]+).*https?://.* 5[0-9][0-9]|Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock directory'
+# Lines worth quoting in an annotation: apt's own E:/Err: lines first, otherwise the network match.
+error_line_pattern='^(E|Err:[0-9]+|W): |^Err:[0-9]+ '
 
 log="$(mktemp)"
-trap 'rm -f "$log"' EXIT
+tail_pid=""
+cleanup() {
+  [ -n "$tail_pid" ] && kill "$tail_pid" 2>/dev/null
+  rm -f "$log"
+}
+trap cleanup EXIT
+
+# One line for a `::warning::`/`::error::` annotation: the last apt error line of the output,
+# else the last network match; newlines and percent signs are escaped for the workflow command.
+last_error_line() {
+  local line
+  line="$(grep -E "$error_line_pattern" "$log" | tail -n 1)"
+  [ -n "$line" ] || line="$(grep -Ei "$network_pattern" "$log" | tail -n 1)"
+  [ -n "$line" ] || return 0
+  line="${line:0:300}"
+  line="${line//'%'/%25}"
+  line="${line//$'\r'/}"
+  printf ' [%s]' "$line"
+}
+
+# After a timeout: what is still running and what dpkg logged last, as a collapsed log group.
+hang_diagnostics() {
+  echo "::group::[$label] state after the timeout"
+  if command -v ps >/dev/null 2>&1; then
+    ps -eo pid,ppid,etimes,user:12,stat,args --sort=start_time 2>/dev/null | grep -Ei 'apt|dpkg|playwright|sudo|unattended|needrestart|PID' | grep -v 'grep -Ei' | cut -c1-220
+  fi
+  if [ -r /var/log/dpkg.log ]; then
+    echo "--- /var/log/dpkg.log (last 15 lines)"
+    tail -n 15 /var/log/dpkg.log
+  fi
+  echo "::endgroup::"
+}
 
 attempt=1
 while true; do
   echo "[$label] attempt $attempt/$attempts (timeout ${attempt_timeout}s): $*"
-  timeout -k 10 "$attempt_timeout" "$@" 2>&1 | tee "$log"
-  status="${PIPESTATUS[0]}"
+  : >"$log"
+  timeout -k 10 "$attempt_timeout" "$@" >"$log" 2>&1 </dev/null &
+  command_pid=$!
+  # Live output while the command runs; --pid ends the follower with the command, not with the
+  # file's last writer.
+  tail -n +1 -s 0.2 -f --pid="$command_pid" "$log" &
+  tail_pid=$!
+  wait "$command_pid"
+  status=$?
+  wait "$tail_pid" 2>/dev/null
+  tail_pid=""
 
   if [ "$status" -eq 0 ]; then
     if [ "$attempt" -gt 1 ]; then
@@ -66,21 +117,23 @@ while true; do
     exit 0
   fi
 
+  evidence="$(last_error_line)"
   if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
     reason="no result within ${attempt_timeout}s (hung network or package source)"
+    hang_diagnostics
   elif grep -Eiq "$network_pattern" "$log"; then
     reason="network or package-source error (exit code $status)"
   else
-    echo "::error title=$label::failed with exit code $status; not a network or package-source error, not retried"
+    echo "::error title=$label::failed with exit code $status; not a network or package-source error, not retried${evidence}"
     exit "$status"
   fi
 
   if [ "$attempt" -ge "$attempts" ]; then
-    echo "::error title=$label::attempt $attempt/$attempts failed ($reason); giving up"
+    echo "::error title=$label::attempt $attempt/$attempts failed ($reason); giving up${evidence}"
     exit "$status"
   fi
 
-  echo "::warning title=$label::attempt $attempt/$attempts failed ($reason); retrying in ${pause}s"
+  echo "::warning title=$label::attempt $attempt/$attempts failed ($reason); retrying in ${pause}s${evidence}"
   sleep "$pause"
   attempt=$((attempt + 1))
 done

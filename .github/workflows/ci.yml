@@ -154,6 +154,17 @@ jobs:
         run: bun run --cwd apps/app db:migrate
       - name: Run unit tests
         run: bun run test
+      - name: DB tests ran without skips
+        # Second run on the already used database (order/isolation check); the counts go into a
+        # notice annotation on the run, and a skipped or missing DB test fails the job.
+        run: |
+          set -euo pipefail
+          bun test tests/integration/*-db.integration.test.ts 2>&1 | tee "$RUNNER_TEMP/db-tests.log"
+          count() { { grep -E "^ *[0-9]+ $1\$" "$RUNNER_TEMP/db-tests.log" || true; } | awk '{print $1}' | tail -1; }
+          pass="$(count pass)"; skip="$(count skip)"; fail="$(count fail)"
+          echo "::notice title=DB tests::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
+          test "${pass:-0}" -gt 0
+          test "${skip:-0}" -eq 0
       - name: Validate M1 QA matrix and test plan
         run: bun run test:qa
       - name: Build web

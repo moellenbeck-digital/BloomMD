@@ -250,14 +250,16 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/app/package.json', 'apps/marketing/package.json') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            playwright-${{ runner.os }}-
+            playwright-chromium-${{ runner.os }}-
       # Two steps instead of `playwright install --with-deps`: the browser cache above only covers
       # the browser download, while the apt part runs on every job. Each part retries on its own, and
       # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut
       # off per attempt instead of eating the whole 10 minutes; every failed attempt is a
-      # ::warning:: in the log, and the last failure is a hard red (#141).
+      # ::warning:: in the log with the last apt error line, and the last failure is a hard red
+      # (#141). The cache key is the same as in mobile.yml (one Playwright version, set by bun.lock),
+      # so a run on main fills the cache for both workflows.
       - name: Install Playwright system dependencies
         working-directory: apps/app
         timeout-minutes: 10

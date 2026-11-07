@@ -253,13 +253,14 @@ test.describe.serial("Plausible-Tracking gegen den Produktions-Build @t299", () 
     await expectPageview(() => page.goto(`${app.base}/`), "/login");
     await expectPageview(() => page.goto(`${app.base}/app`), "/login");
     await expectPageview(() => page.goto(`${app.base}/login?lang=en&next=/app#anker`), "/login");
-    await expectPageview(() => page.goto(`${app.base}/signup`), "/signup");
+    // `/signup` führt in diesem Env (ohne Bypass) auf `/login`; `/impressum` ist öffentlich und bleibt, wie es ist.
+    await expectPageview(() => page.goto(`${app.base}/impressum`), "/impressum");
     await expectPageview(() => page.goto(`${app.base}/share/${TOKEN}?x=1#y`), "/share/:token");
 
     // Navigation ohne Neuladen (History-API wie der Next-Router): Token, Query, Hash und unbekannte Route.
     await expectPageview(() => page.evaluate((token) => history.pushState({}, "Geheimer Titel", `/invite/${token}?lang=en#h`), TOKEN), "/invite/:token");
     await expectPageview(() => page.evaluate(() => history.pushState({}, "", "/wiki/privater-titel?q=geheim#abschnitt")), "/other");
-    await expectPageview(() => page.evaluate(() => history.pushState({}, "", "/impressum")), "/impressum");
+    await expectPageview(() => page.evaluate(() => history.pushState({}, "", "/agb")), "/agb");
 
     // Was der Browser an die eigene Herkunft schickt, ist schon sauber und geht nur an /_plausible/api/event.
     const posts = seen.plausibleRequests.filter((entry) => entry.method === "POST");

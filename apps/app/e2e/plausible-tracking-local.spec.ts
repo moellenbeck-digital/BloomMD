@@ -226,18 +226,27 @@ test.describe.serial("Plausible-Tracking gegen den Produktions-Build @t299", () 
     expect(app.log()).toContain("Browser: AN, nur auf dem Host localhost");
     expect(app.log()).toContain(`Ziel http://127.0.0.1:${COUNTERPART_PORT}`);
     expect(app.log()).toContain("Server-Signal: AUS");
+
+    // Der Seitenaufbau oben ist ein Ereignis; abwarten, damit es nicht in den nächsten Test hineinläuft.
+    await expect.poll(() => counterpart.events.length, { timeout: 15_000 }).toBe(1);
   });
 
   test("K4: Seitenaufbau und Navigation senden Routenmuster ohne ID, Token, Query, Hash und Titel, Antwort 202 @t299", async ({ page, request }) => {
     const seen = observe(page);
 
+    // Jede Navigation ergibt genau ein Ereignis (das Script meldet einen Pfad nur beim Wechsel des Musters). Die
+    // Gegenstelle bekommt die Ereignisse asynchron; deshalb zählt der Test kumulativ und wartet auf die genaue Zahl,
+    // statt Neues seit einem Zeitpunkt zu vergleichen (ein spätes Ereignis der vorigen Seite verschöbe sonst alles).
+    const baseline = counterpart.events.length;
+    const expectedPaths: string[] = [];
     async function expectPageview(go: () => Promise<unknown>, expectedPath: string) {
-      const before = counterpart.events.length;
+      expectedPaths.push(expectedPath);
       await go();
-      await expect.poll(() => counterpart.events.length, { timeout: 15_000, message: `Ereignis für ${expectedPath}` }).toBeGreaterThan(before);
+      await expect.poll(() => counterpart.events.length, { timeout: 15_000, message: `Ereignis für ${expectedPath}` }).toBe(baseline + expectedPaths.length);
       await page.waitForLoadState("networkidle");
-      const fresh = counterpart.events.slice(before);
-      for (const event of fresh) expectScrubbedEvent(event, expectedPath);
+      await page.waitForTimeout(300);
+      expect(counterpart.events.length, `genau ein Ereignis je Navigation (nach ${expectedPath})`).toBe(baseline + expectedPaths.length);
+      expectScrubbedEvent(counterpart.events[counterpart.events.length - 1], expectedPath);
     }
 
     // Seitenaufbau (Hartes Laden). `/` und `/app` führen ohne Login auf `/login`.
@@ -273,6 +282,8 @@ test.describe.serial("Plausible-Tracking gegen den Produktions-Build @t299", () 
     }, EVENT_PATH);
     expect(fromPage.status).toBe(202);
     expect(fromPage.setCookie).toBeNull();
+    // Ein gültiges Ereignis wird weitergegeben; abwarten, damit der Stand für die nächsten Prüfungen feststeht.
+    await expect.poll(() => counterpart.events.length, { timeout: 15_000 }).toBe(baseline + expectedPaths.length + 1);
 
     // Feindlicher Request: Query, Token, Titel, Properties, Referrer werden verworfen; fremde Ereignisnamen gar nicht erst weitergegeben.
     const beforeHostile = counterpart.events.length;
@@ -283,7 +294,7 @@ test.describe.serial("Plausible-Tracking gegen den Produktions-Build @t299", () 
     });
     expect(hostile.status()).toBe(202);
     expect(hostile.headers()["set-cookie"]).toBeUndefined();
-    await expect.poll(() => counterpart.events.length).toBe(beforeHostile + 1);
+    await expect.poll(() => counterpart.events.length, { timeout: 15_000 }).toBe(beforeHostile + 1);
     expectScrubbedEvent(counterpart.events[counterpart.events.length - 1], "/share/:token");
     const forwarded = counterpart.requests[counterpart.requests.length - 1];
     expect(forwarded.headers["cookie"]).toBeUndefined();

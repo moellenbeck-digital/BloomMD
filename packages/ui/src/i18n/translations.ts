@@ -94,6 +94,9 @@ export interface Translations {
   loadPreview: string;
   loadWebsitePreview: string;
   savedPreview: string;
+  previewDisclosure: string;
+  previewEmpty: string;
+  previewImageRequest: string;
   openUrl: string;
   targetMap: string;
   selectMap: string;
@@ -655,6 +658,9 @@ export const translations: Record<Locale, Translations> = {
     loadPreview: "Vorschau laden...",
     loadWebsitePreview: "Website-Vorschau laden",
     savedPreview: "Gespeicherte Vorschau",
+    previewDisclosure: "Beim Klick wird nur diese URL abgerufen: {url} (Host: {host}). Daraus werden Titel, Beschreibung und Vorschaubild gelesen. Inhalte, Dateinamen und Ordnernamen deiner Maps werden nicht gesendet. Das Vorschaubild lädt dein Browser vom Host der Seite.",
+    previewEmpty: "Keine Metadaten gefunden",
+    previewImageRequest: "Vorschaubild von {host} laden",
     openUrl: "URL öffnen",
     targetMap: "Ziel-Map",
     selectMap: "Map auswählen",
@@ -1209,6 +1215,9 @@ export const translations: Record<Locale, Translations> = {
     loadPreview: "Loading preview...",
     loadWebsitePreview: "Load website preview",
     savedPreview: "Saved preview",
+    previewDisclosure: "On click, only this URL is requested: {url} (host: {host}). Title, description and preview image are read from it. The contents, file names and folder names of your maps are not sent. Your browser loads the preview image from the page's host.",
+    previewEmpty: "No metadata found",
+    previewImageRequest: "Load preview image from {host}",
     openUrl: "Open URL",
     targetMap: "Target map",
     selectMap: "Select map",

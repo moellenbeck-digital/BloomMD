@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { MindMapNode } from "./MindMapNode";
+import { RemotePreviewImage } from "./RemotePreviewImage";
 import { MindMapEdge } from "./MindMapEdge";
 import { useMindMapStore, type LocalViewState } from "../hooks/useMindMapStore";
 import type { RootRenameEvent } from "../hooks/useMindMapLayout";
@@ -111,7 +112,7 @@ function OutlineView() {
   );
 }
 
-function PresentationView() {
+export function PresentationView() {
   const { t } = useLocale();
   const doc = useMindMapStore((state) => state.document);
   const selectedNodeId = useMindMapStore((state) => state.selectedNodeId);
@@ -148,7 +149,7 @@ function PresentationView() {
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight text-[var(--color-ink)] sm:text-6xl">{current.title}</h1>
         {websitePreview && (
           <article className="mt-7 max-w-2xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm" data-testid="presentation-website-preview">
-            {websitePreview.previewImage && <img src={websitePreview.previewImage} alt={websitePreview.previewTitle || current.title} loading="lazy" className="max-h-64 w-full object-cover" />}
+            {websitePreview.previewImage && <RemotePreviewImage key={`${current.id}:${websitePreview.previewImage}`} src={websitePreview.previewImage} alt={websitePreview.previewTitle || current.title} className="max-h-64 w-full object-cover" />}
             <div className="grid gap-2 p-5">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#C94D20]"><Globe2 size={14} /> {websiteHost || t.website}</div>
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">{websitePreview.previewTitle || current.title}</h2>

@@ -53,6 +53,7 @@ import "./NodeEditor.css";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
 import { usePlatform } from "../platform/PlatformContext";
+import { RemotePreviewImage, remoteHost } from "./RemotePreviewImage";
 import { requestNodeFocus } from "../utils/nodeFocus";
 import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
@@ -161,6 +162,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>({ url: "", file: "", targetNodeId: "", citation: "", due: "", assignee: "" });
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewEmpty, setPreviewEmpty] = useState(false);
+  // The image the user just fetched; it may show at once, any other stored image needs a click.
+  const [fetchedImage, setFetchedImage] = useState<string | null>(null);
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
   const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
   const [viewer, setViewer] = useState<ViewerRequest | null>(null);
@@ -521,8 +525,11 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     if (!url) return;
     setPreviewLoading(true);
     setPreviewError(null);
+    setPreviewEmpty(false);
     try {
       const preview = await platform.api.linkPreview(url);
+      if (!preview.title && !preview.description && !preview.image) setPreviewEmpty(true);
+      setFetchedImage(preview.image || null);
       updateMetadata({
         ...(preview.title ? { previewTitle: preview.title } : {}),
         ...(preview.description ? { previewDescription: preview.description } : {}),
@@ -738,14 +745,20 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 URL
                 <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
               </label>
+              {metadataDraft.url.trim() && (
+                <p className="text-xs leading-5 text-[var(--color-ink-muted)]" data-testid="node-preview-disclosure">
+                  {t.previewDisclosure.replace("{url}", metadataDraft.url.trim()).replace("{host}", remoteHost(metadataDraft.url.trim()) ?? metadataDraft.url.trim())}
+                </p>
+              )}
               <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 {previewLoading ? <LoaderCircle size={15} className="animate-spin" /> : <ExternalLink size={15} />}
                 {previewLoading ? t.loadPreview : t.loadWebsitePreview}
               </button>
-              {previewError && <p className="text-xs text-red-700">{previewError}</p>}
+              {previewError && <p className="text-xs text-red-700" data-testid="node-preview-error">{previewError}</p>}
+              {previewEmpty && <p className="text-xs text-[var(--color-ink-muted)]" data-testid="node-preview-empty">{t.previewEmpty}</p>}
               {(metadata?.previewTitle || metadata?.previewDescription || metadata?.previewImage) && (
                 <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
-                  {metadata.previewImage && <img src={metadata.previewImage} alt="Website preview" loading="lazy" className="h-28 w-full object-cover" />}
+                  {metadata.previewImage && <RemotePreviewImage key={`${selectedNodeId}:${metadata.previewImage}`} src={metadata.previewImage} alt="Website preview" className="h-28 w-full object-cover" autoLoad={fetchedImage === metadata.previewImage} />}
                   <div className="grid gap-1 p-3">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#C94D20]">{t.savedPreview}</span>
                     <strong className="text-sm text-[var(--color-ink)]">{metadata.previewTitle || selectedNode.title}</strong>

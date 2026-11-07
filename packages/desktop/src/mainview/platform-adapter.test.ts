@@ -46,6 +46,12 @@ describe("desktop platform adapter", () => {
     expect(calls[4]).toEqual(["rename", "plan.md", "b.md"]);
   });
 
+  test("@t91 the link preview RPC receives the URL and nothing else", async () => {
+    const { rpc, calls } = fakeRpc();
+    await createDesktopPlatformAdapter(rpc).api.linkPreview("https://x.test/page");
+    expect(calls).toEqual([["preview", "https://x.test/page"]]);
+  });
+
   test("@t79 write passes the cloud version metadata through and returns the new one", async () => {
     const storage = { mode: "database" as const, documentId: "d", workspaceId: "w", version: 3 };
     const { rpc, calls } = fakeRpc({ saveMindmap: (async (...args: unknown[]) => {

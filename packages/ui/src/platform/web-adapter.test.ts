@@ -69,6 +69,25 @@ describe("web platform adapter", () => {
     expect(calls[0]?.url).toBe("/api/link-preview?url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2");
   });
 
+  test("@t91 the link preview request carries only the URL: GET, no body, no workspace, no extra options", async () => {
+    const inits: Array<RequestInit | undefined> = [];
+    const urls: string[] = [];
+    const impl = (async (input: string | URL | Request, init?: RequestInit) => {
+      urls.push(String(input));
+      inits.push(init);
+      return json({ preview: { title: "Example" } });
+    }) as typeof fetch;
+    const adapter = createWebPlatformAdapter({ fetch: impl, workspaceId: () => "secret workspace" });
+    await adapter.api.linkPreview("https://example.com/page");
+
+    const request = new URL(urls[0]!, "https://bloommd.test");
+    expect(request.pathname).toBe("/api/link-preview");
+    expect([...request.searchParams.keys()]).toEqual(["url"]);
+    expect(request.searchParams.get("url")).toBe("https://example.com/page");
+    expect(urls[0]).not.toContain("workspace");
+    expect(inits[0]).toBeUndefined();
+  });
+
   test("@t79 an explicit workspace is sent as query parameter on every file call and re-read each time", async () => {
     let workspace: string | null = "ws 1";
     const { calls, impl } = fakeFetch((call) => (call.method === "GET" && call.url.startsWith("/api/mindmaps?") ? json({ files: [] }) : json(DOC)));

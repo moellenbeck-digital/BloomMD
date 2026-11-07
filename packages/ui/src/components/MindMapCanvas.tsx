@@ -25,8 +25,6 @@ import {
   ClipboardCopy,
   ClipboardPaste,
   Focus,
-  Globe2,
-  Link2,
   ListTree,
   Network,
   Pencil,
@@ -37,6 +35,7 @@ import {
 } from "lucide-react";
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { MindMapNode } from "./MindMapNode";
+import { WebsitePreviewCard } from "./WebsitePreviewCard";
 import { MindMapEdge } from "./MindMapEdge";
 import { useMindMapStore, type LocalViewState } from "../hooks/useMindMapStore";
 import type { RootRenameEvent } from "../hooks/useMindMapLayout";
@@ -133,30 +132,12 @@ function PresentationView() {
   const currentIndex = Math.max(0, ordered.indexOf(selectedNodeId ?? ""));
   const current = doc?.nodes.get(ordered[currentIndex] ?? "");
   if (!current) return null;
-  const websitePreview = (current.metadata?.kind === "web" || current.metadata?.kind === "source") && current.metadata.url
-    ? current.metadata
-    : null;
-  let websiteHost = "";
-  if (websitePreview?.url) {
-    try { websiteHost = new URL(websitePreview.url).hostname.replace(/^www\./, ""); } catch { /* Keep the URL visible if it is incomplete. */ }
-  }
-
   return (
     <section className="flex h-full flex-col bg-[var(--color-surface)] px-5 pb-5 pt-32 sm:p-10" data-testid="presentation-view">
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center">
         <div className="font-mono text-xs font-semibold uppercase text-[#C94D20]">H{current.level} · {currentIndex + 1}/{ordered.length}</div>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight text-[var(--color-ink)] sm:text-6xl">{current.title}</h1>
-        {websitePreview && (
-          <article className="mt-7 max-w-2xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm" data-testid="presentation-website-preview">
-            {websitePreview.previewImage && <img src={websitePreview.previewImage} alt={websitePreview.previewTitle || current.title} loading="lazy" className="max-h-64 w-full object-cover" />}
-            <div className="grid gap-2 p-5">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#C94D20]"><Globe2 size={14} /> {websiteHost || t.website}</div>
-              <h2 className="text-xl font-semibold text-[var(--color-ink)]">{websitePreview.previewTitle || current.title}</h2>
-              {(websitePreview.previewDescription || current.content) && <p className="text-sm leading-6 text-[var(--color-ink-muted)]">{websitePreview.previewDescription || current.content.slice(0, 280)}</p>}
-              <a href={websitePreview.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#C94D20] hover:underline">{t.openWebsite} <Link2 size={14} /></a>
-            </div>
-          </article>
-        )}
+        <WebsitePreviewCard node={current} />
         {current.content && <div className="mt-7 max-w-3xl whitespace-pre-wrap text-lg leading-8 text-[var(--color-ink-muted)]">{current.content}</div>}
       </div>
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between border-t border-[var(--color-border)] pt-4">

@@ -23,7 +23,8 @@ export default defineConfig({
   fullyParallel: false,
   retries: 0,
   workers: 1,
-  reporter: [["list"]],
+  // The GitHub reporter turns a failure into an annotation on the run (the job log is not readable without a token).
+  reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],
   use: {
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

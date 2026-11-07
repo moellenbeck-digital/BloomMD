@@ -42,7 +42,7 @@ import {
   listRemoteWorkspaces, selectRemoteWorkspace,
   getConnectionMode, onConnectionModeChanged, getBuildInfo, onAboutRequested,
   consumeExternalFile, onExternalFileOpened,
-  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, choosePublicationFolder, selectOpenFolderForPublication, previewFolderPublication, publishFolderAsWorkspace, listFolderShares, getFolderActivity, resolveFolderActivity, disconnectFolderShare, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
+  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, choosePublicationFolder, selectOpenFolderForPublication, previewFolderPublication, publishFolderAsWorkspace, listFolderShares, getFolderActivity, resolveFolderActivity, disconnectFolderShare, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, openExternalUrl, recordE2EState,
   submitFeedback, getUpdateState, checkForUpdate, downloadUpdate, applyUpdate, onUpdateStatus, setApplicationLocale,
 } from "./rpc";
 import { isChangedFileActive } from "../shared/file-change";
@@ -720,39 +720,6 @@ export function App() {
         .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.urlOpenFailed }));
     };
 
-    const loadLinkPreview = (event: Event) => {
-      const detail = (event as CustomEvent<{ url?: string; respond?: (result: { preview: { title?: string; description?: string; image?: string } } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.url || !detail.respond) return;
-      void fetchLinkPreview(detail.url)
-        .then((result) => {
-          if ("error" in result) {
-            detail.respond?.({ error: result.error });
-            return;
-          }
-          detail.respond?.({ preview: result.preview });
-        })
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.previewUnavailable }));
-    };
-
-    const listMaps = (event: Event) => {
-      const detail = (event as CustomEvent<{ respond?: (result: { files: MindMapListEntry[] } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.respond) return;
-      void listMindmaps()
-        .then((result) => detail.respond?.({ files: result.files }))
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.mapsUnavailable }));
-    };
-
-    const loadMapDocument = (event: Event) => {
-      const detail = (event as CustomEvent<{ filename?: string; respond?: (result: { document: Awaited<ReturnType<typeof openMindmap>> } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.filename || !detail.respond) return;
-      void openMindmap(detail.filename)
-        .then((documentData) => detail.respond?.({ document: documentData }))
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.mapUnavailable }));
-    };
-
     const chooseResource = (event: Event) => {
       const detail = (event as CustomEvent<ResourceChooseRequest>).detail;
       event.preventDefault();
@@ -811,16 +778,10 @@ export function App() {
       }).catch(failed);
     };
     window.addEventListener("bloommd:open-url", openUrl);
-    window.addEventListener("bloommd:load-link-preview", loadLinkPreview);
-    window.addEventListener("bloommd:list-maps", listMaps);
-    window.addEventListener("bloommd:load-map-document", loadMapDocument);
     window.addEventListener("bloommd:choose-resource", chooseResource);
     window.addEventListener("bloommd:open-resource", openResource);
     return () => {
       window.removeEventListener("bloommd:open-url", openUrl);
-      window.removeEventListener("bloommd:load-link-preview", loadLinkPreview);
-      window.removeEventListener("bloommd:list-maps", listMaps);
-      window.removeEventListener("bloommd:load-map-document", loadMapDocument);
       window.removeEventListener("bloommd:choose-resource", chooseResource);
       window.removeEventListener("bloommd:open-resource", openResource);
     };

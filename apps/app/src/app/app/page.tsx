@@ -4,6 +4,8 @@ import {
   useEffect,
   useState,
   useCallback,
+  useLayoutEffect,
+  useMemo,
   useRef,
   type FormEvent,
 } from "react";
@@ -53,6 +55,8 @@ import {
   type ToolbarHandle,
   type AboutBuildInfo,
   ConflictDialog,
+  PlatformProvider,
+  createWebPlatformAdapter,
 } from "@bloommd/ui";
 import {
   buildWorkspaceMindMap,
@@ -391,7 +395,25 @@ async function loadInitialMindmap(
   };
 }
 
+/**
+ * Hands the shared UI its file and API access. Requests carry the workspace the page has open;
+ * without one the server falls back to the workspace cookie, as the shared components did before
+ * they went through an adapter.
+ */
 export default function Home() {
+  const workspaceIdRef = useRef<string | null>(null);
+  const platformAdapter = useMemo(
+    () => createWebPlatformAdapter({ workspaceId: () => workspaceIdRef.current }),
+    [],
+  );
+  return (
+    <PlatformProvider adapter={platformAdapter}>
+      <HomeContent workspaceIdRef={workspaceIdRef} />
+    </PlatformProvider>
+  );
+}
+
+function HomeContent({ workspaceIdRef }: { workspaceIdRef: { current: string | null } }) {
   const { t, locale } = useLocale();
   const copy = appCopy[locale];
   const localizedDocsUrl = `${docsUrl}${locale === "en" ? "?lang=en" : "?lang=de"}`;
@@ -476,6 +498,10 @@ export default function Home() {
   const [cloudWorkspace, setCloudWorkspace] = useState<WorkspaceInfo | null>(
     null,
   );
+  // Layout effect: it must run before the effects of children that load files for this workspace.
+  useLayoutEffect(() => {
+    workspaceIdRef.current = cloudWorkspace?.id ?? null;
+  }, [cloudWorkspace?.id, workspaceIdRef]);
   const [workspaceRenameOpen, setWorkspaceRenameOpen] = useState(false);
   const [workspaceAgentOpen, setWorkspaceAgentOpen] = useState(false);
   const [nodeAgentOpen, setNodeAgentOpen] = useState(false);
@@ -1205,100 +1231,6 @@ export default function Home() {
       detail.respond?.({ opened: true });
     };
 
-    const loadLinkPreview = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{
-          url?: string;
-          respond?: (
-            result:
-              | {
-                  preview: {
-                    title?: string;
-                    description?: string;
-                    image?: string;
-                  };
-                }
-              | { error: string },
-          ) => void;
-        }>
-      ).detail;
-      event.preventDefault();
-      if (!detail.url || !detail.respond) return;
-      void fetch(`/api/link-preview?url=${encodeURIComponent(detail.url)}`)
-        .then(async (response) => {
-          const data = (await response.json()) as {
-            preview?: { title?: string; description?: string; image?: string };
-            error?: string;
-          };
-          if (!response.ok || !data.preview)
-            throw new Error(data.error || "Preview unavailable.");
-          detail.respond?.({ preview: data.preview });
-        })
-        .catch((error) =>
-          detail.respond?.({
-            error:
-              error instanceof Error ? error.message : "Preview unavailable.",
-          }),
-        );
-    };
-
-    const listMaps = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{
-          respond?: (
-            result: { files: MindMapListEntry[] } | { error: string },
-          ) => void;
-        }>
-      ).detail;
-      event.preventDefault();
-      if (!detail.respond) return;
-      void fetch(`/api/mindmaps${workspaceQuery(cloudWorkspace?.id)}`)
-        .then(async (response) => {
-          const data = (await response.json()) as {
-            files?: MindMapListEntry[];
-            error?: string;
-          };
-          if (!response.ok || !data.files)
-            throw new Error(data.error || "Maps unavailable.");
-          detail.respond?.({ files: data.files });
-        })
-        .catch((error) =>
-          detail.respond?.({
-            error: error instanceof Error ? error.message : "Maps unavailable.",
-          }),
-        );
-    };
-
-    const loadMapDocument = (event: Event) => {
-      const detail = (
-        event as CustomEvent<{
-          filename?: string;
-          respond?: (
-            result: { document: ApiResponse } | { error: string },
-          ) => void;
-        }>
-      ).detail;
-      event.preventDefault();
-      if (!detail.filename || !detail.respond) return;
-      void fetch(
-        `/api/mindmaps/${encodeURIComponent(detail.filename)}${workspaceQuery(cloudWorkspace?.id)}`,
-      )
-        .then(async (response) => {
-          const data = (await response.json()) as
-            ApiResponse | { error?: string };
-          if (!response.ok || !("nodes" in data))
-            throw new Error(
-              "error" in data && data.error ? data.error : "Map unavailable.",
-            );
-          detail.respond?.({ document: data });
-        })
-        .catch((error) =>
-          detail.respond?.({
-            error: error instanceof Error ? error.message : "Map unavailable.",
-          }),
-        );
-    };
-
     // Back from a linked document returns to the document the link was followed in.
     const linkOrigin = (): TabOrigin | undefined =>
       activeTabKeyRef.current ? { kind: "document", key: activeTabKeyRef.current } : undefined;
@@ -1381,21 +1313,14 @@ export default function Home() {
         .catch((openError) => showNotice(String(openError), detail.nodeId));
     };
     window.addEventListener("bloommd:open-url", openUrl);
-    window.addEventListener("bloommd:load-link-preview", loadLinkPreview);
-    window.addEventListener("bloommd:list-maps", listMaps);
-    window.addEventListener("bloommd:load-map-document", loadMapDocument);
     window.addEventListener("bloommd:open-resource", openResource);
     return () => {
       window.removeEventListener("bloommd:open-url", openUrl);
-      window.removeEventListener("bloommd:load-link-preview", loadLinkPreview);
-      window.removeEventListener("bloommd:list-maps", listMaps);
-      window.removeEventListener("bloommd:load-map-document", loadMapDocument);
       window.removeEventListener("bloommd:open-resource", openResource);
     };
   }, [
     browserWorkspaceFiles,
-    cloudWorkspace?.id,
-    locale,
+    copy,
     openLocalFile,
     openMindmap,
     openMindmapChecked,

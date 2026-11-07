@@ -322,6 +322,14 @@ jobs:
           e2e/release-contracts.spec.ts
           e2e/mobile-smoke.spec.ts
           e2e/workspace-agent-node.spec.ts
+      # Plausible tracking (#299): the spec starts the production build above twice with different env
+      # (tracking on, then BLOOMMD_PLAUSIBLE_DISABLED=true) and a local counterpart, so it needs no rebuild.
+      # The default run above cannot cover it: its servers run in E2E test mode, which switches tracking off.
+      - name: Run Plausible tracking end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+        run: bun run test:e2e:plausible
       - name: Reclaim Docker disk before workspace-agent end-to-end test
         # GitHub-hosted runners arrive with preloaded images and BuildKit cache. The isolated
         # stack needs several large images at the same time (app, sync, Postgres, OpenClaw and

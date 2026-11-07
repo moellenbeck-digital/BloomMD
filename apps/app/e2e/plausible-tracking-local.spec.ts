@@ -150,15 +150,23 @@ async function startApp(port: number, plausibleEnv: Record<string, string | unde
   };
 }
 
-type Observed = { consoleErrors: string[]; failedRequests: string[]; plausibleRequests: Array<{ method: string; url: string; postData: string | null }> };
+type Observed = {
+  consoleErrors: string[];
+  failedRequests: string[];
+  plausibleRequests: Array<{ method: string; url: string; postData: string | null }>;
+  plausibleResponseStatuses: number[];
+};
 
 function observe(page: Page): Observed {
-  const seen: Observed = { consoleErrors: [], failedRequests: [], plausibleRequests: [] };
+  const seen: Observed = { consoleErrors: [], failedRequests: [], plausibleRequests: [], plausibleResponseStatuses: [] };
   page.on("console", (message) => {
     if (message.type() === "error") seen.consoleErrors.push(message.text());
   });
   page.on("pageerror", (error) => seen.consoleErrors.push(`pageerror: ${error.message}`));
   page.on("requestfailed", (request) => seen.failedRequests.push(`${request.method()} ${request.url()} ${request.failure()?.errorText ?? ""}`));
+  page.on("response", (response) => {
+    if (response.url().includes("/_plausible")) seen.plausibleResponseStatuses.push(response.status());
+  });
   page.on("request", (request) => {
     if (request.url().includes("/_plausible")) seen.plausibleRequests.push({ method: request.method(), url: request.url(), postData: request.postData() });
   });
@@ -358,7 +366,11 @@ test.describe.serial("Plausible-Tracking gegen den Produktions-Build @t299", () 
 
     expect(seen.plausibleRequests.some((entry) => entry.method === "POST")).toBe(true);
     expect(relevantConsoleErrors(seen.consoleErrors)).toEqual([]);
-    expect(seen.failedRequests.filter((entry) => entry.includes("/_plausible"))).toEqual([]);
+    // Ein Beacon, den der Browser beim Verlassen der Seite abbricht, meldet Chromium als ERR_ABORTED; das ist kein
+    // Fehler der Anwendung. Jeder andere Fehlschlag eines /_plausible-Requests und jede Antwort außer 200/202 zählt.
+    expect(seen.failedRequests.filter((entry) => entry.includes("/_plausible") && !/^POST \S+\/_plausible\/api\/event net::ERR_ABORTED/.test(entry))).toEqual([]);
+    expect(seen.plausibleResponseStatuses.length).toBeGreaterThan(0);
+    expect(seen.plausibleResponseStatuses.filter((status) => status !== 200 && status !== 202)).toEqual([]);
     // Höchstens eine Logzeile über den Ausfall (einmal je Prozess).
     expect(app.log().match(/Plausible-Ziel .* nicht erreichbar/g)?.length ?? 0).toBeLessThanOrEqual(1);
   });

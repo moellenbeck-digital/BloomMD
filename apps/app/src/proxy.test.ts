@@ -116,3 +116,59 @@ describe("proxy: read-only mode of expired trial accounts (#274)", () => {
     expect(response.headers.get("access-control-allow-origin")).toBe("capacitor://localhost");
   });
 });
+
+describe("proxy: first-party Plausible routes (#299)", () => {
+  const rewriteTarget = (response: Response) => response.headers.get("x-middleware-rewrite");
+
+  beforeEach(() => {
+    // Every guard that could redirect or block a visitor is on: the routes must still be reachable.
+    lookups = 0;
+    ends[USER] = new Date(Date.now() - DAY).toISOString();
+    process.env.BLOOMMD_REQUIRE_AUTH = "1";
+    process.env.BLOOMMD_TRIAL_READONLY = "1";
+  });
+  afterEach(() => {
+    delete process.env.BLOOMMD_REQUIRE_AUTH;
+    delete process.env.BLOOMMD_TRIAL_READONLY;
+    delete process.env.BLOOMMD_PLAUSIBLE_TARGET_URL;
+  });
+
+  test("the public paths are rewritten to internal segments, without a session and with every guard on", async () => {
+    const script = await proxy(request("GET", "/_plausible/js/script.js"));
+    expect(rewriteTarget(script)).toEndWith("/plausible-proxy/script");
+    expect(script.status).toBe(200);
+    const event = await proxy(request("POST", "/_plausible/api/event"));
+    expect(rewriteTarget(event)).toEndWith("/plausible-proxy/event");
+    expect(lookups).toBe(0);
+  });
+
+  test("an expired trial account does not block the event POST, and nothing is redirected", async () => {
+    const response = await proxy(request("POST", "/_plausible/api/event", { cookie: cookie(USER) }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(rewriteTarget(response)).toEndWith("/plausible-proxy/event");
+  });
+
+  test("the internal segments are not reachable from outside", async () => {
+    for (const path of ["/plausible-proxy", "/plausible-proxy/script", "/plausible-proxy/event", "/plausible-proxy/event/"]) {
+      const response = await proxy(request("POST", path, { "x-bloommd-plausible-proxy": "1" }));
+      expect(response.status).toBe(404);
+      expect(rewriteTarget(response)).toBeNull();
+    }
+  });
+
+  test("other paths under /_plausible are not rewritten", async () => {
+    expect(rewriteTarget(await proxy(request("GET", "/_plausible/js/other.js")))).toBeNull();
+    expect(rewriteTarget(await proxy(request("GET", "/_plausible")))).toBeNull();
+  });
+
+  test("the CSP has no Plausible or foreign host, with or without a target set", async () => {
+    for (const target of [undefined, "https://plausible.ops.moellenbeck-digital.io", "https://ping.bloommd.app"]) {
+      if (target) process.env.BLOOMMD_PLAUSIBLE_TARGET_URL = target;
+      const csp = (await proxy(request("GET", "/app"))).headers.get("content-security-policy") ?? "";
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp).toContain("script-src 'self'");
+      for (const forbidden of ["plausible", "ping.bloommd.app", "moellenbeck-digital", "ops."]) expect(csp).not.toContain(forbidden);
+    }
+  });
+});

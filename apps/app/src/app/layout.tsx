@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { THEME_BOOT_SCRIPT } from "@bloommd/ui/theme-boot";
 import { AnalyticsProvider } from "./analytics-provider";
 import { getAppLocale } from "../lib/locale";
+import { plausibleBrowserConfig, plausibleRequestHost, plausibleScriptAttributes } from "../lib/plausible";
 import "./globals.css";
 
 // The on-screen keyboard shrinks the page (not only the visual viewport) where the browser supports it,
@@ -44,6 +45,9 @@ export default async function RootLayout({
 }) {
   const requestHeaders = await headers();
   const lang = requestHeaders.get("x-bloommd-locale") === "en" ? "en" : "de";
+  // Read per request on the server (not NEXT_PUBLIC_*), so the environment of the running server decides.
+  // `null` for foreign hosts, the test system and when switched off: then no tag at all.
+  const plausible = plausibleBrowserConfig(plausibleRequestHost(requestHeaders));
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
@@ -71,6 +75,7 @@ export default async function RootLayout({
             __html: THEME_BOOT_SCRIPT,
           }}
         />
+        {plausible && <script {...plausibleScriptAttributes(plausible)} />}
       </head>
       {/* Colours come from the tokens so the body follows the theme the script just picked. */}
       <body className="bg-[var(--color-surface)] text-[var(--color-ink)]">

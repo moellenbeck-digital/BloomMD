@@ -428,6 +428,57 @@ Optional for analytics and later sync:
 - `BLOOMMD_FEEDBACK_GITHUB_STATUS_FIELD_ID`
 - `BLOOMMD_FEEDBACK_GITHUB_FEEDBACK_OPTION_ID`
 
+#### Usage statistics (Plausible, `apps/app`)
+
+The app sends anonymous usage statistics to Plausible. **Default: on, but only on the host
+`bloommd.app`** (our own installation). Switch it off with:
+
+```bash
+BLOOMMD_PLAUSIBLE_DISABLED=true   # also 1; empty or unset = on
+```
+
+The server logs one line at start, also when it is off, that names this variable, the rule and the
+server signal (below).
+
+- **What is sent:** page views (as a route pattern such as `/app` or `/share/:token`: no ids, no query,
+  no hash) and usage events from a fixed list (names only, no properties). No user, organisation or
+  workspace ids, no file names, titles, share tokens or search terms, no cookies, no identifier. The
+  server scrubs every event again before it forwards it.
+- **Where it goes:** the browser talks to the app itself (`/_plausible/js/script.js`,
+  `/_plausible/api/event`); the server forwards the events to the target. Plausible gets the
+  `User-Agent` and the client address from `X-Forwarded-For` (country, device); cookies and
+  `Authorization` are never forwarded.
+- **Read at runtime, not at build:** all values are read per request on the server (none is
+  `NEXT_PUBLIC_*`), so changing the environment and restarting the pods switches tracking without a new image.
+- **Other installations (customers, self-hosted):** the browser **never** tracks on a host other than
+  `BLOOMMD_PLAUSIBLE_DOMAIN`; with the default domain that is only `bloommd.app`. No browser data goes
+  to us from such an installation, and the proxy routes answer 404. The test system and the
+  desktop app (`views://mainview`) do not track either. The only thing such an installation sends is
+  the server signal below.
+- **Server signal (installations that did not set a target):** once at start, then at most once every
+  24 h, the server sends one event `server-start` with the BloomMD version as its only property:
+  `POST <target>/api/event` to `https://ping.bloommd.app`, User-Agent `BloomMD-Server/<version>`, domain
+  `installations.bloommd.app`, and a fixed neutral `X-Forwarded-For` so the address of the server is
+  not sent from the application. No end-user address, no identifier, no cookie, no browser. Fire and
+  forget with a timeout of about 3 s: it never delays the start, and an unreachable target stays silent
+  (no log line). It is not sent when `BLOOMMD_PLAUSIBLE_DISABLED=true`, when `BLOOMMD_PLAUSIBLE_TARGET_URL`
+  is set explicitly (that installation chose its own target, ours sets the internal Plausible and
+  tracks in the browser instead), by a dev server, a build or the E2E test mode.
+- **If the target is down:** nothing breaks. The event POST answers 202 after a 3 s timeout, there are no
+  browser console errors, and the log gets at most one line per process for the first failure.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BLOOMMD_PLAUSIBLE_DISABLED` | unset (on) | `true` or `1` switches everything off: browser statistics and server signal |
+| `BLOOMMD_PLAUSIBLE_DOMAIN` | `bloommd.app` | The only host that tracks; also the domain name in Plausible |
+| `BLOOMMD_PLAUSIBLE_TARGET_URL` | `https://ping.bloommd.app` | Target of the proxy (http or https URL, origin only); an invalid value falls back to the default. Setting it also turns the server signal off |
+
+A domain other than `bloommd.app` tracks only when `BLOOMMD_PLAUSIBLE_TARGET_URL` is set explicitly, so
+an installation with its own domain never sends its visitors' addresses to our default target by accident.
+Our own installation sets the internal Plausible instance in its ConfigMap
+(`BLOOMMD_PLAUSIBLE_TARGET_URL=https://plausible.ops.moellenbeck-digital.io`). The data transfer is also
+described in [docs/LICENSING.md](docs/LICENSING.md#data-transmission-to-the-bloommd-operator).
+
 Required for the early public marketing deployment:
 
 - `NEXT_PUBLIC_SITE_URL=https://bloommd.io`

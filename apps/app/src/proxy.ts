@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { publicMarketingUrl } from "./lib/deployment";
 import { mobileCorsHeaders } from "./lib/mobile-cors";
+import { PLAUSIBLE_EVENT_PATH, PLAUSIBLE_SCRIPT_PATH } from "./lib/plausible";
 import { isTrialGuardedWrite, isTrialReadonlyEnabled } from "./lib/trial-readonly";
+
+// Public paths on our own origin, implemented by route handlers under an internal segment (see
+// src/lib/plausible-proxy.ts). `rewrites()` in next.config.mjs is not used on purpose.
+const PLAUSIBLE_PUBLIC_ROUTES: Record<string, string> = {
+  [PLAUSIBLE_SCRIPT_PATH]: "/plausible-proxy/script",
+  [PLAUSIBLE_EVENT_PATH]: "/plausible-proxy/event",
+};
+const PLAUSIBLE_INTERNAL_PREFIX = "/plausible-proxy";
 
 function configuredOrigin(value: string | undefined) {
   if (!value) return null;
@@ -70,6 +79,22 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith("/_next/static/") && pathname.endsWith(".map")) {
     return new NextResponse(null, { status: 404 });
+  }
+
+  // First-party Plausible proxy (#299). Decided before every guard below: no marketing redirect, no
+  // trial block, no CORS, no CSP. The route handler owns the whole response. Auth is not a concern of
+  // this file (it lives in the routes), and these two handlers read no session.
+  // A rewritten request does not pass this function again, so any request that arrives here with the
+  // internal path is a direct one from outside.
+  if (pathname === PLAUSIBLE_INTERNAL_PREFIX || pathname.startsWith(`${PLAUSIBLE_INTERNAL_PREFIX}/`)) {
+    return new NextResponse(null, { status: 404 });
+  }
+  const plausibleTarget = PLAUSIBLE_PUBLIC_ROUTES[pathname];
+  if (plausibleTarget) {
+    const internalUrl = request.nextUrl.clone();
+    internalUrl.pathname = plausibleTarget;
+    internalUrl.search = "";
+    return NextResponse.rewrite(internalUrl, { request: { headers: requestHeaders } });
   }
 
   if ((request.method === "GET" || request.method === "HEAD") && isMarketingPageRoute(pathname)) {

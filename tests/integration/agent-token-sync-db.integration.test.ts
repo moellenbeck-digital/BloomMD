@@ -12,8 +12,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseFile, serializeToMarkdown, yDocToDocument, yUpdateContentDiff } from "../../packages/core/src/index";
 import { SyncProvider } from "../../packages/ui/src/sync/SyncProvider";
+import { testDatabaseUrl } from "./db-test-url";
 
-const url = process.env.BLOOMMD_TEST_DATABASE_URL;
+const url = testDatabaseUrl();
 const SYNC_SECRET = "agent-token-sync-secret-with-enough-entropy-1234";
 const BASE = "https://app.bloommd.test";
 

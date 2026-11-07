@@ -1,0 +1,52 @@
+diff --git a/dist/api/bun/proc/native.ts b/dist/api/bun/proc/native.ts
+index f0f6c2532ba2eb467ec1d452a25c835b6db72661..0cdcf6d36f8406892f54db7db451b2fcf2c41cff 100644
+--- a/dist/api/bun/proc/native.ts
++++ b/dist/api/bun/proc/native.ts
+@@ -930,6 +930,7 @@ const _ffiImpl = {
+ 				native_.symbols.showWindow(windowPtr, activate);
+ 			}
+ 
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return windowPtr;
+ 		},
+ 		setTitle: (params: { winId: number; title: string }) => {
+@@ -1337,6 +1338,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
+ 				throw "Failed to create webview";
+ 			}
+ 
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return webviewPtr;
+ 		},
+ 
+@@ -1383,6 +1385,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
+ 				throw "Failed to create WGPUView";
+ 			}
+ 
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return viewPtr;
+ 		},
+ 
+@@ -1470,6 +1473,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
+ 			}
+ 
+ 			const handle = native_.symbols.wgpuViewGetNativeHandle(view.ptr);
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return handle || null;
+ 		},
+ 
+@@ -1514,6 +1518,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
+ 				throw "Failed to create tray";
+ 			}
+ 
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return trayPtr;
+ 		},
+ 		setTrayTitle: (params: { id: number; title: string }): void => {
+@@ -1646,6 +1651,7 @@ window.__electrobunBunBridge = window.__electrobunBunBridge || window.webkit?.me
+ 				allowsMultipleSelection ? 1 : 0,
+ 			);
+ 
++			// @ts-ignore bun-types 1.4 types FFI pointers as Pointer | bigint | null (BloomMD #304)
+ 			return filePath.toString();
+ 		},
+ 		showMessageBox: (params: {

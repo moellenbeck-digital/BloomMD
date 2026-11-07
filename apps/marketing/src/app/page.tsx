@@ -5,6 +5,7 @@ import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
+import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
@@ -38,7 +39,7 @@ import {
 const headerNavItems = [
   { label: "Produkt", href: "#produkt" },
   { label: "Demo", href: "/demo" },
-  { label: "Vision", href: "#vision" },
+  { label: "Agenten", href: "#agenten" },
   { label: "Roadmap", href: "/roadmap" },
   { label: "Download", href: "/download" },
   { label: "Testaccount", href: "#beta" },
@@ -87,6 +88,7 @@ const footerSections = [
     links: [
       { label: "Desktop", href: "/download" },
       { label: "Obsidian", href: "/obsidian" },
+      { label: "Agenten", href: "#agenten" },
       { label: "Wissensplattform", href: "#vision" },
     ],
   },
@@ -1104,6 +1106,7 @@ export default function LandingPage() {
         <SplitDemo />
       </section>
 
+      <AgentWorkflowSection locale="de" />
       <KnowledgeVisionSection locale="de" />
       <AudiencePathSection />
       <UseCasesSection />

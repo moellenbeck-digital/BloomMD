@@ -9,8 +9,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { testDatabaseUrl } from "./db-test-url";
 
-const url = process.env.BLOOMMD_TEST_DATABASE_URL;
+const url = testDatabaseUrl();
 const SYNC_SECRET = "agent-token-rights-sync-secret-with-enough-entropy";
 const BASE = "https://app.bloommd.test";
 

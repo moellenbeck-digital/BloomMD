@@ -22,6 +22,14 @@ nach `plugins/obsidian` hierher.
 - GitHub Actions in Workflows werden auf vollständige Commit-SHAs festgenagelt,
   nicht auf Tags; der Prozess steht in
   [docs/CI-ACTIONS-PINNING.md](docs/CI-ACTIONS-PINNING.md).
+- Ein roter CI-Lauf ist ein Fehler, kein Rauschen: Er wird nicht so lange wiederholt,
+  bis er grün ist. Klärt zuerst die Ursache im Log (Installationsschritt, Test oder
+  Inhalt). Ein echter Flake (gleicher Stand, mal rot, mal grün) wird als Issue gemeldet
+  mit Links auf den roten und den grünen Lauf, Testname, Auszug der Fehlermeldung und
+  Vermutung zur Ursache. Der Test wird repariert, nicht mit Retry, Sleep oder längerem
+  Zeitlimit überdeckt. Ein erneuter Lauf darf einen Verdacht prüfen, ersetzt die Meldung
+  aber nicht. Einzige Ausnahme ist `scripts/ci-retry-network.sh` für apt- und
+  Playwright-Downloads: Jeder wiederholte Versuch erscheint als Annotation im Lauf.
 - Die öffentliche PR-CI nutzt nur Leserechte. Produktive GHCR-Images werden
   nach grüner Main-CI separat durch die Maintainer veröffentlicht.
 - Reiche nur Code, Texte und Medien ein, für die du die nötigen Rechte hast.
@@ -55,6 +63,14 @@ repository is a generated release mirror; plugin changes belong in
   German and English release text.
 - Pin GitHub Actions in workflows to full commit SHAs, not tags; the process
   is in [docs/CI-ACTIONS-PINNING.md](docs/CI-ACTIONS-PINNING.md).
+- A red CI run is a failure, not noise: it is not rerun until it turns green. First find
+  the cause in the log (install step, test or content). A real flake (same state, red
+  once, green once) is reported as an issue with links to the red and the green run, the
+  test name, an excerpt of the error message and a guess at the cause. The test is fixed,
+  not covered up with a retry, a sleep or a longer time limit. A rerun may check a
+  suspicion but does not replace the report. The only exception is
+  `scripts/ci-retry-network.sh` for apt and Playwright downloads: every repeated attempt
+  shows up as an annotation in the run.
 - Public PR CI uses read-only permissions. Maintainers publish production
   GHCR images separately after the main CI succeeds.
 - Submit only code, text, and media that you have the right to provide. State

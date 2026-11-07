@@ -6,8 +6,9 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { testDatabaseUrl } from "./db-test-url";
 
-const url = process.env.BLOOMMD_TEST_DATABASE_URL;
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("app sign-in (Postgres)", () => {
   let db: typeof import("../../apps/app/src/lib/db");

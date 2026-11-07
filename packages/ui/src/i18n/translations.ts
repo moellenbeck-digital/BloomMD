@@ -325,7 +325,6 @@ export interface Translations {
   previewUnavailable: string;
   mapsUnavailable: string;
   mapUnavailable: string;
-  previewServiceError: string;
   localPreviewUnavailable: string;
   unsupportedResource: string;
   resourceSelectionFailed: string;
@@ -886,7 +885,6 @@ export const translations: Record<Locale, Translations> = {
     previewUnavailable: "Vorschau ist in dieser Umgebung nicht verfügbar.",
     mapsUnavailable: "Maps sind nicht verfügbar.",
     mapUnavailable: "Map ist nicht verfügbar.",
-    previewServiceError: "Vorschau-Service meldet HTTP",
     localPreviewUnavailable: "Für diese lokale Datei ist aktuell keine Vorschau verfügbar.",
     unsupportedResource: "Dieser Ressourcentyp wird nicht unterstützt.",
     resourceSelectionFailed: "Ressource konnte nicht ausgewählt werden.",
@@ -1441,7 +1439,6 @@ export const translations: Record<Locale, Translations> = {
     previewUnavailable: "Preview unavailable in this environment.",
     mapsUnavailable: "Maps are unavailable.",
     mapUnavailable: "Map is unavailable.",
-    previewServiceError: "Preview service returned HTTP",
     localPreviewUnavailable: "No preview is currently available for this local file.",
     unsupportedResource: "This resource type is not supported.",
     resourceSelectionFailed: "Resource selection failed.",

@@ -1433,6 +1433,32 @@
   stroke-dasharray: 6 5;
 }
 
+/* Backlink mode: dotted and grey with an arrowhead, so it differs from hierarchy (solid) and relations (blue dashes). */
+.react-flow__edge-path.bloommd-backlink-edge,
+.bloommd-backlink-edge {
+  stroke: var(--text-faint, #8b8b8b);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.react-flow__edge[data-id^="backlink:"] {
+  pointer-events: none;
+}
+
+.bloommd-backlink-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--text-warning, #b45309);
+  background: color-mix(in srgb, var(--text-warning, #b45309) 14%, var(--background-primary));
+  font-size: 10px;
+}
+
 .bloommd-relation-label {
   position: absolute;
   padding: 2px 8px;

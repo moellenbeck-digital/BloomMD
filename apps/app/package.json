@@ -29,7 +29,8 @@
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "typecheck": "tsc --noEmit",
     "test:e2e:wiki": "playwright test --config playwright.wiki.config.ts",
-    "test:e2e:testsystem": "playwright test --config playwright.testsystem.config.ts"
+    "test:e2e:testsystem": "playwright test --config playwright.testsystem.config.ts",
+    "test:e2e:plausible": "playwright test --config playwright.plausible.config.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",

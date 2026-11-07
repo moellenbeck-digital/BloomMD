@@ -21,13 +21,13 @@ const { act } = React;
 const { createRoot } = await import("react-dom/client");
 const { LocaleProvider } = await import("../i18n/LocaleContext");
 const { useMindMapStore } = await import("../hooks/useMindMapStore");
-const { PresentationView } = await import("./MindMapCanvas");
+const { WebsitePreviewCard } = await import("./WebsitePreviewCard");
 
 const IMAGE = "https://cdn.example.net/img/card.png";
 const META = { kind: "web", url: "https://www.example.com/page", previewTitle: "Artikel", previewDescription: "Kurz", previewImage: IMAGE };
 const MAP = ["# Review", "", `## Quelle <!-- bloommd:id=quelle --> <!-- bloommd:meta=${JSON.stringify(META)} -->`, "", "Text.", ""].join("\n");
 
-describe("presentation view: website preview image", () => {
+describe("presentation view: website preview card", () => {
   let root: Root | null = null;
   let container: HTMLDivElement;
   const originalFetch = globalThis.fetch;
@@ -58,10 +58,12 @@ describe("presentation view: website preview image", () => {
   });
 
   async function open() {
+    const doc = useMindMapStore.getState().document!;
+    const node = [...doc.nodes.values()].find((entry) => entry.title === "Quelle")!;
     await act(async () => {
       root!.render(
         <LocaleProvider initialLocale="de">
-          <PresentationView />
+          <WebsitePreviewCard node={node} />
         </LocaleProvider>,
       );
     });

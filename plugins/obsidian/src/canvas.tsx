@@ -6,6 +6,7 @@ import {
   Controls,
   EdgeLabelRenderer,
   Handle,
+  MarkerType,
   MiniMap,
   NodeResizer,
   Position,
@@ -83,7 +84,7 @@ import { headingsToOpml } from "./opml-note";
 import { MapInkLayer } from "./map-ink-layer";
 import { inkContentBounds, serializeInkSvg, type InkDocument } from "./ink-document";
 import { InkDrawingList, nodeDrawings, useInkSession, type InkVaultActions } from "./ink-panel";
-import { floatingEdgeEnds, freePosition, relationEdges, studyCards, studyProgress, withKind, withRelations, type NodeRelation } from "./concept-map";
+import { backlinkEdges, floatingEdgeEnds, freePosition, relationEdges, studyCards, studyProgress, withKind, withRelations, type BacklinkResolver, type NodeRelation, type UnresolvedBacklink } from "./concept-map";
 import { LinkedNoteSection, RelationsSection, hoverNoteHandler, type LinkedNoteHandlers } from "./concept-map-panel";
 import { dayKey, isDue, levelOn, studyOrder, summarize, type LearningDisplay, type LearningEntry, type StudyOrder } from "./learning";
 import { LearningStatus, RatingButtons, branchProgress, learnColor, type CanvasLearning } from "./learning-panel";
@@ -125,6 +126,8 @@ export interface PersistedCanvasLayout {
   collapsed: string[];
   viewport?: Viewport;
   mode?: "map" | "outline" | "presentation";
+  /** Show backlink edges (display only; never written to the note). Off when absent. */
+  backlinks?: boolean;
 }
 
 export interface BacklinkEntry {
@@ -193,6 +196,8 @@ export interface CanvasProps {
   files: Array<{ path: string; title: string }>;
   resources: ResourceEntry[];
   backlinks: BacklinkEntry[];
+  /** Link resolution for the backlink edges mode; without it the mode is not offered. */
+  linkResolver?: BacklinkResolver;
   layout: PersistedCanvasLayout;
   canUndo: boolean;
   canRedo: boolean;
@@ -212,10 +217,12 @@ export interface CanvasProps {
 }
 
 /** Editing chrome that does not belong on an exported learning sheet. */
-const EXPORT_HIDDEN = [".react-flow__edges", ".react-flow__resize-control", ".bloommd-node-actions", ".react-flow__handle", ".bloommd-study-bar", ".bloommd-map-ink", ".bloommd-rate"];
+const EXPORT_HIDDEN = [".react-flow__edges", ".react-flow__resize-control", ".bloommd-node-actions", ".react-flow__handle", ".bloommd-study-bar", ".bloommd-map-ink", ".bloommd-rate", ".bloommd-backlink-warning"];
 
 /** Dispatched on the view container by the "Toggle focus mode" command. */
 export const FOCUS_MODE_EVENT = "bloommd:toggle-focus-mode";
+/** Dispatched on the view container by the "Toggle backlink edges" command. */
+export const BACKLINKS_EVENT = "bloommd:toggle-backlink-edges";
 
 export interface CanvasMount {
   /** Element React renders into; focus-mode requests are dispatched on it. */
@@ -293,6 +300,8 @@ interface BloomNodeData extends Record<string, unknown> {
   collapsed: boolean;
   externalLinkCount: number;
   wikiLinkCount: number;
+  /** Links from this node that backlink mode could not turn into an edge. */
+  unresolvedLinks: UnresolvedBacklink[];
   showContent: boolean;
   drawingUrls: string[];
   sized: boolean;
@@ -362,6 +371,7 @@ function sameCanvasNodeSync(left: BloomFlowNode[], right: BloomFlowNode[]): bool
       && heading.children.join("\u0000") === nextHeading.children.join("\u0000")
       && metadataValue(heading.metadata) === metadataValue(nextHeading.metadata)
       && node.data.collapsed === next.data.collapsed
+      && unresolvedKey(node.data.unresolvedLinks) === unresolvedKey(next.data.unresolvedLinks)
       && node.data.showContent === next.data.showContent
       && node.data.drawingUrls.join("\u0000") === next.data.drawingUrls.join("\u0000")
       && node.data.sized === next.data.sized
@@ -377,6 +387,8 @@ function sameCanvasNodeSync(left: BloomFlowNode[], right: BloomFlowNode[]): bool
       && node.data.autoEdit === next.data.autoEdit;
   });
 }
+
+const unresolvedKey = (links: UnresolvedBacklink[]) => links.map((link) => `${link.reason}:${link.link}`).join("\u0000");
 
 function sameCanvasEdgeSync(left: Edge[], right: Edge[]): boolean {
   if (left.length !== right.length) return false;
@@ -844,6 +856,16 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
             {data.externalLinkCount + data.wikiLinkCount}
           </button>
         )}
+        {data.unresolvedLinks.length > 0 && (
+          <span
+            className="bloommd-backlink-warning"
+            title={data.unresolvedLinks.map((link) => `${link.link} (${link.reason})`).join("\n")}
+            aria-label={`${data.unresolvedLinks.length} unresolved ${data.unresolvedLinks.length === 1 ? "link" : "links"}`}
+          >
+            <AlertTriangle size={12} />
+            {data.unresolvedLinks.length}
+          </span>
+        )}
         {heading.metadata?.note && (
           <button
             type="button"
@@ -923,8 +945,24 @@ function RelationEdge(props: EdgeProps) {
   );
 }
 
+/** Backlink mode: a dashed arrow from the linking node to the linked one, display only. */
+function BacklinkEdge(props: EdgeProps) {
+  const source = useInternalNode(props.source);
+  const target = useInternalNode(props.target);
+  if (!source || !target) return null;
+  const box = (node: NonNullable<typeof source>) => ({
+    x: node.internals.positionAbsolute.x,
+    y: node.internals.positionAbsolute.y,
+    width: node.measured.width ?? NODE_WIDTH,
+    height: node.measured.height ?? NODE_HEIGHT,
+  });
+  const { sx, sy, tx, ty } = floatingEdgeEnds(box(source), box(target));
+  const [path] = getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
+  return <BaseEdge path={path} className="bloommd-backlink-edge" markerEnd={props.markerEnd} interactionWidth={0} />;
+}
+
 const nodeTypes = { bloommd: BloomNode };
-const edgeTypes = { bloommd: BloomEdge, relation: RelationEdge };
+const edgeTypes = { bloommd: BloomEdge, relation: RelationEdge, backlink: BacklinkEdge };
 
 function SaveState({ state }: { state: "saved" | "saving" | "conflict" }) {
   if (state === "saving") return <span className="bloommd-save-state">Saving...</span>;
@@ -1737,6 +1775,7 @@ function CanvasInner(props: CanvasProps) {
   const [mode, setMode] = useState<"map" | "outline" | "presentation">(props.layout.mode ?? "map");
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState(() => new Set(props.layout.collapsed));
+  const [showBacklinks, setShowBacklinks] = useState(Boolean(props.layout.backlinks));
   const [saveState, setSaveState] = useState<"saved" | "saving" | "conflict">("saved");
   const pendingChildAdds = useRef(new Set<string>());
   const pendingSiblingAdds = useRef(new Set<string>());
@@ -1773,6 +1812,7 @@ function CanvasInner(props: CanvasProps) {
       ...(patch.sizes || latestLayout.current.sizes ? { sizes: patch.sizes ?? latestLayout.current.sizes } : {}),
       ...(patch.viewport || latestLayout.current.viewport ? { viewport: patch.viewport ?? latestLayout.current.viewport } : {}),
       ...(patch.mode || latestLayout.current.mode ? { mode: patch.mode ?? latestLayout.current.mode } : {}),
+      ...(patch.backlinks !== undefined || latestLayout.current.backlinks !== undefined ? { backlinks: patch.backlinks ?? latestLayout.current.backlinks } : {}),
     };
     latestLayout.current = next;
     props.actions.persistLayout(next);
@@ -1781,6 +1821,13 @@ function CanvasInner(props: CanvasProps) {
   const changeMode = useCallback((next: "map" | "outline" | "presentation") => {
     setMode(next);
     persist({ mode: next });
+  }, [persist]);
+
+  const toggleBacklinks = useCallback(() => {
+    setShowBacklinks((current) => {
+      persist({ backlinks: !current });
+      return !current;
+    });
   }, [persist]);
 
   const toggleCollapse = useCallback((id: string) => {
@@ -1887,7 +1934,8 @@ function CanvasInner(props: CanvasProps) {
         for (const path of shell.querySelectorAll<SVGPathElement>(".react-flow__edges path")) {
           const style = getComputedStyle(path);
           const d = path.getAttribute("d");
-          if (!d || style.stroke === "none" || style.visibility === "hidden") continue;
+          // Backlink edges are a view mode; the exported map stays the same with it on or off.
+          if (!d || style.stroke === "none" || style.visibility === "hidden" || path.classList.contains("bloommd-backlink-edge")) continue;
           edges.push({
             d,
             stroke: style.stroke,
@@ -2074,6 +2122,12 @@ function CanvasInner(props: CanvasProps) {
     };
   }, [branches, entries, headingsById, learnSettings, levels, rateNode, revealed, sessionSet, spaced, study, today]);
 
+  const backlinkModel = useMemo(() => (
+    showBacklinks && props.linkResolver
+      ? backlinkEdges(props.headings, visibleIds, props.linkResolver, relationEdges(props.headings, visibleIds))
+      : { edges: [], unresolved: [] }
+  ), [props.headings, props.linkResolver, showBacklinks, visibleIds]);
+
   const flowModel = useMemo(() => {
     // Real sizes where React Flow has measured them: previews and drawings make nodes much taller
     // than the default, and layout and collision checks must see that.
@@ -2116,6 +2170,7 @@ function CanvasInner(props: CanvasProps) {
           collapsed: collapsed.has(heading.id),
           externalLinkCount: externalLinks(heading.content).length,
           wikiLinkCount: wikiLinks(heading.content).length,
+          unresolvedLinks: backlinkModel.unresolved.filter((link) => link.source === heading.id),
           // Study mode always shows content once revealed; that is what one studies.
           showContent: props.showNodeContent || study,
           studyHidden: study && sessionSet.has(heading.id) && !revealed.has(heading.id),
@@ -2168,9 +2223,19 @@ function CanvasInner(props: CanvasProps) {
       selectable: false,
       ...(edge.label ? { label: edge.label } : {}),
     }));
-    return { nodes, edges: [...edges, ...relations] };
+    const backlinkList: Edge[] = backlinkModel.edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      type: "backlink",
+      selectable: false,
+      deletable: false,
+      focusable: false,
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#8b8b8b" },
+    }));
+    return { nodes, edges: [...edges, ...relations, ...backlinkList] };
     // sizeRevision is listed because sizes live in a ref and change without new props.
-  }, [addChild, addSibling, autoEditId, cards, collapsed, deleteNode, headingsById, learnData, noteHandlers, openNodeMenu, props.actions, reactFlow, reveal, revealed, sessionSet, study, props.headings, props.layout.positions, props.showNodeContent, resetNodeSize, resizeNode, run, selectNode, sizeRevision, toggleCollapse, visibleIds]);
+  }, [addChild, addSibling, autoEditId, cards, collapsed, deleteNode, headingsById, learnData, noteHandlers, openNodeMenu, props.actions, reactFlow, reveal, revealed, sessionSet, study, props.headings, props.layout.positions, props.showNodeContent, backlinkModel, resetNodeSize, resizeNode, run, selectNode, sizeRevision, toggleCollapse, visibleIds]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<BloomFlowNode>(flowModel.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowModel.edges);
@@ -2526,6 +2591,13 @@ function CanvasInner(props: CanvasProps) {
   }, []);
 
   useEffect(() => {
+    const root = shellRef.current?.parentElement;
+    if (!root) return;
+    root.addEventListener(BACKLINKS_EVENT, toggleBacklinks);
+    return () => root.removeEventListener(BACKLINKS_EVENT, toggleBacklinks);
+  }, [toggleBacklinks]);
+
+  useEffect(() => {
     // The React root container: listeners here run after React's own root listener (registered
     // first), so React still sees every touch while Obsidian's ancestors do not.
     const root = shellRef.current?.parentElement;
@@ -2603,6 +2675,15 @@ function CanvasInner(props: CanvasProps) {
           <button type="button" className={`bloommd-mode-button${mode === "outline" ? " is-active" : ""}`} aria-pressed={mode === "outline"} title="Outline mode (Alt+2)" onClick={() => changeMode("outline")}><ListTree size={15} /><span>Outline</span></button>
           <button type="button" className={`bloommd-mode-button${mode === "presentation" ? " is-active" : ""}`} aria-pressed={mode === "presentation"} title="Presentation mode (Alt+3)" onClick={() => changeMode("presentation")}><Presentation size={15} /><span>Present</span></button>
         </div>
+        {props.linkResolver && (
+          <button
+            type="button"
+            className={`bloommd-mode-button${showBacklinks ? " is-active" : ""}`}
+            aria-pressed={showBacklinks}
+            title="Backlink edges"
+            onClick={toggleBacklinks}
+          ><Link2 size={15} /><span>Backlinks</span></button>
+        )}
         <span className="bloommd-toolbar-spacer" />
         <div className="bloommd-toolbar-group" aria-label="Editing tools">
           {props.sharedStatus && <span className={`bloommd-share-status is-${props.sharedStatus}`} title={sharedStatusLabel(props.sharedStatus)}><Cloud size={14} />{sharedStatusLabel(props.sharedStatus)}</span>}

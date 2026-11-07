@@ -42,6 +42,7 @@ import {
   type MarkdownHeadingNode,
 } from "./markdown-document";
 import {
+  BACKLINKS_EVENT,
   FOCUS_MODE_EVENT,
   createCanvasMount,
   renderMountFailure,
@@ -60,7 +61,7 @@ import { appendSvgEmbed, ensureWikiLink, inkFileName } from "./ink-embeds";
 import { unresolvedImages } from "./vault-images";
 import { BLOOMMD_DOWNLOAD_URL, desktopNodeId, desktopOpenUrl, mobileOpenUrl } from "./open-app";
 import { desktopDeps, openNoteInDesktop } from "./desktop-handoff";
-import { MAP_INK_PROPERTY, createLinkedMapInk, mapInkLink, retargetLinkedNotes, withLinkedNote } from "./concept-map";
+import { MAP_INK_PROPERTY, createLinkedMapInk, mapInkLink, retargetLinkedNotes, withLinkedNote, type BacklinkResolver } from "./concept-map";
 import { migratePersistedPathState } from "./path-migration";
 import { LEARNING_FOLDER, emptyLearningFile, learningFilePath, learningKey, normalizeLearningSettings, rateEntry, type LearningFile, type LearningSettings } from "./learning";
 import { LearningStore } from "./learning-store";
@@ -338,6 +339,10 @@ export class BloomMDView extends ItemView {
       // The map drawing is linked from the frontmatter; re-render once Obsidian has indexed a new link.
       this.registerEvent(this.app.metadataCache.on("changed", (file) => {
         if (file.path === this.sourceFile?.path) this.renderCanvas();
+      }));
+      // Backlink edges follow the links of the whole vault (a folder map shows many notes).
+      this.registerEvent(this.app.metadataCache.on("resolved", () => {
+        if (this.layoutHasBacklinks()) this.renderCanvas();
       }));
       this.registerEvent(this.app.vault.on("modify", (file) => {
         if (!(file instanceof TFile) || file.extension !== "svg" || file.path !== this.mapInkPath(this.sourceFile)) return;
@@ -836,6 +841,23 @@ export class BloomMDView extends ItemView {
     }
   }
 
+  private layoutHasBacklinks(): boolean {
+    return Boolean(this.plugin.getLayout(this.layoutKey).backlinks);
+  }
+
+  /** Link resolution for the backlink edges mode (read-only; nothing here writes to a note). */
+  private linkResolver(): BacklinkResolver {
+    const cache = this.app.metadataCache;
+    return {
+      notePath: this.sourceFile?.path ?? null,
+      resolve: (linkpath, fromPath) => cache.getFirstLinkpathDest(linkpath, fromPath)?.path ?? null,
+      linksOf: (path) => {
+        const file = this.app.vault.getAbstractFileByPath(path);
+        return file instanceof TFile ? (cache.getFileCache(file)?.links ?? []).map((link) => link.link) : [];
+      },
+    };
+  }
+
   private backlinks(): BacklinkEntry[] {
     if (!this.sourceFile) return [];
     const result: BacklinkEntry[] = [];
@@ -865,6 +887,7 @@ export class BloomMDView extends ItemView {
       rootId: this.rootId,
       files: this.plugin.markdownFiles(this.scopeFolder),
       backlinks: this.backlinks(),
+      linkResolver: this.linkResolver(),
       layout: this.plugin.getLayout(this.layoutKey),
       canUndo: this.undoStack.length > 0,
       canRedo: this.redoStack.length > 0,
@@ -1029,6 +1052,10 @@ export class BloomMDView extends ItemView {
   toggleFocusMode() {
     this.mount?.host.dispatchEvent(new CustomEvent(FOCUS_MODE_EVENT));
   }
+
+  toggleBacklinkEdges() {
+    this.mount?.host.dispatchEvent(new CustomEvent(BACKLINKS_EVENT));
+  }
 }
 
 export default class BloomMDPlugin extends Plugin implements NavigatorHost {
@@ -1093,6 +1120,16 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
         const view = this.app.workspace.getActiveViewOfType(BloomMDView) ?? this.app.workspace.getLeavesOfType(VIEW_TYPE_BLOOMMD)[0]?.view;
         if (!(view instanceof BloomMDView)) return false;
         if (!checking) view.toggleFocusMode();
+        return true;
+      },
+    });
+    this.addCommand({
+      id: "toggle-backlink-edges",
+      name: "Toggle backlink edges",
+      checkCallback: (checking) => {
+        const view = this.app.workspace.getActiveViewOfType(BloomMDView) ?? this.app.workspace.getLeavesOfType(VIEW_TYPE_BLOOMMD)[0]?.view;
+        if (!(view instanceof BloomMDView)) return false;
+        if (!checking) view.toggleBacklinkEdges();
         return true;
       },
     });

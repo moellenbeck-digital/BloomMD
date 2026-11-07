@@ -124,6 +124,7 @@ describe("node panel: privacy-aware website preview", () => {
 
   const query = <T extends HTMLElement>(testId: string) => container.querySelector<T>(`[data-testid='${testId}']`);
   const loadButton = () => container.querySelector<HTMLButtonElement>("[data-testid='node-url-panel'] button")!;
+  const selectedId = () => useMindMapStore.getState().selectedNodeId!;
   const flush = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
 
   async function typeUrl(value: string) {
@@ -166,11 +167,29 @@ describe("node panel: privacy-aware website preview", () => {
     expect(previewCalls).toEqual([]);
   });
 
+  test("@t91 render, URL input, blur and a change of the node kind never request a preview", async () => {
+    await open({ url: PAGE });
+    await typeUrl("https://docs.other.org/guide");
+    await act(async () => { query<HTMLInputElement>("node-url-input")!.dispatchEvent(new win.Event("focusout", { bubbles: true })); });
+    const select = query<HTMLSelectElement>("node-kind-select")!;
+    const setter = Object.getOwnPropertyDescriptor(win.HTMLSelectElement.prototype, "value")!.set!;
+    await act(async () => {
+      setter.call(select, "source");
+      select.dispatchEvent(new win.Event("change", { bubbles: true }));
+    });
+    await flush();
+    expect(query<HTMLSelectElement>("node-kind-select")!.value).toBe("source");
+    expect(query("node-url-panel")).not.toBeNull();
+    expect(previewCalls).toEqual([]);
+  });
+
   test("@t91 one click sends one request with the URL only; there is no modal or second click", async () => {
     await open({ url: PAGE });
     nextPreview = async () => ({ url: PAGE, finalUrl: PAGE, title: "Artikel" });
     await clickLoad();
     expect(previewCalls).toEqual([PAGE]);
+    expect(container.textContent).toContain("Artikel");
+    expect(useMindMapStore.getState().document!.nodes.get(selectedId())?.metadata?.previewTitle).toBe("Artikel");
     expect(container.querySelector("[role='dialog']")).toBeNull();
     expect(query("node-preview-empty")).toBeNull();
   });
@@ -184,9 +203,11 @@ describe("node panel: privacy-aware website preview", () => {
 
   test("@t91 an error keeps its message, and the next attempt clears the old error and the old empty hint", async () => {
     await open({ url: PAGE });
+    const before = JSON.stringify(useMindMapStore.getState().document!.nodes.get(selectedId())?.metadata);
     nextPreview = async () => { throw new Error("The URL did not return an HTML page."); };
     await clickLoad();
     expect(query("node-preview-error")?.textContent).toBe("The URL did not return an HTML page.");
+    expect(JSON.stringify(useMindMapStore.getState().document!.nodes.get(selectedId())?.metadata)).toBe(before);
     expect(query("node-preview-empty")).toBeNull();
 
     nextPreview = async () => ({ url: PAGE, finalUrl: PAGE });
@@ -213,6 +234,8 @@ describe("node panel: privacy-aware website preview", () => {
     expect(fresh.getAttribute("src")).toBe(IMAGE);
     expect(fresh.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(query("node-preview-image-request")).toBeNull();
+    expect(container.textContent).toContain("Artikel");
+    expect(container.textContent).toContain("Kurz");
 
     // Reopening the map: the stored image is still there, but nothing contacts its host by itself.
     await remount();

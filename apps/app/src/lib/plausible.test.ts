@@ -106,23 +106,49 @@ describe("plausibleRequestHost", () => {
 });
 
 describe("startup line", () => {
-  test("on: names the switch, the host rule and what is sent", () => {
-    const line = plausibleStartupLine({});
+  const PROD = { NODE_ENV: "production" };
+
+  test("on, default target: names the switch, the host rule, what is sent, and the server signal", () => {
+    const line = plausibleStartupLine(PROD, "0.5.8");
     expect(line).toContain("BLOOMMD_PLAUSIBLE_DISABLED");
-    expect(line).toContain("AN");
+    expect(line).toContain("Plausible-Statistik: AN");
     expect(line).toContain("bloommd.app");
     expect(line).toContain("nur Seitenaufrufe und Nutzungsereignisse, keine Kennung");
-  });
-
-  test("off: one line that still names the switch", () => {
-    const line = plausibleStartupLine({ BLOOMMD_PLAUSIBLE_DISABLED: "true" });
-    expect(line).toContain("AUS");
-    expect(line).toContain("BLOOMMD_PLAUSIBLE_DISABLED");
+    expect(line).toContain("Server-Signal: AN");
+    expect(line).toContain("server-start");
+    expect(line).toContain("Version 0.5.8");
+    expect(line).toContain("installations.bloommd.app");
+    expect(line).toContain("ohne IP, Kennung und Cookies");
     expect(line).not.toContain("\n");
   });
 
-  test("own domain without a target of its own: says it is inactive", () => {
-    expect(plausibleStartupLine({ BLOOMMD_PLAUSIBLE_DOMAIN: "notes.customer.example" })).toContain("INAKTIV");
+  test("off: one line that still names the switch, and says there is no server signal either", () => {
+    const line = plausibleStartupLine({ ...PROD, BLOOMMD_PLAUSIBLE_DISABLED: "true" }, "0.5.8");
+    expect(line).toContain("AUS");
+    expect(line).toContain("BLOOMMD_PLAUSIBLE_DISABLED");
+    expect(line).toContain("kein Server-Signal");
+    expect(line).not.toContain("\n");
+  });
+
+  test("our own installation (explicit target): browser on, server signal off", () => {
+    const line = plausibleStartupLine({ ...PROD, BLOOMMD_PLAUSIBLE_TARGET_URL: "https://plausible.ops.moellenbeck-digital.io" }, "0.5.8");
+    expect(line).toContain("Server-Signal: AUS");
+    expect(line).toContain("Browser: AN, nur auf dem Host bloommd.app");
+  });
+
+  test("own domain without a target of its own: browser off, server signal on", () => {
+    const line = plausibleStartupLine({ ...PROD, BLOOMMD_PLAUSIBLE_DOMAIN: "notes.customer.example" }, "0.5.8");
+    expect(line).toContain("Browser: AUS");
+    expect(line).toContain("Server-Signal: AN");
+  });
+
+  test("own domain and own target: browser on that domain, no server signal", () => {
+    const line = plausibleStartupLine(
+      { ...PROD, BLOOMMD_PLAUSIBLE_DOMAIN: "notes.customer.example", BLOOMMD_PLAUSIBLE_TARGET_URL: "https://stats.customer.example" },
+      "0.5.8",
+    );
+    expect(line).toContain("Browser: AN, nur auf dem Host notes.customer.example");
+    expect(line).toContain("Server-Signal: AUS");
   });
 });
 

@@ -95,17 +95,64 @@ export function plausibleBrowserConfig(host: string | null | undefined, env: Pla
   return { domain: settings.domain, targetUrl: settings.targetUrl };
 }
 
-/** One line for the server log at start, also when tracking is off. It names the switch and the rule. */
-export function plausibleStartupLine(env: PlausibleEnv = process.env): string {
+/** The tracker domain of every installation that is not ours, fixed so nothing flows into `bloommd.app`. */
+export const INSTALLATIONS_PLAUSIBLE_DOMAIN = "installations.bloommd.app";
+export const SERVER_SIGNAL_EVENT = "server-start";
+/** After the signal at start, at most one more per this interval. */
+export const SERVER_SIGNAL_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Fixed neutral value, so the address of the server never reaches the receiving point. */
+export const SERVER_SIGNAL_FORWARDED_FOR = "127.0.0.1";
+
+export type ServerSignalConfig = {
+  targetUrl: string;
+  domain: string;
+  version: string;
+  userAgent: string;
+};
+
+/** The version goes into a header and a property: only a plain version string passes, anything else is `unknown`. */
+export function sanitizeServerSignalVersion(value: string | undefined): string {
+  const version = value?.trim() ?? "";
+  return /^[0-9A-Za-z][0-9A-Za-z.+_-]{0,31}$/.test(version) ? version : "unknown";
+}
+
+/**
+ * Server signal of customer installations: one `server-start` event with the version, from the server
+ * and not from a browser, so no visitor address is involved. It is sent only when tracking is not
+ * switched off and the target was NOT set explicitly (default target). Whoever sets a target of their
+ * own has chosen where their statistics go, and our own installation sets its internal target and
+ * tracks in the browser instead. Not sent from a dev server, a build or the E2E test mode either.
+ * `null` means: no signal.
+ */
+export function serverSignalConfig(version: string | undefined, env: PlausibleEnv = process.env): ServerSignalConfig | null {
   const settings = readPlausibleSettings(env);
-  const sends = "nur Seitenaufrufe und Nutzungsereignisse, keine Kennung, keine Cookies";
+  if (settings.disabled || settings.targetExplicit) return null;
+  if (env.NODE_ENV !== "production" || env.NEXT_PHASE === "phase-production-build") return null;
+  if (env.BLOOMMD_E2E_TEST_MODE === "1") return null;
+  const safeVersion = sanitizeServerSignalVersion(version);
+  return {
+    targetUrl: settings.targetUrl,
+    domain: INSTALLATIONS_PLAUSIBLE_DOMAIN,
+    version: safeVersion,
+    userAgent: `BloomMD-Server/${safeVersion}`,
+  };
+}
+
+/** One line for the server log at start, also when tracking is off. It names the switch, the rule and both ways. */
+export function plausibleStartupLine(env: PlausibleEnv = process.env, version?: string): string {
+  const settings = readPlausibleSettings(env);
   if (settings.disabled) {
-    return "[BloomMD] Plausible-Statistik: AUS (BLOOMMD_PLAUSIBLE_DISABLED ist gesetzt).";
+    return "[BloomMD] Plausible-Statistik: AUS (BLOOMMD_PLAUSIBLE_DISABLED ist gesetzt), auch kein Server-Signal.";
   }
-  if (settings.domain !== OWN_PLAUSIBLE_DOMAIN && !settings.targetExplicit) {
-    return `[BloomMD] Plausible-Statistik: INAKTIV (Domain ${settings.domain} ohne BLOOMMD_PLAUSIBLE_TARGET_URL sendet nichts). Abschalten: BLOOMMD_PLAUSIBLE_DISABLED=true.`;
-  }
-  return `[BloomMD] Plausible-Statistik: AN, nur auf dem Host ${settings.domain} (${sends}; Ziel ${settings.targetUrl}). Abschalten: BLOOMMD_PLAUSIBLE_DISABLED=true.`;
+  const signal = serverSignalConfig(version, env);
+  const signalText = signal
+    ? `Server-Signal: AN (beim Start und höchstens alle 24 h das Ereignis ${SERVER_SIGNAL_EVENT} mit der Version ${signal.version} an ${signal.targetUrl}, Domain ${signal.domain}; ohne IP, Kennung und Cookies)`
+    : "Server-Signal: AUS";
+  const browserText =
+    settings.domain !== OWN_PLAUSIBLE_DOMAIN && !settings.targetExplicit
+      ? "Browser: AUS (eigene Domain ohne BLOOMMD_PLAUSIBLE_TARGET_URL)"
+      : `Browser: AN, nur auf dem Host ${settings.domain} (nur Seitenaufrufe und Nutzungsereignisse, keine Kennung, keine Cookies; Ziel ${settings.targetUrl})`;
+  return `[BloomMD] Plausible-Statistik: AN. ${signalText}. ${browserText}. Abschalten: BLOOMMD_PLAUSIBLE_DISABLED=true.`;
 }
 
 /** Attributes of the script tag that the root layout renders when tracking applies to the request. */

@@ -1,8 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { LocaleProvider, configureLayoutWorker } from "@bloommd/ui";
+import { LocaleProvider, PlatformProvider, configureLayoutWorker } from "@bloommd/ui";
 import LayoutWorker from "./layout.worker?worker&inline";
-import { recordE2EState } from "./rpc";
+import { createDesktopPlatformAdapter } from "./platform-adapter";
+import { createMindmap, deleteMindmap, fetchLinkPreview, listMindmaps, openMindmap, recordE2EState, renameMindmap, saveMindmap } from "./rpc";
 import { installPerformanceProbe } from "./performance-probe";
 import { App } from "./App";
 import "./globals.css";
@@ -17,12 +18,16 @@ window.addEventListener("bloommd:layout-ready", (event) => {
 
 configureLayoutWorker(() => new LayoutWorker());
 
+const platformAdapter = createDesktopPlatformAdapter({ listMindmaps, openMindmap, createMindmap, saveMindmap, deleteMindmap, renameMindmap, fetchLinkPreview });
+
 if (import.meta.env.VITE_BLOOMMD_PROFILE === "1") installPerformanceProbe();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <LocaleProvider>
-      <App />
+      <PlatformProvider adapter={platformAdapter}>
+        <App />
+      </PlatformProvider>
     </LocaleProvider>
   </StrictMode>,
 );

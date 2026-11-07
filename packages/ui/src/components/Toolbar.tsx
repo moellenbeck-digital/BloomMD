@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useImperativeHandle, forwardRef, useState, type MouseEvent, type ReactNode } from "react";
 import { AlertTriangle, FilePlus, History, FilePlus2, FolderPlus, Upload, Download, FileText, ListTree, FileDown, ImageDown, Shapes, Link2, Save, Check, RefreshCw, CircleHelp, Info, Sun, Moon, Palette, RotateCcw, Search, Languages, BookOpen, MessageSquare, UserCircle, Rocket, type LucideIcon } from "lucide-react";
-import { importOpml, isWorkspaceMindMap, OpmlError, parseFile, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
+import { importOpml, isWorkspaceMindMap, OpmlError, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import { MapExportError } from "../export/capture-map";
 import { buildTextExport, downloadExportFile, EXPORT_FORMATS, type ExportFile, type ExportFormat } from "../export/export-file";
 import { exportMapFile } from "../export/run-map-export";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
 import { useTheme } from "../hooks/useTheme";
 import { ThemeCustomDialog } from "./ThemeCustomDialog";
 
@@ -122,6 +123,7 @@ const toolbarMenuItemClass = "flex w-full items-center gap-2 rounded-md px-2.5 p
 
 export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar({ onReload, onToggleHelp, onOpenAbout, onToggleCommandPalette, onOpenFeedback, feedbackTestId, onOpenOnboarding, docsHref, accountHref, onCreateFolder, onCreateFromTemplate, onNewFile, onSaveFile, onImportFile, onCreateNew, onDeliverExport, onShareLink, onOpenHistory }, ref) {
   const { t, locale, toggleLocale } = useLocale();
+  const platform = usePlatform();
   const { theme, toggleTheme, customTheme, saveCustomTheme, resetCustomTheme } = useTheme();
   const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const document = useMindMapStore((s) => s.document);
@@ -162,11 +164,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
     if (onNewFile) {
       Promise.resolve(onNewFile(doc)).catch(() => {});
     } else {
-      fetch("/api/mindmaps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, markdown: serializeToMarkdown(doc) }),
-      }).catch(() => {});
+      platform.files.create(filename, serializeToMarkdown(doc)).catch((error: unknown) => console.error("[BloomMD] New map could not be saved:", error));
     }
 
     // Select root node so user can immediately rename with the canvas shortcut.
@@ -174,7 +172,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
       const rootId = doc.rootId;
       useMindMapStore.getState().setSelectedNodeId(rootId);
     }, 100);
-  }, [t, setDocument, onNewFile, onCreateNew]);
+  }, [t, setDocument, onNewFile, onCreateNew, platform]);
 
   const onSave = useCallback(async () => {
     if (!document) return;
@@ -192,16 +190,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
       } else {
         const markdown = serializeToMarkdown(document);
         const filename = document.filePath.split("/").pop() || "mindmap.md";
-        const res = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ markdown, expectedVersion: document.storage?.version }),
-        });
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(body || `Save failed with HTTP ${res.status}`);
-        }
-        const saved = (await res.json()) as { storage?: MindMapDocument["storage"] };
+        const saved = await platform.files.write(filename, markdown, { storage: document.storage });
         if (saved.storage) setStorageMetadata(saved.storage);
       }
       setSaved(true);
@@ -213,7 +202,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
     } finally {
       setSaving(false);
     }
-  }, [document, onSaveFile, setStorageMetadata, t.derivedWorkspaceSave]);
+  }, [document, onSaveFile, platform, setStorageMetadata, t.derivedWorkspaceSave]);
 
   const [exportOpen, setExportOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -328,17 +317,13 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
         if (onNewFile) {
           onNewFile(doc);
         } else {
-          fetch("/api/mindmaps", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ filename, markdown }),
-          }).catch((err) => console.error("Import save failed:", err));
+          platform.files.create(filename, markdown).catch((err: unknown) => console.error("Import save failed:", err));
         }
       };
       reader.readAsText(file);
       e.target.value = "";
     },
-    [setDocument, onNewFile, setStatusMessage, t.importOpmlFailed],
+    [setDocument, onNewFile, platform, setStatusMessage, t.importOpmlFailed],
   );
 
   return (

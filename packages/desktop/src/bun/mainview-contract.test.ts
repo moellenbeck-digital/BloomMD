@@ -132,19 +132,25 @@ describe("desktop mainview contract", () => {
 
     for (const wiring of [
       "window.addEventListener(\"bloommd:open-url\", openUrl);",
-      "window.addEventListener(\"bloommd:load-link-preview\", loadLinkPreview);",
-      "window.addEventListener(\"bloommd:list-maps\", listMaps);",
-      "window.addEventListener(\"bloommd:load-map-document\", loadMapDocument);",
       "window.addEventListener(\"bloommd:choose-resource\", chooseResource);",
       "window.addEventListener(\"bloommd:open-resource\", openResource);",
       "void openExternalUrl(detail.url)",
-      "void fetchLinkPreview(detail.url)",
-      "void listMindmaps() .then((result) => detail.respond?.({ files: result.files }))",
-      "void openMindmap(detail.filename) .then((documentData) => detail.respond?.({ document: documentData }))",
       "void chooseResourceFile(detail.kind)",
       "void readResource(detail.file)",
     ]) {
       expect(source).toContain(wiring);
+    }
+  });
+
+  test("hands the shared UI its file and API access through the desktop platform adapter", async () => {
+    const main = compact(await readFile(join(ROOT, "mainview", "main.tsx"), "utf8"));
+    const renderer = compact(await readFile(APP_SOURCE, "utf8"));
+
+    expect(main).toContain("createDesktopPlatformAdapter({ listMindmaps, openMindmap, createMindmap, saveMindmap, deleteMindmap, renameMindmap, fetchLinkPreview })");
+    expect(main).toContain("<PlatformProvider adapter={platformAdapter}> <App /> </PlatformProvider>");
+    // The editor no longer asks the shell for maps and previews through window events.
+    for (const retired of ["bloommd:list-maps", "bloommd:load-map-document", "bloommd:load-link-preview"]) {
+      expect(renderer).not.toContain(retired);
     }
   });
 

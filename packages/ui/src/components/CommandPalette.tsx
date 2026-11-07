@@ -2,25 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2, History, Quote, BookOpen } from "lucide-react";
-import { buildPdfCitationNode, parseFile, serializeToMarkdown, type MindMapDocument, type MindMapListEntry, type MindMapNode } from "@bloommd/core/browser";
+import { buildPdfCitationNode, parseFile, serializeToMarkdown, type MindMapListEntry } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
 import { bibliographyFilename, bibliographyForDocument, downloadTextFile } from "../utils/bibliography";
 import { extractLinksFromMarkdown } from "../utils/links";
 import { ConflictCopyBadge } from "./ConflictCopyBadge";
-
-interface ApiListResponse {
-  files: MindMapListEntry[];
-}
-
-interface ApiDocResponse {
-  filePath: string;
-  frontmatter: MindMapDocument["frontmatter"];
-  nodes: Record<string, MindMapNode>;
-  rootId: string;
-  preamble?: string;
-  storage?: MindMapDocument["storage"];
-}
 
 interface CommandPaletteProps {
   open: boolean;
@@ -39,14 +27,6 @@ type PaletteItem =
   | { id: string; category: string; title: string; subtitle: string; kind: "action"; icon: typeof Plus; run: () => void | Promise<void>; keepOpen?: boolean }
   | { id: string; category: string; title: string; subtitle: string; kind: "mindmap"; filename: string }
   | { id: string; category: string; title: string; subtitle: string; kind: "node"; nodeId: string; linkCount: number };
-
-function hydrateDocument(data: ApiDocResponse): MindMapDocument {
-  return {
-    ...data,
-    nodes: new Map(Object.entries(data.nodes)),
-    rawMarkdown: "",
-  };
-}
 
 export function CommandPalette({
   open,
@@ -67,6 +47,7 @@ export function CommandPalette({
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setSelectedNodeId = useMindMapStore((s) => s.setSelectedNodeId);
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
+  const platform = usePlatform();
   const document = useMindMapStore((s) => s.document);
   const readOnly = useMindMapStore((s) => s.readOnly);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
@@ -82,11 +63,13 @@ export function CommandPalette({
     setPdfForm(null);
     setNotice(null);
     requestAnimationFrame(() => inputRef.current?.focus());
-    fetch("/api/mindmaps")
-      .then((res) => res.json())
-      .then((data: ApiListResponse) => setFiles(data.files))
-      .catch(() => setFiles([]));
-  }, [open]);
+    platform.files.list()
+      .then(setFiles)
+      .catch((error: unknown) => {
+        console.error("[BloomMD] File list could not be loaded:", error);
+        setFiles([]);
+      });
+  }, [open, platform]);
 
   const openMindmap = useCallback(
     async (filename: string) => {
@@ -94,11 +77,9 @@ export function CommandPalette({
         await onOpenMindmap(filename);
         return;
       }
-      const res = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`);
-      const data = (await res.json()) as ApiDocResponse;
-      setDocument(hydrateDocument(data));
+      setDocument(await platform.files.read(filename));
     },
-    [onOpenMindmap, setDocument],
+    [onOpenMindmap, platform, setDocument],
   );
 
   const createTemplateMindmap = useCallback(
@@ -160,15 +141,10 @@ export function CommandPalette({
       ].join("\n");
       const doc = parseFile(filename, markdown);
       const serialized = serializeToMarkdown(doc);
-      const response = await fetch("/api/mindmaps", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, markdown: serialized }),
-      });
-      if (!response.ok) throw new Error(await response.text());
+      await platform.files.create(filename, serialized);
       setDocument(doc);
     },
-    [setDocument, t],
+    [platform, setDocument, t],
   );
 
   const exportBibliography = useCallback(

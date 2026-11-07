@@ -52,6 +52,7 @@ import "@mdxeditor/editor/style.css";
 import "./NodeEditor.css";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
 import { requestNodeFocus } from "../utils/nodeFocus";
 import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
@@ -76,19 +77,6 @@ import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "..
 interface NodeEditorProps {
   /** When true, renders without the aside wrapper (for embedding in bottom sheets etc.) */
   embedded?: boolean;
-}
-
-interface ApiListResponse {
-  files: MindMapListEntry[];
-}
-
-interface ApiDocResponse {
-  filePath: string;
-  frontmatter: MindMapDocument["frontmatter"];
-  nodes: Record<string, MindMapNode>;
-  rootId: string;
-  preamble?: string;
-  storage?: MindMapDocument["storage"];
 }
 
 interface BacklinkEntry {
@@ -125,20 +113,6 @@ interface ResourceChooseRequest {
   respond: (result: { path: string } | { canceled: true } | { error: string }) => void;
 }
 
-interface LinkPreviewRequest {
-  url: string;
-  respond: (result: { preview: { title?: string; description?: string; image?: string } } | { error: string }) => void;
-}
-
-interface ListMapsRequest {
-  respond: (result: { files: MindMapListEntry[] } | { error: string }) => void;
-}
-
-interface LoadMapDocumentRequest {
-  filename: string;
-  respond: (result: { document: ApiDocResponse } | { error: string }) => void;
-}
-
 interface OpenUrlRequest {
   url: string;
   respond: (result: { opened: true } | { error: string }) => void;
@@ -163,19 +137,12 @@ function filenameFor(doc: MindMapDocument): string {
   return doc.filePath.split("/").pop() || doc.filePath;
 }
 
-function hydrateDocument(data: ApiDocResponse): MindMapDocument {
-  return {
-    ...data,
-    nodes: new Map(Object.entries(data.nodes)),
-    rawMarkdown: "",
-  };
-}
-
 const NodeHandwriting = lazy(() => import("./NodeHandwriting").then((module) => ({ default: module.NodeHandwriting })));
 
 export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const inkAttachments = useContext(InkAttachmentsContext);
   const { t } = useLocale();
+  const platform = usePlatform();
   const nodeKindOptions = getNodeKindOptions(t);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const document = useMindMapStore((s) => s.document);
@@ -269,71 +236,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     [requestNodeFocus, setEditorVisible, setSelectedNodeId],
   );
 
-  const loadMapList = useCallback(async (): Promise<MindMapListEntry[]> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<MindMapListEntry[] | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<ListMapsRequest>("bloommd:list-maps", {
-          cancelable: true,
-          detail: {
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.files);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapsUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return shellResult;
-    }
+  const loadMapList = useCallback((): Promise<MindMapListEntry[]> => platform.files.list(), [platform]);
 
-    if (typeof fetch === "undefined") return [];
-    const response = await fetch("/api/mindmaps");
-    if (!response.ok) return [];
-    const data = await response.json() as ApiListResponse;
-    return data.files;
-  }, [t.mapsUnavailable]);
-
-  const loadMapDocument = useCallback(async (filename: string): Promise<MindMapDocument | null> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<ApiDocResponse | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LoadMapDocumentRequest>("bloommd:load-map-document", {
-          cancelable: true,
-          detail: {
-            filename,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.document);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return hydrateDocument(shellResult);
-    }
-
-    if (typeof fetch === "undefined") return null;
-    const response = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`);
-    if (!response.ok) return null;
-    return hydrateDocument(await response.json() as ApiDocResponse);
-  }, [t.mapUnavailable]);
+  const loadMapDocument = useCallback((filename: string): Promise<MindMapDocument> => platform.files.read(filename), [platform]);
 
   const openMapLink = useCallback(
     async (link: MapLinkResource) => {
@@ -356,7 +261,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
 
       try {
         const nextDoc = await loadMapDocument(targetFilename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         const resolved = resolveMapLinkInDocument(link, targetFilename, nextDoc.nodes.values());
         const nextSelection = resolved.status === "resolved" ? resolved.nodeId : nextDoc.rootId;
@@ -397,7 +301,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       }
       try {
         const nextDoc = await loadMapDocument(entry.filename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         setTimeout(() => {
           focusMapNode(entry.nodeId);
@@ -432,7 +335,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             if (file.filename === currentFilename) return;
             try {
               const doc = await loadMapDocument(file.filename);
-              if (doc) docs.set(file.filename, doc);
+              docs.set(file.filename, doc);
             } catch {
               // Skip unavailable files.
             }
@@ -619,43 +522,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     setPreviewLoading(true);
     setPreviewError(null);
     try {
-      const previewFromShell = await new Promise<{ title?: string; description?: string; image?: string } | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LinkPreviewRequest>("bloommd:load-link-preview", {
-          cancelable: true,
-          detail: {
-            url,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.preview);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-          if (!shellResponded) reject(new Error(t.previewUnavailable));
-        }, 10_000);
-      });
-      let data: { preview?: { title?: string; description?: string; image?: string }; error?: string };
-      if (previewFromShell) {
-        data = { preview: previewFromShell };
-      } else {
-        const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-        const raw = await response.text();
-        try {
-          data = JSON.parse(raw) as typeof data;
-        } catch {
-          throw new Error(`${t.previewServiceError} ${response.status || 500}.`);
-        }
-        if (!response.ok || !data.preview) throw new Error(data.error || t.previewUnavailable);
-      }
-      const preview = data.preview;
-      if (!preview) throw new Error(t.previewUnavailable);
+      const preview = await platform.api.linkPreview(url);
       updateMetadata({
         ...(preview.title ? { previewTitle: preview.title } : {}),
         ...(preview.description ? { previewDescription: preview.description } : {}),

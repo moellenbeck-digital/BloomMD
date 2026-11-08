@@ -8,6 +8,7 @@ import {
   LazyNodeEditor,
   HelpModal,
   InkAttachmentsContext,
+  PlatformProvider,
   requestNodeFocus,
   useVisualViewport,
   VIEWPORT_ROOT_FILL_CLASS,
@@ -28,6 +29,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { markdownFilename, newNoteMarkdown } from "./mobile-files";
 import { shareExportFile, type ExportShareDeps } from "./export-share";
+import { createMobilePlatformAdapter, mobileFileSource } from "./platform-adapter";
 import { MobileRemoteClient, RemoteRequestError } from "./remote-client";
 import { DEFAULT_SERVER_URL, describeDevice, MobileAuth, MobileAuthError, normalizeServerUrl, type MobileSession } from "./mobile-auth";
 import { parseAppLink } from "./app-links";
@@ -168,6 +170,8 @@ export function App() {
   const [account, setAccount] = useState<MobileSession | null>(null);
   const [signingIn, setSigningIn] = useState(false);
   const [remoteClient, setRemoteClient] = useState<MobileRemoteClient | null>(null);
+  const remoteClientRef = useRef(remoteClient);
+  remoteClientRef.current = remoteClient;
   const [remoteConnecting, setRemoteConnecting] = useState(false);
   const [auth] = useState(() => new MobileAuth({
     keychain: BloomKeychain,
@@ -693,6 +697,13 @@ export function App() {
     // would restore and connect again in a loop.
   }, []);
 
+  // The node panel reads maps through this; the source is picked per call, so a store switch or a
+  // sign-in needs no new adapter.
+  const platformAdapter = useMemo(
+    () => createMobilePlatformAdapter(() => mobileFileSource({ remote: remoteClientRef.current, store: storeRef.current })),
+    [],
+  );
+
   // Handwriting files live next to the notes, like the Obsidian plugin keeps them.
   const inkAttachments = useMemo(() => {
     if (remoteClient) return null;
@@ -723,6 +734,7 @@ export function App() {
   }
 
   return (
+    <PlatformProvider adapter={platformAdapter}>
     <InkAttachmentsContext.Provider value={inkAttachments}>
     <div className={`${VIEWPORT_ROOT_FILL_CLASS} flex flex-col bg-[#FAFAFA]`}>
       <input ref={fileInputRef} type="file" accept=".md,.markdown,.opml,text/markdown,text/plain,text/x-opml+xml,text/xml" className="hidden" onChange={handleImport} />
@@ -1014,5 +1026,6 @@ export function App() {
       </div>
     </div>
     </InkAttachmentsContext.Provider>
+    </PlatformProvider>
   );
 }

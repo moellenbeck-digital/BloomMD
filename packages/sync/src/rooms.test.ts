@@ -8,7 +8,9 @@ import type { ServerWebSocket } from "bun";
 import { createRoomManager, SyncNodeConflictError, SyncRoomBusyError, SyncServerDrainingError, type RoomManager } from "./rooms";
 import { TestClock } from "./clock";
 import { createSyncTelemetry } from "./observability";
-import { releaseAwarenessClients } from "./sync-handler";
+import * as syncProtocol from "y-protocols/sync";
+import * as encoding from "lib0/encoding";
+import { handleSyncMessage, releaseAwarenessClients } from "./sync-handler";
 import { parseFile, yDocToDocument, yUpdateContentDiff } from "@bloommd/core";
 import { KnowledgeNodeNotFoundError, parseKnowledgeNodePatch } from "@bloommd/core/knowledge";
 import {
@@ -1109,5 +1111,246 @@ describe("room presence", () => {
 
     peer.destroy();
     peerDoc.destroy();
+  });
+});
+
+/**
+ * Ticket #46: a change that arrives through the WebSocket path (a Y.Doc update from a client
+ * origin) must end up in storage, also after a storage error. The fake below behaves like the
+ * Postgres adapter: an optimistic `version`, a conflict on a stale one, synthetic data only.
+ */
+describe("websocket updates reach storage", () => {
+  const descriptor: RoomDescriptor = {
+    key: "document-id",
+    filename: "test.md",
+    documentId: "document-id",
+    workspaceId: "workspace-id",
+    userId: "user-a",
+  };
+  type Room = Awaited<ReturnType<RoomManager["getOrCreateRoom"]>>;
+
+  function createVersionedStorage(options: { failures?: Array<Error> } = {}) {
+    const failures = [...(options.failures ?? [])];
+    const stored = { version: 1, rootContent: "", saves: 0, attempts: 0 };
+    const persistence: DocumentPersistence = {
+      authorize: async () => "write",
+      load: async (d) => ({
+        ...parseFile(d.filename, SAMPLE_MD),
+        storage: { mode: "database", documentId: d.documentId!, workspaceId: d.workspaceId!, version: stored.version },
+      }),
+      save: async (_d, document) => {
+        stored.attempts += 1;
+        const failure = failures.shift();
+        if (failure) throw failure;
+        if (document.storage?.version !== stored.version) throw new SyncDocumentVersionConflictError();
+        stored.version += 1;
+        stored.saves += 1;
+        stored.rootContent = document.nodes.get(document.rootId)?.content ?? "";
+        return { ...document, storage: { ...document.storage!, version: stored.version } };
+      },
+    };
+    return { stored, persistence };
+  }
+
+  /** A connected browser: its own Y.Doc, and a socket that records what the server sends it. */
+  function connectClient(manager: RoomManager, room: Room) {
+    const received: Uint8Array[] = [];
+    const ws = {
+      sendBinary: (data: Uint8Array) => { received.push(data); },
+      readyState: 1,
+      data: { roomName: room.key },
+    } as unknown as ServerWebSocket<WebSocketData>;
+    manager.addClient(room, ws);
+    const doc = new Y.Doc();
+    Y.applyUpdate(doc, Y.encodeStateAsUpdate(room.yDoc));
+    return { ws, doc, received };
+  }
+
+  /** Edits the client document and delivers the update the way onMessage does (MSG_SYNC update). */
+  function editFromClient(room: Room, client: ReturnType<typeof connectClient>, text: string) {
+    const rootId = room.yDoc.getMap("meta").get("rootId") as string;
+    const content = client.doc.getMap("nodeContents").get(rootId) as Y.Text;
+    let update: Uint8Array | null = null;
+    const capture = (next: Uint8Array) => { update = next; };
+    client.doc.on("update", capture);
+    content.insert(content.length, text);
+    client.doc.off("update", capture);
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, 0);
+    syncProtocol.writeUpdate(encoder, update!);
+    handleSyncMessage(room.yDoc, encoding.toUint8Array(encoder), client.ws, room);
+  }
+
+  /** Lets queued promise work (the async save chain) finish after a clock step. */
+  async function settle() {
+    for (let i = 0; i < 10; i += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+
+  test("persists a client update after the debounce and relays it to the other clients", async () => {
+    const { stored, persistence } = createVersionedStorage();
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+    const peer = connectClient(manager, room);
+
+    editFromClient(room, author, "\nEdited over the socket");
+    expect(peer.received.length).toBe(1);
+    expect(author.received.length).toBe(0);
+
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+
+    expect(stored.saves).toBe(1);
+    expect(stored.rootContent).toContain("Edited over the socket");
+    expect(room.version).toBe(2);
+    expect(room.lastPersistError).toBeNull();
+  });
+
+  test("keeps the version chain intact although the persisted version is not broadcast", async () => {
+    const { stored, persistence } = createVersionedStorage();
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+    const peer = connectClient(manager, room);
+
+    editFromClient(room, author, "\nfirst");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+    // The PERSISTENCE_ORIGIN transaction (new storage.version) is filtered out of the broadcast.
+    expect(peer.received.length).toBe(1);
+    editFromClient(room, author, "\nsecond");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+
+    expect(stored.saves).toBe(2);
+    expect(stored.version).toBe(3);
+    expect(stored.rootContent).toContain("first");
+    expect(stored.rootContent).toContain("second");
+  });
+
+  test("saves a client update that arrives while the server is draining", async () => {
+    const { stored, persistence } = createVersionedStorage();
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    manager.beginDrain();
+    editFromClient(room, author, "\nduring drain");
+    expect(room.persistTimer).toBeNull();
+    const result = await manager.shutdown();
+
+    expect(result.failedRoomKeys).toEqual([]);
+    expect(stored.rootContent).toContain("during drain");
+  });
+
+  test("persists a client update when the last client leaves", async () => {
+    const { stored, persistence } = createVersionedStorage();
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    editFromClient(room, author, "\nbefore leaving");
+    manager.removeClient(room, author.ws);
+    await settle();
+
+    expect(stored.rootContent).toContain("before leaving");
+  });
+
+  test("retries a failed debounced save by itself and persists the pending client update", async () => {
+    const { stored, persistence } = createVersionedStorage({ failures: [new Error("storage unavailable")] });
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    editFromClient(room, author, "\nlost unless retried");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+    expect(room.lastPersistError).toBe("storage unavailable");
+    expect(stored.saves).toBe(0);
+
+    // No further edit: the room itself has to bring the pending change to storage.
+    await clock.advanceBy(60_000);
+    await settle();
+
+    expect(stored.rootContent).toContain("lost unless retried");
+    expect(room.lastPersistError).toBeNull();
+    expect(room.version).toBe(2);
+  });
+
+  test("recovers after several consecutive failures and does not hammer storage", async () => {
+    const { stored, persistence } = createVersionedStorage({
+      failures: [new Error("storage unavailable"), new Error("storage unavailable"), new Error("storage unavailable")],
+    });
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    editFromClient(room, author, "\nafter an outage");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+    // Shortly after the first failure there is no immediate retry storm.
+    await clock.advanceBy(1);
+    await settle();
+    expect(stored.attempts).toBeLessThanOrEqual(2);
+
+    // Each retry is scheduled only after the previous save settled, so step through the backoff.
+    for (let step = 0; step < 60; step += 1) {
+      await clock.advanceBy(1_000);
+      await settle();
+    }
+
+    expect(stored.attempts).toBe(4);
+    expect(stored.rootContent).toContain("after an outage");
+    expect(room.lastPersistError).toBeNull();
+  });
+
+  test("retries the final save of a room whose last client left while storage was failing", async () => {
+    // The debounced save fails first, so no timer is left when the last client disconnects and
+    // its final flush fails as well.
+    const { stored, persistence } = createVersionedStorage({
+      failures: [new Error("storage unavailable"), new Error("storage unavailable")],
+    });
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    editFromClient(room, author, "\nlast words");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+    manager.removeClient(room, author.ws);
+    await settle();
+    expect(room.lastPersistError).toBe("storage unavailable");
+    expect(stored.attempts).toBe(2);
+    expect(manager.getRooms().has(descriptor.key)).toBe(true);
+
+    await clock.advanceBy(60_000);
+    await settle();
+
+    expect(stored.rootContent).toContain("last words");
+    expect(room.lastPersistError).toBeNull();
+  });
+
+  test("does not retry a conflict that retrying cannot resolve", async () => {
+    const { stored, persistence } = createVersionedStorage({ failures: [new SyncDocumentVersionConflictError()] });
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom(descriptor);
+    const author = connectClient(manager, room);
+
+    editFromClient(room, author, "\nconflicting");
+    await clock.advanceBy(config.persistDebounceMs);
+    await settle();
+    await clock.advanceBy(10 * 60_000);
+    await settle();
+
+    expect(stored.attempts).toBe(1);
+    expect(room.lastPersistError).toBe("VERSION_CONFLICT");
   });
 });

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Map
+
+- New optional **Backlink edges** mode (header button and command **Toggle backlink edges**, off by default, saved per map or folder): a dashed arrow runs from a node to every node it links to (`[[#Heading]]`, `[[Note#Heading]]`, a BloomMD node id as the fragment; in folder maps from file to file). It is display only and never writes to the note. Broken or ambiguous links are not guessed: the node shows a warning badge with the link and the reason. Image and map exports are unchanged.
+
 ### Fixes
 
 - The map view no longer stays blank after **Visualize current note**: the map is fitted once the view has a size (a freshly split or hidden pane is not laid out yet), and a map restored with the workspace is reused instead of opening a second one.

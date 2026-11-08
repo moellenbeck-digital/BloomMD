@@ -2,24 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, Star } from "lucide-react";
-import type { MindMapListEntry, MindMapDocument, MindMapNode } from "@bloommd/core/browser";
+import type { MindMapDocument, MindMapListEntry } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
 import { ConflictCopyBadge } from "./ConflictCopyBadge";
 import { FileContextMenu } from "./FileContextMenu";
-
-interface ApiListResponse {
-  files: MindMapListEntry[];
-}
-
-interface ApiDocResponse {
-  filePath: string;
-  frontmatter: MindMapDocument["frontmatter"];
-  nodes: Record<string, MindMapNode>;
-  rootId: string;
-  preamble?: string;
-  storage?: MindMapDocument["storage"];
-}
 
 interface FileBrowserProps {
   open: boolean;
@@ -107,6 +95,7 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
   const revealActiveOnOpenRef = useRef(false);
   const listLoadRequestRef = useRef(0);
   const [listLoadVersion, setListLoadVersion] = useState(0);
+  const platform = usePlatform();
   const setDocument = useMindMapStore((s) => s.setDocument);
   const currentDoc = useMindMapStore((s) => s.document);
   const listRef = useRef<HTMLDivElement>(null);
@@ -129,20 +118,20 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
     setLoading(true);
     setFocusedIndex(-1);
     setQuery("");
-    fetch("/api/mindmaps")
-      .then((res) => res.json())
-      .then((data: ApiListResponse) => {
+    platform.files.list()
+      .then((entries) => {
         if (listLoadRequestRef.current !== loadRequest) return;
-        setFiles(data.files);
+        setFiles(entries);
         setLoading(false);
         // The reveal effect must wait for this open cycle's response. Otherwise it can consume
         // the reveal request against the previous list before the fresh entries have rendered.
         setListLoadVersion(loadRequest);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        console.error("[BloomMD] File list could not be loaded:", error);
         if (listLoadRequestRef.current === loadRequest) setLoading(false);
       });
-  }, [open, currentDoc?.frontmatter.id]);
+  }, [open, currentDoc?.frontmatter.id, platform]);
 
   // Focus the list container when drawer opens so keyboard events work
   useEffect(() => {
@@ -174,19 +163,18 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
    */
   const refreshFiles = useCallback(async () => {
     try {
-      const response = await fetch("/api/mindmaps");
-      if (!response.ok) return;
-      const data = (await response.json()) as ApiListResponse;
+      const entries = await platform.files.list();
       setFiles((current) => {
         const same =
-          current.length === data.files.length
-          && current.every((file, index) => file.filename === data.files[index]?.filename);
-        return same ? current : data.files;
+          current.length === entries.length
+          && current.every((file, index) => file.filename === entries[index]?.filename);
+        return same ? current : entries;
       });
-    } catch {
+    } catch (error) {
       // A failed background refresh keeps the last known list, which beats emptying it.
+      console.error("[BloomMD] File list refresh failed:", error);
     }
-  }, []);
+  }, [platform]);
 
   useEffect(() => {
     if (!open) return;
@@ -205,12 +193,16 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
       if (onDelete) {
         await onDelete(filename, title);
       } else {
-        const response = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`, { method: "DELETE" });
-        if (!response.ok) throw new Error(t.deleteFailed);
+        try {
+          await platform.files.remove(filename);
+        } catch (error) {
+          console.error("[BloomMD] Delete failed:", error);
+          throw new Error(t.deleteFailed);
+        }
       }
       await refreshFiles();
     },
-    [onDelete, refreshFiles, t.deleteFailed],
+    [onDelete, platform, refreshFiles, t.deleteFailed],
   );
 
   const handleRename = useCallback(
@@ -219,14 +211,8 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
         void onRename(filename, title);
         return;
       }
-      fetch(`/api/mindmaps/${encodeURIComponent(filename)}`)
-        .then((res) => res.json())
-        .then((data: ApiDocResponse) => {
-          const doc: MindMapDocument = {
-            ...data,
-            nodes: new Map(Object.entries(data.nodes)),
-            rawMarkdown: "",
-          };
+      platform.files.read(filename)
+        .then((doc) => {
           setDocument(doc);
           onClose();
           setTimeout(() => {
@@ -234,9 +220,10 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
             store.setSelectedNodeId(doc.rootId);
             store.setAutoEditNodeId(doc.rootId);
           }, 300);
-        });
+        })
+        .catch((error: unknown) => console.error("[BloomMD] Map could not be opened for rename:", error));
     },
-    [onClose, onRename, setDocument],
+    [onClose, onRename, platform, setDocument],
   );
 
   const openFile = useCallback(
@@ -251,14 +238,8 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
         onClose();
         return;
       }
-      fetch(`/api/mindmaps/${encodeURIComponent(filename)}`)
-        .then((res) => res.json())
-        .then((data: ApiDocResponse) => {
-          const doc: MindMapDocument = {
-            ...data,
-            nodes: new Map(Object.entries(data.nodes)),
-            rawMarkdown: "",
-          };
+      platform.files.read(filename)
+        .then((doc) => {
           setDocument(doc);
           setRecents((current) => {
             const next = [filename, ...current.filter((item) => item !== filename)].slice(0, 8);
@@ -266,9 +247,10 @@ export function FileBrowser({ open, onClose, onRename, onDelete, onOpen, revealF
             return next;
           });
           onClose();
-        });
+        })
+        .catch((error: unknown) => console.error("[BloomMD] Map could not be opened:", error));
     },
-    [onClose, onOpen, setDocument],
+    [onClose, onOpen, platform, setDocument],
   );
 
   const sortedFiles = [...files].sort((a, b) => compareFileBrowserEntries(a, b, favorites, recents));

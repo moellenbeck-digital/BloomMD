@@ -28,7 +28,7 @@ Das dev-team-Image braucht Bun ab 1.4; mit Bun 1.3.14 lässt sich das Lockfile v
 
 - Die Bun-Version je Repo festhalten, statt eine Version für alle Repos anzunehmen.
 - Behoben wurde es im dev-team-Image mit Bun 1.4.2 (Commit `1da7950`).
-- BloomMD selbst bleibt auf Bun 1.3.14.
+- BloomMD selbst läuft seit Ticket #304 (PR #306, 06.11.2026) auf Bun 1.4.4.
 
 ## Beleg
 

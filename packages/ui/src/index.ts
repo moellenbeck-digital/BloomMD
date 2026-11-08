@@ -61,3 +61,17 @@ export { layoutWorkspaceMap, type WorkspaceMapNodeData } from "./hooks/useWorksp
 export { WorkspaceHealth, type WorkspaceHealthProps } from "./components/WorkspaceHealth";
 export { CreateEntryDialog, type CreateEntryDialogProps, type CreateEntryKind } from "./components/CreateEntryDialog";
 export { InkAttachmentsContext, inkEmbedNames, appendInkEmbed, type InkAttachments } from "./ink/attachments";
+export {
+  PlatformError,
+  hydrateDocument,
+  isPlatformError,
+  type LinkPreview,
+  type PlatformAdapter,
+  type PlatformApi,
+  type PlatformErrorCode,
+  type PlatformFiles,
+  type PlatformWriteResult,
+  type SerializedMindMapDocument,
+} from "./platform/platform-adapter";
+export { PlatformProvider, usePlatform } from "./platform/PlatformContext";
+export { createWebPlatformAdapter, type WebPlatformAdapterOptions } from "./platform/web-adapter";

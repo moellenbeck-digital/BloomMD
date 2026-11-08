@@ -52,6 +52,8 @@ import "@mdxeditor/editor/style.css";
 import "./NodeEditor.css";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
+import { RemotePreviewImage, remoteHost } from "./RemotePreviewImage";
 import { requestNodeFocus } from "../utils/nodeFocus";
 import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
@@ -76,19 +78,6 @@ import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "..
 interface NodeEditorProps {
   /** When true, renders without the aside wrapper (for embedding in bottom sheets etc.) */
   embedded?: boolean;
-}
-
-interface ApiListResponse {
-  files: MindMapListEntry[];
-}
-
-interface ApiDocResponse {
-  filePath: string;
-  frontmatter: MindMapDocument["frontmatter"];
-  nodes: Record<string, MindMapNode>;
-  rootId: string;
-  preamble?: string;
-  storage?: MindMapDocument["storage"];
 }
 
 interface BacklinkEntry {
@@ -125,20 +114,6 @@ interface ResourceChooseRequest {
   respond: (result: { path: string } | { canceled: true } | { error: string }) => void;
 }
 
-interface LinkPreviewRequest {
-  url: string;
-  respond: (result: { preview: { title?: string; description?: string; image?: string } } | { error: string }) => void;
-}
-
-interface ListMapsRequest {
-  respond: (result: { files: MindMapListEntry[] } | { error: string }) => void;
-}
-
-interface LoadMapDocumentRequest {
-  filename: string;
-  respond: (result: { document: ApiDocResponse } | { error: string }) => void;
-}
-
 interface OpenUrlRequest {
   url: string;
   respond: (result: { opened: true } | { error: string }) => void;
@@ -163,19 +138,12 @@ function filenameFor(doc: MindMapDocument): string {
   return doc.filePath.split("/").pop() || doc.filePath;
 }
 
-function hydrateDocument(data: ApiDocResponse): MindMapDocument {
-  return {
-    ...data,
-    nodes: new Map(Object.entries(data.nodes)),
-    rawMarkdown: "",
-  };
-}
-
 const NodeHandwriting = lazy(() => import("./NodeHandwriting").then((module) => ({ default: module.NodeHandwriting })));
 
 export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const inkAttachments = useContext(InkAttachmentsContext);
   const { t } = useLocale();
+  const platform = usePlatform();
   const nodeKindOptions = getNodeKindOptions(t);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const document = useMindMapStore((s) => s.document);
@@ -194,6 +162,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>({ url: "", file: "", targetNodeId: "", citation: "", due: "", assignee: "" });
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewEmpty, setPreviewEmpty] = useState(false);
+  // The image the user just fetched; it may show at once, any other stored image needs a click.
+  const [fetchedImage, setFetchedImage] = useState<string | null>(null);
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
   const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
   const [viewer, setViewer] = useState<ViewerRequest | null>(null);
@@ -269,71 +240,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     [requestNodeFocus, setEditorVisible, setSelectedNodeId],
   );
 
-  const loadMapList = useCallback(async (): Promise<MindMapListEntry[]> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<MindMapListEntry[] | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<ListMapsRequest>("bloommd:list-maps", {
-          cancelable: true,
-          detail: {
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.files);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapsUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return shellResult;
-    }
+  const loadMapList = useCallback((): Promise<MindMapListEntry[]> => platform.files.list(), [platform]);
 
-    if (typeof fetch === "undefined") return [];
-    const response = await fetch("/api/mindmaps");
-    if (!response.ok) return [];
-    const data = await response.json() as ApiListResponse;
-    return data.files;
-  }, [t.mapsUnavailable]);
-
-  const loadMapDocument = useCallback(async (filename: string): Promise<MindMapDocument | null> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<ApiDocResponse | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LoadMapDocumentRequest>("bloommd:load-map-document", {
-          cancelable: true,
-          detail: {
-            filename,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.document);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return hydrateDocument(shellResult);
-    }
-
-    if (typeof fetch === "undefined") return null;
-    const response = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`);
-    if (!response.ok) return null;
-    return hydrateDocument(await response.json() as ApiDocResponse);
-  }, [t.mapUnavailable]);
+  const loadMapDocument = useCallback((filename: string): Promise<MindMapDocument> => platform.files.read(filename), [platform]);
 
   const openMapLink = useCallback(
     async (link: MapLinkResource) => {
@@ -356,7 +265,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
 
       try {
         const nextDoc = await loadMapDocument(targetFilename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         const resolved = resolveMapLinkInDocument(link, targetFilename, nextDoc.nodes.values());
         const nextSelection = resolved.status === "resolved" ? resolved.nodeId : nextDoc.rootId;
@@ -397,7 +305,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       }
       try {
         const nextDoc = await loadMapDocument(entry.filename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         setTimeout(() => {
           focusMapNode(entry.nodeId);
@@ -432,7 +339,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             if (file.filename === currentFilename) return;
             try {
               const doc = await loadMapDocument(file.filename);
-              if (doc) docs.set(file.filename, doc);
+              docs.set(file.filename, doc);
             } catch {
               // Skip unavailable files.
             }
@@ -618,44 +525,11 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     if (!url) return;
     setPreviewLoading(true);
     setPreviewError(null);
+    setPreviewEmpty(false);
     try {
-      const previewFromShell = await new Promise<{ title?: string; description?: string; image?: string } | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LinkPreviewRequest>("bloommd:load-link-preview", {
-          cancelable: true,
-          detail: {
-            url,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.preview);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-          if (!shellResponded) reject(new Error(t.previewUnavailable));
-        }, 10_000);
-      });
-      let data: { preview?: { title?: string; description?: string; image?: string }; error?: string };
-      if (previewFromShell) {
-        data = { preview: previewFromShell };
-      } else {
-        const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-        const raw = await response.text();
-        try {
-          data = JSON.parse(raw) as typeof data;
-        } catch {
-          throw new Error(`${t.previewServiceError} ${response.status || 500}.`);
-        }
-        if (!response.ok || !data.preview) throw new Error(data.error || t.previewUnavailable);
-      }
-      const preview = data.preview;
-      if (!preview) throw new Error(t.previewUnavailable);
+      const preview = await platform.api.linkPreview(url);
+      if (!preview.title && !preview.description && !preview.image) setPreviewEmpty(true);
+      setFetchedImage(preview.image || null);
       updateMetadata({
         ...(preview.title ? { previewTitle: preview.title } : {}),
         ...(preview.description ? { previewDescription: preview.description } : {}),
@@ -871,14 +745,20 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 URL
                 <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
               </label>
+              {metadataDraft.url.trim() && (
+                <p className="text-xs leading-5 text-[var(--color-ink-muted)]" data-testid="node-preview-disclosure">
+                  {t.previewDisclosure.replace("{url}", metadataDraft.url.trim()).replace("{host}", remoteHost(metadataDraft.url.trim()) ?? metadataDraft.url.trim())}
+                </p>
+              )}
               <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 {previewLoading ? <LoaderCircle size={15} className="animate-spin" /> : <ExternalLink size={15} />}
                 {previewLoading ? t.loadPreview : t.loadWebsitePreview}
               </button>
-              {previewError && <p className="text-xs text-red-700">{previewError}</p>}
+              {previewError && <p className="text-xs text-red-700" data-testid="node-preview-error">{previewError}</p>}
+              {previewEmpty && <p className="text-xs text-[var(--color-ink-muted)]" data-testid="node-preview-empty">{t.previewEmpty}</p>}
               {(metadata?.previewTitle || metadata?.previewDescription || metadata?.previewImage) && (
                 <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
-                  {metadata.previewImage && <img src={metadata.previewImage} alt="Website preview" loading="lazy" className="h-28 w-full object-cover" />}
+                  {metadata.previewImage && <RemotePreviewImage key={`${selectedNodeId}:${metadata.previewImage}`} src={metadata.previewImage} alt="Website preview" className="h-28 w-full object-cover" autoLoad={fetchedImage === metadata.previewImage} />}
                   <div className="grid gap-1 p-3">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#C94D20]">{t.savedPreview}</span>
                     <strong className="text-sm text-[var(--color-ink)]">{metadata.previewTitle || selectedNode.title}</strong>

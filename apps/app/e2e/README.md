@@ -57,4 +57,4 @@ Diese Specs ersetzen eine API per `page.route` durch eine feste Antwort, weil da
 
 | Spec | Marke | Was der Mock ersetzt, was offen bleibt |
 | --- | --- | --- |
-| `wiki-sources-t87.spec.ts` | `@t87` | `GET /api/wiki` mit Quellenstatus `ok`/`changed`/`missing`/`unmonitored`; prüft nur die Darstellung (K1–K3, K5; K4 Englisch entfällt, `/wiki` hat keinen `LocaleProvider`). Das echte Erkennen geänderter oder gelöschter Quelldateien im Pod ist nicht geprüft (`route.test.ts`, `wiki-sources.test.ts`, `watch.test.ts`) |
+| `wiki-sources-t87.spec.ts` | `@t87` | `GET /api/wiki` mit Quellenstatus `ok`/`changed`/`missing`/`unmonitored`; prüft nur die Darstellung (K1–K5). K4 (Englisch) ist `test.fixme`: `/wiki` hat keinen `LocaleProvider`. Das echte Erkennen geänderter oder gelöschter Quelldateien im Pod ist nicht geprüft (`route.test.ts`, `wiki-sources.test.ts`, `watch.test.ts`) |

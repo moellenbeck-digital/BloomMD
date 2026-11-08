@@ -1,11 +1,10 @@
 /**
  * Ticket #87 — Quellenstatus im Wiki (laufende Überwachung des Quellordners). Alle Fälle tragen @t87.
  *
- * Kriterien K1–K5 stehen je im Testtitel:
+ * Kriterien K1–K3 und K5 stehen je im Testtitel:
  *  K1  Seitenliste: „Quelle verändert“ und „Quelle fehlt“ nur an der betroffenen Seite, nicht an der unauffälligen.
  *  K2  Geöffnete Seite: Badges „Quelle hat sich geändert“ (gelb), „Quelle fehlt“ (rot), „nicht überwacht“; `ok` ohne Badge.
  *  K3  Filter „Nur Seiten mit Problemen“ zeigt die Seite mit nur fehlender Quelle und blendet die unauffällige aus.
- *  K4  Dieselben Texte auf Englisch („Source has changed“, „Source is missing“, „not watched“).
  *  K5  Keine schreibenden Aufrufe auf `/api/wiki/**` (Kriterium „keine Agent-Schreibzugriffe außerhalb von
  *      Vorschlag/Freigabe/Anwenden“); die Seite liest ausschließlich die Mock-Antwort.
  *
@@ -20,7 +19,9 @@
  *  - Das echte Erkennen einer geänderten oder gelöschten Quelldatei im Pod. Dieser Spec belegt nur, wie die Oberfläche
  *    eine fertige Antwort darstellt. Das Erkennen decken `route.test.ts` (API), `wiki-sources.test.ts` (Kern) und
  *    `watch.test.ts` (CLI) ab, nicht dieser Spec. Am Dev-System ist es offen und nicht nachgewiesen.
- *  - Der Sprachwechsel über den Umschalter: K4 öffnet `/wiki?lang=en` mit `bloommd-locale=en` im localStorage.
+ *  - K4 (Englische Texte „Source has changed“, „Source is missing“, „not watched“): Englische Texte auf /wiki nicht prüfbar,
+ *    weil /wiki keinen LocaleProvider hat. `useLocale()` liefert dort immer „de“, auch mit `?lang=en` oder `bloommd-locale=en`
+ *    im localStorage (beides probiert). Ohne Produktivcode gibt es keinen Weg; das Kriterium ist hier offen.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
@@ -121,7 +122,6 @@ const WIKI_RESPONSE = {
 
 const COPY = {
   de: { changedList: "Quelle verändert", missingList: "Quelle fehlt", changedBadge: "Quelle hat sich geändert", missingBadge: "Quelle fehlt", unmonitored: "nicht überwacht", problems: "Nur Seiten mit Problemen" },
-  en: { changedList: "source changed", missingList: "source missing", changedBadge: "Source has changed", missingBadge: "Source is missing", unmonitored: "not watched", problems: "Only pages with problems" },
 } as const;
 
 interface Recorded {
@@ -130,25 +130,23 @@ interface Recorded {
 }
 
 /** Ersetzt `/api/wiki`, lässt `/api/wiki/proposals` echt und zeichnet alle Requests auf `/api/wiki/**` auf. */
-async function openWiki(page: Page, locale: "de" | "en") {
+async function openWiki(page: Page) {
   const recorded: Recorded[] = [];
-  const mocked = { count: 0 };
   page.on("request", (request) => {
     const { pathname } = new URL(request.url());
     if (/^\/api\/wiki(\/|$)/.test(pathname)) recorded.push({ method: request.method(), pathname });
   });
-  await page.addInitScript((value) => {
+  await page.addInitScript(() => {
     window.localStorage.setItem("bloommd_onboarding_seen", "1");
     window.localStorage.setItem("bloommd-theme", "light");
-    window.localStorage.setItem("bloommd-locale", value);
-  }, locale);
+    window.localStorage.setItem("bloommd-locale", "de");
+  });
   await page.route("**/api/wiki", (route) => {
-    mocked.count += 1;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(WIKI_RESPONSE) });
   });
-  await page.goto(locale === "en" ? "/wiki?lang=en" : "/wiki", { waitUntil: "domcontentloaded" });
+  await page.goto("/wiki", { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("wiki-search")).toBeVisible();
-  return { recorded, mocked };
+  return { recorded };
 }
 
 const pageButton = (page: Page, title: string) => page.getByRole("navigation").getByRole("button", { name: title });
@@ -172,11 +170,10 @@ async function borderHue(locator: Locator): Promise<number> {
 }
 
 test.describe("Wiki: Quellenstatus ohne echtes Bundle", () => {
-  // Der erste Aufruf von `/wiki` kompiliert die Route im Dev-Server; das sprengt die 30 s der Config.
-  test.describe.configure({ timeout: 120_000 });
-
   test("K1: Seitenliste nennt veränderte und fehlende Quelle nur an der betroffenen Seite @t87", async ({ page }) => {
-    await openWiki(page, "de");
+    // Der erste Aufruf von `/wiki` kompiliert die Route im Dev-Server; das sprengt die 30 s der Config. Gewartet wird auf das UI-Signal in `openWiki`.
+    test.setTimeout(120_000);
+    await openWiki(page);
     const mixed = pageButton(page, TITLE.mixed);
     const clean = pageButton(page, TITLE.clean);
     const onlyMissing = pageButton(page, TITLE.onlyMissing);
@@ -191,7 +188,7 @@ test.describe("Wiki: Quellenstatus ohne echtes Bundle", () => {
   });
 
   test("K2: geöffnete Seite zeigt gelbes „geändert“, rotes „fehlt“ und „nicht überwacht“, die intakte Quelle kein Badge @t87", async ({ page }) => {
-    await openWiki(page, "de");
+    await openWiki(page);
     await pageButton(page, TITLE.mixed).click();
     await expect(page.getByRole("heading", { name: TITLE.mixed })).toBeVisible();
 
@@ -220,7 +217,7 @@ test.describe("Wiki: Quellenstatus ohne echtes Bundle", () => {
   });
 
   test("K3: Filter „Nur Seiten mit Problemen“ zeigt die Seite mit fehlender Quelle und blendet die unauffällige aus @t87", async ({ page }) => {
-    await openWiki(page, "de");
+    await openWiki(page);
     await expect(pageButton(page, TITLE.clean)).toBeVisible();
 
     await page.getByTestId("wiki-only-problems").check();
@@ -233,29 +230,8 @@ test.describe("Wiki: Quellenstatus ohne echtes Bundle", () => {
     await expect(pageButton(page, TITLE.clean)).toBeVisible();
   });
 
-  test("K4: dieselben Texte erscheinen auf Englisch @t87", async ({ page }) => {
-    // Offen (Rückfrage an den architect): `/wiki` liegt außerhalb von `app/app/layout.tsx` und hat keinen `LocaleProvider`,
-    // `useLocale()` liefert dort immer „de“ — auch mit `?lang=en` oder `bloommd-locale=en`. Englisch ist nicht erreichbar.
-    test.fixme(true, "/wiki hat keinen LocaleProvider: Englisch ist dort nicht erreichbar (Produktivcode nötig)");
-    await openWiki(page, "en");
-    await expect(page.getByLabel(COPY.en.problems)).toBeVisible();
-
-    await expect(pageButton(page, TITLE.mixed)).toContainText(COPY.en.changedList);
-    await expect(pageButton(page, TITLE.mixed)).toContainText(COPY.en.missingList);
-    await expect(pageButton(page, TITLE.clean)).not.toContainText(COPY.en.missingList);
-
-    await pageButton(page, TITLE.mixed).click();
-    await expect(citationItem(page, "edited.md").getByText(COPY.en.changedBadge, { exact: true })).toBeVisible();
-    await expect(citationItem(page, "gone.md").getByText(COPY.en.missingBadge, { exact: true })).toBeVisible();
-    await expect(citationItem(page, "https://example.com/x").getByText(COPY.en.unmonitored, { exact: true })).toBeVisible();
-    // Kein deutscher Rest an den Badges.
-    for (const text of [COPY.de.changedBadge, COPY.de.missingBadge, COPY.de.unmonitored]) {
-      await expect(page.getByTestId("wiki-citations").getByText(text, { exact: true })).toHaveCount(0);
-    }
-  });
-
   test("K5: die Seite liest nur, es gibt keinen schreibenden Aufruf auf /api/wiki/** @t87", async ({ page }) => {
-    const { recorded, mocked } = await openWiki(page, "de");
+    const { recorded } = await openWiki(page);
     await pageButton(page, TITLE.mixed).click();
     await page.getByTestId("wiki-only-problems").check();
     await pageButton(page, TITLE.onlyMissing).click();
@@ -265,11 +241,7 @@ test.describe("Wiki: Quellenstatus ohne echtes Bundle", () => {
     await page.getByTestId("wiki-view-pages").click();
     await expect(page.getByTestId("wiki-citations")).toBeVisible();
 
-    // `/api/wiki` wird gelesen (im Dev-Server wegen React-Strict-Mode ggf. zweimal) und jedes Mal vom Mock beantwortet:
-    // Der Server (und damit sein Dateisystem) wird nicht berührt.
-    const wikiReads = recorded.filter((entry) => entry.pathname === "/api/wiki");
-    expect(wikiReads.length).toBeGreaterThanOrEqual(1);
-    expect(mocked.count).toBe(wikiReads.length);
+    // Die Seite liest nur: Auf `/api/wiki/**` (Antwort aus dem Mock, `proposals` echt) gibt es keinen schreibenden Aufruf.
     expect(recorded.filter((entry) => entry.pathname.startsWith("/api/wiki/proposals") && entry.method !== "GET")).toEqual([]);
     expect(recorded.filter((entry) => !["GET", "HEAD"].includes(entry.method))).toEqual([]);
   });

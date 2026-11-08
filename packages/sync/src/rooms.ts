@@ -12,12 +12,24 @@ import {
   SyncPersistenceTimeoutError,
   SyncRetryablePersistenceError,
   SyncDocumentVersionConflictError,
+  SyncPersistenceAuthorizationError,
+  SyncPersistenceCorruptionError,
+  SyncPersistenceValidationError,
   type DocumentPersistence,
   type DocumentRenameResult,
 } from "./persistence";
 import type { PersistenceOperation, RoomDescriptor, SyncRoom, SyncServerConfig, WebSocketData } from "./types";
 
 const PERSISTENCE_ORIGIN = "bloommd:persistence";
+const MAX_RECOVERY_DELAY_MS = 60_000;
+
+/** Errors a later attempt cannot fix: they need a person or a reconciliation, not another save. */
+function isTerminalPersistenceError(error: unknown): boolean {
+  return error instanceof SyncDocumentVersionConflictError
+    || error instanceof SyncPersistenceAuthorizationError
+    || error instanceof SyncPersistenceValidationError
+    || error instanceof SyncPersistenceCorruptionError;
+}
 
 export class SyncRoomCapacityError extends Error {
   constructor() {
@@ -96,6 +108,7 @@ export function createRoomManager(
   // gets the metric semantics without unexpectedly writing room lifecycle events to its stdout.
   const telemetry = config.telemetry ?? createSyncTelemetry({ write: () => undefined });
   const persistencePromises = new WeakMap<SyncRoom, Promise<void>>();
+  const recoveryAttempts = new WeakMap<SyncRoom, number>();
   const keyLocks = new Map<string, Promise<void>>();
   const mutatingKeys = new Set<string>();
   let draining = false;
@@ -236,7 +249,7 @@ export function createRoomManager(
     refreshGauges();
 
     if (room.clients.size === 0) {
-      void flushRoom(room).then(() => scheduleDestroy(room)).catch(() => undefined);
+      void flushRoom(room).then(() => scheduleDestroy(room)).catch((error: unknown) => scheduleRecoveryRetry(room, error));
     }
   }
 
@@ -425,7 +438,7 @@ export function createRoomManager(
     }, config.destroyDelayMs);
   }
 
-  function schedulePersist(room: SyncRoom): void {
+  function schedulePersist(room: SyncRoom, delayMs: number = config.persistDebounceMs): void {
     if (draining) return;
     if (room.persistTimer) {
       clock.clearTimeout(room.persistTimer);
@@ -433,9 +446,24 @@ export function createRoomManager(
     room.persistTimer = clock.setTimeout(() => {
       room.persistTimer = null;
       refreshGauges();
-      void persistRoom(room).catch(() => undefined);
-    }, config.persistDebounceMs);
+      void persistRoom(room)
+        .then(() => { if (room.clients.size === 0) scheduleDestroy(room); })
+        .catch((error: unknown) => scheduleRecoveryRetry(room, error));
+    }, delayMs);
     refreshGauges();
+  }
+
+  /**
+   * A save nobody awaits (the debounce timer, the flush after the last client left) must not end
+   * with the change only in memory: the room stays degraded and, unless the error is terminal,
+   * tries again with a growing delay. Callers that await persistRoom report the error themselves.
+   */
+  function scheduleRecoveryRetry(room: SyncRoom, error: unknown): void {
+    if (draining || rooms.get(room.key) !== room || isTerminalPersistenceError(error)) return;
+    const attempt = (recoveryAttempts.get(room) ?? 0) + 1;
+    recoveryAttempts.set(room, attempt);
+    const baseDelayMs = config.persistenceRecoveryBaseMs ?? 2_000;
+    schedulePersist(room, Math.min(MAX_RECOVERY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)));
   }
 
   async function persistRoom(room: SyncRoom): Promise<void> {
@@ -481,6 +509,7 @@ export function createRoomManager(
         }
         room.lastPersistError = null;
         room.persistenceOperation = null;
+        recoveryAttempts.delete(room);
         telemetry.observe("sync_persistence_duration_ms", clock.now() - startedAt);
         telemetry.event({
           operation: "persistence",

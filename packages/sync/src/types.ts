@@ -58,6 +58,11 @@ export interface SyncServerConfig {
   persistenceRetryBaseMs?: number;
   persistenceRetryMaxDelayMs?: number;
   persistenceRetryMaxDurationMs?: number;
+  /**
+   * First delay before a room whose debounced or final save failed tries again by itself; it
+   * doubles per failure up to a minute. Defaults to 2000 ms.
+   */
+  persistenceRecoveryBaseMs?: number;
   /** Bound one persistence request. A timeout is treated as an unknown commit, never retried blindly. */
   persistenceSaveTimeoutMs?: number;
   /** Bound the complete graceful shutdown drain, including final room flushes. */

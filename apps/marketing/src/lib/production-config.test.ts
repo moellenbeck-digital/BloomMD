@@ -113,12 +113,12 @@ describe("marketing app production config", () => {
     expect(productionConfigErrors(insecureHost)).toContain("NEXT_PUBLIC_POSTHOG_HOST must be HTTPS.");
   });
 
-  test("validates the direct Plausible configuration when enabled", () => {
+  test("validates the first-party Plausible configuration when enabled", () => {
     const valid = {
       ...marketingEnv(),
       NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "bloommd.io",
-      NEXT_PUBLIC_PLAUSIBLE_SRC: "https://plausible.moellenbeck-digital.io/js/script.js",
-      NEXT_PUBLIC_PLAUSIBLE_API_HOST: "https://plausible.moellenbeck-digital.io",
+      NEXT_PUBLIC_PLAUSIBLE_SRC: "/_plausible/js/script.js",
+      NEXT_PUBLIC_PLAUSIBLE_API_HOST: "/_plausible",
     };
     expect(productionConfigErrors(valid)).toEqual([]);
 
@@ -130,7 +130,10 @@ describe("marketing app production config", () => {
     expect(productionConfigErrors(wrongDomain)).toContain("NEXT_PUBLIC_PLAUSIBLE_DOMAIN must be bloommd.io.");
 
     const wrongHost = { ...valid, NEXT_PUBLIC_PLAUSIBLE_API_HOST: "https://plausible.example" };
-    expect(productionConfigErrors(wrongHost)).toContain("NEXT_PUBLIC_PLAUSIBLE_API_HOST must be https://plausible.moellenbeck-digital.io.");
+    expect(productionConfigErrors(wrongHost)).toContain("NEXT_PUBLIC_PLAUSIBLE_API_HOST must be /_plausible.");
+
+    const legacyHost = { ...valid, NEXT_PUBLIC_PLAUSIBLE_SRC: "https://plausible.moellenbeck-digital.io/js/script.js" };
+    expect(productionConfigErrors(legacyHost)).toContain("NEXT_PUBLIC_PLAUSIBLE_SRC must be /_plausible/js/script.js.");
   });
 
   test("rejects placeholder legal identity values", () => {

@@ -521,23 +521,79 @@ test.describe("marketing documentation and registration", () => {
     expect(body).not.toContain("posthog");
   });
 
-  test("loads cookieless Plausible directly without a consent dialog", async ({ page, request }) => {
-    const scriptResponse = await request.get("https://plausible.moellenbeck-digital.io/js/script.js");
-    expect(scriptResponse.ok()).toBe(true);
-    const legacyScriptResponse = await request.get("/_plausible/js/script.js");
-    expect(legacyScriptResponse.status()).toBe(404);
-    const legacyEventResponse = await request.post("/_plausible/api/event", { data: { name: "legacy_route_probe" } });
-    expect(legacyEventResponse.status()).toBe(404);
+  test("serves the Plausible script and accepts events through the own origin", async ({ request }) => {
+    const scriptResponse = await request.get("/_plausible/js/script.js");
+    expect(scriptResponse.status()).toBe(200);
+    expect(scriptResponse.headers()["content-type"]).toContain("javascript");
+    expect(scriptResponse.headers()["cache-control"]).toBe("public, max-age=3600");
 
-    const pageResponse = await page.goto("/");
-    expect(pageResponse?.headers()["content-security-policy"]).toContain("script-src 'self' https://plausible.moellenbeck-digital.io");
-    expect(pageResponse?.headers()["content-security-policy"]).toContain("connect-src 'self' https://plausible.moellenbeck-digital.io");
-    const plausibleScript = page.locator('script[data-bloommd-plausible="true"]');
-    await expect(plausibleScript).toHaveCount(1);
-    await expect(plausibleScript).toHaveAttribute("data-domain", "bloommd.io");
-    await expect(plausibleScript).toHaveAttribute("src", "https://plausible.moellenbeck-digital.io/js/script.js");
-    await expect(plausibleScript).toHaveAttribute("data-api", "https://plausible.moellenbeck-digital.io/api/event");
-    await expect(page.getByRole("dialog", { name: "Analytics-Einwilligung" })).toHaveCount(0);
+    const eventResponse = await request.post("/_plausible/api/event", {
+      headers: {
+        "content-type": "text/plain",
+        "user-agent": "BloomMD-e2e/1.0",
+        "x-forwarded-for": "203.0.113.7",
+        cookie: "bloommd_session=must-not-leave-bloommd",
+        authorization: "Bearer must-not-leave-bloommd",
+      },
+      data: JSON.stringify({ n: "pageview", u: "https://bloommd.io/", d: "bloommd.io" }),
+    });
+    expect(eventResponse.status()).toBe(202);
+    expect(eventResponse.headers()["cache-control"]).toBe("no-store, max-age=0");
+
+    // The stub stands in for the Ops instance: it shows what the proxy actually forwarded.
+    const stubPort = process.env.PLAYWRIGHT_PLAUSIBLE_STUB_PORT ?? "3291";
+    const forwarded = await (await request.get(`http://127.0.0.1:${stubPort}/__last-event`)).json();
+    expect(forwarded.headers["user-agent"]).toBe("BloomMD-e2e/1.0");
+    expect(forwarded.headers["x-forwarded-for"]).toBe("203.0.113.7");
+    expect(forwarded.headers.cookie).toBeUndefined();
+    expect(forwarded.headers.authorization).toBeUndefined();
+    expect(JSON.parse(forwarded.body)).toEqual({ n: "pageview", u: "https://bloommd.io/", d: "bloommd.io" });
+  });
+
+  test("does not expose the Plausible handlers or other /_plausible paths", async ({ request }) => {
+    expect((await request.get("/plausible-proxy/script")).status()).toBe(404);
+    expect((await request.post("/plausible-proxy/event", { data: "{}" })).status()).toBe(404);
+    expect((await request.get("/_plausible/admin")).status()).toBe(404);
+    expect((await request.get("/_plausible/api/event")).status()).toBe(405);
+  });
+
+  test("loads cookieless Plausible first-party without a consent dialog or CSP errors", async ({ page }) => {
+    for (const path of ["/", "/en"]) {
+      const requested: string[] = [];
+      const cspErrors: string[] = [];
+      page.on("request", (request) => { if (request.url().includes("/_plausible/")) requested.push(request.url()); });
+      page.on("console", (message) => { if (message.type() === "error" && /content security policy/i.test(message.text())) cspErrors.push(message.text()); });
+
+      const pageResponse = await page.goto(path);
+      const csp = pageResponse?.headers()["content-security-policy"] ?? "";
+      expect(csp).toContain("script-src 'self' 'unsafe-inline'");
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp).not.toMatch(/plausible/i);
+
+      const plausibleScript = page.locator('script[data-bloommd-plausible="true"]');
+      await expect(plausibleScript).toHaveCount(1);
+      await expect(plausibleScript).toHaveAttribute("data-domain", "localhost");
+      await expect(plausibleScript).toHaveAttribute("src", "/_plausible/js/script.js");
+      await expect(plausibleScript).toHaveAttribute("data-api", "/_plausible/api/event");
+      await expect(page.getByRole("dialog", { name: "Analytics-Einwilligung" })).toHaveCount(0);
+      await page.waitForLoadState("networkidle");
+
+      const origin = new URL(page.url()).origin;
+      expect(requested).toContain(`${origin}/_plausible/js/script.js`);
+      expect(requested.every((url) => url.startsWith(`${origin}/_plausible/`))).toBe(true);
+      expect(cspErrors).toEqual([]);
+      page.removeAllListeners("request");
+      page.removeAllListeners("console");
+    }
+  });
+
+  test("does not load Plausible when the page is not served from the configured domain", async ({ page }) => {
+    await page.goto("/");
+    const otherHost = new URL(page.url());
+    otherHost.hostname = "127.0.0.1";
+    await page.goto(otherHost.toString());
+    await expect(page.locator("main, body").first()).toBeVisible();
+    await expect(page.locator('script[data-bloommd-plausible="true"]')).toHaveCount(0);
   });
 
   test("the waitlist signup endpoint is closed and writes nothing", async ({ request }) => {

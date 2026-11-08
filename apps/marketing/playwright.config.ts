@@ -3,6 +3,9 @@ import { nextServerCommand } from "./playwright-server";
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3211);
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
+// Local stand-in for the Plausible instance of Ops. The marketing server proxies /_plausible/... to it,
+// so the e2e run needs no network access and can read back which headers arrived.
+const PLAUSIBLE_STUB_PORT = Number(process.env.PLAYWRIGHT_PLAUSIBLE_STUB_PORT ?? 3291);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -22,23 +25,33 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: nextServerCommand(PORT),
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    env: {
-      NEXT_PUBLIC_SITE_URL: baseURL,
-      NEXT_PUBLIC_MARKETING_URL: baseURL,
-      NEXT_PUBLIC_APP_URL: "https://bloommd.app",
-      NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "bloommd.io",
-      NEXT_PUBLIC_PLAUSIBLE_SRC: "https://plausible.moellenbeck-digital.io/js/script.js",
-      NEXT_PUBLIC_PLAUSIBLE_API_HOST: "https://plausible.moellenbeck-digital.io",
-      NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: "https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg",
-      BLOOMMD_REQUIRE_AUTH: "1",
-      BLOOMMD_E2E_AUTH_BYPASS: "1",
+  webServer: [
+    {
+      command: `bun e2e/support/plausible-stub.ts ${PLAUSIBLE_STUB_PORT}`,
+      url: `http://127.0.0.1:${PLAUSIBLE_STUB_PORT}/__health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
     },
-  },
+    {
+      command: nextServerCommand(PORT),
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      env: {
+        PLAUSIBLE_PROXY_TARGET: `http://127.0.0.1:${PLAUSIBLE_STUB_PORT}`,
+        NEXT_PUBLIC_SITE_URL: baseURL,
+        NEXT_PUBLIC_MARKETING_URL: baseURL,
+        NEXT_PUBLIC_APP_URL: "https://bloommd.app",
+        // The script only loads on the configured domain; the e2e server is served from localhost.
+        NEXT_PUBLIC_PLAUSIBLE_DOMAIN: "localhost",
+        NEXT_PUBLIC_PLAUSIBLE_SRC: "/_plausible/js/script.js",
+        NEXT_PUBLIC_PLAUSIBLE_API_HOST: "/_plausible",
+        NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: "https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg",
+        BLOOMMD_REQUIRE_AUTH: "1",
+        BLOOMMD_E2E_AUTH_BYPASS: "1",
+      },
+    },
+  ],
   projects: [
     {
       name: "chromium",

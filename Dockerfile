@@ -61,14 +61,18 @@ ENV NEXT_PUBLIC_BLOOMMD_GIT_SHA=$BLOOMMD_BUILD_SHA
 ENV NEXT_PUBLIC_BLOOMMD_GIT_TAG=$BLOOMMD_BUILD_TAG
 ENV NEXT_PUBLIC_BLOOMMD_BUILD_TIME=$BLOOMMD_BUILD_TIME
 ENV NEXT_PUBLIC_BLOOMMD_VERSION=$BLOOMMD_RELEASE_VERSION
-ARG NEXT_PUBLIC_PLAUSIBLE_DOMAIN=
-ARG NEXT_PUBLIC_PLAUSIBLE_SRC=https://plausible.moellenbeck-digital.io/js/script.js
-ARG NEXT_PUBLIC_PLAUSIBLE_API_HOST=https://plausible.moellenbeck-digital.io
+# NEXT_PUBLIC_* values are inlined at build time; the cluster ConfigMap cannot change them later. The
+# defaults make every image from this Dockerfile send Plausible events without extra build args
+# (first-party: /_plausible/... on our own origin, proxied to the Ops instance).
+ARG NEXT_PUBLIC_PLAUSIBLE_DOMAIN=bloommd.io
+ARG NEXT_PUBLIC_PLAUSIBLE_SRC=/_plausible/js/script.js
+ARG NEXT_PUBLIC_PLAUSIBLE_API_HOST=/_plausible
 ENV NEXT_PUBLIC_PLAUSIBLE_DOMAIN=$NEXT_PUBLIC_PLAUSIBLE_DOMAIN
 ENV NEXT_PUBLIC_PLAUSIBLE_SRC=$NEXT_PUBLIC_PLAUSIBLE_SRC
 ENV NEXT_PUBLIC_PLAUSIBLE_API_HOST=$NEXT_PUBLIC_PLAUSIBLE_API_HOST
+# The check always runs: an empty or wrong value fails the build instead of shipping without tracking.
 RUN bun run --cwd apps/marketing build \
-  && if [ -n "$NEXT_PUBLIC_PLAUSIBLE_DOMAIN" ]; then bun run --cwd apps/marketing verify:plausible-build; fi
+  && bun run --cwd apps/marketing verify:plausible-build
 
 FROM marketing-build AS marketing
 WORKDIR /app

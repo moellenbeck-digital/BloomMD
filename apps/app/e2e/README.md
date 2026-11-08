@@ -50,3 +50,11 @@ Die CI führt davon bisher nur `mobile-smoke.spec.ts` aus (`.github/workflows/ci
 
 Neue Specs für ein Ticket tragen `@t<nr>` im Testtitel, z. B. `test("Einladung bleibt sichtbar @t147", …)`.
 Ausgewählt wird nur auf der Kommandozeile mit `--grep @t<nr>`; die Config setzt kein `grep`.
+
+## Specs mit Mock-API
+
+Diese Specs ersetzen eine API per `page.route` durch eine feste Antwort, weil das Dev-System die Testdaten nicht hat. Sie laufen mit jeder Config (auch `playwright.config.ts` und der Testsystem-Config).
+
+| Spec | Marke | Was der Mock ersetzt, was offen bleibt |
+| --- | --- | --- |
+| `wiki-sources-t87.spec.ts` | `@t87` | `GET /api/wiki` mit Quellenstatus `ok`/`changed`/`missing`/`unmonitored`; prüft nur die Darstellung (K1–K3, K5; K4 Englisch entfällt, `/wiki` hat keinen `LocaleProvider`). Das echte Erkennen geänderter oder gelöschter Quelldateien im Pod ist nicht geprüft (`route.test.ts`, `wiki-sources.test.ts`, `watch.test.ts`) |

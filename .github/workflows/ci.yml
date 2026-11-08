@@ -93,6 +93,8 @@ jobs:
       BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
       BLOOMMD_REQUIRE_AUTH: "1"
       NEXT_PUBLIC_SITE_URL: http://localhost:3211
+      # CI sends no Plausible server signal; the plausible spec toggles this itself.
+      BLOOMMD_PLAUSIBLE_DISABLED: "true"
       # Throwaway database below; tests/integration/*-db.integration.test.ts fail in CI without it.
       BLOOMMD_TEST_DATABASE_URL: postgres://bloommd:bloommd-ci-only@localhost:5432/bloommd_test
     services:
@@ -229,6 +231,8 @@ jobs:
       BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
       BLOOMMD_REQUIRE_AUTH: "1"
       NEXT_PUBLIC_SITE_URL: http://localhost:3211
+      # CI sends no Plausible server signal; the plausible spec toggles this itself.
+      BLOOMMD_PLAUSIBLE_DISABLED: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

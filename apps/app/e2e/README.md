@@ -51,6 +51,28 @@ Die CI führt davon bisher nur `mobile-smoke.spec.ts` aus (`.github/workflows/ci
 Neue Specs für ein Ticket tragen `@t<nr>` im Testtitel, z. B. `test("Einladung bleibt sichtbar @t147", …)`.
 Ausgewählt wird nur auf der Kommandozeile mit `--grep @t<nr>`; die Config setzt kein `grep`.
 
+## Obsidian-Plugin (echtes Obsidian)
+
+`obsidian-navigator-t57.spec.ts` (`@t57`) testet das Obsidian-Plugin, nicht die Web-App: Der Spec startet ein echtes
+Obsidian (Electron) mit eigenem Profil, kopiert den Test-Vault `obsidian-test-vaults/BloomMD Plugin Test Vault` samt
+gebautem Plugin in ein Temp-Verzeichnis und steuert es per Playwright über CDP (Vorlage: `scripts/qa/obsidian-ink-smoke.ts`).
+`PLAYWRIGHT_BASE_URL` wird nicht benutzt (die Config verlangt sie trotzdem). Ohne `OBSIDIAN_BIN` ist der Spec übersprungen.
+
+```bash
+bun run --cwd plugins/obsidian build                  # main.js, shared-runtime.js, styles.css
+# Linux ohne Bildschirm: virtuelles Display (Xvfb)
+Xvfb :97 -screen 0 1600x1000x24 &
+cd apps/app
+DISPLAY=:97 OBSIDIAN_BIN=/pfad/zu/obsidian PLAYWRIGHT_BASE_URL=http://localhost:3000 \
+  bunx playwright test -c playwright.testsystem.config.ts e2e/obsidian-navigator-t57.spec.ts --grep @t57
+```
+
+- `OBSIDIAN_BIN`: Linux das entpackte `obsidian-<version>.tar.gz` (Datei `obsidian`), macOS `…/Obsidian.app/Contents/MacOS/Obsidian`.
+  Der Spec startet mit `--no-sandbox --disable-gpu` (Container ohne SUID-Sandbox). Auf Linux braucht Electron u. a. `libgtk-3`.
+- Obsidian öffnet nach dem Vertrauensdialog ein eigenes Einstellungsfenster; der Spec schließt es, sonst erscheinen
+  Hinweise (`Notice`) in diesem Fenster statt im Hauptfenster.
+- Anfragen des Obsidian-Hauptprozesses (Update-Prüfung) sind für den Spec nicht sichtbar, nur die des Renderers.
+
 ## Specs mit Mock-API
 
 Diese Specs ersetzen eine API per `page.route` durch eine feste Antwort, weil das Dev-System die Testdaten nicht hat. Sie laufen mit jeder Config (auch `playwright.config.ts` und der Testsystem-Config).

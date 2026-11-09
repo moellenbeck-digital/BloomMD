@@ -100,12 +100,13 @@ afterEach(() => {
 
 type FakeLeaf = { view: unknown; detached: boolean; setViewState(state: { type: string }): Promise<void>; detach(): void; loadIfDeferred(): Promise<void> };
 
-function setup(options: { processError?: Error; setViewStateError?: Error; noMarkdownOpen?: boolean } = {}) {
+function setup(options: { readError?: Error; processError?: Error; setViewStateError?: Error; noMarkdownOpen?: boolean } = {}) {
   const demo = new FakeFile(demoPath);
   const folder = new FakeFolder("Aufnahmen");
   demo.parent = folder;
   folder.children = [demo];
   let content = demoMarkdown;
+  const writes: string[] = [];
   const leaves: FakeLeaf[] = [];
   const revealed: unknown[] = [];
   const markdownLeaf = Object.assign(new FakeMarkdownView(), { file: demo });
@@ -115,10 +116,15 @@ function setup(options: { processError?: Error; setViewStateError?: Error; noMar
       getAbstractFileByPath: (path: string) => (path === demoPath ? demo : null),
       process: async (_file: FakeFile, change: (current: string) => string) => {
         if (options.processError) throw options.processError;
-        content = change(content);
+        const next = change(content);
+        writes.push(next);
+        content = next;
         return content;
       },
-      read: async () => content,
+      read: async () => {
+        if (options.readError) throw options.readError;
+        return content;
+      },
       cachedRead: async () => content,
       on: () => ({}),
     },
@@ -163,7 +169,7 @@ function setup(options: { processError?: Error; setViewStateError?: Error; noMar
   });
   const opened: unknown[] = [];
   plugin.openMarkdownFile = (async (file: unknown) => void opened.push(file)) as never;
-  return { plugin, app, demo, leaves, revealed, opened, openView: () => leaves[0]?.view as InstanceType<typeof main.BloomMDView> | undefined };
+  return { plugin, app, demo, leaves, revealed, opened, writes, content: () => content, setContent: (next: string) => void (content = next), openView: () => leaves[0]?.view as InstanceType<typeof main.BloomMDView> | undefined };
 }
 
 const settle = async () => act(() => wait(120));
@@ -192,7 +198,7 @@ describe("Visualize current note", () => {
   });
 
   test("a failing load shows the error state with Back to Markdown instead of an empty pane", async () => {
-    const { plugin, openView, opened, demo } = setup({ processError: new Error("Vault is read-only") });
+    const { plugin, openView, opened, demo } = setup({ readError: new Error("Vault is read-only") });
     await silenced(() => plugin.visualizeCurrentNote());
     await settle();
     const view = openView()!;
@@ -204,13 +210,12 @@ describe("Visualize current note", () => {
   });
 
   test("Try again loads the note again and replaces the error with the map", async () => {
-    const env = setup({ processError: new Error("Vault is read-only") });
+    const env = setup({ readError: new Error("Vault is read-only") });
     await silenced(() => env.plugin.visualizeCurrentNote());
     await settle();
     const view = env.openView()!;
     expect(alertOf(view.contentEl)).not.toBeNull();
-    delete (env.app.vault as { process?: unknown }).process;
-    env.app.vault.process = async (_file, change) => change(demoMarkdown);
+    env.app.vault.read = async () => demoMarkdown;
     act(() => buttonOf(view.contentEl, "Try again")!.click());
     await settle();
     expect(alertOf(view.contentEl)).toBeNull();
@@ -294,5 +299,80 @@ describe("opening the view", () => {
     await settle();
     expect(view.contentEl.textContent).toContain("No Markdown headings found");
     expect(buttonOf(view.contentEl, "Back to Markdown")).toBeDefined();
+  });
+});
+
+/** What the map shows for the note: the headings with the ids the canvas works with. */
+type Headings = Array<{ id: string; title: string; kind: string }>;
+type Actions = {
+  renameNode(id: string, title: string, expectedTitle: string): Promise<boolean>;
+  undo(selectedId: string | null): Promise<string | null>;
+};
+const propsOf = (view: unknown) => (view as { canvasProps(): { headings: Headings; actions: Actions; canUndo: boolean } }).canvasProps();
+const headingIds = (markdown: string) => [...markdown.matchAll(/^#{1,6} .*<!-- bloommd:id=([0-9a-f]+) -->$/gm)].map((match) => match[1]);
+
+describe("opening a map leaves the note as it is", () => {
+  test("Visualize current note (and the M key / header button path) does not write to the note", async () => {
+    const { plugin, writes, content, openView, demo } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    expect(openView()!.contentEl.textContent).toContain("Obsidian Demo");
+    expect(writes).toEqual([]);
+    expect(content()).toBe(demoMarkdown);
+
+    // The navigator opens a map of a note through the same load: byte-identical again.
+    await plugin.openMapFor(demo as never);
+    await settle();
+    expect(writes).toEqual([]);
+    expect(content()).toBe(demoMarkdown);
+    expect(nodesOf(openView()!.contentEl)).toBe(8);
+  });
+
+  test("a change made outside BloomMD while the map is open is read, not rewritten", async () => {
+    const { plugin, writes, content, setContent, openView, demo } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const changed = `${demoMarkdown}\n## Neu von aussen\n`;
+    setContent(changed);
+    await openView()!.handleFileChange(demo as never);
+    await settle();
+    expect(writes).toEqual([]);
+    expect(content()).toBe(changed);
+    expect(propsOf(openView()).headings.some((heading) => heading.title === "Neu von aussen")).toBe(true);
+  });
+
+  test("the ids the map shows are the same every time the note is opened", async () => {
+    const { plugin, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const first = propsOf(openView()).headings.map((heading) => heading.id);
+    await plugin.visualizeCurrentNote();
+    await settle();
+    expect(propsOf(openView()).headings.map((heading) => heading.id)).toEqual(first);
+    expect(new Set(first).size).toBe(first.length);
+  });
+
+  test("the first edit writes the ids the map already showed; undo keeps them", async () => {
+    const { plugin, writes, content, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const shown = propsOf(openView()).headings.filter((heading) => heading.kind === "heading");
+    const project = shown.find((heading) => heading.title === "Projekt")!;
+    expect(writes).toEqual([]);
+
+    expect(await propsOf(openView()).actions.renameNode(project.id, "Vorhaben", "Projekt")).toBe(true);
+    await settle();
+    expect(writes).toHaveLength(1);
+    const written = content();
+    expect(written).toContain("## Vorhaben <!-- bloommd:id=");
+    expect(headingIds(written)).toEqual(shown.map((heading) => heading.id));
+    expect(propsOf(openView()).headings.filter((heading) => heading.kind === "heading").map((heading) => heading.id)).toEqual(shown.map((heading) => heading.id));
+    expect(propsOf(openView()).canUndo).toBe(true);
+
+    const focus = await propsOf(openView()).actions.undo(project.id);
+    await settle();
+    expect(focus).toBe(project.id);
+    expect(content()).toContain("## Projekt <!-- bloommd:id=");
+    expect(headingIds(content())).toEqual(shown.map((heading) => heading.id));
   });
 });

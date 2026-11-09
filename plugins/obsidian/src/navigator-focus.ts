@@ -94,6 +94,33 @@ export function focusArea(state: NavigatorState, area: FocusArea): NavigatorStat
   return state.focus === area ? state : withFocus(state, area);
 }
 
+/** Opens the map from the focused area. The map has no keyboard focus of its own, so the area it was opened from is kept for Escape. */
+export function enterMap(state: NavigatorState): NavigatorState {
+  const origin = state.focus === "tree" || state.focus === "list" ? state.focus : state.returnFocus;
+  return { ...state, focus: "map", returnFocus: origin };
+}
+
+/** Leaves the map when it is no longer the active view (the person went to a note, say): back to the area it was opened from, without moving focus. */
+export function leaveMap(state: NavigatorState): NavigatorState {
+  return state.focus === "map" ? { ...state, focus: state.returnFocus } : state;
+}
+
+export type HistoryButton = "back" | "forward";
+
+/**
+ * Where focus goes when the history button that had it is disabled by the step it just took (the
+ * end of the history): the opposite button while that is usable, else the list or tree. Null when
+ * focus is not on a history button or that button is still usable.
+ */
+export function focusAfterHistory(state: NavigatorState, focused: HistoryButton | null): HistoryButton | "tree" | "list" | null {
+  if (focused === null) return null;
+  const usable = { back: canGoBack(state), forward: canGoForward(state) };
+  if (usable[focused]) return null;
+  const other = focused === "back" ? "forward" : "back";
+  if (usable[other]) return other;
+  return state.focus === "list" || state.focus === "tree" ? state.focus : state.returnFocus === "list" ? "list" : "tree";
+}
+
 /** The next (or previous) available area in tab order. */
 export function cycleFocus(focus: FocusArea, available: FocusAvailability, direction: 1 | -1 = 1): FocusArea {
   const order = FOCUS_ORDER.filter((area) => area === "tree" || area === "list" || available[area]);

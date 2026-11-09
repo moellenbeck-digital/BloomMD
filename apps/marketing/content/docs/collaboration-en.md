@@ -22,6 +22,10 @@ below.
 *The illustration explains the flow. The Desktop app shows the actual sharing state on the open
 file itself.*
 
+![BloomMD Desktop (German interface) showing the sharing status "Konflikt" (conflict) for "Kapitel 2.md" with the choices "Cloud-Version verwenden" (use cloud version) and "Lokale Version beibehalten" (keep local version)](/blog/shared-mode-conflict-desktop.png)
+
+*Real screenshot of the Desktop app: in a conflict, BloomMD offers two deliberate choices.*
+
 1. Open the local Markdown file in the Desktop app.
 2. Choose **Share this local file** from the file header.
 3. Select a saved server profile and workspace, then confirm the proposed cloud filename.
@@ -43,7 +47,9 @@ workspace audit trail.
 - **Offline:** the local file remains editable. New local edits are not silently emitted as cloud
   changes; reconnect first and check the visible status.
 - **Conflict:** BloomMD never overwrites a diverging local copy. Review and resolve the conflict
-  deliberately before continuing to share.
+  deliberately before continuing to share. The share offers two choices (see the screenshot above):
+  **Use cloud version** or **Keep local version**. Neither side is silently overwritten; the version
+  you do not choose is not saved as an additional copy.
 - **Access revoked:** the server closes the sync connection. The last local copy remains, but
   cannot write back to the workspace.
 

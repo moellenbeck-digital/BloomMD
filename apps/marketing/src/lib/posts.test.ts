@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { listMarketingPosts, marketingPostSlug, parseMarketingPost } from "./posts";
 
 describe("marketing posts", () => {
@@ -69,4 +71,23 @@ describe("marketing posts", () => {
     expect(german.every((post) => post.locale === "de")).toBe(true);
     expect(english.every((post) => post.locale === "en")).toBe(true);
   });
+});
+
+describe("pictures in posts", () => {
+  const root = join(import.meta.dir, "..", "..");
+  const pictureRe = /!\[([^\]]*)\]\(([^)\s]+)[^)]*\)/g;
+
+  for (const kind of ["blog", "news"] as const) {
+    const dir = join(root, "content", kind);
+    for (const file of readdirSync(dir).filter((name) => name.endsWith(".md")).sort()) {
+      test(`${kind}/${file}: every picture has an alt text and exists under public/`, () => {
+        for (const [, alt = "", src = ""] of readFileSync(join(dir, file), "utf8").matchAll(pictureRe)) {
+          expect(alt.trim(), `empty alt text for ${src}`).not.toBe("");
+          if (/^https?:\/\//.test(src)) continue;
+          expect(src.startsWith("/"), `${src} must be a site path starting with /`).toBe(true);
+          expect(existsSync(join(root, "public", src.split(/[?#]/)[0] ?? src)), `${src} is missing under public/`).toBe(true);
+        }
+      });
+    }
+  }
 });

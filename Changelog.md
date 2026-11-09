@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Doku mit echten Screenshots und Release-Status (Ticket 47): Die News „Shared Mode und lokale Agenten“ zeigt jetzt den echten Desktop-Konflikt-Dialog und die echte Agenten-Vorschau (DE/EN mit eigenem Alt-Text) und nennt den Release-Status in der Vergangenheit (Desktop 0.5.6, Hosted 0.4.18, 22.09.2026). Die Hilfe „Zusammenarbeit“ zeigt den Konflikt-Screenshot und erklärt die Entscheidungen „Cloud-Version verwenden“ und „Lokale Version beibehalten“. Ein neuer Test prüft, dass jedes Bild in Blog und News einen Alt-Text hat und unter `public/` existiert.
+- Docs with real screenshots and release status (ticket 47): the news post "Shared mode and local agents" now shows the real Desktop conflict dialog and the real agent preview (DE/EN with their own alt text) and states the release status in the past tense (Desktop 0.5.6, Hosted 0.4.18, 22 September 2026). The "Collaboration" help page shows the conflict screenshot and explains the choices "Use cloud version" and "Keep local version". A new test checks that every picture in blog and news has alt text and exists under `public/`.
+
 - CI sendet kein Plausible-Server-Signal mehr (Ticket 321): Der `web`-Container des Agent-E2E-Laufs und die Jobs `verify` und `full-e2e` setzen `BLOOMMD_PLAUSIBLE_DISABLED=true`; bisher meldete jeder CI-Lauf ein `server-start` an die Plausible-Instanz. Für Installationen ändert sich nichts.
 - CI no longer sends a Plausible server signal (ticket 321): the `web` container of the agent E2E run and the `verify` and `full-e2e` jobs set `BLOOMMD_PLAUSIBLE_DISABLED=true`; so far every CI run reported a `server-start` to the Plausible instance. Nothing changes for installations.
 

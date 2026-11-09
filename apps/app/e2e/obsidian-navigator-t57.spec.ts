@@ -467,16 +467,35 @@ test.describe("Obsidian-Navigator @t57", () => {
     await expect.poll(focusArea).toBe("list");
   });
 
-  test("K5 (Esc aus der Map): Esc führt aus der Map dorthin zurück, wo man herkam (Hilfe: „from the map back to where you came from“) @t57", async () => {
+  test("K5 (Esc aus der Map): Esc führt aus der Map in Liste bzw. Baum zurück, aus dem sie geöffnet wurde @t57", async () => {
     await openNavigatorViaRibbon();
+    const dataFocus = () => page.locator(".bloommd-nav").getAttribute("data-focus");
+    // Notiz-Map aus der Liste → Esc → Liste (nicht Editor)
     await selectFolderRow(ALPHA);
     await listRow(`${ALPHA}/Plan 2.md`).locator(".bloommd-nav-label").click();
     await page.locator(".bloommd-nav-pane-list .bloommd-nav-scroll").focus();
     await page.keyboard.press("m");
+    await expect(mapLine()).toHaveAttribute("data-kind", "file");
     await expect.poll(focusArea).toBe("map");
     await page.keyboard.press("Escape");
-    // Erwartet: zurück in die Liste (dorther kam man). Beobachtet bis jetzt: der Fokus landet im Editor.
-    await expect.poll(focusArea, { message: "Esc in der Map führt nicht in den Navigator zurück" }).toBe("list");
+    await expect.poll(focusArea, { message: "Esc aus der Notiz-Map führt nicht in die Liste zurück" }).toBe("list");
+    expect(await dataFocus()).toBe("list");
+    expect(await page.evaluate(() => document.activeElement?.closest<HTMLElement>("[data-area]")?.dataset.area)).toBe("list");
+    // Ordner-Map aus dem Baum → Esc → Baum
+    await selectFolderRow(`${NAV}/Projekte`);
+    await page.locator(".bloommd-nav-pane-tree .bloommd-nav-scroll").focus();
+    await page.keyboard.press("m");
+    await expect(mapLine()).toHaveAttribute("data-kind", "folder");
+    await expect.poll(focusArea).toBe("map");
+    await page.keyboard.press("Escape");
+    await expect.poll(focusArea, { message: "Esc aus der Ordner-Map führt nicht in den Baum zurück" }).toBe("tree");
+    expect(await dataFocus()).toBe("tree");
+    expect(await page.evaluate(() => document.activeElement?.closest<HTMLElement>("[data-area]")?.dataset.area)).toBe("tree");
+    // Die Kette Liste → Baum (→ Editor, bei geschlossener Map) prüft der Fall „K5“ oben. Mit offener Map liegt der
+    // zuletzt aktive Blatt-Fokus im Hauptbereich bei der Map, deshalb wird der letzte Schritt hier nicht geprüft.
+    await page.locator(".bloommd-nav-pane-list .bloommd-nav-scroll").focus();
+    await page.keyboard.press("Escape");
+    await expect.poll(focusArea).toBe("tree");
   });
 
   // ── K6 ────────────────────────────────────────────────────────────────────────
@@ -520,21 +539,48 @@ test.describe("Obsidian-Navigator @t57", () => {
     await expect(selectedTree()).toHaveAttribute("title", ALPHA);
   });
 
-  test("K6 (Verlaufsende): Auch wenn „Vor“ per Klick das Ende des Verlaufs erreicht, bleibt der Fokus nachvollziehbar @t57", async () => {
+  test("K6 (Verlaufsende): Am Verlaufsende (Klick und Tastatur) bleibt der Fokus auf einem sichtbaren Element, nie auf <body> @t57", async () => {
     await openNavigatorViaRibbon();
     await selectFolderRow(VAULT_NAME);
     await selectFolderRow("Viele");
     await selectFolderRow(ALPHA);
-    await page.getByRole("button", { name: "Back", exact: true }).click();
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    const back = page.getByRole("button", { name: "Back", exact: true });
     const forward = page.getByRole("button", { name: "Forward", exact: true });
+    const focusVisible = () =>
+      page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (!el || el === document.body) return `body (${el?.tagName})`;
+        const box = el.getBoundingClientRect();
+        return box.width > 0 && box.height > 0 ? `ok:${el.className}` : "unsichtbar";
+      });
+    // Klick: zweimal zurück, zweimal vor
+    await back.click();
+    await back.click();
     await forward.click();
     await forward.click();
     await expect(selectedTree()).toHaveAttribute("title", ALPHA);
     await expect(forward).toBeDisabled();
-    // Erwartet: Fokus bleibt im Navigator. Beobachtet bis jetzt: der Knopf wird deaktiviert und der Fokus fällt auf <body>.
-    const where = await focusArea();
-    expect(where.startsWith("other:BODY"), `Fokus verloren: ${where.slice(0, 40)}`).toBe(false);
+    expect(await focusVisible(), "Klick am Verlaufsende").toMatch(/^ok:/);
+    // Am Anfang des Verlaufs (Zurück wird deaktiviert) ebenso
+    while (await back.isEnabled()) {
+      await back.click();
+      expect(await focusVisible(), "Klick auf Zurück").toMatch(/^ok:/);
+    }
+    expect(await focusVisible(), "Klick am Verlaufsanfang").toMatch(/^ok:/);
+    // Tastatur: Ctrl+[ und Ctrl+] bis an beide Enden
+    await selectFolderRow(`${NAV}/Projekte`);
+    await selectFolderRow(ALPHA);
+    await page.locator(".bloommd-nav-pane-tree .bloommd-nav-scroll").focus();
+    for (let i = 0; i < 3 && (await back.isEnabled()); i += 1) {
+      await page.keyboard.press("Control+[");
+      expect(await focusVisible(), "Ctrl+[").toMatch(/^ok:/);
+    }
+    for (let i = 0; i < 5 && (await forward.isEnabled()); i += 1) {
+      await page.keyboard.press("Control+]");
+      expect(await focusVisible(), "Ctrl+]").toMatch(/^ok:/);
+    }
+    await expect(forward).toBeDisabled();
+    expect(await focusVisible(), "Tastatur am Verlaufsende").toMatch(/^ok:/);
   });
 
   // ── K7 ────────────────────────────────────────────────────────────────────────
@@ -578,6 +624,11 @@ test.describe("Obsidian-Navigator @t57", () => {
     await page.locator(".bloommd-nav-pane-list .bloommd-nav-scroll").focus();
     await page.keyboard.press("m");
     await expect(mapLine()).toHaveAttribute("data-kind", "file");
+    // Dieselbe Notiz und eine zweite über den Header-Knopf „Open map of the selected note“
+    await listRow(`${ALPHA}/Plan 10.md`).locator(".bloommd-nav-label").click();
+    await page.getByRole("button", { name: "Open map of the selected note" }).click();
+    await expect(mapLine()).toContainText("Plan 10");
+    await page.bringToFront();
     await page.locator(".bloommd-nav-pane-tree .bloommd-nav-scroll").focus();
     await selectFolderRow("Viele");
     await page.locator(".bloommd-nav-pane-tree .bloommd-nav-scroll").focus();
@@ -611,5 +662,41 @@ test.describe("Obsidian-Navigator @t57", () => {
     expect(externalRequests, `Anfragen nach außen: ${externalRequests.join(", ")}`).toEqual([]);
     // Und die Seite protokolliert keinen Fehler des Navigators.
     expect(consoleErrors.filter((text) => /navigator|bloommd/i.test(text)), consoleErrors.join("\n")).toEqual([]);
+  });
+
+  // ── Zusatz zu K8 (Rerun nach Nacharbeit) ───────────────────────────────────────
+  test("K8 (Bearbeiten): Erst die Bearbeitung in der Map schreibt die `bloommd:id`-Kommentare, mit denselben IDs wie vorher in der Map; Undo stellt den Text her @t57", async () => {
+    await openNavigatorViaRibbon();
+    const note = path.join(vault, ALPHA, "Plan 2.md");
+    const original = await readFile(note, "utf8");
+    await selectFolderRow(ALPHA);
+    await listRow(`${ALPHA}/Plan 2.md`).locator(".bloommd-nav-label").click();
+    await page.getByRole("button", { name: "Open map of the selected note" }).click();
+    await expect(page.locator(".react-flow__node")).toHaveCount(3);
+    const nodes = await page.locator(".react-flow__node").evaluateAll((all) => all.map((node) => ({ id: node.getAttribute("data-id") ?? "", text: (node as HTMLElement).innerText })));
+    const details = nodes.find((node) => /Details/.test(node.text));
+    expect(details?.id, "Knoten „Details“ hat keine ID").toBeTruthy();
+    expect(new Set(nodes.map((node) => node.id)).size).toBe(3);
+    // Nur Ansehen: die Datei ist unverändert.
+    await page.waitForTimeout(1500);
+    expect(await readFile(note, "utf8")).toBe(original);
+    // Bearbeiten: Überschrift „Details“ in der Map umbenennen.
+    await page.locator(`.react-flow__node[data-id="${details!.id}"]`).dblclick();
+    const input = page.locator(".bloommd-inline-title");
+    await expect(input).toBeFocused();
+    await page.keyboard.press("Control+A");
+    await page.keyboard.type("Details neu");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain("## Details neu <!-- bloommd:id=");
+    const edited = await readFile(note, "utf8");
+    for (const node of nodes) expect(edited, `ID ${node.id} fehlt in der Datei`).toContain(`<!-- bloommd:id=${node.id} -->`);
+    expect((edited.match(/bloommd:id=/g) ?? []).length).toBe(3);
+    expect(edited).toContain(`## Details neu <!-- bloommd:id=${details!.id} -->`);
+    // Undo stellt den Text („Details“) wieder her; die IDs bleiben dieselben.
+    await page.getByRole("button", { name: "Undo", exact: true }).click();
+    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain(`## Details <!-- bloommd:id=${details!.id} -->`);
+    const undone = await readFile(note, "utf8");
+    expect(undone).not.toContain("Details neu");
+    expect(undone.replace(/ <!-- bloommd:id=[0-9a-f]+ -->/g, "")).toBe(original);
   });
 });

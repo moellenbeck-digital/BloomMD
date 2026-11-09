@@ -604,6 +604,8 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const editStartTitleRef = useRef(heading.title);
   const skipBlurCommitRef = useRef(false);
+  // Set by the first key or input in the title field: from then on the field is the person's, not ours.
+  const typedRef = useRef(false);
   const preview = contentPreview(heading.content);
   const isRoot = heading.parentId === null;
   const editable = heading.kind === "heading";
@@ -611,9 +613,13 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
   useEffect(() => setTitle(heading.title), [heading.title]);
   useEffect(() => {
     if (!editing) return;
+    typedRef.current = false;
     inputRef.current?.focus();
     inputRef.current?.select();
+    // Focus can be taken back right after the double click; take it again, but never select the text
+    // once typing has begun, or the next character would replace what was just typed.
     const timer = window.setTimeout(() => {
+      if (typedRef.current) return;
       inputRef.current?.focus();
       inputRef.current?.select();
     }, 50);
@@ -770,7 +776,10 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
             ref={inputRef}
             className="bloommd-inline-title nodrag"
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              typedRef.current = true;
+              setTitle(event.target.value);
+            }}
             onBlur={() => {
               if (skipBlurCommitRef.current) {
                 skipBlurCommitRef.current = false;
@@ -780,6 +789,7 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
             }}
             onKeyDown={(event) => {
               event.stopPropagation();
+              typedRef.current = true;
               if (event.key === "Enter") {
                 event.preventDefault();
                 skipBlurCommitRef.current = true;

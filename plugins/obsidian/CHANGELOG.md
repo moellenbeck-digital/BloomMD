@@ -10,6 +10,7 @@
 
 - The map view no longer stays blank after **Visualize current note**: the map is fitted once the view has a size (a freshly split or hidden pane is not laid out yet), and a map restored with the workspace is reused instead of opening a second one.
 - If opening, loading or rendering a map fails, the view shows what went wrong with **Back to Markdown** (and **Try again**) instead of an empty pane. An empty view and a note without headings now offer **Back to Markdown** too, and the button also works in folder mode.
+- Renaming a node (or typing the title of a new node) no longer loses the first characters when typing starts right after the double click: the title field re-selected its text 50 ms after opening, so the next character replaced what had just been typed. It now only does that while nothing has been typed yet.
 
 ### Live Preview
 

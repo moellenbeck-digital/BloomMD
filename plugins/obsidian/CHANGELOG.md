@@ -26,6 +26,9 @@
 - **Show active file in navigator** (`Cmd/Ctrl+Shift+R`) opens the folders on the way, scrolls to the note, selects and focuses it. The navigator also follows the active note while you work.
 - Keyboard model with explicit focus areas (tree, list, map): `↑`/`↓`, `←`/`→`, `Enter`, `Tab`, `Esc`; back and forward through the navigation history with `Cmd/Ctrl+[` and `Cmd/Ctrl+]` or the buttons in the header. The header shows where you are browsing and which map is open as two separate lines; a built-in help lists all shortcuts. New command **Focus navigator** brings focus back from the map.
 - Folder tree and note list only render the rows in view, so large vaults stay responsive.
+- `Esc` in the map now returns focus to the list or tree the map was opened from (with `M` or the header buttons), as the help says, instead of landing in the editor. The existing `Esc` chain list → tree → editor is unchanged.
+- At the end of the navigation history the focus no longer falls onto the page: when **Back** or **Forward** (click, `Cmd/Ctrl+[` or `Cmd/Ctrl+]`) reaches the end and the button is disabled, focus moves to the other button if it is usable, otherwise to the list or tree.
+- Opening a map of a note (`M` or **Open map of the selected note**, **Visualize current note**) no longer writes to the note. The `<!-- bloommd:id=… -->` comments are written with the first edit made in the map; until then the map shows the same ids it will write, so layout, learning progress and undo behave as before. Notes shared with a workspace still get them when sharing starts.
 
 ## 0.7.1
 

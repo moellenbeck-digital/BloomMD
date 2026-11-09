@@ -39,7 +39,7 @@ The wider BloomMD product is evolving as a local-first Markdown workspace: brows
 Read this before using the plugin in an important vault.
 
 - BloomMD writes to the note you are viewing. Try it on a copy first if the vault is sensitive.
-- BloomMD adds one HTML comment per heading, for example `## Goal <!-- bloommd:id=a1b2c3 -->`. These comments give nodes stable IDs and are invisible in Obsidian preview.
+- BloomMD adds one HTML comment per heading, for example `## Goal <!-- bloommd:id=a1b2c3 -->`. These comments give nodes stable IDs and are invisible in Obsidian preview. Opening a map (or the navigator) only reads the note: the comments are written with your first edit in the map (or when you share the note), and until then the map uses the same IDs it will write.
 - Deleting a BloomMD ID does not break the note. BloomMD will generate a new one when needed.
 - Frontmatter, code blocks, HTML blocks, unrelated sections, and text outside headings are preserved.
 - Headings inside fenced code, indented code, and HTML blocks are ignored.
@@ -142,7 +142,7 @@ The navigator keeps track of which area has focus instead of guessing from the p
 |---|---|
 | Tree | The vault's folders. |
 | List | The Markdown notes of the selected folder. |
-| Map | The BloomMD map. `Tab` and **Map of ...** move focus there; **Focus navigator** returns. |
+| Map | The BloomMD map. `Tab` and **Map of ...** move focus there; `Esc` or **Focus navigator** returns to the list or tree you came from. |
 | Search | Reserved for the vault search; not available yet. |
 
 ### Shortcuts

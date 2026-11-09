@@ -1,5 +1,5 @@
 // Runs in its own `bun test` process (see the test script): it mocks the "obsidian" module, which other test files may already have loaded.
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, mock, test } from "bun:test";
 import { LONG_NAME, vault } from "./navigator-fixture";
 import type { SourceEntry } from "./navigator-model";
 
@@ -80,6 +80,9 @@ function installDomHelpers() {
 }
 
 const notices: string[] = [];
+/** What the view registered for unload; Obsidian runs it when the view closes, the tests after each test. */
+const teardowns: Array<() => void> = [];
+afterEach(() => teardowns.splice(0).forEach((teardown) => teardown()));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 let NavigatorViewClass: typeof import("./navigator-view").NavigatorView;
 
@@ -92,7 +95,9 @@ beforeAll(async () => {
     registerEvent(ref: { name: string; callback: Handler }) {
       this.registered.push(ref);
     }
-    register() {}
+    register(teardown: () => void) {
+      teardowns.push(teardown);
+    }
     getState() {
       return {};
     }
@@ -120,6 +125,7 @@ async function openView(active: string | null = null) {
   const opened: string[] = [];
   const maps: string[] = [];
   let mapTarget: { kind: "file" | "folder"; path: string } | null = null;
+  let mapActive = true;
   const handlers = new Map<string, Handler>();
   const app = {
     vault: {
@@ -147,6 +153,7 @@ async function openView(active: string | null = null) {
     },
     mapTarget: () => mapTarget,
     focusMapView: () => true,
+    mapViewActive: () => mapActive,
   };
   const view = new NavigatorViewClass({} as never, host);
   (view as unknown as { app: unknown }).app = app;
@@ -158,7 +165,15 @@ async function openView(active: string | null = null) {
   const press = (area: "tree" | "list", key: string, init: KeyboardEventInit = {}) =>
     pane(area).dispatchEvent(new (document.defaultView as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
   const click = (row: HTMLElement) => row.dispatchEvent(new (document.defaultView as unknown as { MouseEvent: typeof MouseEvent }).MouseEvent("click", { bubbles: true }));
-  return { view, el, rows, labels, pane, press, click, opened, maps, handlers };
+  const pressOnDocument = (key: string, init: KeyboardEventInit = {}) => {
+    const event = new (document.defaultView as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+    document.body.dispatchEvent(event);
+    return event;
+  };
+  const setMapActive = (active: boolean) => {
+    mapActive = active;
+  };
+  return { view, el, rows, labels, pane, press, click, opened, maps, handlers, pressOnDocument, setMapActive };
 }
 
 describe("navigator view", () => {
@@ -221,6 +236,88 @@ describe("navigator view", () => {
     expect(el.querySelector(".bloommd-nav-context-map")?.textContent).toBe("Map: note Home");
   });
 
+  test("Escape in the map returns the focus to the list the map was opened from, not to the editor", async () => {
+    const { view, el, press, pressOnDocument, pane, maps } = await openView();
+    document.body.appendChild(el);
+    press("tree", "ArrowRight");
+    press("list", "m");
+    await settle();
+    expect(maps).toEqual(["Home.md"]);
+    expect(el.dataset.focus).toBe("map");
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+
+    const event = pressOnDocument("Escape");
+    expect(event.defaultPrevented).toBe(true);
+    expect(el.dataset.focus).toBe("list");
+    expect(document.activeElement).toBe(pane("list"));
+    expect(view.getState()).toMatchObject({ folder: "/" });
+    el.remove();
+  });
+
+  test("Escape in the map returns to the tree when the map was opened from the tree", async () => {
+    const { el, press, pressOnDocument, pane } = await openView();
+    document.body.appendChild(el);
+    press("tree", "ArrowDown");
+    press("tree", "ArrowDown");
+    press("tree", "m");
+    await settle();
+    expect(el.dataset.focus).toBe("map");
+    pressOnDocument("Escape");
+    expect(el.dataset.focus).toBe("tree");
+    expect(document.activeElement).toBe(pane("tree"));
+    el.remove();
+  });
+
+  test("the header button opens the map from the area that last had focus", async () => {
+    const { el, press, pressOnDocument, pane } = await openView();
+    document.body.appendChild(el);
+    press("tree", "ArrowRight");
+    (el.querySelector('button[aria-label="Open map of the selected note"]') as HTMLButtonElement).click();
+    await settle();
+    expect(el.dataset.focus).toBe("map");
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+    pressOnDocument("Escape");
+    expect(document.activeElement).toBe(pane("list"));
+    el.remove();
+  });
+
+  test("Escape out of the list and tree is unchanged: list → tree → editor", async () => {
+    const { el, press, pane } = await openView();
+    document.body.appendChild(el);
+    press("tree", "ArrowRight");
+    press("list", "Escape");
+    expect(el.dataset.focus).toBe("tree");
+    expect(document.activeElement).toBe(pane("tree"));
+    el.remove();
+  });
+
+  test("Escape elsewhere is left alone: in a text field, with the map not active, or after another view took over", async () => {
+    const { el, press, pressOnDocument, setMapActive, handlers } = await openView();
+    document.body.appendChild(el);
+    press("tree", "ArrowRight");
+    press("list", "m");
+    await settle();
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    const inField = new (document.defaultView as unknown as { KeyboardEvent: typeof KeyboardEvent }).KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    input.dispatchEvent(inField);
+    expect(inField.defaultPrevented).toBe(false);
+    expect(el.dataset.focus).toBe("map");
+    input.remove();
+
+    setMapActive(false);
+    expect(pressOnDocument("Escape").defaultPrevented).toBe(false);
+    expect(el.dataset.focus).toBe("map");
+    // The leaf change that goes with it puts the model back where the map was opened from.
+    handlers.get("active-leaf-change")!();
+    expect(el.dataset.focus).toBe("list");
+    expect(pressOnDocument("Escape").defaultPrevented).toBe(false);
+    el.remove();
+  });
+
   test("the whole vault is not turned into a map", async () => {
     const { press, maps } = await openView();
     press("tree", "m");
@@ -235,6 +332,48 @@ describe("navigator view", () => {
     expect(labels("list")).toEqual(["Notes"]);
     (el.querySelector('button[aria-label="Back"]') as HTMLButtonElement).click();
     expect(labels("list")).toEqual(["Home"]);
+  });
+
+  test("focus is not lost at the end of the history: the button that gets disabled hands it on", async () => {
+    const { rows, click, el } = await openView();
+    document.body.appendChild(el);
+    const back = el.querySelector('button[aria-label="Back"]') as HTMLButtonElement;
+    const forward = el.querySelector('button[aria-label="Forward"]') as HTMLButtonElement;
+    click(rows("tree")[1]!); // Archive
+    click(rows("tree")[2]!); // Projects: three entries with the start
+
+    back.focus();
+    back.click();
+    expect(document.activeElement).toBe(back);
+    back.click();
+    expect(back.disabled).toBe(true);
+    // The click that reached the start disabled Back: focus moved to Forward, which is usable.
+    expect(document.activeElement).toBe(forward);
+
+    forward.click();
+    forward.click();
+    expect(forward.disabled).toBe(true);
+    expect(document.activeElement).toBe(back);
+    expect(document.activeElement).not.toBe(document.body);
+    el.remove();
+  });
+
+  test("Ctrl+[ and Ctrl+] at the ends of the history keep focus on a usable element", async () => {
+    const { rows, click, el, pane, press } = await openView();
+    document.body.appendChild(el);
+    click(rows("tree")[1]!);
+    click(rows("tree")[2]!);
+    pane("tree").focus();
+    press("tree", "[", { ctrlKey: true });
+    press("tree", "[", { ctrlKey: true });
+    press("tree", "[", { ctrlKey: true });
+    expect(document.activeElement).toBe(pane("tree"));
+    press("tree", "]", { ctrlKey: true });
+    press("tree", "]", { ctrlKey: true });
+    press("tree", "]", { ctrlKey: true });
+    expect(document.activeElement).toBe(pane("tree"));
+    expect(document.activeElement).not.toBe(document.body);
+    el.remove();
   });
 
   test("renders only the rows in view for a large folder", async () => {

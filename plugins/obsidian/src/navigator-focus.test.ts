@@ -5,11 +5,14 @@ import {
   canGoForward,
   createState,
   cycleFocus,
+  enterMap,
   escapeTarget,
+  focusAfterHistory,
   focusArea,
   goBack,
   goForward,
   handleKey,
+  leaveMap,
   listIndex,
   normalizeState,
   remapState,
@@ -188,6 +191,39 @@ describe("focus areas", () => {
     expect(press(fromTree, ["Escape"]).state.focus).toBe("tree");
   });
 
+  test("opening the map remembers the area it was opened from, and Escape in the map goes back there", () => {
+    const inList = press(start(), ["ArrowRight"]).state;
+    const mapFromList = enterMap(inList);
+    expect(mapFromList).toMatchObject({ focus: "map", returnFocus: "list" });
+    const back = press(mapFromList, ["Escape"], withMap);
+    expect(back.state.focus).toBe("list");
+    expect(back.effects).toEqual([]);
+
+    const mapFromTree = enterMap(start());
+    expect(mapFromTree).toMatchObject({ focus: "map", returnFocus: "tree" });
+    expect(press(mapFromTree, ["Escape"], withMap).state.focus).toBe("tree");
+  });
+
+  test("opening a map again while the map has focus keeps the original area", () => {
+    const again = enterMap(enterMap(press(start(), ["ArrowRight"]).state));
+    expect(again).toMatchObject({ focus: "map", returnFocus: "list" });
+  });
+
+  test("Escape from the map does not reach the editor; the existing list → tree → editor chain is unchanged after it", () => {
+    const fromList = press(enterMap(press(start(), ["ArrowRight"]).state), ["Escape"], withMap);
+    expect(fromList.effects).toEqual([]);
+    const second = press(fromList.state, ["Escape"], withMap);
+    expect(second.state.focus).toBe("tree");
+    expect(press(second.state, ["Escape"], withMap).effects).toEqual([{ type: "focus-editor" }]);
+  });
+
+  test("leaving the map for another view returns the model to the area it came from", () => {
+    const inMap = enterMap(press(start(), ["ArrowRight"]).state);
+    expect(leaveMap(inMap).focus).toBe("list");
+    const tree = start();
+    expect(leaveMap(tree)).toBe(tree);
+  });
+
   test("the map and search have no navigator keys of their own", () => {
     const inMap = focusArea(start(), "map");
     expect(press(inMap, ["ArrowDown", "Enter", "m"], withMap).state).toBe(inMap);
@@ -255,6 +291,31 @@ describe("history", () => {
       expect(back.folder).toBe("Projects");
       expect(press(back, [{ key: "]", mod: true }], withMap).state.file).toBe("Projects/Alpha/Notes.md");
     }
+  });
+
+  test("at the end of the history focus moves off the button that was just disabled", () => {
+    // Three folders after the start: three steps back reach the start (Back disabled), three forward the end (Forward disabled).
+    let state = selectFolder(selectFolder(selectFolder(start(), root, "Projects", true), root, "Projects/Alpha", true), root, "Projects/Beta", true);
+    state = goBack(goBack(state, root), root);
+    expect(canGoBack(state)).toBe(true);
+    expect(focusAfterHistory(state, "back")).toBeNull();
+    state = goBack(state, root);
+    expect(canGoBack(state)).toBe(false);
+    expect(focusAfterHistory(state, "back")).toBe("forward");
+    state = goForward(goForward(goForward(state, root), root), root);
+    expect(canGoForward(state)).toBe(false);
+    expect(focusAfterHistory(state, "forward")).toBe("back");
+  });
+
+  test("with neither button usable focus returns to the list or the tree", () => {
+    const only = start();
+    expect(focusAfterHistory(only, "back")).toBe("tree");
+    expect(focusAfterHistory(focusArea({ ...only, file: null }, "list"), "forward")).toBe("list");
+    expect(focusAfterHistory(enterMap(focusArea(only, "list")), "back")).toBe("list");
+  });
+
+  test("focus that is not on a history button is left alone", () => {
+    expect(focusAfterHistory(start(), null)).toBeNull();
   });
 
   test("going back at the start does nothing", () => {

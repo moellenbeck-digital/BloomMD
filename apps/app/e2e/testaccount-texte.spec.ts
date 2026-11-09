@@ -130,7 +130,7 @@ test.describe("Testaccount-Texte @t271", () => {
     expect(text).toContain("nach 15 Tagen");
     expect(text).toContain("nach 23 Tagen");
     expect(text).toContain("Zweck:");
-    expect(text).toContain("deine E-Mail-Adresse und der Zeitpunkt deiner E-Mail-Bestätigung");
+    expect(text).toContain("Verarbeitete Daten: deine E-Mail-Adresse, der Zeitpunkt deiner E-Mail-Bestätigung");
     expect(text).toContain("Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO");
     expect(text).not.toContain("Freischaltung der geschlossenen Beta");
     expect(text).not.toMatch(CLOSED_BETA);
@@ -142,7 +142,7 @@ test.describe("Testaccount-Texte @t271", () => {
     await expect(page.getByRole("heading", { name: "Warteliste (beendet)" })).toBeVisible();
     expect(text).toContain("nach 15 Tagen");
     expect(text).toContain("nach 23 Tagen");
-    expect(text).toContain("deine E-Mail-Adresse und der Zeitpunkt deiner E-Mail-Bestätigung");
+    expect(text).toContain("Verarbeitete Daten: deine E-Mail-Adresse, der Zeitpunkt deiner E-Mail-Bestätigung");
     expect(text).toContain("Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO");
     expect(text).not.toMatch(CLOSED_BETA);
   });

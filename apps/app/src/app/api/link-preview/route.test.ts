@@ -24,12 +24,12 @@ mock.module("../../../lib/db", () => ({
 }));
 
 const { GET } = await import("./route");
+const { setLinkPreviewTransportForTests } = await import("../../../lib/link-preview");
 const { LINK_PREVIEW_RATE_LIMIT } = await import("../../../lib/link-preview-rate-limit");
 const { resetMemoryRateLimitsForTests } = await import("../../../lib/request-security");
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const savedEnv = { ...mutableEnv };
-const realFetch = globalThis.fetch;
 const realNow = Date.now;
 const WINDOW = LINK_PREVIEW_RATE_LIMIT.windowMs;
 const START = Math.floor(1_800_000_000_000 / WINDOW) * WINDOW;
@@ -54,16 +54,18 @@ beforeEach(() => {
   Date.now = () => now;
   outbound = [];
   warn = spyOn(console, "warn").mockImplementation(() => {});
-  globalThis.fetch = (async (input: Request | string | URL) => {
-    outbound.push(String(input));
-    return new Response("<html><head><title>Example</title></head></html>", { headers: { "content-type": "text/html" } });
-  }) as typeof fetch;
+  setLinkPreviewTransportForTests({
+    request: async (target) => {
+      outbound.push(target.url.toString());
+      return { status: 200, headers: { "content-type": "text/html" }, read: async () => new TextEncoder().encode("<html><head><title>Example</title></head></html>"), close: () => {} };
+    },
+  });
 });
 
 afterEach(() => {
   warn.mockRestore();
   Date.now = realNow;
-  globalThis.fetch = realFetch;
+  setLinkPreviewTransportForTests(null);
   for (const key of ["DATABASE_URL", "BLOOMMD_TRUSTED_PROXY_HEADER", "BLOOMMD_E2E_AUTH_BYPASS"]) {
     if (savedEnv[key] === undefined) delete mutableEnv[key];
     else mutableEnv[key] = savedEnv[key];

@@ -41,6 +41,7 @@ import {
   updateHeadingContent,
   type MarkdownHeadingNode,
 } from "./markdown-document";
+import { assignHeadingIds } from "./heading-ids";
 import {
   BACKLINKS_EVENT,
   FOCUS_MODE_EVENT,
@@ -522,17 +523,8 @@ export class BloomMDView extends ItemView {
 
   async handleFileChange(file: TFile) {
     if (this.writing || this.sourceFile?.path !== file.path) return;
-    const current = await this.app.vault.read(file);
-    const withIds = ensureHeadingIds(current);
-    let markdown = current;
-    if (withIds.changed) {
-      this.writing = true;
-      try {
-        markdown = await this.app.vault.process(file, (latest) => ensureHeadingIds(latest).markdown);
-      } finally {
-        this.writing = false;
-      }
-    }
+    // Ids the note lacks are given in memory only; the file is written by the first edit.
+    const markdown = assignHeadingIds(await this.app.vault.read(file)).markdown;
     if (markdown === this.lastKnownMarkdown) return;
     this.lastKnownMarkdown = markdown;
     this.undoStack = [];
@@ -556,9 +548,12 @@ export class BloomMDView extends ItemView {
       this.writing = true;
       try {
         let before = "";
-        const after = await this.app.vault.process(this.sourceFile, (current) => {
-          before = current;
-          return ensureHeadingIds(transform(current)).markdown;
+        let after = "";
+        await this.app.vault.process(this.sourceFile, (current) => {
+          // The map shows ids the file may not have yet; an edit starts from that view and writes them.
+          before = assignHeadingIds(current).markdown;
+          after = ensureHeadingIds(transform(before)).markdown;
+          return after === before ? current : after;
         });
         if (before !== after) {
           this.undoStack.push({ before, after });
@@ -605,7 +600,8 @@ export class BloomMDView extends ItemView {
     });
   }
 
-  private updateFromMarkdown(markdown: string) {
+  private updateFromMarkdown(raw: string) {
+    const markdown = assignHeadingIds(raw).markdown;
     this.lastKnownMarkdown = markdown;
     const tree = parseHeadingTree(markdown);
     this.headings = canvasHeadings(tree);
@@ -696,7 +692,7 @@ export class BloomMDView extends ItemView {
       return linked.markdown;
     };
     if (this.sourceFile?.path !== sourceFile.path) {
-      await this.app.vault.process(sourceFile, transform);
+      await this.app.vault.process(sourceFile, (markdown) => transform(assignHeadingIds(markdown).markdown));
       return found;
     }
     if (transform(this.lastKnownMarkdown) === this.lastKnownMarkdown) return found;
@@ -1483,11 +1479,16 @@ export default class BloomMDPlugin extends Plugin implements NavigatorHost {
     return true;
   }
 
+  mapViewActive(): boolean {
+    return this.app.workspace.getActiveViewOfType(BloomMDView) !== null;
+  }
+
   async loadFileIntoView(path: string, view: BloomMDView) {
     const file = this.app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile) || file.extension !== "md") return;
     try {
-      const markdown = await this.app.vault.process(file, (current) => ensureHeadingIds(current).markdown);
+      // Opening a map only reads: the ids the note lacks are given in memory and written by the first edit.
+      const markdown = assignHeadingIds(await this.app.vault.read(file)).markdown;
       await this.connectSharedDocument(file).catch((error: unknown) => {
         console.error("BloomMD: shared document connection could not be restored", error);
         new Notice(`BloomMD collaboration is offline: ${error instanceof Error ? error.message : "connection unavailable"}`);

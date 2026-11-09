@@ -665,39 +665,97 @@ test.describe("Obsidian-Navigator @t57", () => {
   });
 
   // ── Zusatz zu K8 (Rerun nach Nacharbeit) ───────────────────────────────────────
-  test("K8 (Bearbeiten): Erst die Bearbeitung in der Map schreibt die `bloommd:id`-Kommentare, mit denselben IDs wie vorher in der Map; Undo stellt den Text her @t57", async () => {
+  // Je Tipptempo eine eigene Notiz (jede ohne IDs), weil die erste Bearbeitung die IDs in die Datei schreibt.
+  const EDIT_CASES = [
+    { delay: 0, note: `${ALPHA}/Plan 2.md`, label: "0 ms (sofort nach dem Doppelklick)" },
+    { delay: 100, note: `${ALPHA}/Plan 10.md`, label: "100 ms" },
+    { delay: 250, note: `${NAV}/Projekte/Beta/Notizen.md`, label: "250 ms" },
+  ];
+  for (const edit of EDIT_CASES) {
+    test(`K8 (Bearbeiten, ${edit.label}): Erst die Bearbeitung in der Map schreibt die bloommd:id-Kommentare, mit denselben IDs wie vorher in der Map; der Titel ist vollständig, Undo stellt den Text her @t57`, async () => {
+      await openNavigatorViaRibbon();
+      const note = path.join(vault, edit.note);
+      const original = await readFile(note, "utf8");
+      await selectFolderRow(path.posix.dirname(edit.note));
+      await listRow(edit.note).locator(".bloommd-nav-label").click();
+      await page.getByRole("button", { name: "Open map of the selected note" }).click();
+      // Die Knoten werden beim Laden kurz neu eingehängt und sind erst danach beschriftet: warten, bis alle drei Text und ID haben.
+      const readNodes = () => page.locator(".react-flow__node").evaluateAll((all) => all.map((node) => ({ id: node.getAttribute("data-id") ?? "", text: (node as HTMLElement).innerText })));
+      await expect
+        .poll(async () => {
+          const found = await readNodes();
+          return found.length === 3 && found.every((node) => node.id && node.text.trim()) && found.some((node) => /Details/.test(node.text));
+        })
+        .toBe(true);
+      const nodes = await readNodes();
+      const details = nodes.find((node) => /Details/.test(node.text));
+      expect(details?.id, "Knoten „Details“ hat keine ID").toBeTruthy();
+      expect(new Set(nodes.map((node) => node.id)).size).toBe(3);
+      // Nur Ansehen: die Datei ist unverändert.
+      await page.waitForTimeout(1500);
+      expect(await readFile(note, "utf8")).toBe(original);
+      // Bearbeiten: Überschrift „Details“ in der Map umbenennen; getippt wird sofort, sobald das Feld da ist.
+      await page.locator(`.react-flow__node[data-id="${details!.id}"]`).dblclick();
+      await expect(page.locator(".bloommd-inline-title")).toBeFocused();
+      await page.keyboard.press("Control+A");
+      await page.keyboard.type("Details neu", { delay: edit.delay });
+      await page.keyboard.press("Enter");
+      await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toMatch(/## .*neu <!-- bloommd:id=/);
+      const edited = await readFile(note, "utf8");
+      for (const node of nodes) expect(edited, `ID ${node.id} fehlt in der Datei`).toContain(`<!-- bloommd:id=${node.id} -->`);
+      expect((edited.match(/bloommd:id=/g) ?? []).length).toBe(3);
+      expect(edited, "Beim ersten Bearbeiten gehen getippte Zeichen verloren").toContain(`## Details neu <!-- bloommd:id=${details!.id} -->`);
+      // Undo stellt den Text („Details“) wieder her; die IDs bleiben dieselben.
+      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain(`## Details <!-- bloommd:id=${details!.id} -->`);
+      const undone = await readFile(note, "utf8");
+      expect(undone).not.toContain("Details neu");
+      expect(undone.replace(/ <!-- bloommd:id=[0-9a-f]+ -->/g, "")).toBe(original);
+    });
+  }
+
+  test("K8 (Doppelklick ohne Tippen): Der Titel bleibt komplett markiert und das Feld fokussiert, auch nach über 50 ms @t57", async () => {
     await openNavigatorViaRibbon();
-    const note = path.join(vault, ALPHA, "Plan 2.md");
+    const note = path.join(vault, ARCHIV_2025, "Notizen.md");
     const original = await readFile(note, "utf8");
-    await selectFolderRow(ALPHA);
-    await listRow(`${ALPHA}/Plan 2.md`).locator(".bloommd-nav-label").click();
+    await selectFolderRow(ARCHIV_2025);
+    await listRow(`${ARCHIV_2025}/Notizen.md`).locator(".bloommd-nav-label").click();
     await page.getByRole("button", { name: "Open map of the selected note" }).click();
     await expect(page.locator(".react-flow__node")).toHaveCount(3);
-    const nodes = await page.locator(".react-flow__node").evaluateAll((all) => all.map((node) => ({ id: node.getAttribute("data-id") ?? "", text: (node as HTMLElement).innerText })));
-    const details = nodes.find((node) => /Details/.test(node.text));
-    expect(details?.id, "Knoten „Details“ hat keine ID").toBeTruthy();
-    expect(new Set(nodes.map((node) => node.id)).size).toBe(3);
-    // Nur Ansehen: die Datei ist unverändert.
-    await page.waitForTimeout(1500);
-    expect(await readFile(note, "utf8")).toBe(original);
-    // Bearbeiten: Überschrift „Details“ in der Map umbenennen.
-    await page.locator(`.react-flow__node[data-id="${details!.id}"]`).dblclick();
+    await page.locator(".react-flow__node", { hasText: "Details" }).dblclick();
     const input = page.locator(".bloommd-inline-title");
+    await input.waitFor();
+    for (const wait of [0, 120, 400]) {
+      await page.waitForTimeout(wait);
+      await expect(input).toBeFocused();
+      const state = await input.evaluate((el: HTMLInputElement) => ({ value: el.value, start: el.selectionStart, end: el.selectionEnd }));
+      expect(state, `nach ${wait} ms zusätzlich`).toEqual({ value: "Details", start: 0, end: "Details".length });
+    }
+    // Esc bricht ab: die Datei bleibt unverändert.
+    await page.keyboard.press("Escape");
+    await expect(input).toHaveCount(0);
+    await page.waitForTimeout(1000);
+    expect(await readFile(note, "utf8")).toBe(original);
+  });
+
+  test("K8 (Neuer Knoten): Knoten markieren, Tab, sofort tippen: der erste Buchstabe fehlt nicht @t57", async () => {
+    await openNavigatorViaRibbon();
+    const note = path.join(vault, NAV, "Start.md");
+    await selectFolderRow(NAV);
+    await listRow(`${NAV}/Start.md`).locator(".bloommd-nav-label").click();
+    await page.getByRole("button", { name: "Open map of the selected note" }).click();
+    await expect(page.locator(".react-flow__node").first()).toBeVisible();
+    const before = await page.locator(".react-flow__node").count();
+    await page.locator(".react-flow__node", { hasText: "Details" }).click();
+    await page.keyboard.press("Tab");
+    const input = page.locator(".bloommd-inline-title");
+    await input.waitFor();
+    // Sofort tippen, sobald das Feld den Fokus hat (0 ms Tipptempo): der erste Buchstabe darf nicht fehlen.
     await expect(input).toBeFocused();
-    await page.keyboard.press("Control+A");
-    await page.keyboard.type("Details neu", { delay: 100 });
+    await page.keyboard.type("Kindknoten", { delay: 0 });
     await page.keyboard.press("Enter");
-    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toMatch(/## .*neu <!-- bloommd:id=/);
-    const edited = await readFile(note, "utf8");
-    for (const node of nodes) expect(edited, `ID ${node.id} fehlt in der Datei`).toContain(`<!-- bloommd:id=${node.id} -->`);
-    expect((edited.match(/bloommd:id=/g) ?? []).length).toBe(3);
-    // Tippen mit 100 ms je Zeichen (menschliches Tempo): die Überschrift muss vollständig „Details neu“ lauten.
-    expect.soft(edited, "Beim ersten Bearbeiten gehen getippte Zeichen verloren").toContain(`## Details neu <!-- bloommd:id=${details!.id} -->`);
-    // Undo stellt den Text („Details“) wieder her; die IDs bleiben dieselben.
-    await page.getByRole("button", { name: "Undo", exact: true }).click();
-    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain(`## Details <!-- bloommd:id=${details!.id} -->`);
-    const undone = await readFile(note, "utf8");
-    expect(undone).not.toContain("Details neu");
-    expect(undone.replace(/ <!-- bloommd:id=[0-9a-f]+ -->/g, "")).toBe(original);
+    await expect.poll(() => page.locator(".react-flow__node").count()).toBeGreaterThan(before);
+    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toMatch(/#+ .*indknoten <!-- bloommd:id=/);
+    expect(await readFile(note, "utf8")).toMatch(/### Kindknoten <!-- bloommd:id=[0-9a-f]+ -->/);
   });
 });

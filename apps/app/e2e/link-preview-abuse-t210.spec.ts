@@ -7,7 +7,7 @@
  *  K2  Ungültige/bösartige URLs (leer, zu lang, `http://`, offene `[`, Zugangsdaten, javascript:/data:, Leer-/Steuerzeichen) → 400/422.
  *  K3  Übermäßiges Volumen → 429 mit `Retry-After`, danach kein ausgehender Abruf.            → NUR im Bun-Test, siehe unten.
  *  K4  Weiterleitung auf interne Adresse, DNS-Rebinding, gemischte Antwort öffentlich+privat. → NUR im Bun-Test, siehe unten.
- *  K5  Jede Ablehnung hat dieselbe Form: Status 400/422/429, Body nur `{ error }`, kein Seiteninhalt.
+ *  K5  Jede Ablehnung hat dieselbe Form: Status 400/422/429, Body nur `{ error }`, `no-store`, kein Seiteninhalt.
  *
  * Was dieser Spec NICHT abdeckt und warum (kein stilles Weglassen):
  *  - K3 (Rate-Limit) ist im Playwright-Stack nicht prüfbar: Der Stack läuft mit `BLOOMMD_E2E_AUTH_BYPASS=1`, und der Bypass
@@ -46,7 +46,8 @@ function expectRefusal(reply: Reply, statuses: number[], message?: RegExp) {
   expect(statuses, `Antwort ${reply.status}: ${reply.text.slice(0, 200)}`).toContain(reply.status);
   expect(Object.keys(reply.body)).toEqual(["error"]);
   expect(typeof reply.body.error).toBe("string");
-  expect(reply.cacheControl).toBe("private, no-store");
+  // next.config.mjs setzt für /api/* „no-store, max-age=0“ und überschreibt das „private, no-store“ der Route.
+  expect(reply.cacheControl ?? "").toContain("no-store");
   if (message) expect(reply.body.error).toMatch(message);
 }
 

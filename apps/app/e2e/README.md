@@ -81,6 +81,12 @@ Befund: Ein Token mit Scope `read` wird bei einer ändernden Methode mit **401**
 macht ihn für die Anfrage zur Nicht-Identität (`src/lib/auth.ts`). Geschützt ist es, die Statuscodes sind nur anders als in
 der Anforderung vermutet; K6 prüft 401 und dass nichts gespeichert wird.
 
+Befund (Folge-Ticket-Kandidat, kein Produktfix in #210): `PUT /api/mindmaps/:datei` mit einem Workspace, auf den der Token
+keinen Zugriff hat, antwortet **500** „Mindmap could not be saved.“ statt 404. Die Workspace-Auflösung (`getMindmapStorage`) steht im
+`try` der Route, und dessen `catch` bildet „Workspace not found or access denied.“ nicht ab (`GET` und `POST /api/mindmaps` nutzen
+`workspaceErrorResponse` und antworten 404). Geschützt ist es (nichts wird geschrieben, kein Vorschlag); K8 prüft deshalb „abgelehnt
+(Status >= 400) und nichts geschrieben“ und pinnt den Status nicht.
+
 ## Obsidian-Plugin (echtes Obsidian)
 
 `obsidian-navigator-t57.spec.ts` (`@t57`) testet das Obsidian-Plugin, nicht die Web-App: Der Spec startet ein echtes

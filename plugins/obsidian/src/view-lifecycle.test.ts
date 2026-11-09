@@ -1,4 +1,5 @@
 // Runs in its own `bun test` process (see the test script): it mocks the "obsidian" module, which other test files may already have loaded.
+import { assignHeadingIds } from "./heading-ids";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { act } from "preact/test-utils";
@@ -305,6 +306,7 @@ describe("opening the view", () => {
 /** What the map shows for the note: the headings with the ids the canvas works with. */
 type Headings = Array<{ id: string; title: string; kind: string }>;
 type Actions = {
+  reparentBranch(id: string, parentId: string): Promise<boolean>;
   renameNode(id: string, title: string, expectedTitle: string): Promise<boolean>;
   undo(selectedId: string | null): Promise<string | null>;
 };
@@ -374,5 +376,132 @@ describe("opening a map leaves the note as it is", () => {
     expect(focus).toBe(project.id);
     expect(content()).toContain("## Projekt <!-- bloommd:id=");
     expect(headingIds(content())).toEqual(shown.map((heading) => heading.id));
+  });
+});
+
+describe("other first edits right after opening", () => {
+  test("moving a branch writes the ids the map showed and keeps the text", async () => {
+    const { plugin, writes, content, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const shown = propsOf(openView()).headings.filter((heading) => heading.kind === "heading");
+    const zielgruppe = shown.find((heading) => heading.title === "Zielgruppe")!;
+    const quellen = shown.find((heading) => heading.title === "Quellen")!;
+    expect(writes).toEqual([]);
+    expect(await propsOf(openView()).actions.reparentBranch(zielgruppe.id, quellen.id)).toBe(true);
+    await settle();
+    expect(writes).toHaveLength(1);
+    expect(headingIds(content()).sort()).toEqual(shown.map((heading) => heading.id).sort());
+    expect(content()).toContain("Menschen mit bestehenden Obsidian-Vaults");
+    expect(content().indexOf("Zielgruppe")).toBeGreaterThan(content().indexOf("## Quellen"));
+  });
+});
+
+describe("typing a title right after the edit starts", () => {
+  const win = () => document.defaultView as unknown as { MouseEvent: typeof MouseEvent; Event: typeof Event; KeyboardEvent: typeof KeyboardEvent };
+  const nodeNamed = (el: HTMLElement, title: string) => [...el.querySelectorAll(".bloommd-flow-node")].find((node) => node.querySelector(".bloommd-node-label")?.textContent === title) as HTMLElement;
+  const titleInput = (el: HTMLElement) => el.querySelector("input.bloommd-inline-title") as HTMLInputElement | null;
+
+  /** One key press as the browser delivers it: keydown, then the typed character replaces the selection. */
+  const typeKey = (el: HTMLElement, character: string) => act(() => {
+    const input = titleInput(el)!;
+    input.dispatchEvent(new (win().KeyboardEvent)("keydown", { key: character, bubbles: true, cancelable: true }));
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    input.value = input.value.slice(0, start) + character + input.value.slice(end);
+    input.setSelectionRange(start + 1, start + 1);
+    input.dispatchEvent(new (win().Event)("input", { bubbles: true }));
+  });
+  const press = (el: HTMLElement, key: string) => act(() => void titleInput(el)!.dispatchEvent(new (win().KeyboardEvent)("keydown", { key, bubbles: true, cancelable: true })));
+  const doubleClick = (node: HTMLElement) => act(() => void node.dispatchEvent(new (win().MouseEvent)("dblclick", { bubbles: true, cancelable: true })));
+
+  test("the first rename in a note without ids loses no character, however fast the typing starts", async () => {
+    const { plugin, writes, content, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const view = openView()!;
+    const shownIds = propsOf(view).headings.filter((heading) => heading.kind === "heading").map((heading) => heading.id);
+
+    doubleClick(nodeNamed(view.contentEl, "Projekt"));
+    // Replace the whole title (it starts selected), first character straight after the double click.
+    typeKey(view.contentEl, "D");
+    await act(() => wait(120));
+    expect(titleInput(view.contentEl)!.value).toBe("D");
+    expect(titleInput(view.contentEl)!.selectionStart).toBe(1);
+    for (const character of "etails neu") typeKey(view.contentEl, character);
+    expect(titleInput(view.contentEl)!.value).toBe("Details neu");
+    press(view.contentEl, "Enter");
+    await settle();
+
+    expect(writes).toHaveLength(1);
+    expect(content()).toContain("## Details neu <!-- bloommd:id=");
+    expect(content()).not.toContain("## etails");
+    expect(headingIds(content())).toEqual(shownIds);
+  });
+
+  test("typing with pauses between the characters keeps every character", async () => {
+    const { plugin, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const view = openView()!;
+    doubleClick(nodeNamed(view.contentEl, "Quellen"));
+    for (const character of "Neu") {
+      typeKey(view.contentEl, character);
+      await act(() => wait(80));
+    }
+    expect(titleInput(view.contentEl)!.value).toBe("Neu");
+  });
+
+  test("the field still takes focus and selects the old title when nothing has been typed", async () => {
+    const { plugin, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const view = openView()!;
+    doubleClick(nodeNamed(view.contentEl, "Projekt"));
+    await act(() => wait(120));
+    const input = titleInput(view.contentEl)!;
+    expect(document.activeElement).toBe(input);
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, "Projekt".length]);
+  });
+
+  test("a node added right after opening: its title edit keeps the first typed character", async () => {
+    const { plugin, writes, content, openView } = setup();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const view = openView()!;
+    const shownIds = propsOf(view).headings.filter((heading) => heading.kind === "heading").map((heading) => heading.id);
+    const node = nodeNamed(view.contentEl, "Quellen");
+    act(() => node.focus());
+    // Tab adds a node next to the selected one and opens its title for editing.
+    act(() => void node.dispatchEvent(new (win().KeyboardEvent)("keydown", { key: "Tab", bubbles: true, cancelable: true })));
+    await act(() => wait(10));
+    expect(titleInput(view.contentEl)).not.toBeNull();
+    typeKey(view.contentEl, "Z");
+    await act(() => wait(120));
+    for (const character of "weig") typeKey(view.contentEl, character);
+    expect(titleInput(view.contentEl)!.value).toBe("Zweig");
+    press(view.contentEl, "Enter");
+    await settle();
+    expect(writes.length).toBeGreaterThanOrEqual(1);
+    expect(content()).toMatch(/^#{2,3} Zweig <!-- bloommd:id=[0-9a-f]+ -->$/m);
+    // Every id the map showed before the first edit is the one now in the file.
+    expect(headingIds(content())).toEqual(expect.arrayContaining(shownIds));
+  });
+
+  test("a note that already has ids behaves the same", async () => {
+    const { plugin, setContent, content, openView } = setup();
+    setContent(assignHeadingIds(demoMarkdown).markdown);
+    const before = content();
+    await plugin.visualizeCurrentNote();
+    await settle();
+    const view = openView()!;
+    doubleClick(nodeNamed(view.contentEl, "Projekt"));
+    typeKey(view.contentEl, "D");
+    await act(() => wait(120));
+    for (const character of "etails neu") typeKey(view.contentEl, character);
+    press(view.contentEl, "Enter");
+    await settle();
+    expect(content()).toContain("## Details neu <!-- bloommd:id=");
+    expect(headingIds(content())).toEqual(headingIds(before));
   });
 });

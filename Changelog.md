@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Obsidian-Plugin: Zeichenverlust beim Umbenennen behoben (Ticket 57): Wer direkt nach dem Doppelklick auf einen Knoten losgetippt hat, verlor die ersten Zeichen des Titels, weil das Titelfeld seinen Text 50 ms nach dem Öffnen noch einmal markierte; das passiert jetzt nur noch, solange nichts getippt wurde
+- Obsidian plugin: lost characters when renaming fixed (ticket 57): typing straight after double-clicking a node lost the first characters of the title because the title field selected its text again 50 ms after opening; that now only happens while nothing has been typed
+
 - Obsidian-Navigator, Nacharbeit (Ticket 57): `Esc` in der Map führt zurück in die Liste bzw. den Baum, aus der die Map geöffnet wurde (nicht mehr in den Editor); am Ende des Verlaufs („Zurück“/„Vor“, `Strg/Cmd+[` und `]`) bleibt der Fokus auf einem bedienbaren Element statt verloren zu gehen; das bloße Öffnen der Map einer Notiz verändert die Notiz nicht mehr — die `bloommd:id`-Kommentare werden erst mit der ersten Bearbeitung in der Map geschrieben
 - Obsidian navigator, follow-up (ticket 57): `Esc` in the map returns to the list or tree the map was opened from (no longer to the editor); at the end of the history ("Back"/"Forward", `Ctrl/Cmd+[` and `]`) focus stays on a usable element instead of falling onto the page; merely opening the map of a note no longer changes the note — the `bloommd:id` comments are written with the first edit made in the map
 

@@ -40,6 +40,10 @@ Ordner bewusst veröffentlichen“ weiter unten.
 *Die Illustration erklärt den Ablauf. Den tatsächlichen Freigabestatus zeigt die Desktop-App direkt
 an der geöffneten Datei.*
 
+![BloomMD Desktop zeigt den Freigabestatus „Konflikt“ für „Kapitel 2.md“ mit den Entscheidungen „Cloud-Version verwenden“ und „Lokale Version beibehalten“](/blog/shared-mode-conflict-desktop.png)
+
+*Echter Screenshot der Desktop-App: Bei einem Konflikt bietet BloomMD zwei bewusste Entscheidungen an.*
+
 ### Ablauf
 
 1. Öffne die lokale Markdown-Datei in der Desktop-App.
@@ -65,7 +69,9 @@ Workspace-Audit festgehalten.
 - **Offline:** Die lokale Datei bleibt bearbeitbar. Neue lokale Änderungen werden nicht still als
   Cloud-Änderung ausgegeben; stelle zuerst die Verbindung wieder her und prüfe den Status.
 - **Konflikt:** BloomMD überschreibt keinen abweichenden lokalen Stand. Prüfe die Datei und löse
-  den Konflikt bewusst, bevor du weiter teilst.
+  den Konflikt bewusst, bevor du weiter teilst. Die Freigabe zeigt dazu zwei Entscheidungen (siehe
+  Screenshot oben): **Cloud-Version verwenden** oder **Lokale Version beibehalten**. Keine Seite wird
+  still überschrieben; die nicht gewählte Version wird nicht als zusätzliche Kopie angelegt.
 - **Zugriff entzogen:** Der Server beendet die Sync-Verbindung. Die letzte lokale Kopie bleibt
   erhalten, kann aber nicht mehr zurück in den Workspace schreiben.
 

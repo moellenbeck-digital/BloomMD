@@ -59,6 +59,21 @@ describe("link-preview rate limit (marketing)", () => {
     expect(await blocked.json()).toMatchObject({ error: expect.any(String) });
   });
 
+  test("the 429 body is JSON and names neither the client address nor the requested URL", async () => {
+    const target = "http://93.184.216.34/secret-path?token=abc";
+    for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.perSource; i += 1) await preview(target, "203.0.113.10");
+    const blocked = await preview(target, "203.0.113.10");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Content-Type")).toContain("application/json");
+    const retryAfter = Number(blocked.headers.get("Retry-After"));
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(LINK_PREVIEW_RATE_LIMIT.windowMs / 1000);
+    const text = await blocked.text();
+    expect(typeof (JSON.parse(text) as { error: unknown }).error).toBe("string");
+    for (const secret of ["203.0.113.10", "93.184.216.34", "secret-path", "token=abc", encodeURIComponent(target)]) expect(text).not.toContain(secret);
+  });
+
   test("counts invalid URLs too: 422 up to the limit, then 429", async () => {
     for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.perSource; i += 1) {
       expect((await preview("http://127.0.0.1/admin")).status).toBe(422);

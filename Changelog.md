@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Learnings-Ablage: Checkliste je Brand und Verweis auf die Betriebsanleitung (Ticket 115): `docs/LEARNINGS-ABLAGE.md` ergänzt „Muster für eine weitere Brand“ um eine Checkliste mit Backend-Wahl (Vault oder Cloud), Rechten, Vault-Name und Pfad, Velero (Backup/Restore-Test, beim Betrieb), täglichem Export und Verantwortlichem, jeweils mit Verweis auf den passenden Abschnitt, und verweist für Betrieb und Cluster-Teil (PVC-Vorlage, Chart-Werte, `adapter.wissen`, Rechte, Backup, Export) auf die Kurzanleitung „Learnings-Ablage einrichten“ in `md-brand-cluster-base`. Die sechs bestehenden Schritte bleiben unverändert.
+- Learnings store: checklist per brand and pointer to the operations guide (ticket 115): `docs/LEARNINGS-ABLAGE.md` extends "Muster für eine weitere Brand" (pattern for another brand) with a checklist covering backend choice (vault or cloud), rights, vault name and path, Velero (backup/restore test, owned by operations), the daily export and the owner, each pointing to the matching section, and points to the short guide "Learnings-Ablage einrichten" in `md-brand-cluster-base` for operations and the cluster part (PVC template, chart values, `adapter.wissen`, rights, backup, export). The six existing steps are unchanged.
+
 - Obsidian-Plugin: Zeichenverlust beim Umbenennen behoben (Ticket 57): Wer direkt nach dem Doppelklick auf einen Knoten losgetippt hat, verlor die ersten Zeichen des Titels, weil das Titelfeld seinen Text 50 ms nach dem Öffnen noch einmal markierte; das passiert jetzt nur noch, solange nichts getippt wurde
 - Obsidian plugin: lost characters when renaming fixed (ticket 57): typing straight after double-clicking a node lost the first characters of the title because the title field selected its text again 50 ms after opening; that now only happens while nothing has been typed
 

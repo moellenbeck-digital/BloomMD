@@ -132,6 +132,50 @@ describe("link-preview rate limit (app)", () => {
     expect((await preview()).status).toBe(200);
   });
 
+  test("the 429 body is JSON and names neither the client address nor the requested URL", async () => {
+    const target = "http://93.184.216.34/secret-path?token=abc";
+    for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.anonymousPerSource; i += 1) await preview(target, "203.0.113.10");
+    const blocked = await preview(target, "203.0.113.10");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Content-Type")).toContain("application/json");
+    const retryAfter = Number(blocked.headers.get("Retry-After"));
+    expect(Number.isInteger(retryAfter)).toBe(true);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(LINK_PREVIEW_RATE_LIMIT.windowMs / 1000);
+    const text = await blocked.text();
+    expect(typeof (JSON.parse(text) as { error: unknown }).error).toBe("string");
+    for (const secret of ["203.0.113.10", "93.184.216.34", "secret-path", "token=abc", encodeURIComponent(target)]) expect(text).not.toContain(secret);
+  });
+
+  test("a limited account gets 429 with Retry-After and no-store, and the body names neither account nor address nor URL", async () => {
+    identity = { authKind: "session", userId: USER, email: "user@example.test" };
+    for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.accountPerAccount; i += 1) await preview();
+    now = START + 5_000;
+    const blocked = await preview();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Retry-After")).toBe("55");
+    expect(blocked.headers.get("Cache-Control")).toBe("private, no-store");
+    const text = await blocked.text();
+    for (const secret of [USER, "user@example.test", "203.0.113.10", "93.184.216.34"]) expect(text).not.toContain(secret);
+  });
+
+  test("an exhausted anonymous allowance of a shared address leaves the account allowance intact", async () => {
+    for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.anonymousPerSource; i += 1) await preview();
+    expect((await preview()).status).toBe(429);
+
+    identity = { authKind: "session", userId: USER, email: "user@example.test" };
+    for (let i = 0; i < LINK_PREVIEW_RATE_LIMIT.accountPerAccount; i += 1) {
+      expect((await preview()).status).toBe(200);
+    }
+    expect((await preview()).status).toBe(429);
+
+    // The account traffic did not move the anonymous counter: still limited, nothing more.
+    identity = null;
+    expect((await preview()).status).toBe(429);
+    now = START + LINK_PREVIEW_RATE_LIMIT.windowMs;
+    expect((await preview()).status).toBe(200);
+  });
+
   test("an unresolvable identity is treated as anonymous", async () => {
     identityBroken = true;
     const error = spyOn(console, "error").mockImplementation(() => {});

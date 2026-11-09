@@ -685,13 +685,14 @@ test.describe("Obsidian-Navigator @t57", () => {
     const input = page.locator(".bloommd-inline-title");
     await expect(input).toBeFocused();
     await page.keyboard.press("Control+A");
-    await page.keyboard.type("Details neu");
+    await page.keyboard.type("Details neu", { delay: 100 });
     await page.keyboard.press("Enter");
-    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain("## Details neu <!-- bloommd:id=");
+    await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toMatch(/## .*neu <!-- bloommd:id=/);
     const edited = await readFile(note, "utf8");
     for (const node of nodes) expect(edited, `ID ${node.id} fehlt in der Datei`).toContain(`<!-- bloommd:id=${node.id} -->`);
     expect((edited.match(/bloommd:id=/g) ?? []).length).toBe(3);
-    expect(edited).toContain(`## Details neu <!-- bloommd:id=${details!.id} -->`);
+    // Tippen mit 100 ms je Zeichen (menschliches Tempo): die Überschrift muss vollständig „Details neu“ lauten.
+    expect.soft(edited, "Beim ersten Bearbeiten gehen getippte Zeichen verloren").toContain(`## Details neu <!-- bloommd:id=${details!.id} -->`);
     // Undo stellt den Text („Details“) wieder her; die IDs bleiben dieselben.
     await page.getByRole("button", { name: "Undo", exact: true }).click();
     await expect.poll(() => readFile(note, "utf8"), { timeout: 15_000 }).toContain(`## Details <!-- bloommd:id=${details!.id} -->`);

@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Payload-Spike nachgezogen (Ticket 103): `docs/adr/0001-payload-cms.md` verweist auf den Spike-Anhang und führt O12, O14, O16, O17, Annahme A6 und die Aufwandsschätzung (77 bis 122 Personentage, Annahme) auf dem Stand des Spikes; der Anhang listet die Abweichungen von der ADR und enthält die Prüfskripte samt Wiederholungsablauf; keine Änderung an App oder Marketing-Seite
+- Payload spike follow-up (ticket 103): `docs/adr/0001-payload-cms.md` links to the spike appendix and brings O12, O14, O16, O17, assumption A6 and the effort estimate (77 to 122 person-days, an assumption) up to the state of the spike; the appendix lists the deviations from the ADR and contains the check scripts with a repeatable procedure; no change to the app or the marketing site
+
 - Payload-Spike (Ticket 103): `docs/adr/0001-payload-spike.md` hält fest, was die gewählte Payload-Version (3.93.0) für Anmeldung der Endnutzer, `/svc/v1`, Lese-Token und Laufzeit (Node statt Bun, Node ≥ 22.23.4) belegt, und schätzt den Aufwand neu (77 bis 122 Personentage, Annahme); keine Änderung an App oder Marketing-Seite
 - Payload spike (ticket 103): `docs/adr/0001-payload-spike.md` records what the chosen Payload version (3.93.0) proves for end-user sign-in, `/svc/v1`, read token and runtime (Node instead of Bun, Node ≥ 22.23.4) and re-estimates the effort (77 to 122 person-days, an assumption); no change to the app or the marketing site
 

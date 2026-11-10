@@ -27,7 +27,7 @@
 | Bun | 1.4.2 im Pod (das Repo pinnt 1.4.4) |
 | Treiber/ORM | `pg` 8.20.0, `drizzle-orm` 0.45.2, `drizzle-kit` 0.31.7 (kommen mit dem Adapter) |
 
-Ablauf zum Nachvollziehen (aus einem leeren Verzeichnis außerhalb des Repos):
+Kurzablauf (der vollständige, ohne den Pod des coders lauffähige Ablauf mit allen Prüfskripten steht im Abschnitt „Wiederholung ohne den Pod des coders“ am Ende):
 
 ```bash
 npm view payload version dist-tags --json          # 3.93.0, latest
@@ -209,12 +209,12 @@ Ohne Anmeldung (`scripts/o16.mjs`, Abschnitt D), mit Statuscode:
 | `GET/POST /api/users`, `/api/users/login`, `/forgot-password`, `/first-register`, `/me`, `/api/posts`, `/api/read-tokens`, `/api/access`, `/api/payload-preferences/x`, `/api/operators`, `/api/globals`, `/api/payload-jobs/run` | 404 | Wächter |
 | `GET/POST /api/graphql`, `GET /api/graphql-playground`, `/api/openapi.json`, `/api/_openapi` | 404 | Route-Dateien gelöscht |
 
-Mit Betreiber-Cookie (und `Origin`): `GET /api/users` 200, `PATCH /api/users/:id` 200, `GET /api/access` 200, `GET /api/operators/me` 200. Ein Betreiber ohne passende Zugriffsfunktion bekommt 403 (z. B. `GET /api/posts`, im Prototyp nicht freigegeben).
+Mit Betreiber-Cookie (und `Origin`): `GET /api/users` 200, `PATCH /api/users/:id` 200, `GET /api/access` 200, `GET /api/operators/me` 200. Ein Betreiber ohne passende Zugriffsfunktion bekommt 403 (z. B. `GET /api/posts`, im ersten Prototyp nicht freigegeben, im Prüfgerüst unten freigegeben).
 
 **Bauplan für den Inventar-Test (#204):** Er hat drei Teile und scheitert bei jeder unbekannten Route.
 
 1. **Dateien:** alle `route.ts`/`page.tsx` unter `apps/cms/src/app` gegen eine Positivliste. Im Prototyp: `(payload)/admin/[[...segments]]`, `(payload)/api/[...slug]`, fünf Routen unter `svc/v1`. Keine Dateien für `graphql`, `graphql-playground`.
-2. **Payload-Endpunkte aus der aufgelösten Konfiguration** (`payload.config.endpoints` und `collection.endpoints`, Skript `inv.ts`): **ca. 163 Endpunkte** bei 10 Collections (6 eigene, 4 interne `payload-kv`, `payload-locked-documents`, `payload-preferences`, `payload-jobs`). Je Collection 12 Zeilen (`find`, `count`, `findByID`, `create`, `update`, `delete`, Versionen, `docAccess`, `duplicate`), je Auth-Collection 10 weitere (`login`, `logout`, `me`, `refresh-token`, `forgot-password`, `reset-password`, `verify/:id`, `unlock`, `first-register`, `init`), dazu `GET /api/access`. Ein Plugin fügt Endpunkte hinzu (`payload-totp`: `setup-totp`, `remove-totp`, `totp-attempts`). Jede neue Collection oder jedes Plugin ändert die Zahl, der Test muss das sichtbar machen.
+2. **Payload-Endpunkte aus der aufgelösten Konfiguration** (`payload.config.endpoints` und `collection.endpoints`, Skript `inv.ts`): **ca. 163 Endpunkte** bei 10 Collections (126 im Prüfgerüst unten mit 8 Collections) (6 eigene, 4 interne `payload-kv`, `payload-locked-documents`, `payload-preferences`, `payload-jobs`). Je Collection 12 Zeilen (`find`, `count`, `findByID`, `create`, `update`, `delete`, Versionen, `docAccess`, `duplicate`), je Auth-Collection 10 weitere (`login`, `logout`, `me`, `refresh-token`, `forgot-password`, `reset-password`, `verify/:id`, `unlock`, `first-register`, `init`), dazu `GET /api/access`. Ein Plugin fügt Endpunkte hinzu (`payload-totp`: `setup-totp`, `remove-totp`, `totp-attempts`). Jede neue Collection oder jedes Plugin ändert die Zahl, der Test muss das sichtbar machen.
 3. **HTTP-Probe** aller Pfade aus 1 und 2 ohne Anmeldung gegen den laufenden Dienst: erlaubt sind nur 200 für die Positivliste (Anmeldeseite, `health/ready`, Betreiber-Login), 401 für `/svc/v1` ohne Signatur oder Token, sonst 404.
 
 ### F. Alternative aus O16: Payload-API-Schlüssel mit Zugriffsfunktionen
@@ -284,6 +284,28 @@ Summe nachgerechnet: untere Werte 5+1+8+8+10+3+6+4+8+4+5+5+3+7 = 77, obere 8+2+1
 7. **Migration mit Hook-Umgehung** (`db.create`): schnell, aber ohne Validierung. Ein Fehler in der Migration erzeugt Konten, die die Hooks nie gesehen haben.
 8. **Datenbankversion:** getestet nur mit Postgres 18, das Repo (CI) nutzt 17; CNPG-Version in Prod ist nicht bekannt. Risiko gering, Prüfung in #204 mit `postgres:17` der CI.
 
+## Abweichungen von der ADR (Stand der Nacharbeit)
+
+Der erste Bericht zu diesem Spike nannte nur eine Stelle (Schicht 4, GraphQL). Die folgende Liste ist vollständig; die Stellen sind im [ADR](0001-payload-cms.md) korrigiert oder mit dem Spike-Ergebnis ergänzt. Die Beschlüsse vom 09.11. bleiben unverändert.
+
+| # | ADR-Stelle | Aussage der ADR | Befund des Spikes | Korrektur |
+|---|---|---|---|---|
+| 1 | Abschnitt 3, Schicht 4 | „GraphQL aus, kein Playground“ | `graphQL.disable` allein sperrt den Playground nicht (200 ohne Anmeldung) | Route-Dateien `api/graphql` und `api/graphql-playground` löschen |
+| 2 | Abschnitt 3, Schicht 4 | Standard-Endpunkte von `users` „abgeschaltet oder verweigert“ | Sie bleiben registriert (126 Endpunkte im Prüfgerüst, ca. 163 im ersten Prototyp); verweigert per Zugriffsfunktion, ohne Wächter antwortet `/api` mit 401/403 statt 404 | Wächter vor `/api`, Inventar-Test |
+| 3 | Abschnitt 3, Dienst-Authentisierung | Wiederholschutz über die Nonce | Ein Speicher je Prozess genügt bei mehreren Replikas nicht | geteilter Nonce-Speicher (z. B. CMS-Datenbank) |
+| 4 | Abschnitt 3, Option T | „Anfragen je Zeit begrenzt“ als gegeben | Payload hat kein Rate-Limit; `minRequestInterval` gilt nur mit Mailversand | Rate-Limit im Handler, bei Replikas geteilter Zähler |
+| 5 | Abschnitt 3, Endpunkt `auth/login` | Zähler je Konto im CMS | Die native Sperre meldet „gesperrt“ anders als „falsch“ und verrät das Konto | Handler bildet beides auf dieselbe 401-Antwort ab |
+| 6 | Abschnitt 8, Link | „im CMS nur als Hash gespeichert“ | Payload speichert Reset- und Verifizierungs-Token im Klartext; der Verifizierungs-Token hat keinen Ablauf | eigene Token-Collection mit Hash, Zweck, Ablauf |
+| 7 | Abschnitt 8, Punkt 1 | Konten ohne Passwort anlegen | `payload.create` verweigert das | Import über `payload.db.create` (ohne Hooks) oder Zufallspasswort |
+| 8 | Abschnitt 8, Passwort-Regel | Regel „wie heute“ (implizit überall wirksam) | `beforeValidate` greift beim Reset nicht; ein schwaches Passwort wurde angenommen | zusätzlich `beforeOperation`-Hook für `resetPassword` |
+| 9 | Abschnitt 3, Betreiber / O9 | zweiter Faktor Pflicht | Payload hat keinen nativen zweiten Faktor | Community-Plugin oder Eigenbau, Oberfläche ungeprüft |
+| 10 | A2 | Benutzer-ID 1:1 (dieselbe UUID) | `idType: 'uuid'` allein ignoriert die mitgegebene ID | eigenes Feld `id` (Text) in der CMS-Collection |
+| 11 | Abschnitt 6, Missbrauchsschutz | „eindeutiger Index“ | Payload erzeugt keinen partiellen Index | Roh-SQL-Migration, Rennen-Test |
+| 12 | Kontext, Spike; Abschnitt 2 | „das Repo erlaubt `node >=22 <23`“; Laufzeit offen | `.nvmrc` 22.22.2 liegt unter Payloads Engine `^22.23.4 \|\| >=24.22.1` | Node ≥ 22.23.4, Image auf Node; Aufgabe für #204 |
+| 13 | Abschnitt 11 | „Nicht eingerechnet: CMS-Image auf Node“; Summe 70 bis 109 | Node-Image ist nötig | eingerechnet, Summe 77 bis 122 |
+
+Bestätigt ohne Abweichung: Next 16.4.2 passt (Peer `>=16.3.3 <17`); `/svc/v1` als eigene Routen neben `/api`; Option T und Annahme A6 (mit den Ergänzungen 1, 3, 4); Sperre, Reset-Token (zurückgeben, 14 Tage, einmalig), Sitzungswiderruf, Hash-Stärke; PKCE und Sitzungen bleiben in der App (A1).
+
 ## Was der Spike nicht belegt
 
 - Produktions-Build und -Start (Node und Bun), Speicherbedarf des Builds.
@@ -291,3 +313,599 @@ Summe nachgerechnet: untere Werte 5+1+8+8+10+3+6+4+8+4+5+5+3+7 = 77, obere 8+2+1
 - `disablePlaygroundInProduction`; `jobs.autoRun` mit mehreren Replikas; API-Schlüssel über HTTP.
 - Mesh, Ingress, NetworkPolicy (O15), Medien-S3, Mails, Last.
 - Passwort-Mails, Wartelisten-Konten, Testzeitraum, DSGVO-Abläufe: bewusst nicht Teil des Spikes.
+
+## Wiederholung ohne den Pod des coders
+
+Alle Dateien des Prototyps, die die Tabellen oben belegen, stehen unten als Codeblöcke (Prüfskripte und das nötige Gerüst, kein Produktivcode, ca. 400 Zeilen; Zusatzprüfungen zu API-Schlüssel, Job-Queue, TOTP-Plugin, Migrationen und `id` sind nicht enthalten und aus den Befehlen im Text einzeln nachzustellen). Es gibt keine Zugangsdaten: Das Postgres ist ein Wegwerf-Container oder ein npm-Postgres, alle Werte in `.env` sind Dummywerte.
+
+**Voraussetzungen:** Node ≥ 22.23.4 (z. B. `npx -p node@22.23.4 node -v`), npm, Python 3, entweder Docker oder die Option „npm-Postgres“, Port 55439 und 3939 frei, ca. 1,5 GB Speicher für `next dev`, nur lokal, nichts davon im Repo ausführen: ein leeres Verzeichnis außerhalb des Checkouts verwenden.
+
+```bash
+export REPO=/pfad/zum/BloomMD-checkout           # enthält docs/adr/0001-payload-spike.md
+mkdir -p /tmp/spike && cd /tmp/spike
+
+# 1. Postgres mit Docker (Datenbank „cms“, Benutzer/Passwort „spike“); ohne Docker: Schritt 3b
+docker run -d --name spike-pg -e POSTGRES_USER=spike -e POSTGRES_PASSWORD=spike -e POSTGRES_DB=cms -p 55439:5432 postgres:17-alpine
+
+# 2. Vorlage erzeugen (Payload 3.93.0), Abhängigkeiten auf die des Repos stellen
+npx --yes create-payload-app@3.93.0 -n proto -t blank --db postgres \
+  --db-connection-string postgres://spike:spike@127.0.0.1:55439/cms --no-deps --no-agent --no-git
+cd proto
+node -e 'const p=require("./package.json");p.dependencies.next="16.4.2";p.dependencies.react="^19.2.8";p.dependencies["react-dom"]="^19.2.8";delete p.dependencies.sharp;for(const k of Object.keys(p.devDependencies))if(!/types|typescript|tsx/.test(k))delete p.devDependencies[k];delete p.pnpm;require("fs").writeFileSync("package.json",JSON.stringify(p,null,2))'
+rm -rf "src/app/(frontend)" src/app/my-route src/collections/Media.ts tests vitest* playwright.config.ts eslint.config.mjs Dockerfile docker-compose.yml \
+  "src/app/(payload)/api/graphql" "src/app/(payload)/api/graphql-playground"
+
+# 3. Dateien aus diesem Dokument schreiben (Blöcke „Datei `…`“)
+python3 -I - "$REPO/docs/adr/0001-payload-spike.md" . <<'PY'
+import re, sys, pathlib
+text = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'); out = pathlib.Path(sys.argv[2])
+for m in re.finditer(r"\*\*Datei `([^`]+)`\*\*\n\n```\w*\n(.*?)\n```", text, re.S):
+    f = out / m.group(1); f.parent.mkdir(parents=True, exist_ok=True); f.write_text(m.group(2) + "\n", encoding='utf-8'); print("geschrieben", m.group(1))
+PY
+
+# 3b. nur ohne Docker: echtes Postgres 18 aus npm (das Skript hydrate-symlinks.js legt nur Symlinks an)
+(cd pg && npm init -y >/dev/null && npm i embedded-postgres && node node_modules/@embedded-postgres/linux-x64/scripts/hydrate-symlinks.js   && (nohup node start.mjs > pg.log 2>&1 &) && sleep 20 && tail -1 pg.log)      # „READY“
+
+# 4. installieren (npm; mit `bun install` geht es ebenfalls)
+npm install --no-audit --no-fund
+```
+
+**O14 (Auth, Local API gegen Postgres), Ausgabe 38 Zeilen `[1a …]` bis `[8 …]` (im Doku-Lauf mit Node 22.23.4 und frischer Datenbank bestätigt):**
+
+```bash
+NODE_OPTIONS=--no-deprecation npx payload run scripts/o14.ts < /dev/null 2>&1 | grep -E '^\[[0-9]'
+```
+
+Erwartet (Auszug; Zeiten, IDs und welche der gleichzeitigen Bestätigungen gewinnt, wechseln): `1a OK`, `1b FEHLER`, `1c FEHLER`, `1e` Präfix `pbkdf2-sha256-v1:`, `2b FEHLER … locked`, `2e OK`, `3b gleichKlartext:true, laufzeitTage:"14.00"`, `3d FEHLER`, `3e OK`, `3f FEHLER`, `4b` ohne Ablauf-Spalte, `5a lebensdauerTage:"30.0"`, `5d`/`5e user:null`, `6c` genau ein `OK`, `6d n:1`, `7a FEHLER`, `7b OK`, `7c FEHLER`. Ohne den `beforeOperation`-Hook in `Users.ts` (Block entfernen) wird `3d` zu `OK`: das ist die Abweichung 8.
+
+**O16 (HTTP gegen den Dev-Server):**
+
+```bash
+NODE_OPTIONS=--no-deprecation npx payload run scripts/seed.ts < /dev/null      # Betreiber, Lese-Token, drei Beiträge
+NODE_OPTIONS="--no-deprecation --max-old-space-size=1800" npx next dev -p 3939 &   # warten bis „Ready“
+curl -s -o /dev/null -w '%{http_code}\n' localhost:3939/svc/v1/health/ready        # 200, kompiliert beim ersten Aufruf (dauert)
+node scripts/o16.mjs                                                           # Abschnitte A bis E
+NODE_OPTIONS=--no-deprecation npx payload run scripts/inv.ts < /dev/null 2>&1 | grep -c -E '^(GET|POST|PATCH|PUT|DELETE) '   # Zahl der Payload-Endpunkte (**126** mit diesem Gerüst: 5 eigene und 3 interne Collections; der erste Prototyp mit zusätzlichem API-Schlüssel-Konto und Job-Queue kam auf ca. 163)
+```
+
+Erwartet: Abschnitt A `401, 401, 401, 401`, Nonce-Wiederholung `200` dann `401`; B `201`, Token (40 Zeichen), `redeem` schwaches Passwort `400`, gutes `200`, zweites Mal `400`, Login `200`, dann `429`; C `401, 401, 200 (nur „Veröffentlicht“, kein Entwurf), 200, 404, 404, 404`, `/admin` `200`; D: alle `/api/*` ohne Anmeldung `404` außer `GET /api/operators/me` `200` und `POST /api/operators/login` `400`; GraphQL und Playground `404`; E mit Betreiber-Cookie `200` (auch `/api/posts`, im Gerüst für Betreiber freigegeben). Zum Beleg der Abweichung 1 (so geprüft: `200` mit Datei, `404` ohne): die Datei der Vorlage anlegen, `graphQL.disable: true` bleibt gesetzt, dann `GET /api/graphql-playground` abfragen und die Datei wieder löschen:
+
+```bash
+mkdir -p "src/app/(payload)/api/graphql-playground" && cat > "src/app/(payload)/api/graphql-playground/route.ts" <<'EOF'
+import config from '@payload-config'
+import '@payloadcms/next/css'
+import { GRAPHQL_PLAYGROUND_GET } from '@payloadcms/next/routes'
+export const GET = GRAPHQL_PLAYGROUND_GET(config)
+EOF
+sleep 4; curl -s -o /dev/null -w '%{http_code}\n' localhost:3939/api/graphql-playground   # 200
+rm -rf "src/app/(payload)/api/graphql-playground"; sleep 4; curl -s -o /dev/null -w '%{http_code}\n' localhost:3939/api/graphql-playground   # 404
+```
+
+**Aufräumen:** `kill %1` (Dev-Server), `docker rm -f spike-pg` bzw. das npm-Postgres beenden, `rm -rf /tmp/spike`.
+
+**Datei `pg/start.mjs`**
+
+```js
+import EmbeddedPostgres from "embedded-postgres";
+import { existsSync } from "node:fs";
+const pg = new EmbeddedPostgres({ databaseDir: "./pgdata", user: "spike", password: "spike", port: 55439, persistent: true });
+if (!existsSync("./pgdata/PG_VERSION")) await pg.initialise();
+await pg.start();
+await pg.createDatabase("cms").catch((e) => console.log("createDatabase:", e.message));
+console.log("READY");
+setInterval(() => {}, 1 << 30);
+```
+
+### Dateien des Prototyps (Wegwerfcode, Prüfgerüst)
+
+Zusammenhang: `payload.config.ts` bindet die Collections, `shared.ts` und `svc.ts` sind Hilfen (Passwort-Regel, kanonische Adresse, HMAC-Prüfung, Zähler), `src/app/svc/v1/**` sind die Routen aus Abschnitt 3, `(payload)/api/[...slug]/route.ts` ist der Wächter aus 3 D, `scripts/` sind die Prüfläufe.
+
+**Datei `.env`**
+
+```
+DATABASE_URL=postgres://spike:spike@127.0.0.1:55439/cms
+PAYLOAD_SECRET=spike-secret-not-real-0123456789abcdef
+SVC_APP_KEY=spike-app-hmac-key-not-real
+```
+
+**Datei `src/payload.config.ts`**
+
+```ts
+import { postgresAdapter } from '@payloadcms/db-postgres'
+import path from 'path'
+import { buildConfig } from 'payload'
+import { fileURLToPath } from 'url'
+import { Users } from './collections/Users'
+import { Operators } from './collections/Operators'
+import { Posts, ReadTokens, MobileAuthCodes } from './collections/Posts'
+
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+
+export default buildConfig({
+  admin: { user: Operators.slug, importMap: { baseDir: path.resolve(dirname) } },
+  collections: [Operators, Users, Posts, ReadTokens, MobileAuthCodes],
+  secret: process.env.PAYLOAD_SECRET || '',
+  graphQL: { disable: true, disablePlaygroundInProduction: true },
+  typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
+  db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URL || '' }, push: true }),
+  cors: [],
+  csrf: ['http://localhost:3939'],
+  auth: { passwordHashIterations: 600000 } as never,
+})
+```
+
+**Datei `src/lib/shared.ts`**
+
+```ts
+import crypto from 'node:crypto'
+export const sha256 = (v: string) => crypto.createHash('sha256').update(v).digest('hex')
+export function canonicalEmail(email: string): string {
+  const n = email.trim().toLowerCase(); const at = n.lastIndexOf('@'); if (at < 0) return n
+  const local = n.slice(0, at); const domain = n.slice(at + 1)
+  const gmail = domain === 'gmail.com' || domain === 'googlemail.com'
+  let s = local.split('+')[0]!; if (gmail) s = s.replaceAll('.', '')
+  return `${s || local}@${gmail ? 'gmail.com' : domain}`
+}
+// same rule as apps/app/src/lib/passwordAuth.ts
+export function passwordRuleError(p: string): string | null {
+  if (p.length < 10) return 'Das Passwort muss mindestens 10 Zeichen lang sein.'
+  if (!/[a-z]/i.test(p) || !/[0-9]/.test(p)) return 'Das Passwort muss Buchstaben und Zahlen enthalten.'
+  return null
+}
+export const pkceChallenge = (verifier: string) => crypto.createHash('sha256').update(verifier).digest('base64url')
+// HMAC call signature (ADR 3): method, path, body hash, timestamp, nonce
+export function sign(key: string, m: string, path: string, body: string, ts: string, nonce: string) {
+  return crypto.createHmac('sha256', key).update([m, path, sha256(body), ts, nonce].join('\n')).digest('hex')
+}
+const seenNonces = new Map<string, number>()
+export function verifySignature(key: string, req: { method: string; path: string; body: string; headers: Headers }): boolean {
+  const sig = req.headers.get('x-svc-signature'); const ts = req.headers.get('x-svc-timestamp'); const nonce = req.headers.get('x-svc-nonce')
+  if (!sig || !ts || !nonce) return false
+  if (Math.abs(Date.now() - Number(ts)) > 60_000) return false
+  const exp = sign(key, req.method, req.path, req.body, ts, nonce)
+  const a = Buffer.from(sig), b = Buffer.from(exp)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false
+  if (seenNonces.has(nonce)) return false
+  seenNonces.set(nonce, Date.now()); for (const [k, t] of seenNonces) if (Date.now() - t > 120_000) seenNonces.delete(k)
+  return true
+}
+// minimal in-process fixed-window limiter (handler-level, ADR: app keeps bloom_rate_limits)
+const buckets = new Map<string, { n: number; exp: number }>()
+export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now(); const b = buckets.get(key)
+  if (!b || b.exp < now) { buckets.set(key, { n: 1, exp: now + windowMs }); return true }
+  b.n++; return b.n <= limit
+}
+```
+
+**Datei `src/lib/svc.ts`**
+
+```ts
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { rateLimit, sha256, verifySignature } from './shared'
+export const json = (b: unknown, status = 200) => Response.json(b, { status, headers: { 'cache-control': 'no-store' } })
+export const getP = () => getPayload({ config })
+export async function signed(req: Request): Promise<{ body: any } | Response> {
+  const text = await req.text()
+  const ok = verifySignature(process.env.SVC_APP_KEY!, { method: req.method, path: new URL(req.url).pathname, body: text, headers: req.headers })
+  if (!ok) return json({ error: 'unauthorized' }, 401)
+  try { return { body: text ? JSON.parse(text) : {} } } catch { return json({ error: 'bad json' }, 400) }
+}
+export { rateLimit, sha256 }
+```
+
+**Datei `src/collections/Users.ts`**
+
+```ts
+import { ValidationError, type CollectionConfig } from 'payload'
+import { canonicalEmail, passwordRuleError } from '../lib/shared'
+
+const isOp = ({ req }: { req: { user?: { collection?: string } | null } }) => req.user?.collection === 'operators'
+// End users (platform identity). No REST access for anyone; the service layer uses the Local API.
+export const Users: CollectionConfig = {
+  slug: 'users',
+  admin: { useAsTitle: 'email' },
+  auth: {
+    tokenExpiration: 60 * 60 * 24 * 30,        // JWT/session lifetime (30 d like the app cookie)
+    maxLoginAttempts: 5,                        // lock after 5 wrong passwords
+    lockTime: 15 * 60 * 1000,                   // 15 min
+    forgotPassword: { expiration: 14 * 24 * 3600 * 1000 }, // 14 days (ADR 8)
+    verify: true,                               // generates _verificationToken
+    useSessions: true,
+  },
+  access: { read: isOp as never, create: isOp as never, update: isOp as never, delete: isOp as never, unlock: isOp as never },
+  fields: [
+    { name: 'emailCanonical', type: 'text', index: true, admin: { readOnly: true } },
+    { name: 'emailVerifiedAt', type: 'date' },
+    { name: 'trialGuarded', type: 'checkbox', defaultValue: true },
+    { name: 'status', type: 'select', defaultValue: 'active', options: ['active', 'deletion_requested'] },
+    { name: 'sessionsValidAfter', type: 'date' },
+  ],
+  hooks: {
+    beforeOperation: [
+      ({ args, operation }) => {
+        if (operation === 'resetPassword') {
+          const pw = (args as { data?: { password?: string } }).data?.password
+          const err = typeof pw === 'string' ? passwordRuleError(pw) : 'Passwort fehlt'
+          if (err) throw new ValidationError({ errors: [{ message: err, path: 'password' }] })
+        }
+        return args
+      },
+    ],
+    beforeValidate: [
+      ({ data, operation }) => {
+        if (!data) return data
+        if (typeof data.password === 'string') {
+          const err = passwordRuleError(data.password)
+          if (err) throw new ValidationError({ errors: [{ message: err, path: 'password' }] })
+        }
+        if (typeof data.email === 'string') data.emailCanonical = canonicalEmail(data.email)
+        return data
+      },
+    ],
+  },
+}
+```
+
+**Datei `src/collections/Operators.ts`**
+
+```ts
+import type { CollectionConfig } from 'payload'
+export const Operators: CollectionConfig = {
+  slug: 'operators',
+  admin: { useAsTitle: 'email' },
+  auth: { tokenExpiration: 60 * 60 * 8, maxLoginAttempts: 5, lockTime: 15 * 60 * 1000 },
+  fields: [{ name: 'role', type: 'select', defaultValue: 'admin', options: ['admin', 'support', 'editor'] }],
+  access: {
+    read: ({ req }) => req.user?.collection === 'operators',
+    create: ({ req }) => req.user?.collection === 'operators',
+    update: ({ req }) => req.user?.collection === 'operators',
+    delete: ({ req }) => req.user?.collection === 'operators',
+  },
+}
+```
+
+**Datei `src/collections/Posts.ts`**
+
+```ts
+import type { CollectionConfig } from 'payload'
+const op = ({ req }: { req: { user?: { collection?: string } | null } }) => req.user?.collection === 'operators'
+export const Posts: CollectionConfig = {
+  slug: 'posts',
+  admin: { useAsTitle: 'title' },
+  versions: { drafts: true },
+  access: { read: op as never, create: op as never, update: op as never, delete: op as never },
+  fields: [{ name: 'kind', type: 'select', options: ['blog', 'news'], required: true }, { name: 'locale', type: 'select', options: ['de', 'en'], required: true }, { name: 'title', type: 'text', required: true }, { name: 'body', type: 'textarea' }],
+}
+export const ReadTokens: CollectionConfig = {
+  slug: 'read-tokens',
+  access: { read: () => false, create: op as never, update: op as never, delete: op as never },
+  fields: [{ name: 'hash', type: 'text', required: true, unique: true }, { name: 'label', type: 'text' }, { name: 'uses', type: 'number', defaultValue: 0 }],
+}
+export const MobileAuthCodes: CollectionConfig = {
+  slug: 'mobile-auth-codes',
+  access: { read: () => false, create: () => false, update: () => false, delete: () => false },
+  fields: [{ name: 'codeHash', type: 'text', unique: true, required: true }, { name: 'challenge', type: 'text', required: true }, { name: 'stateHash', type: 'text', required: true }, { name: 'userId', type: 'text', required: true }, { name: 'expiresAt', type: 'date', required: true }, { name: 'usedAt', type: 'date' }],
+}
+```
+
+**Datei `src/app/(payload)/api/[...slug]/route.ts`**
+
+```ts
+import config from '@payload-config'
+import '@payloadcms/next/css'
+import { REST_DELETE, REST_GET, REST_OPTIONS, REST_PATCH, REST_POST, REST_PUT } from '@payloadcms/next/routes'
+import { getPayload } from 'payload'
+
+// Guard: /api only answers for a signed-in operator (admin UI), plus the operator login endpoints.
+const OPEN = /^\/api\/operators\/(login|logout|me|refresh-token|init|first-register|forgot-password|reset-password)$/
+async function guard(req: Request): Promise<Response | null> {
+  const path = new URL(req.url).pathname
+  if (OPEN.test(path)) return null
+  const p = await getPayload({ config })
+  const { user } = await p.auth({ headers: req.headers })
+  return user?.collection === 'operators' ? null : new Response('Not Found', { status: 404 })
+}
+type Ctx = { params: Promise<{ slug: string[] }> }
+const wrap = (h: (c: typeof config) => (r: Request, c: Ctx) => Promise<Response>) => async (req: Request, ctx: Ctx) => (await guard(req)) ?? h(config)(req, ctx)
+export const GET = wrap(REST_GET as never)
+export const POST = wrap(REST_POST as never)
+export const DELETE = wrap(REST_DELETE as never)
+export const PATCH = wrap(REST_PATCH as never)
+export const PUT = wrap(REST_PUT as never)
+export const OPTIONS = REST_OPTIONS(config)
+```
+
+**Datei `src/app/svc/v1/health/ready/route.ts`**
+
+```ts
+import { getP, json } from '@/lib/svc'
+export async function GET() { const p = await getP(); await p.count({ collection: 'users' }); return json({ ready: true }) }
+```
+
+**Datei `src/app/svc/v1/auth/login/route.ts`**
+
+```ts
+import { getP, json, rateLimit, signed } from '@/lib/svc'
+export async function POST(req: Request) {
+  const s = await signed(req); if (s instanceof Response) return s
+  const { email, password } = s.body as { email: string; password: string }
+  if (!rateLimit(`login:${String(email).toLowerCase()}`, 10, 15 * 60_000)) return json({ error: 'rate_limited' }, 429)
+  const p = await getP()
+  try {
+    const r = await p.login({ collection: 'users', data: { email, password } })
+    return json({ userId: r.user.id, status: (r.user as any).status, sessionsValidAfter: (r.user as any).sessionsValidAfter ?? null })
+  } catch { return json({ error: 'invalid_credentials' }, 401) }
+}
+```
+
+**Datei `src/app/svc/v1/password-resets/route.ts`**
+
+```ts
+import { getP, json, rateLimit, signed } from '@/lib/svc'
+export async function POST(req: Request) {
+  const s = await signed(req); if (s instanceof Response) return s
+  const { email } = s.body as { email: string }
+  if (!rateLimit(`reset:${String(email).toLowerCase()}`, 3, 60 * 60_000)) return json({ error: 'rate_limited' }, 429)
+  const p = await getP()
+  const token = await p.forgotPassword({ collection: 'users', data: { email }, disableEmail: true })
+  return json({ accepted: true, token: token ?? null })
+}
+```
+
+**Datei `src/app/svc/v1/tokens/redeem/route.ts`**
+
+```ts
+import { getP, json, signed } from '@/lib/svc'
+export async function POST(req: Request) {
+  const s = await signed(req); if (s instanceof Response) return s
+  const { token, password } = s.body as { token: string; password: string }
+  const p = await getP()
+  try { await p.resetPassword({ collection: 'users', data: { token, password }, overrideAccess: true }); return json({ ok: true }) }
+  catch (e) { return json({ error: 'invalid_token_or_password', detail: (e as Error).message }, 400) }
+}
+```
+
+**Datei `src/app/svc/v1/content/[kind]/route.ts`**
+
+```ts
+import { getP, json, rateLimit, sha256 } from '@/lib/svc'
+export async function GET(req: Request, ctx: { params: Promise<{ kind: string }> }) {
+  const { kind } = await ctx.params
+  if (kind !== 'blog' && kind !== 'news') return json({ error: 'not_found' }, 404)
+  const auth = req.headers.get('authorization') ?? ''
+  const tok = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+  if (!tok || !rateLimit('read:' + sha256(tok).slice(0, 8), 600, 60_000)) return json({ error: 'unauthorized' }, 401)
+  const p = await getP()
+  const f = await p.find({ collection: 'read-tokens', where: { hash: { equals: sha256(tok) } }, limit: 1, overrideAccess: true })
+  if (!f.docs[0]) return json({ error: 'unauthorized' }, 401)
+  await p.update({ collection: 'read-tokens', id: f.docs[0].id, data: { uses: ((f.docs[0] as any).uses ?? 0) + 1 }, overrideAccess: true })
+  const posts = await p.find({ collection: 'posts', where: { and: [{ kind: { equals: kind } }, { _status: { equals: 'published' } }] }, overrideAccess: true, draft: false, limit: 50 })
+  return json({ items: posts.docs.map((d: any) => ({ id: d.id, title: d.title, locale: d.locale, body: d.body })) })
+}
+```
+
+**Datei `scripts/seed.ts`**
+
+```ts
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+import { sha256 } from '../src/lib/shared'
+const p = await getPayload({ config })
+const ex = await p.find({ collection: 'operators', where: { email: { equals: 'admin@example.test' } }, limit: 1 })
+if (!ex.docs[0]) await p.create({ collection: 'operators', data: { email: 'admin@example.test', password: 'Operator-Pass-123', role: 'admin' } })
+const t = await p.find({ collection: 'read-tokens', where: { hash: { equals: sha256('spike-read-token-0123456789') } }, limit: 1 })
+if (!t.docs[0]) await p.create({ collection: 'read-tokens', data: { hash: sha256('spike-read-token-0123456789'), label: 'marketing' } })
+const n = await p.count({ collection: 'posts' })
+if (!n.totalDocs) {
+  await p.create({ collection: 'posts', data: { kind: 'blog', locale: 'de', title: 'Veröffentlicht', body: 'x', _status: 'published' } })
+  await p.create({ collection: 'posts', data: { kind: 'blog', locale: 'de', title: 'Entwurf', body: 'geheim', _status: 'draft' } })
+  await p.create({ collection: 'posts', data: { kind: 'news', locale: 'en', title: 'News live', body: 'y', _status: 'published' } })
+}
+console.log('seeded'); process.exit(0)
+```
+
+**Datei `scripts/o14.ts`**
+
+```ts
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+import pg from 'pg'
+import crypto from 'node:crypto'
+import { pkceChallenge, sha256 } from '../src/lib/shared'
+
+const out = (k: string, v: unknown) => console.log(`[${k}] ${typeof v === 'string' ? v : JSON.stringify(v)}`)
+const msg = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/\s+/g, ' ').slice(0, 160)
+const run = Date.now().toString(36)
+const payload = await getPayload({ config })
+const db = new pg.Client({ connectionString: process.env.DATABASE_URL }); await db.connect()
+const q = async (s: string, p: unknown[] = []) => (await db.query(s, p)).rows
+const GOOD = 'Sup3rGeheim123'
+const mk = (n: string) => `${n}${run}@example.test`
+const attempt = async (f: () => Promise<unknown>) => { try { await f(); return 'OK' } catch (e) { return 'FEHLER: ' + msg(e) } }
+
+// ---- 1 Passwort-Regel
+out('1a regel ohne hook (operators, Payload-Standard) "abc"', await attempt(() => payload.create({ collection: 'operators', data: { email: mk('op0'), password: 'abc', role: 'admin' } })))
+out('1b users "kurz1" (<10)', await attempt(() => payload.create({ collection: 'users', data: { email: mk('p1'), password: 'kurz1' }, disableVerificationEmail: true })))
+out('1c users "nurbuchstaben" (keine Zahl)', await attempt(() => payload.create({ collection: 'users', data: { email: mk('p2'), password: 'nurbuchstaben' }, disableVerificationEmail: true })))
+out('1d users GOOD', await attempt(() => payload.create({ collection: 'users', data: { email: mk('p3'), password: GOOD }, disableVerificationEmail: true })))
+const h = await q('select hash, salt from users where email=$1', [mk('p3')])
+out('1e hash-Format', { prefix: h[0].hash.slice(0, 24), hashHexLen: h[0].hash.length, saltHexLen: h[0].salt.length })
+
+// ---- 2 Sperre
+const u = mk('lock'); await payload.create({ collection: 'users', data: { email: u, password: GOOD }, disableVerificationEmail: true })
+const res: string[] = []
+for (let i = 1; i <= 5; i++) res.push(await attempt(() => payload.login({ collection: 'users', data: { email: u, password: 'falsch12345' } })))
+out('2a 5 Fehlversuche', [...new Set(res)])
+out('2b 6. Versuch mit RICHTIGEM Passwort', await attempt(() => payload.login({ collection: 'users', data: { email: u, password: GOOD } })))
+out('2c unbekanntes Konto', await attempt(() => payload.login({ collection: 'users', data: { email: mk('gibtsnicht'), password: GOOD } })))
+out('2d lock_until/login_attempts', await q('select login_attempts, lock_until from users where email=$1', [u]))
+await q("update users set lock_until = now() - interval '1 minute' where email=$1", [u])
+await q('update users set _verified=true where email=$1',[u])
+out('2e nach Ablauf der Sperre, richtiges Passwort', await attempt(() => payload.login({ collection: 'users', data: { email: u, password: GOOD } })))
+
+// ---- 3 Reset + Einmal-Token
+const r = mk('reset'); await payload.create({ collection: 'users', data: { email: r, password: GOOD }, disableVerificationEmail: true })
+const tok = await payload.forgotPassword({ collection: 'users', data: { email: r }, disableEmail: true })
+out('3a forgotPassword(disableEmail) gibt Token zurück', { type: typeof tok, len: String(tok).length })
+const row = (await q('select reset_password_token, reset_password_expiration from users where email=$1', [r]))[0]
+out('3b Token in der DB', { gleichKlartext: row.reset_password_token === tok, sha256: row.reset_password_token === sha256(String(tok)), laufzeitTage: ((new Date(row.reset_password_expiration).getTime() - Date.now()) / 864e5).toFixed(2) })
+out('3c forgotPassword unbekannte Adresse', await attempt(async () => { const x = await payload.forgotPassword({ collection: 'users', data: { email: mk('nobody') }, disableEmail: true }); out('3c Rückgabe', String(x)) }))
+out('3d resetPassword schwaches PW', await attempt(() => payload.resetPassword({ collection: 'users', data: { token: String(tok), password: 'kurz' }, overrideAccess: true })))
+out('3e resetPassword gutes PW', await attempt(() => payload.resetPassword({ collection: 'users', data: { token: String(tok), password: 'Neu12345678x' }, overrideAccess: true })))
+out('3f zweite Einlösung', await attempt(() => payload.resetPassword({ collection: 'users', data: { token: String(tok), password: 'Nochmal12345x' }, overrideAccess: true })))
+await q("update users set reset_password_expiration = now() - interval '1 second' where email=$1", [r])
+const t2 = await payload.forgotPassword({ collection: 'users', data: { email: r }, disableEmail: true })
+await q("update users set reset_password_expiration = now() - interval '1 second' where email=$1", [r])
+out('3g abgelaufener Token', await attempt(() => payload.resetPassword({ collection: 'users', data: { token: String(t2), password: 'Nochmal12345x' }, overrideAccess: true })))
+const a = await payload.forgotPassword({ collection: 'users', data: { email: r }, disableEmail: true })
+const b = await payload.forgotPassword({ collection: 'users', data: { email: r }, disableEmail: true })
+out('3h 2 Anforderungen direkt hintereinander (disableEmail): kein minRequestInterval', { gleich: a === b })
+
+// ---- 4 Verifizierungs-Token
+const v = mk('verify'); await payload.create({ collection: 'users', data: { email: v, password: GOOD }, disableVerificationEmail: true })
+const vrow = (await q('select _verificationtoken, _verified from users where email=$1', [v]))[0]
+out('4a Verifizierungstoken (Spalten)', Object.keys(vrow).map((k) => k) )
+out('4b Token klar in DB, kein Ablaufdatum', { tokenLen: String(vrow._verificationtoken).length, hatAblaufSpalte: (await q("select column_name from information_schema.columns where table_name='users' and column_name ilike '%verif%'")).map((c: any) => c.column_name) })
+out('4c verifyEmail', await attempt(() => payload.verifyEmail({ collection: 'users', token: vrow._verificationtoken })))
+out('4d verifyEmail zweites Mal', await attempt(() => payload.verifyEmail({ collection: 'users', token: vrow._verificationtoken })))
+
+// ---- 5 Sitzungen / JWT
+const s = mk('sess'); await payload.create({ collection: 'users', data: { email: s, password: GOOD }, disableVerificationEmail: true })
+await q('update users set _verified=true where email=$1', [s])
+const lg = await payload.login({ collection: 'users', data: { email: s, password: GOOD } })
+const claims = JSON.parse(Buffer.from(lg.token!.split('.')[1]!, 'base64url').toString())
+out('5a JWT-Claims', { keys: Object.keys(claims), lebensdauerTage: ((claims.exp - claims.iat) / 86400).toFixed(1) })
+const authOf = async () => (await payload.auth({ headers: new Headers({ Authorization: `JWT ${lg.token}` }) })).user
+out('5b Token gültig', { user: (await authOf())?.email === s })
+out('5c sessions-Zeilen', (await q('select count(*)::int n from users_sessions us join users u on u.id=us._parent_id where u.email=$1', [s]))[0])
+await q('delete from users_sessions where _parent_id=(select id from users where email=$1)', [s])
+out('5d nach Löschen der Session (Widerruf)', { user: (await authOf())?.email ?? null })
+const lg2 = await payload.login({ collection: 'users', data: { email: s, password: GOOD } })
+const tk = await payload.forgotPassword({ collection: 'users', data: { email: s }, disableEmail: true })
+await payload.resetPassword({ collection: 'users', data: { token: String(tk), password: 'Wieder12345xy' }, overrideAccess: true })
+out('5e nach Passwort-Reset: alte Sitzung', { user: (await payload.auth({ headers: new Headers({ Authorization: `JWT ${lg2.token}` }) })).user?.email ?? null })
+
+// ---- 6 Postfach-Index
+await q(`create unique index if not exists users_trial_canonical_idx on users (email_canonical) where email_verified_at is not null and trial_guarded`)
+const dom = `mb${run}.test`
+const mkU = (local: string) => payload.create({ collection: 'users', data: { email: `${local}@${dom}`, password: GOOD }, disableVerificationEmail: true })
+const [x1, x2, x3] = await Promise.all([mkU('max.mustermann'), mkU('max.mustermann+shop'), mkU('Max.Mustermann+b')])
+out('6a kanonische Adresse', (await q('select email, email_canonical from users where id = any($1)', [[x1.id, x2.id, x3.id]])).map((r: any) => r.email_canonical))
+const g1 = await payload.create({ collection: 'users', data: { email: `a.b.c${run}@gmail.com`, password: GOOD }, disableVerificationEmail: true })
+const g2 = await payload.create({ collection: 'users', data: { email: `abc${run}+x@googlemail.com`, password: GOOD }, disableVerificationEmail: true })
+out('6b Gmail', (await q('select email_canonical from users where id = any($1)', [[g1.id, g2.id]])).map((r: any) => r.email_canonical))
+const confirm = (id: number | string) => payload.update({ collection: 'users', id, data: { emailVerifiedAt: new Date().toISOString() }, overrideAccess: true })
+const race = await Promise.allSettled([x1.id, x2.id, x3.id].map(confirm))
+out('6c 3 gleichzeitige Bestätigungen', race.map((x) => (x.status === 'fulfilled' ? 'OK' : 'FEHLER: ' + msg(x.reason))))
+out('6d bestätigt in DB', (await q('select count(*)::int n from users where email_canonical=$1 and email_verified_at is not null', [`max.mustermann@${dom}`]))[0])
+const race2 = await Promise.allSettled([g1.id, g2.id].map(confirm))
+out('6e Gmail-Rennen', race2.map((x) => (x.status === 'fulfilled' ? 'OK' : 'FEHLER')))
+
+// ---- 7 Mobile PKCE (eigener Ablauf, Local API)
+const verifier = crypto.randomBytes(48).toString('base64url'); const challenge = pkceChallenge(verifier)
+const code = 'bloom_mac_' + crypto.randomBytes(32).toString('base64url'); const state = crypto.randomBytes(24).toString('base64url')
+await payload.create({ collection: 'mobile-auth-codes', data: { codeHash: sha256(code), challenge, stateHash: sha256(state), userId: String(x1.id), expiresAt: new Date(Date.now() + 300000).toISOString() }, overrideAccess: true })
+async function redeem(c: string, ver: string, st: string) {
+  const f = await payload.find({ collection: 'mobile-auth-codes', where: { codeHash: { equals: sha256(c) } }, overrideAccess: true, limit: 1 })
+  const d = f.docs[0] as any; if (!d || d.usedAt || new Date(d.expiresAt) < new Date()) throw new Error('code ungültig')
+  if (pkceChallenge(ver) !== d.challenge || sha256(st) !== d.stateHash) throw new Error('PKCE/state falsch')
+  const upd = await db.query('update "mobile_auth_codes" set used_at=now() where id=$1 and used_at is null returning id', [d.id])
+  if (!upd.rowCount) throw new Error('bereits benutzt'); return d.userId
+}
+out('7a falscher Verifier', await attempt(() => redeem(code, crypto.randomBytes(48).toString('base64url'), state)))
+out('7b richtig', await attempt(() => redeem(code, verifier, state)))
+out('7c Wiederholung', await attempt(() => redeem(code, verifier, state)))
+
+// ---- 8 Betreiber: Konten gesperrt? Sperre auch hier
+out('8 operators auth-Felder', (await q("select column_name from information_schema.columns where table_name='operators' order by 1")).map((c: any) => c.column_name).filter((c: string) => /lock|login|reset|hash|salt|session|api|verif/.test(c)))
+await db.end(); process.exit(0)
+```
+
+**Datei `scripts/o16.mjs`**
+
+```js
+import crypto from 'node:crypto'
+const B = 'http://localhost:3939'
+const KEY = 'spike-app-hmac-key-not-real'
+const sha = (v) => crypto.createHash('sha256').update(v).digest('hex')
+const sign = (m, path, body, ts, nonce) => crypto.createHmac('sha256', KEY).update([m, path, sha(body), ts, nonce].join('\n')).digest('hex')
+async function call(method, path, { body, headers = {}, signed } = {}) {
+  const text = body === undefined ? '' : JSON.stringify(body)
+  const h = { ...headers }; if (h.cookie) h.origin = 'http://localhost:3939'
+  if (body !== undefined) h['content-type'] = 'application/json'
+  if (signed) { const ts = String(signed.ts ?? Date.now()), nonce = signed.nonce ?? crypto.randomUUID(); h['x-svc-timestamp'] = ts; h['x-svc-nonce'] = nonce; h['x-svc-signature'] = signed.sig ?? sign(method, path, text, ts, nonce) }
+  const r = await fetch(B + path, { method, headers: h, body: body === undefined ? undefined : text, redirect: 'manual' })
+  const t = await r.text(); return { status: r.status, text: t.slice(0, 110).replace(/\s+/g, ' '), headers: r.headers }
+}
+const row = (label, r) => console.log(`${label.padEnd(58)} -> ${r.status} ${r.text.slice(0, 70)}`)
+const run = Date.now().toString(36)
+const mail = `svc${run}@example.test`
+
+console.log('## A. /svc/v1 neben /api (eigene Routen, Signatur der App)')
+row('GET  /svc/v1/health/ready', await call('GET', '/svc/v1/health/ready'))
+row('POST /svc/v1/auth/login ohne Signatur', await call('POST', '/svc/v1/auth/login', { body: { email: 'a@b.c', password: 'x' } }))
+row('POST /svc/v1/auth/login falsche Signatur', await call('POST', '/svc/v1/auth/login', { body: { email: 'a@b.c', password: 'x' }, signed: { sig: 'ab'.repeat(32) } }))
+row('POST /svc/v1/auth/login Zeitstempel -5 min', await call('POST', '/svc/v1/auth/login', { body: { email: 'a@b.c', password: 'x' }, signed: { ts: Date.now() - 300000 } }))
+const n = crypto.randomUUID()
+row('POST /svc/v1/auth/login signiert, unbekanntes Konto', await call('POST', '/svc/v1/auth/login', { body: { email: 'a@b.c', password: 'x' }, signed: { nonce: n } }))
+const ts = String(Date.now()); const body = { email: 'a@b.c' }
+const r1 = await fetch(B + '/svc/v1/password-resets', { method: 'POST', headers: { 'content-type': 'application/json', 'x-svc-timestamp': ts, 'x-svc-nonce': 'replay-' + run, 'x-svc-signature': sign('POST', '/svc/v1/password-resets', JSON.stringify(body), ts, 'replay-' + run) }, body: JSON.stringify(body) })
+const r2 = await fetch(B + '/svc/v1/password-resets', { method: 'POST', headers: { 'content-type': 'application/json', 'x-svc-timestamp': ts, 'x-svc-nonce': 'replay-' + run, 'x-svc-signature': sign('POST', '/svc/v1/password-resets', JSON.stringify(body), ts, 'replay-' + run) }, body: JSON.stringify(body) })
+console.log(`${'Wiederholung derselben Nonce'.padEnd(58)} -> erster Aufruf ${r1.status}, Wiederholung ${r2.status}`)
+
+console.log('\n## B. Reset-Token zurückgeben, einlösen (App versendet)')
+// legit account created via Local API happens in other script; create via admin op below. Use existing run user from o14? create here through operator session
+const lg = await call('POST', '/api/operators/login', { body: { email: 'admin@example.test', password: 'Operator-Pass-123' } })
+const cookie = (lg.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+console.log(`operator login /api/operators/login -> ${lg.status}, Cookie gesetzt: ${cookie.includes('payload-token')}`)
+const cu = await call('POST', '/api/users', { headers: { cookie }, body: { email: mail, password: 'Sup3rGeheim123' } })
+row('Operator legt Nutzer an (POST /api/users mit Operator-Cookie)', cu)
+const pr = await fetch(B + '/svc/v1/password-resets', { method: 'POST', headers: (() => { const t = String(Date.now()), nn = crypto.randomUUID(); const b = JSON.stringify({ email: mail }); return { 'content-type': 'application/json', 'x-svc-timestamp': t, 'x-svc-nonce': nn, 'x-svc-signature': sign('POST', '/svc/v1/password-resets', b, t, nn) } })(), body: JSON.stringify({ email: mail }) })
+const prj = await pr.json(); console.log(`POST /svc/v1/password-resets -> ${pr.status} accepted=${prj.accepted} tokenLen=${prj.token?.length}`)
+const un = await call('POST', '/svc/v1/password-resets', { body: { email: 'nobody@example.test' }, signed: {} })
+console.log(`POST /svc/v1/password-resets unbekanntes Konto -> ${un.status} ${un.text}`)
+row('redeem schwaches Passwort', await call('POST', '/svc/v1/tokens/redeem', { body: { token: prj.token, password: 'kurz' }, signed: {} }))
+row('redeem gutes Passwort', await call('POST', '/svc/v1/tokens/redeem', { body: { token: prj.token, password: 'Neu12345678x' }, signed: {} }))
+row('redeem zweites Mal', await call('POST', '/svc/v1/tokens/redeem', { body: { token: prj.token, password: 'Neu12345678y' }, signed: {} }))
+// verify the user (verify:true) via operator PATCH then login via svc
+const list = await (await fetch(B + `/api/users?where[email][equals]=${encodeURIComponent(mail)}`, { headers: { cookie, origin: B } })).json()
+const uid = list.docs?.[0]?.id
+row('Operator setzt _verified (PATCH /api/users/:id)', await call('PATCH', '/api/users/' + uid, { headers: { cookie }, body: { _verified: true } }))
+row('POST /svc/v1/auth/login richtig', await call('POST', '/svc/v1/auth/login', { body: { email: mail, password: 'Neu12345678x' }, signed: {} }))
+let last
+for (let i = 0; i < 11; i++) last = await call('POST', '/svc/v1/auth/login', { body: { email: mail, password: 'falsch12345' }, signed: {} })
+row('11 Fehlversuche in Folge, letzter (Handler-Limit 10/15 min)', last)
+
+console.log('\n## C. Lese-Token (Option T) auf /svc/v1/content')
+row('GET /svc/v1/content/blog ohne Token', await call('GET', '/svc/v1/content/blog'))
+row('GET /svc/v1/content/blog falsches Token', await call('GET', '/svc/v1/content/blog', { headers: { authorization: 'Bearer nope' } }))
+const ok = await call('GET', '/svc/v1/content/blog', { headers: { authorization: 'Bearer spike-read-token-0123456789' } })
+console.log(`GET /svc/v1/content/blog gültiges Token -> ${ok.status}`, ok.text)
+row('GET /svc/v1/content/news gültiges Token', await call('GET', '/svc/v1/content/news', { headers: { authorization: 'Bearer spike-read-token-0123456789' } }))
+row('GET /svc/v1/content/users (nicht erlaubte Art)', await call('GET', '/svc/v1/content/users', { headers: { authorization: 'Bearer spike-read-token-0123456789' } }))
+row('Token auf /api/posts (kein Payload-Auth)', await call('GET', '/api/posts', { headers: { authorization: 'Bearer spike-read-token-0123456789' } }))
+row('Token auf /api/users', await call('GET', '/api/users', { headers: { authorization: 'Bearer spike-read-token-0123456789' } }))
+row('Token auf /admin', await call('GET', '/admin', { headers: { authorization: 'Bearer spike-read-token-0123456789' } }))
+
+console.log('\n## D. Pfad-Inventar unauthentifiziert (kein Cookie)')
+const probes = [['GET', '/'], ['GET', '/admin'], ['GET', '/admin/login'], ['GET', '/api'], ['GET', '/api/users'], ['POST', '/api/users/login'], ['POST', '/api/users/forgot-password'], ['POST', '/api/users/first-register'], ['GET', '/api/users/me'], ['GET', '/api/posts'], ['GET', '/api/read-tokens'], ['GET', '/api/access'], ['GET', '/api/payload-preferences/x'], ['GET', '/api/operators'], ['GET', '/api/operators/me'], ['POST', '/api/operators/login'], ['GET', '/api/graphql'], ['POST', '/api/graphql'], ['GET', '/api/graphql-playground'], ['GET', '/api/_openapi'], ['GET', '/api/openapi.json'], ['GET', '/api/globals'], ['GET', '/api/payload-jobs/run'], ['GET', '/robots.txt'], ['GET', '/svc/v1'], ['GET', '/svc/v1/nope'], ['GET', '/my-route']]
+for (const [m, p] of probes) row(`${m} ${p}`, await call(m, p, m === 'POST' ? { body: {} } : {}))
+
+console.log('\n## E. Pfad-Inventar mit Operator-Cookie (Admin-UI braucht /api)')
+for (const [m, p] of [['GET', '/api/users'], ['GET', '/api/posts'], ['GET', '/api/access'], ['GET', '/api/operators/me'], ['GET', '/admin'], ['GET', '/api/graphql-playground']]) row(`${m} ${p}`, await call(m, p, { headers: { cookie } }))
+```
+
+**Datei `scripts/inv.ts`**
+
+```ts
+import { getPayload } from 'payload'
+import config from '../src/payload.config'
+const p = await getPayload({ config })
+const seen = new Set<string>()
+for (const e of p.config.endpoints) seen.add(`${e.method.toUpperCase()} /api${e.path} (global)`)
+for (const c of p.config.collections) for (const e of c.endpoints || []) seen.add(`${e.method.toUpperCase()} /api/${c.slug}${e.path}`)
+console.log([...seen].sort().join('\n')); console.log('n=', seen.size)
+process.exit(0)
+```

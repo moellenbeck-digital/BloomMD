@@ -1,11 +1,11 @@
 # ADR 0001: Payload als getrennte Admin-App für Inhalte, Benutzer und Zugänge
 
-- **Status:** Entwurf, überarbeitet nach der Entscheidung von Martin vom 09.11.2026. Die Entscheidungen Martin (Abschnitt „Entscheidungen Martin 09.11.“) sind beschlossen. Was in „Offene Entscheidungen“ steht, ist offen. Freigabe der ADR und Merge von PR #220 liegen bei Martin und Max. **Spike-Ergebnis vom 10.11.2026** (O12, O14, O16, O17, Version, Laufzeit, Aufwand): [Anhang](0001-payload-spike.md). Die Entscheidungen Martin sind davon nicht berührt.
+- **Status:** **angenommen**, freigegeben von Martin am 10.11.2026, PR #220 (793aa08). Die Entscheidungen Martin (Abschnitte „Entscheidungen Martin 09.11.“ und „Entscheidung Martin 10.11.“) sind beschlossen. Was in „Offene Entscheidungen“ steht, gilt nach der Empfehlung, außer O2, O8, O10 und O15. **Spike-Ergebnis vom 10.11.2026** (O12, O14, O16, O17, Version, Laufzeit, Aufwand): [Anhang](0001-payload-spike.md). Die Entscheidungen Martin sind davon nicht berührt.
 - **Datum:** 2026-11-10 (erste Fassung 2026-11-02, ersetzt die Empfehlung V1 vom 02.11.)
 - **Ticket:** #103 (Epic #196, Teil #203). Folgeschritte: #204 bis #207, neu zuzuschneiden (Abschnitt „Folgeschritte“). Zahlung: #276.
 - **Gilt für:** `apps/marketing`, `apps/app`, `packages/sync`, neuer Dienst `apps/cms`, GitOps-Repo `bloommd-cluster`.
 
-Diese Runde ist nur die ADR. Es gibt keinen Code, kein `apps/cms` und keine Migration. Alles, was hier als „Annahme“ steht, ist nicht beschlossen und steht mit Nummer in „Offene Entscheidungen“.
+Diese Runde ist nur die ADR. Es gibt keinen Code, kein `apps/cms` und keine Migration. Alles, was hier als „Annahme“ steht, steht mit Nummer in „Offene Entscheidungen“ und gilt dort nach der Empfehlung (Ausnahmen siehe dort).
 
 ## Kontext
 
@@ -50,7 +50,7 @@ Die Punkte des Wegwerf-Spikes sind seit dem 10.11.2026 gegen Payload **3.93.0** 
 
 Payload headless läuft als **getrennte Admin-App `apps/cms`** im wave-mesh. Sie führt Inhalte (Blog, News), Benutzer, Zugänge und den Testzeitraum. Zahlungsbezug (letzte Bezahlung, Rückerstattung) kommt mit #276 dazu. `apps/app` fragt Anmeldung und Rechte über eine dedizierte interne Schnittstelle (`/svc/v1`) beim CMS ab. Es gibt keine öffentliche API. Ein Zwischenstand geht nicht nach Prod: Oberfläche und Migration werden gemeinsam umgesetzt, im Testsystem mit pseudonymisiertem Abbild geprüft und erst dann ausgerollt.
 
-Wo die Entscheidung etwas offenlässt, steht es im Abschnitt „Offene Entscheidungen“ und gilt bis dahin als offen.
+Wo die Entscheidung etwas offenlässt, steht es im Abschnitt „Offene Entscheidungen“ und gilt dort nach der Empfehlung. Ausnahmen (O2, O8, O10, O15) bleiben offen.
 
 ## 1. Zweck und Umfang
 
@@ -401,13 +401,23 @@ Stand: **beschlossen** (Kommentar im Ticket #103, 09.11.2026, Brand-Thread). Sie
 | 15 | Aufwand in der ADR neu schätzen | erledigt, Abschnitt 11: 70 bis 109 Personentage (Annahme A8, O17); nach dem Spike vom 10.11.: 77 bis 122 | 11 |
 | 16 | Rollout in Prod nur mit Ops-CoS und Go eines Admins | beschlossen | 9, 10 |
 
+## Entscheidung Martin 10.11.
+
+Stand: **beschlossen** (Kommentar im Ticket #203, 10.11.2026, 09:03 UTC, über den Chief of Staff).
+
+- ADR #220 ist freigegeben und gemergt (PR #220, 793aa08). Die Umsetzung startet jetzt.
+- O1: Die Umsetzung läuft jetzt, keine Zurückstellung.
+- O3 bis O19: Die Empfehlungen der ADR gelten, weil Martin die ADR so freigegeben hat.
+- O2: Die Details (wer zählt als Beta, Start 15.11., Zeitpunkt der Hinweise) werden nach der ADR-Empfehlung ausgearbeitet und im O2-Ticket zur Abnahme vorgelegt. Dort entscheiden Martin und Max.
+- O15 (Mesh, mTLS, Pfadregeln) und O8 (Testabbild) sind Fragen an Ops. Sie gehen über den Chief of Staff und bleiben bis zur Antwort offen.
+
 ## Offene Entscheidungen
 
-Jede Zeile ist eine Entscheidung, die nicht aus dem Beschluss vom 09.11. folgt. Die Empfehlung ist ein Vorschlag, kein Beschluss. „Annahme“ (A1 bis A8) verweist auf eine Stelle im Text, an der diese Entscheidung bis zur Klärung unterstellt ist; jede Annahme hat hier einen Eintrag. „Vorschlag“ im Text meint eine Empfehlung, die ebenfalls hier steht.
+Jede Zeile ist eine Entscheidung, die nicht aus dem Beschluss vom 09.11. folgt. Seit der Entscheidung Martin vom 10.11. ist die Empfehlung die gültige Vorgabe. Ausnahmen sind O2 (Details werden im O2-Ticket zur Abnahme vorgelegt), O15 und O8 (Antwort von Ops steht aus) und O10 (von Admins und Ops festzulegen). „Annahme“ (A1 bis A8) verweist auf eine Stelle im Text, an der diese Entscheidung bis zur Klärung unterstellt ist; jede Annahme hat hier einen Eintrag. „Vorschlag“ im Text meint eine Empfehlung, die ebenfalls hier steht.
 
 | Nr. | Frage | Empfehlung |
 |---|---|---|
-| O1 | **Priorität und Kapazität.** Der Entscheid vom 30.10. gibt den Stufen 1 bis 3 Vorrang vor allem Neuen; der Beschluss vom 09.11. regelt nur die Reihenfolge innerhalb von #103. Läuft #103 hinter, neben oder vor den Stufen 1 bis 3, oder wird #103 bis Stufe 4 ganz zurückgestellt (Alternative A der ersten Fassung: kein Risiko, aber Blog und Anmeldung bleiben, wie sie sind)? Und: Wird Stufe 4 vor dem Cutover beschlossen oder dürfen beide Entscheidungen aneinander vorbeigehen (Risiko Abschnitt 5)? | #204 bis #207 hinter Stufen 1 bis 3 einreihen; Rechte-Grenze mit Stufe 4 vor dem Cutover prüfen |
+| O1 | **Priorität und Kapazität.** Der Entscheid vom 30.10. gibt den Stufen 1 bis 3 Vorrang vor allem Neuen; der Beschluss vom 09.11. regelt nur die Reihenfolge innerhalb von #103. Läuft #103 hinter, neben oder vor den Stufen 1 bis 3, oder wird #103 bis Stufe 4 ganz zurückgestellt (Alternative A der ersten Fassung: kein Risiko, aber Blog und Anmeldung bleiben, wie sie sind)? Und: Wird Stufe 4 vor dem Cutover beschlossen oder dürfen beide Entscheidungen aneinander vorbeigehen (Risiko Abschnitt 5)? | #204 bis #207 hinter Stufen 1 bis 3 einreihen; Rechte-Grenze mit Stufe 4 vor dem Cutover prüfen. **Stand 10.11.:** Umsetzung läuft jetzt, nicht zurückgestellt |
 | O2 | **Beta-Teilnehmer 60 Tage.** Wer zählt als „Teilnehmer der Beta“: alle Bestandskonten (`trial_legacy`, inklusive früherer Wartelisten-Konten)? Bleibt der Start 15.11.2026, damit das Testende 14.01.2027 ist? Wann gehen die Hinweise (30.11. und 08.12. vom 04.11., oder Tag 45 und 53)? Wann wird die Änderung in der App-Datenbank nachgezogen (eigenes Ticket vor dem Cutover, Migration `015`, Texte, Tests; Abschnitt 6)? Wer darf den „anpassbaren“ Standard ändern (globaler Wert im CMS, Überschreibung je Konto durch die Rolle `admin`, mit Audit)? | alle Bestandskonten, Start 15.11.2026, Ende 14.01.2027; Änderung sofort als eigenes Ticket nachziehen; globaler Wert plus Überschreibung je Konto, Audit |
 | O3 | **Abgrenzung der Datenhaltung.** Annahme A1 (Sitzungen, Zugriffs- und Agent-Tokens bleiben in der App-Datenbank, abgeleitet vom Rechte-Stand) und A2 (`bloom_users` bleibt als Referenztabelle ohne personenbezogene Daten für Fremdschlüssel und Kaskaden). | A1 und A2 bestätigen |
 | O4 | **Ausfallverhalten.** Annahme A3 (Cache 60 Sekunden, bei Fehler bis zu 15 Minuten veraltet) und A4 (keine Sperre aus Unwissen, danach nur Lesen und Export). Sind das die gewollten Werte, oder ist sofort fail-closed gewollt? Verfügbarkeitsziel, Zahl der Replikas (Vorschlag: mindestens zwei) und Update-Ziel für Sicherheitsfixes (Vorschlag: 14 Tage) des CMS? | A3 und A4 bestätigen; Verfügbarkeitsziel wie die App |
@@ -429,12 +439,12 @@ Jede Zeile ist eine Entscheidung, die nicht aus dem Beschluss vom 09.11. folgt. 
 
 ## Folgeschritte (nur Verweise, keine Umsetzung)
 
-Die Folgetickets #204 bis #207 sind laut Beschluss neu zuzuschneiden (Epic #196); das tut der architect im Ticket. Vorschlag für den Zuschnitt. „neu-1“ bis „neu-4“ und „Folgeticket O2“ sind Arbeitstitel; die Nummern vergibt der architect.
+Die Folgetickets #204 bis #207 sind laut Beschluss neu zuzuschneiden (Epic #196); das tut der architect im Ticket. Vorschlag für den Zuschnitt. „neu-1“ bis „neu-4“ und „Folgeticket O2“ sind Arbeitstitel; die Nummern vergibt der Chief of Staff.
 
 | Ticket | Titel | Inhalt | Abhängigkeiten | Abnahme |
 |---|---|---|---|---|
 | Folgeticket O2 | Testzeitraum der Bestandskonten auf 60 Tage nachziehen | Migration `015` (Testende 14.01.2027 vorbehaltlich O2), `trial.ts`, `docs/TRIAL.md`, Texte in beiden Apps (DE/EN), Hinweis-Termine, Tests (`trial-period-db`, `trial.test.ts`, `legal-pages`). Unabhängig von Payload | Entscheidung O2; baut auf #274 (Mechanik), #271 (Texte), #215 (Beschluss 04.11.); Beteiligte der Warteliste aus #104/#105; vor dem Cutover und vor dem Stichtag 15.12.2026 | Texte, Mails und Datenstand nennen dieselbe Dauer; `legal-pages-consistency` und Integrationstests grün; kein Versand ohne Admin-Go |
-| #204 | Admin-App `apps/cms` aufsetzen, Spike und Schnittstelle `/svc/v1` | Workspace, Image, Release-Check, Spike der Auth-Strategie und des Lese-Tokens (O14, O16; Ergebnis im Anhang, Rest: Produktions-Build, Inventar-Test als Code, Oberfläche), Node-Image und Anhebung von `.nvmrc` (22.22.2 liegt unter Payloads Engine), Collections (Benutzer, Zugänge, Testzeitraum, Tokens, Betreiber, Blog, News), `/svc/v1` mit OpenAPI und Vertragstests, Secret-Regel in `AGENTS.md` und `production-config.ts`, `ARCHITECTURE.md` | Freigabe der ADR (#203, Martin/Max), O1; Collections bilden #104 (Registrierung, Postfach-Schutz #169), #105 (Wartelisten-Konten) und #274 (Testzeitraum) ab; erster Schritt des Zuschnitts | Inventar-Test und Vertragstests grün, `docs:verify` grün, Spike mit Ergebnis im Ticket (Aufwand O17 erneuert) |
+| #204 | Admin-App `apps/cms` aufsetzen, Spike und Schnittstelle `/svc/v1` | Workspace, Image, Release-Check, Spike der Auth-Strategie und des Lese-Tokens (O14, O16; Ergebnis im Anhang, Rest: Produktions-Build, Inventar-Test als Code, Oberfläche), Node-Image und Anhebung von `.nvmrc` (22.22.2 liegt unter Payloads Engine), Collections (Benutzer, Zugänge, Testzeitraum, Tokens, Betreiber, Blog, News), `/svc/v1` mit OpenAPI und Vertragstests, Secret-Regel in `AGENTS.md` und `production-config.ts`, `ARCHITECTURE.md` | ADR angenommen (Martin, 10.11.2026, PR #220), O1 (Umsetzung läuft); Collections bilden #104 (Registrierung, Postfach-Schutz #169), #105 (Wartelisten-Konten) und #274 (Testzeitraum) ab; erster Schritt des Zuschnitts | Inventar-Test und Vertragstests grün, `docs:verify` grün, Spike mit Ergebnis im Ticket (Aufwand O17 erneuert) |
 | #205 | GitOps für das CMS in `bloommd-cluster` | Deployment, ClusterIP-Service, NetworkPolicy, wave-Ingress, CNPG-Datenbank und Rolle ohne Recht auf die App-Datenbank, Hetzner-S3, External Secrets (Schlüssel, Lese-Token), Monitoring, Testsystem mit Platz für das Abbild | #204 (Image) und Antwort von Ops auf O15; läuft parallel zu #204 und neu-1 | Von außen unerreichbar; aus dem App-Pod nur `/svc/v1`; aus dem Marketing-Pod nur Inhalte lesbar; Smoke-Test automatisiert |
 | neu-1 | `apps/app` auf die Identität des CMS umbauen | Anmeldung, Registrierung, Bestätigung, Reset, Rechte-Stand mit Cache (A3/A4), Sitzungen (A1), Referenztabelle (A2), Testzeitraum-Prüfung in `proxy.ts`, Auskunft und Löschung über zwei Systeme, Schalter `BLOOMMD_IDENTITY_PROVIDER` | #204; erhält das Verhalten von #104 (offene Registrierung, Postfach-Schutz), #105 (Wartelisten-Konten und Aktivierung), #274 (Hinweis-Mails, Sperre hinter Schalter) und die Texte aus #271 unverändert; Entscheidungen O3, O4, O5 | Ausfallprüfung nach Abschnitt 12 im Testsystem; bestehende Tests zu Trial, Mailbox und Waitlist laufen gegen die Schnittstelle grün |
 | neu-2 | Marketing liest Blog und News aus dem CMS | Lesepfad mit Token und Revalidierung, Übernahme von Blog und News aus Markdown, Weg für News (O12), Export nach Markdown als Rückweg, Secret-Regel in Marketing | #204 (Endpunkt und Token-Prüfung), #205 (Secret, Netz), O11, O12, O16 | Ein Admin legt einen Beitrag an, er erscheint auf bloommd.io; bei CMS-Ausfall liefert Marketing den Cache; `release:check` lehnt andere Secrets weiter ab |
@@ -443,4 +453,4 @@ Die Folgetickets #204 bis #207 sind laut Beschluss neu zuzuschneiden (Epic #196)
 | neu-4 | Zahlungsbezug und Rückerstattungsaufträge im CMS | Collections für Referenzen und Beträge, `payment-refs`, `refund-requests`, Worker in der App, Anpassung der Löschung | #276 (Zahlung selbst), #215 (Beschluss zur Bezahlung), #204, neu-1; Billing ist aus, bis #276 steht; ist #276 vor dem Cutover produktiv, gehört das Ticket zum Cutover, sonst folgt es danach (O13) | Stripe bleibt Quelle, nie Karten- oder Bankdaten; Rückerstattung läuft über die App und Stripe |
 | #207 | Backup, Restore, Cutover und Rückweg, Prod-Go | Restore-Test beider Datenbanken und der Medien (`restore-drill.sh` erweitert), Rückweg-Probelauf, Cutover-Plan, Markdown-Export, Monitoring-Abnahme, Go für Prod | alle anderen Tickets (#204, #205, #206, neu-1 bis neu-3, Folgeticket O2; neu-4 je nach #276); O7, O10; Prod-Go nur mit Ops-CoS und Admin | Restore-Test und Rückweg-Probelauf bestanden, Log im Ticket; Prod-Go dokumentiert |
 
-**Reihenfolge:** 1. Folgeticket O2 (unabhängig, früh) und #204 mit dem Spike. 2. #205 parallel zu #204 und neu-1. 3. neu-1, neu-2, #206, danach neu-3 (braucht #205 und das Testsystem). 4. neu-4, sobald #276 steht. 5. #207 zuletzt. Alle Teile gehen zusammen nach Prod (Beschluss 9, O19). Die Umsetzung beginnt erst, wenn Martin und Max die ADR freigegeben und die offenen Entscheidungen beantwortet haben. Rollout in Prod nur mit Ops-CoS und Go eines Admins.
+**Reihenfolge:** 1. Folgeticket O2 (unabhängig, früh) und #204 mit dem Spike. 2. #205 parallel zu #204 und neu-1. 3. neu-1, neu-2, #206, danach neu-3 (braucht #205 und das Testsystem). 4. neu-4, sobald #276 steht. 5. #207 zuletzt. Alle Teile gehen zusammen nach Prod (Beschluss 9, O19). Stand 10.11.2026: Die ADR ist freigegeben, die Umsetzung läuft. Die Nummern der neuen Tickets vergibt der Chief of Staff; das steht noch aus. Rollout in Prod nur mit Ops-CoS und Go eines Admins.

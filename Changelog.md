@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Payload-Spike, Doku-Korrekturen (Ticket 103): Anker-Links zwischen ADR und Spike-Anhang repariert, Zeilenzahl des Auth-Laufs, Stelle der Passwort-Regel beim Zurücksetzen und die Aussage zu „nur veröffentlicht“ bei News berichtigt; der Anhang nennt jetzt, welche Messungen nicht unabhängig nachgeprüft sind; keine Änderung an App oder Marketing-Seite
+- Payload spike, documentation fixes (ticket 103): anchor links between the ADR and the spike appendix repaired, line count of the auth run, location of the password rule on reset and the statement on "published only" for news corrected; the appendix now lists which measurements were not independently verified; no change to the app or the marketing site
+
 - Payload-Spike nachgezogen (Ticket 103): `docs/adr/0001-payload-cms.md` verweist auf den Spike-Anhang und führt O12, O14, O16, O17, Annahme A6 und die Aufwandsschätzung (77 bis 122 Personentage, Annahme) auf dem Stand des Spikes; der Anhang listet die Abweichungen von der ADR und enthält die Prüfskripte samt Wiederholungsablauf; keine Änderung an App oder Marketing-Seite
 - Payload spike follow-up (ticket 103): `docs/adr/0001-payload-cms.md` links to the spike appendix and brings O12, O14, O16, O17, assumption A6 and the effort estimate (77 to 122 person-days, an assumption) up to the state of the spike; the appendix lists the deviations from the ADR and contains the check scripts with a repeatable procedure; no change to the app or the marketing site
 

@@ -155,7 +155,7 @@ Der Betreiber legt Nutzer über `POST /api/users` mit Cookie an (201), das ist d
 GET /svc/v1/content/blog ohne Token             -> 401
 GET /svc/v1/content/blog falsches Token         -> 401
 GET /svc/v1/content/blog gültiges Token         -> 200 {"items":[{"title":"Veröffentlicht",…}]}   (Entwurf fehlt)
-GET /svc/v1/content/news gültiges Token         -> 200 {"items":[{"title":"News live",…}]}
+GET /svc/v1/content/news gültiges Token         -> 200 {"items":[{"title":"News live",…}]}   (im Gerüst gibt es nur einen veröffentlichten News-Eintrag)
 GET /svc/v1/content/users gültiges Token        -> 404
 Token auf /api/posts                            -> 404
 Token auf /api/users                            -> 404
@@ -163,6 +163,7 @@ Token auf /admin                                -> 200 (Anmeldeseite, ohne Sitzu
 ```
 
 - **Machbarkeit:** ja. Das Token ist kein Payload-API-Schlüssel und keine Payload-Sitzung. Die Prüfung sitzt **im Handler** von `/svc/v1/content/[kind]`: SHA-256 des Bearer-Werts, Nachschlagen in der Collection `read-tokens` (Feld `hash`, eindeutig), Zugriff über die Local API mit `overrideAccess` nur für Blog/News mit `_status: published`. Bei 256 Bit Zufall reicht SHA-256 (kein Passwort-Hash nötig).
+- **Einschränkung „nur veröffentlicht“ bei News:** Im Gerüst legt `seed.ts` nur einen veröffentlichten News-Eintrag an; ein Entwurf existiert nur bei Blog. Das Weglassen von Entwürfen ist **für News nicht getrennt belegt**. Der Handler filtert beide Arten mit derselben Bedingung (`_status: published`).
 - **Rotation:** zwei Zeilen gleichzeitig. **Widerruf:** Zeile löschen, wirkt sofort. **Audit:** Zähler `uses` je Token (Prototyp zählt hoch; ADR: nur Zähler und Zeit).
 - **Aufwand:** etwa 60 Zeilen Handler plus Collection und Test, **0,5 bis 1 Personentag** (eigene Rate-Limit-Logik und Rotation eingerechnet).
 - **Wo die Prüfung sitzt:** nur in `apps/cms`, nicht im Mesh. Auf `/api` und `/admin` ist das Token wirkungslos, auch wenn jemand das Netz erreicht (ADR 3, Annahme A6 bestätigt).
@@ -297,7 +298,7 @@ Der erste Bericht zu diesem Spike nannte nur eine Stelle (Schicht 4, GraphQL). D
 | 5 | Abschnitt 3, Endpunkt `auth/login` | Zähler je Konto im CMS | Die native Sperre meldet „gesperrt“ anders als „falsch“ und verrät das Konto | Handler bildet beides auf dieselbe 401-Antwort ab |
 | 6 | Abschnitt 8, Link | „im CMS nur als Hash gespeichert“ | Payload speichert Reset- und Verifizierungs-Token im Klartext; der Verifizierungs-Token hat keinen Ablauf | eigene Token-Collection mit Hash, Zweck, Ablauf |
 | 7 | Abschnitt 8, Punkt 1 | Konten ohne Passwort anlegen | `payload.create` verweigert das | Import über `payload.db.create` (ohne Hooks) oder Zufallspasswort |
-| 8 | Abschnitt 8, Passwort-Regel | Regel „wie heute“ (implizit überall wirksam) | `beforeValidate` greift beim Reset nicht; ein schwaches Passwort wurde angenommen | zusätzlich `beforeOperation`-Hook für `resetPassword` |
+| 8 | Abschnitt 8 (Seite zum Setzen; Regel „wie heute“), korrigiert in Abschnitt 3, Schicht 4 | Die Passwort-Regel gilt überall, wo ein Passwort gesetzt wird (ohne Hinweis auf den Reset-Weg) | `beforeValidate` greift beim Reset nicht; ein schwaches Passwort wurde angenommen | zusätzlich `beforeOperation`-Hook für `resetPassword`; Schicht 4 nennt ihn, Abschnitt 8 verweist darauf |
 | 9 | Abschnitt 3, Betreiber / O9 | zweiter Faktor Pflicht | Payload hat keinen nativen zweiten Faktor | Community-Plugin oder Eigenbau, Oberfläche ungeprüft |
 | 10 | A2 | Benutzer-ID 1:1 (dieselbe UUID) | `idType: 'uuid'` allein ignoriert die mitgegebene ID | eigenes Feld `id` (Text) in der CMS-Collection |
 | 11 | Abschnitt 6, Missbrauchsschutz | „eindeutiger Index“ | Payload erzeugt keinen partiellen Index | Roh-SQL-Migration, Rennen-Test |
@@ -313,6 +314,8 @@ Bestätigt ohne Abweichung: Next 16.4.2 passt (Peer `>=16.3.3 <17`); `/svc/v1` a
 - `disablePlaygroundInProduction`; `jobs.autoRun` mit mehreren Replikas; API-Schlüssel über HTTP.
 - Mesh, Ingress, NetworkPolicy (O15), Medien-S3, Mails, Last.
 - Passwort-Mails, Wartelisten-Konten, Testzeitraum, DSGVO-Abläufe: bewusst nicht Teil des Spikes.
+- **Nur vom coder gemessen, nicht unabhängig nachgeprüft:** Der tester hat Version, Engines, ADR-Änderungen und die Läufe von `o14`, `o16`, `inv.ts` nachvollzogen. Folgendes steht im Dokument, wurde aber nicht unabhängig geprüft: die Bun-Läufe (Local API, `next dev` mit Turbopack und mit `--webpack`, `bun install`); `next build` und `next start` (nicht gelaufen); die Admin-Oberfläche im Browser (nicht gelaufen); der Ablauf des TOTP-Plugins (nur Laden der Konfiguration und die zusätzlichen Endpunkte); der API-Schlüssel (nur Local API); die Job-Queue für News (ein Lauf gegen die öffentliche GitHub-API); die Migrationen (`migrate:create`, `migrate`, `status`, `down`, Hand-Migration für den Index); die Prüfungen zu eigener `id` und Konto ohne Passwort; die Zeit von ca. 184 ms je Hash und alle Speicher- und Größenangaben (`node_modules` 702 und 935 MB, Speicher von `next dev`); die Download-Zahlen und Alter der Plugins (npm, Stand 10.11.). Der Wiederholungsablauf am Ende deckt nur `o14`, `o16`, `inv.ts` und den Playground-Beleg ab.
+- **Zur Einordnung:** `bun run docs:verify` prüft nur `docs/ARCHITECTURE.md` gegen den Quellstand, nicht die ADR oder diesen Anhang. Ein grüner Lauf ist kein Beleg für deren Inhalt.
 
 ## Wiederholung ohne den Pod des coders
 
@@ -350,10 +353,10 @@ PY
 npm install --no-audit --no-fund
 ```
 
-**O14 (Auth, Local API gegen Postgres), Ausgabe 38 Zeilen `[1a …]` bis `[8 …]` (im Doku-Lauf mit Node 22.23.4 und frischer Datenbank bestätigt):**
+**O14 (Auth, Local API gegen Postgres), Ausgabe 37 Ergebniszeilen `[1a …]` bis `[8 …]` (der Filter blendet die Payload-Warnzeile zum fehlenden Mailadapter aus; im Doku-Lauf mit Node 22.23.4 und frischer Datenbank bestätigt):**
 
 ```bash
-NODE_OPTIONS=--no-deprecation npx payload run scripts/o14.ts < /dev/null 2>&1 | grep -E '^\[[0-9]'
+NODE_OPTIONS=--no-deprecation npx payload run scripts/o14.ts < /dev/null 2>&1 | grep -E '^\[[0-9]+[a-z]? '
 ```
 
 Erwartet (Auszug; Zeiten, IDs und welche der gleichzeitigen Bestätigungen gewinnt, wechseln): `1a OK`, `1b FEHLER`, `1c FEHLER`, `1e` Präfix `pbkdf2-sha256-v1:`, `2b FEHLER … locked`, `2e OK`, `3b gleichKlartext:true, laufzeitTage:"14.00"`, `3d FEHLER`, `3e OK`, `3f FEHLER`, `4b` ohne Ablauf-Spalte, `5a lebensdauerTage:"30.0"`, `5d`/`5e user:null`, `6c` genau ein `OK`, `6d n:1`, `7a FEHLER`, `7b OK`, `7c FEHLER`. Ohne den `beforeOperation`-Hook in `Users.ts` (Block entfernen) wird `3d` zu `OK`: das ist die Abweichung 8.

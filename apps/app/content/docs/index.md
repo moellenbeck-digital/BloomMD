@@ -37,6 +37,4 @@ und Login stehen unter [Kostenloser Testaccount](/docs/closed-beta-zugang).
 - **Mobile.** Es gibt Mobile-Builds, aber sie sind ausdrücklich **nicht Teil der Beta**. Sie sind
   ungetestet für den produktiven Einsatz und werden nicht unterstützt.
 - Keine Wiederherstellungszusage für Cloud-Daten. Lade nichts hoch, was du nicht auch anderswo hast.
-- Keine Developer-ID-Signatur/Notarisierung des macOS-Desktop-Builds — macOS zeigt eine
-  Gatekeeper-Warnung.
 - Windows- und Linux-Desktop-Builds sind nicht Teil dieser Beta.

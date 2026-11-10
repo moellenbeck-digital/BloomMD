@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Payload-Spike (Ticket 103): `docs/adr/0001-payload-spike.md` hält fest, was die gewählte Payload-Version (3.93.0) für Anmeldung der Endnutzer, `/svc/v1`, Lese-Token und Laufzeit (Node statt Bun, Node ≥ 22.23.4) belegt, und schätzt den Aufwand neu (77 bis 122 Personentage, Annahme); keine Änderung an App oder Marketing-Seite
+- Payload spike (ticket 103): `docs/adr/0001-payload-spike.md` records what the chosen Payload version (3.93.0) proves for end-user sign-in, `/svc/v1`, read token and runtime (Node instead of Bun, Node ≥ 22.23.4) and re-estimates the effort (77 to 122 person-days, an assumption); no change to the app or the marketing site
+
 - Learnings-Ablage: Checkliste je Brand und Verweis auf die Betriebsanleitung (Ticket 115): `docs/LEARNINGS-ABLAGE.md` ergänzt „Muster für eine weitere Brand“ um eine Checkliste mit Backend-Wahl (Vault oder Cloud), Rechten, Vault-Name und Pfad, Velero (Backup/Restore-Test, beim Betrieb), täglichem Export und Verantwortlichem, jeweils mit Verweis auf den passenden Abschnitt, und verweist für Betrieb und Cluster-Teil (PVC-Vorlage, Chart-Werte, `adapter.wissen`, Rechte, Backup, Export) auf die Kurzanleitung „Learnings-Ablage einrichten“ in `md-brand-cluster-base`. Die sechs bestehenden Schritte bleiben unverändert.
 - Learnings store: checklist per brand and pointer to the operations guide (ticket 115): `docs/LEARNINGS-ABLAGE.md` extends "Muster für eine weitere Brand" (pattern for another brand) with a checklist covering backend choice (vault or cloud), rights, vault name and path, Velero (backup/restore test, owned by operations), the daily export and the owner, each pointing to the matching section, and points to the short guide "Learnings-Ablage einrichten" in `md-brand-cluster-base` for operations and the cluster part (PVC template, chart values, `adapter.wissen`, rights, backup, export). The six existing steps are unchanged.
 

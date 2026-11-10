@@ -1,0 +1,37 @@
+# Dependabot version updates for GitHub Actions.
+# Pinning rule and review steps: docs/CI-ACTIONS-PINNING.md
+#
+# For `github-actions`, `directory: "/"` makes Dependabot scan
+# `/.github/workflows`. Any other directory is scanned for workflow YAML files
+# directly (not for a `.github/workflows` folder below it), so the nested
+# Obsidian plugin workflow needs its own entry that points at the folder with
+# the workflow files. The two directories must not overlap.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/plugins/obsidian/.github/workflows"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

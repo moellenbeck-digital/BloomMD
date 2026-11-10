@@ -54,6 +54,44 @@ traceable to a published release.
 5. Open a PR and let the CI run. Release, desktop, and mobile workflows do
    not run on PRs; say in the PR which ones were only checked statically.
 
+## Automated updates (Dependabot)
+
+`.github/dependabot.yml` lets Dependabot propose action updates so the pins do
+not go stale.
+
+- **Schedule:** weekly.
+- **Grouped:** all minor and patch updates of the actions arrive in one pull
+  request per directory (group `actions-minor-patch`). Commit and PR titles
+  start with `ci:`.
+- **SHA and comment:** for an action pinned as `@<sha> # vX.Y.Z`, Dependabot
+  replaces the SHA and rewrites the version comment to the new release tag in
+  the same change. It only rewrites the comment when the old comment names a
+  release tag of the old SHA; check the diff for that (see below).
+- **Major upgrades** are not part of the group. Dependabot opens each one as
+  its own pull request, which stays a deliberate, separately reviewed change as
+  required in [Format](#format). Where an action is deliberately used in two
+  major versions (for example `actions/upload-artifact` v7 and v4), Dependabot
+  may also propose the newer major for the older usage; close such a pull
+  request if the old major is intended.
+- **Coverage:** two entries, because for `github-actions` the directory `/`
+  makes Dependabot scan `/.github/workflows`, and any other directory is
+  scanned for workflow files directly. `/plugins/obsidian/.github/workflows`
+  covers the nested `plugins/obsidian/.github/workflows/release.yml`.
+  Sources: [Dependabot options reference, `directories` or
+  `directory`](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#directories-or-directory-)
+  and the [file fetcher of
+  dependabot-core](https://github.com/dependabot/dependabot-core/blob/main/github_actions/lib/dependabot/github_actions/file_fetcher.rb).
+  New workflow folders elsewhere in the repo need their own entry.
+
+Dependabot does not replace the review. Reviewers still follow "Updating an
+action": read the changelog of the new release for breaking changes and
+changed inputs, and run the check below on the pull request branch. Release,
+desktop, and mobile workflows do not run on PRs; the PR must say which ones
+were only checked statically.
+
+Not part of this setup: Dependabot alerts and Dependabot security updates.
+This file configures version updates only.
+
 ## Check
 
 Every line must end in a 40-hex SHA (plus the version comment); this prints

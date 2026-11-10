@@ -2,6 +2,17 @@
 
 @import "@xyflow/react/dist/style.css";
 
+/* Names the path of an image that could not be found, next to Obsidian's broken image icon. */
+.bloommd-image-hint {
+  margin: 4px 0;
+  padding: 4px 8px;
+  border: 1px dashed var(--text-warning);
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
 .bloommd-view-host {
   height: 100%;
   padding: 0;
@@ -788,6 +799,39 @@
   margin: 0;
 }
 
+/* Error state of a map that could not be opened or rendered; always carries Back to Markdown. */
+.bloommd-render-error {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+}
+
+.bloommd-render-error h3,
+.bloommd-render-error p {
+  margin: 0;
+}
+
+.bloommd-render-error code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.bloommd-render-error-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .bloommd-mode-heading {
   display: flex;
   align-items: center;
@@ -1387,6 +1431,32 @@
   stroke: #2563eb;
   stroke-width: 2;
   stroke-dasharray: 6 5;
+}
+
+/* Backlink mode: dotted and grey with an arrowhead, so it differs from hierarchy (solid) and relations (blue dashes). */
+.react-flow__edge-path.bloommd-backlink-edge,
+.bloommd-backlink-edge {
+  stroke: var(--text-faint, #8b8b8b);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.react-flow__edge[data-id^="backlink:"] {
+  pointer-events: none;
+}
+
+.bloommd-backlink-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  color: var(--text-warning, #b45309);
+  background: color-mix(in srgb, var(--text-warning, #b45309) 14%, var(--background-primary));
+  font-size: 10px;
 }
 
 .bloommd-relation-label {

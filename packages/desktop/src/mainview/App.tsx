@@ -2,7 +2,9 @@ import { FileChangeQueue } from "./file-change-queue";
 import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
 import { lazy, Suspense, useEffect, useState, useCallback, useRef, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, CloudUpload, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CloudUpload, FolderUp, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
+import { FolderPublicationDialog, folderPublicationLabel, type FolderPublicationApi } from "./FolderPublicationDialog";
+import { FolderSharesDialog, folderSharesLabel, type FolderSharesApi } from "./FolderSharesDialog";
 import {
   MindMapCanvas,
   ResizableEditor,
@@ -11,6 +13,9 @@ import {
   AboutDialog,
   FileContextMenu,
   CommandPalette,
+  ConflictCopyBadge,
+  ConflictCopyBanner,
+  NoteHistoryDialog,
   SyncStatus,
   useMindMapStore,
   useKeyboardShortcuts,
@@ -21,23 +26,27 @@ import {
   type CreateEntryKind,
   fileEntryIsActive,
   requestNodeFocus,
+  bytesToBase64,
+  DELIVER_EXPORT_EVENT,
+  type DeliverExportDetail,
+  type ExportFile,
 } from "@bloommd/ui";
 import { collapsedAncestors } from "./external-node";
-import type { MindMapDocument, MindMapListEntry, SharedDocumentBinding } from "@bloommd/core/browser";
-import { documentToYDoc, filenameForTitleInPath, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseFile, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
+import type { MindMapDocument, MindMapListEntry, NoteRevision, SharedDocumentBinding } from "@bloommd/core/browser";
+import { documentToYDoc, filenameForTitleInPath, findConflictCopyOriginal, hashSharedDocumentMarkdown, isWorkspaceMindMap, parseConflictCopy, parseFile, pdfPageUrl, serializeToMarkdown, SharedDocumentMirror, yDocToDocument } from "@bloommd/core/browser";
 import {
   listMindmaps, openMindmap, openWorkspace, saveMindmap, onFileChanged,
-  chooseDirectory, chooseResourceFile, importFile, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
-  renameMindmap, deleteMindmap,
+  chooseDirectory, chooseResourceFile, importFile, saveExport, createMindmap, createFolder, listFolders, listTemplates, serializeMindmap,
+  renameMindmap, deleteMindmap, listNoteHistory, restoreNoteVersion,
   listConnectionProfiles, saveConnectionProfile, connectProfile, useLocalConnection, deleteConnectionProfile, setConnectionProfileWorkspace,
   listRemoteWorkspaces, selectRemoteWorkspace,
   getConnectionMode, onConnectionModeChanged, getBuildInfo, onAboutRequested,
   consumeExternalFile, onExternalFileOpened,
-  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, fetchLinkPreview, openExternalUrl, recordE2EState,
+  getSyncTicket, getSharedDocument, getSharedSyncTicket, listProfileWorkspaces, choosePublicationFolder, selectOpenFolderForPublication, previewFolderPublication, publishFolderAsWorkspace, listFolderShares, getFolderActivity, resolveFolderActivity, disconnectFolderShare, shareLocalMindmap, unshareLocalMindmap, updateSharedDocumentBinding, readResource, openExternalUrl, recordE2EState,
   submitFeedback, getUpdateState, checkForUpdate, downloadUpdate, applyUpdate, onUpdateStatus, setApplicationLocale,
 } from "./rpc";
 import { isChangedFileActive } from "../shared/file-change";
-import type { DesktopBuildInfo, DesktopConnectionProfile, DesktopFeedbackAttachment, DesktopFeedbackType, DesktopSharedDocumentInfo, DesktopUpdateState, DesktopWorkspaceInfo } from "../shared/rpc-types";
+import type { DesktopBuildInfo, DesktopConnectionProfile, DesktopFeedbackAttachment, DesktopFeedbackType, DesktopFolderShareInfo, DesktopSharedDocumentInfo, DesktopUpdateState, DesktopWorkspaceInfo } from "../shared/rpc-types";
 
 interface DesktopFeedbackDraft {
   type: DesktopFeedbackType;
@@ -82,6 +91,22 @@ function documentWithRootTitle(doc: MindMapDocument, title: string): MindMapDocu
 function workspaceRoleLabel(role: DesktopWorkspaceInfo["role"], t: ReturnType<typeof useLocale>["t"]): string {
   return role === "owner" ? t.ownerRole : role === "editor" ? t.editorRole : t.viewerRole;
 }
+
+const FOLDER_PUBLICATION_API: FolderPublicationApi = {
+  getConnectionMode,
+  listProfileWorkspaces,
+  choosePublicationFolder,
+  selectOpenFolderForPublication,
+  previewFolderPublication,
+  publishFolderAsWorkspace,
+};
+
+const FOLDER_SHARES_API: FolderSharesApi = {
+  listFolderShares,
+  getFolderActivity,
+  resolveFolderActivity,
+  disconnectFolderShare,
+};
 
 function sharedBindingFromInfo(sharedDocument: DesktopSharedDocumentInfo): SharedDocumentBinding {
   return {
@@ -179,6 +204,8 @@ export function App() {
   const [feedbackDraft, setFeedbackDraft] = useState<DesktopFeedbackDraft>(readFeedbackDraft);
   const feedbackDraftPersistenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyCanRestore, setHistoryCanRestore] = useState(true);
   const drawerListRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; filename: string; title: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ filename: string; title: string } | null>(null);
@@ -199,6 +226,7 @@ export function App() {
   const [forwardNavigationAvailable, setForwardNavigationAvailable] = useState(false);
   const [sharedDocument, setSharedDocument] = useState<DesktopSharedDocumentInfo | null>(null);
   const [sharedDocumentDialogOpen, setSharedDocumentDialogOpen] = useState(false);
+  const [folderPublicationOpen, setFolderPublicationOpen] = useState(false);
   const sharedMirrorRef = useRef<{ localFilename: string; mirror: SharedDocumentMirror } | null>(null);
 
   const clearForwardNavigation = useCallback(() => {
@@ -326,6 +354,18 @@ export function App() {
 
   // Connection state
   const [connectionMode, setConnectionMode] = useState<"local" | "remote">("local");
+  const [folderShares, setFolderShares] = useState<DesktopFolderShareInfo[]>([]);
+  const [folderSharesOpen, setFolderSharesOpen] = useState(false);
+  const refreshFolderShares = useCallback(() => {
+    if (connectionMode !== "local") {
+      setFolderShares([]);
+      return;
+    }
+    void FOLDER_SHARES_API.listFolderShares(true)
+      .then((result) => setFolderShares(result.shares))
+      .catch((error: unknown) => console.error("[BloomMD] Folder shares could not be loaded:", error));
+  }, [connectionMode]);
+  useEffect(() => { refreshFolderShares(); }, [refreshFolderShares]);
   const [reconnectFailedUrl, setReconnectFailedUrl] = useState<string | null>(null);
   const [reconnectFailedProfileId, setReconnectFailedProfileId] = useState<string | null>(null);
   const [remoteUrl, setRemoteUrl] = useState("");
@@ -680,39 +720,6 @@ export function App() {
         .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.urlOpenFailed }));
     };
 
-    const loadLinkPreview = (event: Event) => {
-      const detail = (event as CustomEvent<{ url?: string; respond?: (result: { preview: { title?: string; description?: string; image?: string } } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.url || !detail.respond) return;
-      void fetchLinkPreview(detail.url)
-        .then((result) => {
-          if ("error" in result) {
-            detail.respond?.({ error: result.error });
-            return;
-          }
-          detail.respond?.({ preview: result.preview });
-        })
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.previewUnavailable }));
-    };
-
-    const listMaps = (event: Event) => {
-      const detail = (event as CustomEvent<{ respond?: (result: { files: MindMapListEntry[] } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.respond) return;
-      void listMindmaps()
-        .then((result) => detail.respond?.({ files: result.files }))
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.mapsUnavailable }));
-    };
-
-    const loadMapDocument = (event: Event) => {
-      const detail = (event as CustomEvent<{ filename?: string; respond?: (result: { document: Awaited<ReturnType<typeof openMindmap>> } | { error: string }) => void }>).detail;
-      event.preventDefault();
-      if (!detail.filename || !detail.respond) return;
-      void openMindmap(detail.filename)
-        .then((documentData) => detail.respond?.({ document: documentData }))
-        .catch((error) => detail.respond?.({ error: error instanceof Error ? error.message : t.mapUnavailable }));
-    };
-
     const chooseResource = (event: Event) => {
       const detail = (event as CustomEvent<ResourceChooseRequest>).detail;
       event.preventDefault();
@@ -737,7 +744,15 @@ export function App() {
     };
 
     const openResource = (event: Event) => {
-      const detail = (event as CustomEvent<{ kind?: string; file?: string; targetNodeId?: string }>).detail;
+      const detail = (event as CustomEvent<{
+        kind?: string;
+        file?: string;
+        targetNodeId?: string;
+        /** 1-based PDF page of a clicked `[[file.pdf#page=n]]` link. */
+        page?: number;
+        /** Lets the panel show why a file did not open instead of the click doing nothing. */
+        respond?: (result: { error: string }) => void;
+      }>).detail;
       if (!detail.file) return;
       if ((detail.kind === "portal" || detail.kind === "file") && isMarkdownResource(detail.file)) {
         void loadFile(detail.file).then(() => {
@@ -748,25 +763,25 @@ export function App() {
         return;
       }
       if (detail.kind !== "file" && detail.kind !== "pdf") return;
-      void readResource(detail.file).then((result) => {
+      const file = detail.file;
+      const failed = (cause: unknown) => {
+        console.error("[BloomMD] Resource open failed:", cause);
+        detail.respond?.({ error: t.pdfOpenFailed.replace("%file%", file) });
+      };
+      void readResource(file).then((result) => {
         if ("error" in result) {
-          console.error("[BloomMD] Resource open failed:", result.error);
+          failed(result.error);
           return;
         }
-        window.open(result.dataUrl, "_blank", "noopener,noreferrer");
-      }).catch((error) => console.error("[BloomMD] Resource open failed:", error));
+        // The viewer reads `#page=n` where it can; the page also stays visible in the node panel.
+        window.open(detail.kind === "pdf" && detail.page ? pdfPageUrl(result.dataUrl, detail.page) : result.dataUrl, "_blank", "noopener,noreferrer");
+      }).catch(failed);
     };
     window.addEventListener("bloommd:open-url", openUrl);
-    window.addEventListener("bloommd:load-link-preview", loadLinkPreview);
-    window.addEventListener("bloommd:list-maps", listMaps);
-    window.addEventListener("bloommd:load-map-document", loadMapDocument);
     window.addEventListener("bloommd:choose-resource", chooseResource);
     window.addEventListener("bloommd:open-resource", openResource);
     return () => {
       window.removeEventListener("bloommd:open-url", openUrl);
-      window.removeEventListener("bloommd:load-link-preview", loadLinkPreview);
-      window.removeEventListener("bloommd:list-maps", listMaps);
-      window.removeEventListener("bloommd:load-map-document", loadMapDocument);
       window.removeEventListener("bloommd:choose-resource", chooseResource);
       window.removeEventListener("bloommd:open-resource", openResource);
     };
@@ -1117,7 +1132,10 @@ export function App() {
   const handleImportFile = useCallback(async () => {
     if (!assertRemoteWriteAccess()) return;
     const result = await importFile();
-    if (!("frontmatter" in result)) return;
+    if (!("frontmatter" in result)) {
+      if (result.error) useMindMapStore.getState().setStatusMessage(`${t.importOpmlFailed} ${result.error}`);
+      return;
+    }
     const doc: MindMapDocument = {
       ...result,
       nodes: new Map(Object.entries(result.nodes)),
@@ -1134,32 +1152,25 @@ export function App() {
       await connectRemoteFileSync(importedFilename);
     }
     await refreshFileList();
-  }, [assertRemoteWriteAccess, clearForwardNavigation, connectionMode, syncUrl, setDocument, refreshFileList, connectRemoteFileSync]);
+  }, [assertRemoteWriteAccess, clearForwardNavigation, connectionMode, syncUrl, setDocument, refreshFileList, connectRemoteFileSync, t]);
 
-  // Export
-  const handleExportFile = useCallback(async () => {
-    const doc = useMindMapStore.getState().document;
-    if (!doc) return;
-    if (isWorkspaceMindMap(doc)) {
-      useMindMapStore.getState().setStatusMessage(t.derivedWorkspaceExport);
-      return;
-    }
-    const serializedDoc = {
-      filePath: doc.filePath,
-      frontmatter: doc.frontmatter,
-      nodes: Object.fromEntries(doc.nodes),
-      rootId: doc.rootId,
-      preamble: doc.preamble,
+  // Export: the toolbar builds the file; the webview cannot reliably download blobs, so the bun
+  // process saves it into the Downloads folder and shows it there.
+  const handleDeliverExport = useCallback(async (file: ExportFile) => {
+    const result = await saveExport(file.filename, bytesToBase64(file.data));
+    if ("error" in result) throw new Error(result.error);
+    useMindMapStore.getState().setStatusMessage(`${t.exportSavedTo} ${result.path}`);
+  }, [t]);
+
+  // "Save image" and "Save diagram" in the enlarged view hand their file over the same way.
+  useEffect(() => {
+    const deliver = (event: Event) => {
+      const detail = (event as CustomEvent<DeliverExportDetail>).detail;
+      detail.handle(handleDeliverExport(detail.file));
     };
-    const { markdown } = await serializeMindmap(serializedDoc);
-    const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = window.document.createElement("a");
-    a.href = url;
-    a.download = `${doc.frontmatter.title || "mindmap"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
+    window.addEventListener(DELIVER_EXPORT_EVENT, deliver);
+    return () => window.removeEventListener(DELIVER_EXPORT_EVENT, deliver);
+  }, [handleDeliverExport]);
 
   // Delete
   const handleDeleteMindmap = useCallback(async (filename: string) => {
@@ -1224,6 +1235,55 @@ export function App() {
       store.setStatusMessage(message);
     }
   }, [assertRemoteWriteAccess, connectRemoteFileSync, connectionMode, deleteMindmap, loadFile, loadWorkspace, refreshFileList, reportE2EState, syncUrl, t.deleteFailed, t.documentConflict, t.filesLoadFailed, t.syncRoomActive]);
+
+  // Version history of the open note
+  const handleOpenHistory = useCallback(async () => {
+    const store = useMindMapStore.getState();
+    const doc = store.document;
+    if (!doc || isWorkspaceMindMap(doc)) return;
+    // A local note keeps its versions as backups of what was written: write what is still open first,
+    // so the history starts at what the user sees. A note in a live cloud session is persisted by the room.
+    if (connectionMode === "local") await toolbarRef.current?.triggerSave();
+    setHistoryCanRestore(true);
+    setHistoryOpen(true);
+  }, [connectionMode]);
+
+  const loadNoteHistory = useCallback(async (): Promise<NoteRevision[]> => {
+    const doc = useMindMapStore.getState().document;
+    if (!doc) return [];
+    const result = await listNoteHistory(doc.filePath);
+    if (result.error) throw new Error(result.error);
+    setHistoryCanRestore(result.canRestore);
+    return result.revisions;
+  }, []);
+
+  const restoreNoteHistoryVersion = useCallback(async (revision: NoteRevision) => {
+    const store = useMindMapStore.getState();
+    const doc = store.document;
+    const filename = currentFileRef.current;
+    if (!doc || !filename) throw new Error("RESTORE_FAILED");
+    const reconnectRemote = Boolean(
+      connectionMode === "remote" &&
+        syncUrl &&
+        (store.syncProvider !== null || store.syncStatus !== "disconnected"),
+    );
+    try {
+      // The sync server rejects document mutations while this client still occupies the room.
+      if (reconnectRemote) await store.disconnectSync();
+      const result = await restoreNoteVersion(doc.filePath, revision.id);
+      if (!result.success) throw new Error(result.error ?? "RESTORE_FAILED");
+    } catch (error) {
+      if (reconnectRemote && currentFileRef.current === filename) {
+        await connectRemoteFileSync(filename).catch((reconnectError) => {
+          console.error("[BloomMD] Failed to reconnect after a failed restore:", reconnectError);
+        });
+      }
+      throw error;
+    }
+    // Shows the restored note (and joins the cloud session again).
+    await loadFile(filename);
+    await refreshFileList();
+  }, [connectRemoteFileSync, connectionMode, loadFile, refreshFileList, syncUrl]);
 
   // Rename from sidebar
   const handleRenameFromSidebar = useCallback((filename: string, title: string) => {
@@ -1714,6 +1774,8 @@ export function App() {
   const activeDocumentFilename = files.find((entry) => fileEntryIsActive(entry, document))?.filename
     ?? activeLocalFilename
     ?? null;
+  // The banner shares the column with the canvas only while it is shown, so other notes keep their layout.
+  const showConflictBanner = Boolean(document && activeDocumentFilename && !isWorkspaceMindMap(document) && parseConflictCopy(activeDocumentFilename));
   const canForwardToFile = Boolean(
     document &&
     isWorkspaceMindMap(document) &&
@@ -1829,7 +1891,8 @@ export function App() {
             onCreateNew={handleCreateNew}
             onSaveFile={handleSaveFile}
             onImportFile={handleImportFile}
-            onExportFile={handleExportFile}
+            onDeliverExport={handleDeliverExport}
+            onOpenHistory={document && !isWorkspaceMindMap(document) ? () => void handleOpenHistory() : undefined}
           />
         </div>
       </header>
@@ -1886,8 +1949,18 @@ export function App() {
         onImport={() => toolbarRef.current?.triggerImport()}
         onExport={() => toolbarRef.current?.triggerExport()}
         onReload={() => void reload()}
+        onOpenHistory={document && !isWorkspaceMindMap(document) ? () => void handleOpenHistory() : undefined}
         onOpenMindmap={loadFile}
       />
+      {historyOpen && document && (
+        <NoteHistoryDialog
+          filename={activeDocumentFilename ?? document.filePath}
+          loadRevisions={loadNoteHistory}
+          onRestore={restoreNoteHistoryVersion}
+          canRestore={historyCanRestore}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
 
       {profileDialogOpen && (
         <ConnectionProfileDialog
@@ -1921,6 +1994,22 @@ export function App() {
           onClose={() => setSharedDocumentDialogOpen(false)}
           onChanged={() => { void handleSharedDocumentChanged().catch((error) => console.error("[BloomMD] Shared document state could not be refreshed:", error)); }}
           onResolveConflict={resolveSharedDocumentConflict}
+        />
+      )}
+      {folderPublicationOpen && connectionMode === "local" && (
+        <FolderPublicationDialog
+          profiles={connectionProfiles.filter((profile) => profile.hasToken)}
+          locale={locale}
+          api={FOLDER_PUBLICATION_API}
+          onClose={() => { setFolderPublicationOpen(false); refreshFolderShares(); }}
+        />
+      )}
+      {folderSharesOpen && connectionMode === "local" && (
+        <FolderSharesDialog
+          locale={locale}
+          api={FOLDER_SHARES_API}
+          onChanged={refreshFolderShares}
+          onClose={() => { setFolderSharesOpen(false); refreshFolderShares(); }}
         />
       )}
 
@@ -2016,7 +2105,10 @@ export function App() {
                     <div className={`font-semibold font-[var(--font-display,Outfit,sans-serif)] truncate ${isActive ? "text-[#FF6B35]" : "text-[var(--color-ink)]"}`}>
                       {entry.frontmatter.title}
                     </div>
-                    <div className="text-[11px] text-[var(--color-ink-faint)] font-[var(--font-mono,monospace)] truncate mt-0.5">{entry.filename}</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="min-w-0 truncate text-[11px] text-[var(--color-ink-faint)] font-[var(--font-mono,monospace)]">{entry.filename}</span>
+                      <ConflictCopyBadge filename={entry.filename} />
+                    </div>
                   </button>
                 );
               })}
@@ -2120,6 +2212,33 @@ export function App() {
                 <>
                   <button
                     type="button"
+                    data-testid="publish-folder-as-workspace"
+                    onClick={() => setFolderPublicationOpen(true)}
+                    title={locale === "de" ? "Öffnet nur die Auswahl. Hochgeladen wird erst nach deiner Bestätigung in der Vorschau." : "Only opens the selection. Nothing is uploaded until you confirm in the preview."}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+                  >
+                    <FolderUp size={16} />
+                    <span>{folderPublicationLabel(locale)}</span>
+                  </button>
+                  {folderShares.length > 0 && (
+                    <button
+                      type="button"
+                      data-testid="folder-shares"
+                      onClick={() => setFolderSharesOpen(true)}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+                    >
+                      <FolderUp size={16} />
+                      <span>{folderSharesLabel(locale)}</span>
+                      {folderShares.some((share) => share.state === "revoked") && (
+                        <span className="ml-auto rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-bold text-red-500" data-testid="folder-shares-revoked-badge">{locale === "de" ? "Zugriff entzogen" : "Access revoked"}</span>
+                      )}
+                      {folderShares.reduce((sum, share) => sum + (share.pendingCount ?? 0), 0) > 0 && (
+                        <span className={`${folderShares.some((share) => share.state === "revoked") ? "" : "ml-auto "}rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-500`} data-testid="folder-shares-pending-badge">{folderShares.reduce((sum, share) => sum + (share.pendingCount ?? 0), 0)}</span>
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
                     data-testid="change-folder"
                     onClick={handleChooseDirectory}
                     className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
@@ -2134,7 +2253,15 @@ export function App() {
         )}
 
         {/* Canvas + Editor */}
-        <div className="flex-1 h-full">
+        <div className={`flex-1 h-full ${showConflictBanner ? "flex min-w-0 flex-col" : ""}`}>
+          {showConflictBanner && document && activeDocumentFilename && (
+            <ConflictCopyBanner
+              filename={activeDocumentFilename}
+              originalFilename={findConflictCopyOriginal(activeDocumentFilename, files)}
+              onOpenOriginal={(filename) => void loadFile(filename)}
+            />
+          )}
+          <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {document ? (
             <MindMapCanvas onlyRenderVisibleElements onRootRename={handleRootRename} />
           ) : (
@@ -2176,6 +2303,7 @@ export function App() {
               </div>
             </div>
           )}
+          </div>
         </div>
         {selectedNodeId && editorVisible && <ResizableEditor />}
       </div>
@@ -2497,9 +2625,11 @@ function SharedDocumentDialog({
               <dl className="mt-3 grid gap-2 text-[var(--color-ink-muted)]"><div><dt className="inline font-medium text-[var(--color-ink)]">{de ? "Profil: " : "Profile: "}</dt><dd className="inline">{sharedDocument.profileName}</dd></div><div><dt className="inline font-medium text-[var(--color-ink)]">{de ? "Cloud-Datei: " : "Cloud file: "}</dt><dd className="inline font-mono text-xs">{sharedDocument.cloudFilename}</dd></div></dl>
             </div>
             {sharedDocument.connectionState === "conflict" && <div role="alert" className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-[var(--color-ink-muted)]"><p className="font-semibold text-[var(--color-ink)]">{de ? "Lokale und Cloud-Version unterscheiden sich." : "The local and cloud versions differ."}</p><p className="mt-2 leading-6">{de ? "BloomMD hat nichts automatisch überschrieben. Wähle bewusst, welche Version weitergeführt werden soll." : "BloomMD has not overwritten either version automatically. Choose deliberately which version to continue with."}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" disabled={submitting} onClick={() => void resolveConflict("cloud")} className="rounded-lg border border-[var(--color-border)] px-3 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)] disabled:opacity-50">{de ? "Cloud-Version verwenden" : "Use cloud version"}</button><button type="button" disabled={submitting} onClick={() => void resolveConflict("local")} className="rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">{submitting ? (de ? "Wird übernommen …" : "Applying …") : (de ? "Lokale Version beibehalten" : "Keep local version")}</button></div><p className="mt-3 text-xs leading-5 text-[var(--color-ink-faint)]">{de ? "Die nicht gewählte Version wird dabei nicht als zusätzliche Kopie angelegt." : "The version you do not choose is not saved as an additional copy."}</p></div>}
-            <p className="text-sm leading-6 text-[var(--color-ink-muted)]">{de ? "Beim Trennen bleibt diese lokale Markdown-Datei unverändert erhalten. Das Cloud-Dokument wird nicht gelöscht." : "Disconnecting keeps this local Markdown file unchanged. The cloud document is not deleted."}</p>
+            {sharedDocument.folderShare
+              ? <p className="text-sm leading-6 text-[var(--color-ink-muted)]" data-testid="shared-document-folder-note">{de ? `Diese Datei gehört zur Ordnerfreigabe „${sharedDocument.folderShare.folderName}“. Sie lässt sich nur dort trennen: Seitenleiste → Ordnerfreigaben. Lokale Datei und Cloud-Dokument bleiben dabei unverändert.` : `This file belongs to the folder share “${sharedDocument.folderShare.folderName}”. It can only be disconnected there: sidebar → Folder shares. The local file and the cloud document stay unchanged.`}</p>
+              : <p className="text-sm leading-6 text-[var(--color-ink-muted)]">{de ? "Beim Trennen bleibt diese lokale Markdown-Datei unverändert erhalten. Das Cloud-Dokument wird nicht gelöscht." : "Disconnecting keeps this local Markdown file unchanged. The cloud document is not deleted."}</p>}
             {error && <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">{error}</p>}
-            <div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">{de ? "Schließen" : "Close"}</button><button type="button" disabled={submitting} onClick={() => void submitUnshare()} className="inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-50"><Link2Off size={15} />{submitting ? (de ? "Trenne …" : "Disconnecting …") : (de ? "Freigabe trennen" : "Disconnect share")}</button></div>
+            <div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)]">{de ? "Schließen" : "Close"}</button>{!sharedDocument.folderShare && <button type="button" disabled={submitting} onClick={() => void submitUnshare()} className="inline-flex items-center gap-2 rounded-lg border border-red-500/50 px-4 py-2 text-sm font-semibold text-red-500 hover:bg-red-500/10 disabled:opacity-50"><Link2Off size={15} />{submitting ? (de ? "Trenne …" : "Disconnecting …") : (de ? "Freigabe trennen" : "Disconnect share")}</button>}</div>
           </div>
         ) : (
           <form className="space-y-5 px-6 py-5" onSubmit={(event) => void submitShare(event)}>

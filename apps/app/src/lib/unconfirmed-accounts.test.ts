@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "./unconfirmed-accounts";
+import { purgeUnactivatedWaitlistAccounts, purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "./unconfirmed-accounts";
 import type { SqlClient } from "./sql-client";
 
 function fakeSql(row: Record<string, unknown>) {
@@ -52,6 +52,47 @@ describe("purging unconfirmed accounts (#169)", () => {
     const { sql, calls } = fakeSql({});
     for (const days of [0, -1, 1.5, Number.NaN]) {
       await expect(purgeUnconfirmedAccounts(sql, { days, dryRun: false })).rejects.toThrow("positive integer");
+    }
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("purging unactivated waitlist accounts (#105)", () => {
+  test("defaults to 90 days, the retention of the waitlist entries", async () => {
+    const { sql, calls } = fakeSql({ accounts: 4 });
+
+    const result = await purgeUnactivatedWaitlistAccounts(sql, { dryRun: true });
+
+    expect(result).toEqual({ dryRun: true, days: 90, accounts: 4 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.statement).not.toMatch(/\bdelete\b/i);
+    expect(calls[0]!.values).toEqual([90]);
+  });
+
+  test("applying deletes only prepared accounts nobody used, counted from the mail or else the creation", async () => {
+    const { sql, calls } = fakeSql({ accounts: 2 });
+
+    const result = await purgeUnactivatedWaitlistAccounts(sql, { days: 30, dryRun: false });
+
+    expect(result).toEqual({ dryRun: false, days: 30, accounts: 2 });
+    const { statement, values } = calls[0]!;
+    expect(values).toEqual([30]);
+    expect(statement).toContain("delete from bloom_users");
+    expect(statement).toContain("using bloom_waitlist_transfers t");
+    expect(statement).toContain("t.activated_at is null");
+    expect(statement).toContain("u.password_hash is null");
+    expect(statement).toContain("u.email_verified_at is null");
+    expect(statement).toContain("u.stripe_customer_id is null");
+    expect(statement).toContain("coalesce(t.invited_at, t.created_at)");
+    for (const table of ["bloom_workspace_members", "bloom_workspaces", "bloom_access_tokens"]) {
+      expect(statement).toContain(`not exists (select 1 from ${table}`);
+    }
+  });
+
+  test("rejects an invalid age", async () => {
+    const { sql, calls } = fakeSql({});
+    for (const days of [0, -1, 1.5, Number.NaN]) {
+      await expect(purgeUnactivatedWaitlistAccounts(sql, { days, dryRun: false })).rejects.toThrow("positive integer");
     }
     expect(calls).toHaveLength(0);
   });

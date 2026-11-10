@@ -23,6 +23,6 @@ Die neue macOS-Version von BloomMD macht den Wechsel zwischen Workspace-Übersic
 - Mit `Cmd/Ctrl + ←` geht es zurück zur Workspace-Übersicht; `Cmd/Ctrl + →` öffnet
   wieder die zuletzt geöffnete Datei.
 
-Der macOS-arm64-Build steht ab sofort für die Closed Beta bereit: [Desktop 0.3.1 herunterladen](https://github.com/moellenbeck-digital/BloomMD/releases/download/v0.3.1/stable-macos-arm64-BloomMD.dmg).
+Der macOS-arm64-Build steht ab sofort für die Beta bereit: [Desktop 0.3.1 herunterladen](https://github.com/moellenbeck-digital/BloomMD/releases/download/v0.3.1/stable-macos-arm64-BloomMD.dmg).
 
 **Release-Datum:** 29. August 2026 · [Release ansehen](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.3.1)

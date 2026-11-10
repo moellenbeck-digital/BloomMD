@@ -1,7 +1,7 @@
 # Datenschutz-, Altersfreigabe- und Export-Antworten
 
 Abgeleitet aus dem Code-Stand von `packages/mobile` mit Anmeldung ([Archiv #503](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/503)) und iOS-Projekt ([Archiv #502](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/502)),
-Oktober 2026. Maßgeblich für Apple ist `packages/mobile/ios/App/App/PrivacyInfo.xcprivacy`; die
+Oktober 2026, am 4. November 2026 erneut gegen den Code geprüft (Ticket #26). Maßgeblich für Apple ist `packages/mobile/ios/App/App/PrivacyInfo.xcprivacy`; die
 Antworten hier stimmen damit überein. Jede Änderung an Netzwerk, Anmeldung oder SDKs macht eine neue
 Prüfung nötig.
 
@@ -35,6 +35,13 @@ Prüfung nötig.
 - [x] **Teilen:** über das System-Teilen-Menü (`@capacitor/share`), nur auf Nutzeraktion.
 - [x] **Deep Links:** `bloommd://open?path=…&node=…` öffnet nur eine Notiz im bereits geöffneten
   Ordner; `bloommd://auth?…` schließt nur eine in der App gestartete Anmeldung ab (State-Prüfung).
+  Dasselbe Öffnen gibt es als Universal Link bzw. App Link `https://bloommd.io/open?…` (iOS:
+  `applinks:bloommd.io` in `App.entitlements`, Android: Intent-Filter mit `autoVerify`; `auth` gilt
+  nur über `bloommd://`). Es werden keine Daten übertragen. Die Verknüpfung wirkt erst, wenn die
+  Website `APPLE_TEAM_ID` bzw. `ANDROID_CERT_SHA256` kennt (siehe `OWNER-CHECKLIST.md`).
+- [x] **Gerätebezeichnung:** Beim Anmelden geht nur eine grobe Bezeichnung („iPad“, „iPhone“,
+  „Android-Smartphone“, „Android-Tablet“) an den Server, damit der Zugang in der Kontoverwaltung
+  erkennbar ist (`describeDevice` in `src/mobile-auth.ts`). Keine Geräte-ID, kein Werbe-Identifier.
 - [x] **Share-Links (nur lesen) und Agenten** werden in der Web-App (`bloommd.app`) angelegt, nicht in
   der Mobile-App.
 
@@ -63,6 +70,8 @@ Prüfung nötig.
   angemeldet den Link **„Konto verwalten oder löschen“** (öffnet `https://bloommd.app/account`,
   Abschnitt „Account dauerhaft löschen“: E-Mail und Passwort bestätigen, löscht persönliche
   Workspaces, Cloud-Dokumente, Views, Sessions und Berechtigungen, `apps/app/src/app/api/account/delete`).
+  Die vollständige Liste (auch was beim Löschen nicht entfernt wird) steht im Abschnitt „Speicherdauer und Löschung“
+  der Datenschutzerklärung und in `docs/LOESCHKONZEPT.md` (Ticket #199, Entwurf).
 - [ ] **Privacy Manifest:** vorhanden ([Archiv #502](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/502)) – E-Mail und andere Nutzerinhalte wie oben; Required-
   Reason-APIs `FileTimestamp` (C617.1, 3B52.1) und `UserDefaults` (CA92.1). Nach dem Archivieren in
   Xcode *Generate Privacy Report* prüfen.
@@ -76,6 +85,9 @@ Prüfung nötig.
   **Lösch-URL:** `https://bloommd.app/account` (Abschnitt „Account dauerhaft löschen“; nach Anmeldung,
   ohne App nutzbar). Alternativ per E-Mail an die Adresse aus dem Impressum – im Formular als
   zweiten Weg nennen, weil die Löschung auf der Website ein Passwort verlangt.
+  Für Angaben zu Daten, die nach der Löschung bleiben, gilt `docs/LOESCHKONZEPT.md`: Sicherheitsprotokoll (ohne Kontobezug,
+  365 Tage), Feedback-Nachrichten aus der Web-App (ohne Kontobezug, im Repo ohne automatische Löschung) und ein früherer
+  Wartelisten-Eintrag (90 Tage nach der Einladungs-E-Mail). Das Formular erst nach der Entscheidung der Admins dazu ausfüllen.
 - [ ] **Kontoerstellung:** „Die App ermöglicht Nutzern, ein Konto zu erstellen“ → über die Website
   (Anmelde-Browser), Methode „Benutzername und Passwort“; Lösch-URL wie oben.
 - [ ] **Datentypen** (jeweils *erhoben: ja*, *geteilt: nein*, *nur flüchtig verarbeitet: nein*,
@@ -87,6 +99,10 @@ Prüfung nötig.
   (keine Absturzberichte), Geräte-IDs. Lokale Ordner (SAF) werden nur auf dem Gerät gelesen und
   geschrieben und zählen nicht als Erhebung.
 - [ ] **Werbung:** „Enthält keine Werbung“.
+- [ ] **Android Auto Backup:** `allowBackup="true"`. Notizen im App-Ordner (`files/bloommd/`) und
+  Einstellungen können dadurch ins Google-Konto des Nutzers gesichert werden; das ist eine Funktion
+  des Betriebssystems und keine Erhebung durch BloomMD. Der Anmelde-Token (`bloommd_keychain`)
+  ist von der Sicherung ausgenommen (`backup_rules.xml`, `data_extraction_rules.xml`).
 - [ ] Gilt nur, solange der Android-Build (#28) keine zusätzlichen SDKs (Firebase, Crash-Reporting)
   erhält – vor dem Upload mit `packages/mobile/android/app/build.gradle` abgleichen.
 
@@ -102,8 +118,11 @@ Prüfung nötig.
   keine öffentliche Inhalte-Suche, keinen Chat, keine Profile. Share-Links entstehen in der Web-App
   und sind nur lesbar. Falls Apple nach „Teilen von Inhalten mit anderen Nutzern“ fragt:
   **Ja, nur mit eingeladenen Workspace-Mitgliedern** – das ändert die Stufe nicht.
-- [ ] Uneingeschränkter Webzugang → **Nein**. Der In-App-Browser öffnet nur die Anmeldung und die
-  Kontoseite des BloomMD-Servers; es gibt keine freie Adresseingabe.
+- [ ] Uneingeschränkter Webzugang → **Nein**. Der In-App-Browser öffnet nur `/auth/mobile` und
+  `/account` des BloomMD-Servers; es gibt keine Adressleiste und keine Links ins freie Web. Einzige
+  Ausnahme: Unter „Erweitert: eigener Server“ kann der Nutzer einen anderen `https://`-Server
+  eintragen, dessen Anmeldeseite dann geöffnet wird. Die Antwort „Nein“ bleibt vertretbar; Owner
+  entscheidet (siehe `OWNER-CHECKLIST.md`, offene Entscheidungen).
 - [ ] Werbung → **Nein**. Altersverifikation/Kindersicherung → **Nein**.
 - [ ] Erwartetes Ergebnis: **4+**.
 - [ ] „Made for Kids“/Kinder-Kategorie: **Nein**.

@@ -133,3 +133,157 @@ test("recovers one remote client after a browser network interruption", async ({
     await client.context.close();
   }
 });
+
+// @t46 — Änderungen per WebSocket müssen im Sync-Server persistiert werden (Reload, Raumabbau, Tab-Schluss).
+// Der Test-Sync-Server läuft mit SYNC_PERSIST_DEBOUNCE=250 und SYNC_DESTROY_DELAY=1000 (playwright.collaboration.config.ts).
+// Alle Clients teilen shared.md, und der Server bleibt über die Tests hinweg an. Deshalb benennen diese Tests Knoten
+// `collab-a` per Id um (nie über den Titel) und vergeben je Aufruf einen eigenen Titel: wiederholbar mit Retries.
+const T46_NODE_ID = "collab-a";
+const SYNC_HEALTH_URL = `http://localhost:${process.env.PLAYWRIGHT_COLLAB_SYNC_PORT ?? "4611"}/health`;
+
+function t46Label(tag: string) {
+  return `T46 ${tag} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function nodeByLabel(page: Page, label: string) {
+  return page.locator(`[data-node-label="${label}"]`).first();
+}
+
+async function renameT46Node(page: Page, label: string) {
+  const node = page.locator(`[data-node-id="${T46_NODE_ID}"]`).first();
+  await node.click();
+  await node.press("r");
+  const renameInput = page.getByTestId("node-rename-input");
+  await expect(renameInput).toBeVisible();
+  await renameInput.fill(label);
+  await renameInput.press("Enter");
+  await expect(nodeByLabel(page, label)).toBeVisible();
+}
+
+async function reloadSynced(page: Page) {
+  await page.reload();
+  await expect(page.getByTestId("mindmap-canvas")).toBeVisible();
+  await expect(page.getByTestId("sync-status")).toContainText("Synced");
+}
+
+async function syncHealth() {
+  const response = await fetch(SYNC_HEALTH_URL);
+  return await response.json() as { status: string; rooms: number; clients: number; persistenceFailures: number };
+}
+
+async function expectPersistedInFile(label: string) {
+  await expect.poll(async () => readFile(workspaceFile, "utf8"), { timeout: 10_000 }).toContain(`## ${label}`);
+}
+
+async function expectRoomsTornDown() {
+  // SYNC_DESTROY_DELAY=1000: Raum ist erst weg, wenn /health keinen Raum und keinen Client mehr meldet.
+  await expect.poll(async () => (await syncHealth()).rooms, { timeout: 15_000 }).toBe(0);
+}
+
+test("@t46 rename at client A is persisted: reload at A and at B shows the new state", async ({ browser }) => {
+  const clientA = await signUpAndOpenApp(browser, "t46-reload-a");
+  const clientB = await signUpAndOpenApp(browser, "t46-reload-b");
+
+  try {
+    const label = t46Label("reload");
+    await renameT46Node(clientA.page, label);
+    await expect(nodeByLabel(clientB.page, label)).toBeVisible();
+    await expectPersistedInFile(label);
+
+    await reloadSynced(clientA.page);
+    await expect(nodeByLabel(clientA.page, label)).toBeVisible();
+
+    await reloadSynced(clientB.page);
+    await expect(nodeByLabel(clientB.page, label)).toBeVisible();
+  } finally {
+    await clientA.context.close();
+    await clientB.context.close();
+  }
+});
+
+test("@t46 state survives room teardown after all clients left", async ({ browser }) => {
+  const clientA = await signUpAndOpenApp(browser, "t46-teardown-a");
+  const clientB = await signUpAndOpenApp(browser, "t46-teardown-b");
+  const label = t46Label("teardown");
+
+  try {
+    await renameT46Node(clientA.page, label);
+    await expect(nodeByLabel(clientB.page, label)).toBeVisible();
+    await expectPersistedInFile(label);
+  } finally {
+    await clientA.context.close();
+    await clientB.context.close();
+  }
+
+  await expectRoomsTornDown();
+  expect((await syncHealth()).persistenceFailures).toBe(0);
+
+  const clientC = await signUpAndOpenApp(browser, "t46-teardown-c");
+  try {
+    await expect(nodeByLabel(clientC.page, label)).toBeVisible();
+    await expect(clientC.page.getByTestId("sync-status")).toContainText("Synced");
+    expect(await readFile(workspaceFile, "utf8")).toContain(`## ${label}`);
+  } finally {
+    await clientC.context.close();
+  }
+});
+
+test("@t46 change right before closing the tab is persisted", async ({ browser }) => {
+  const clientA = await signUpAndOpenApp(browser, "t46-close-a");
+  const label = t46Label("close");
+
+  try {
+    await renameT46Node(clientA.page, label);
+    // Kein Warten auf Sync oder Datei: Tab schließt innerhalb des Debounce-Fensters (250 ms).
+    await clientA.page.close();
+  } finally {
+    await clientA.context.close();
+  }
+
+  await expectRoomsTornDown();
+  await expectPersistedInFile(label);
+
+  const clientD = await signUpAndOpenApp(browser, "t46-close-d");
+  try {
+    await expect(nodeByLabel(clientD.page, label)).toBeVisible();
+  } finally {
+    await clientD.context.close();
+  }
+});
+
+test("@t46 editing continues after reload without error and the next reload shows the newest state", async ({ browser }) => {
+  const clientA = await signUpAndOpenApp(browser, "t46-edit-a");
+  const clientB = await signUpAndOpenApp(browser, "t46-edit-b");
+
+  try {
+    const first = t46Label("edit-1");
+    await renameT46Node(clientA.page, first);
+    await expect(nodeByLabel(clientB.page, first)).toBeVisible();
+    await expectPersistedInFile(first);
+
+    await reloadSynced(clientA.page);
+    await expect(nodeByLabel(clientA.page, first)).toBeVisible();
+
+    const second = t46Label("edit-2");
+    await renameT46Node(clientA.page, second);
+    await expect(nodeByLabel(clientB.page, second)).toBeVisible();
+    await expectPersistedInFile(second);
+    expect(await readFile(workspaceFile, "utf8")).not.toContain(`## ${first}`);
+
+    // Weder Fehler- noch Konfliktzustand: Sync-Status bleibt "Synced", der Server meldet keinen Speicherfehler.
+    await expect(clientA.page.getByTestId("sync-status")).toContainText("Synced");
+    await expect(clientA.page.getByTestId("sync-status")).not.toContainText(/fail|conflict|error|offline/i);
+    expect(await syncHealth()).toMatchObject({ status: "ok", persistenceFailures: 0 });
+
+    await reloadSynced(clientA.page);
+    await expect(nodeByLabel(clientA.page, second)).toBeVisible();
+    await expect(nodeByLabel(clientA.page, first)).toHaveCount(0);
+
+    await reloadSynced(clientB.page);
+    await expect(nodeByLabel(clientB.page, second)).toBeVisible();
+    await expect(nodeByLabel(clientB.page, first)).toHaveCount(0);
+  } finally {
+    await clientA.context.close();
+    await clientB.context.close();
+  }
+});

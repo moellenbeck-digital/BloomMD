@@ -1,7 +1,11 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 
-const [distDir = "dist", rawEntryBudget = "1800000", rawLazyBudget = "1750000"] = process.argv.slice(2);
+// `--require-lazy`: a build without a NodeEditor-*.js chunk fails instead of skipping the lazy check
+// (the budget would otherwise check nothing once the editor stops being split off).
+const args = process.argv.slice(2);
+const requireLazy = args.includes("--require-lazy");
+const [distDir = "dist", rawEntryBudget = "1800000", rawLazyBudget = "1750000"] = args.filter((arg) => arg !== "--require-lazy");
 const entryBudget = Number(rawEntryBudget);
 const lazyBudget = Number(rawLazyBudget);
 if (!Number.isSafeInteger(entryBudget) || !Number.isSafeInteger(lazyBudget)) {
@@ -23,3 +27,4 @@ await verify(join(distDir, entryMatch[1]), entryBudget, "Initial JavaScript entr
 const assetsDir = join(distDir, "assets");
 const lazyEditor = (await readdir(assetsDir)).find((name) => /^NodeEditor-.*\.js$/.test(name));
 if (lazyEditor) await verify(join(assetsDir, lazyEditor), lazyBudget, "Lazy node editor");
+else if (requireLazy) throw new Error(`--require-lazy: no NodeEditor-*.js chunk in ${assetsDir}, so the lazy budget checked nothing.`);

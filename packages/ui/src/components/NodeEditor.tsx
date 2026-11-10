@@ -1,7 +1,7 @@
 "use client";
 
 import { workspaceSourceFile, openWorkspaceSource } from "../utils/workspaceSource";
-import { lazy, Suspense, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent } from "react";
 import {
   AlertTriangle,
   BookOpen,
@@ -18,6 +18,7 @@ import {
   LoaderCircle,
   Music2,
   Network,
+  Quote,
   Scale,
   Signpost,
   Trash2,
@@ -51,38 +52,32 @@ import "@mdxeditor/editor/style.css";
 import "./NodeEditor.css";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
+import { usePlatform } from "../platform/PlatformContext";
+import { RemotePreviewImage, remoteHost } from "./RemotePreviewImage";
 import { requestNodeFocus } from "../utils/nodeFocus";
+import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
 import { restoreWikiLinks } from "../utils/wiki-links-escape";
 import type { Translations } from "../i18n/translations";
-import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, resolveMapLinkInDocument, type MapLinkResource, type MapLinkResolution } from "../utils/links";
+import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown, resolveMapLinkInDocument, type MapLinkResource, type MapLinkResolution, type PdfLink } from "../utils/links";
 import {
   countChildKinds,
   directResourcePreviewUrl,
   metadataForKindChange,
   nodeResourceIssue,
+  pdfLinkOpenDetail,
   resourcePreviewKind,
   shouldShowPrimaryMarkdownEditor,
   workspaceReferencesForNode,
   type ResourcePreviewKind,
 } from "./node-panel-model";
+import { LazyNodeImageGallery, LazyVisualViewer, mermaidCodeBlockDescriptor } from "../visuals/lazy";
+import { useInlineImagePreview } from "../visuals/useInlineImages";
+import { VisualsContext, type ViewerRequest, type VisualsContextValue } from "../visuals/visuals-context";
 
 interface NodeEditorProps {
   /** When true, renders without the aside wrapper (for embedding in bottom sheets etc.) */
   embedded?: boolean;
-}
-
-interface ApiListResponse {
-  files: MindMapListEntry[];
-}
-
-interface ApiDocResponse {
-  filePath: string;
-  frontmatter: MindMapDocument["frontmatter"];
-  nodes: Record<string, MindMapNode>;
-  rootId: string;
-  preamble?: string;
-  storage?: MindMapDocument["storage"];
 }
 
 interface BacklinkEntry {
@@ -119,20 +114,6 @@ interface ResourceChooseRequest {
   respond: (result: { path: string } | { canceled: true } | { error: string }) => void;
 }
 
-interface LinkPreviewRequest {
-  url: string;
-  respond: (result: { preview: { title?: string; description?: string; image?: string } } | { error: string }) => void;
-}
-
-interface ListMapsRequest {
-  respond: (result: { files: MindMapListEntry[] } | { error: string }) => void;
-}
-
-interface LoadMapDocumentRequest {
-  filename: string;
-  respond: (result: { document: ApiDocResponse } | { error: string }) => void;
-}
-
 interface OpenUrlRequest {
   url: string;
   respond: (result: { opened: true } | { error: string }) => void;
@@ -157,19 +138,12 @@ function filenameFor(doc: MindMapDocument): string {
   return doc.filePath.split("/").pop() || doc.filePath;
 }
 
-function hydrateDocument(data: ApiDocResponse): MindMapDocument {
-  return {
-    ...data,
-    nodes: new Map(Object.entries(data.nodes)),
-    rawMarkdown: "",
-  };
-}
-
 const NodeHandwriting = lazy(() => import("./NodeHandwriting").then((module) => ({ default: module.NodeHandwriting })));
 
 export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const inkAttachments = useContext(InkAttachmentsContext);
   const { t } = useLocale();
+  const platform = usePlatform();
   const nodeKindOptions = getNodeKindOptions(t);
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const document = useMindMapStore((s) => s.document);
@@ -188,7 +162,15 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>({ url: "", file: "", targetNodeId: "", citation: "", due: "", assignee: "" });
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewEmpty, setPreviewEmpty] = useState(false);
+  // The image the user just fetched; it may show at once, any other stored image needs a click.
+  const [fetchedImage, setFetchedImage] = useState<string | null>(null);
   const [resourcePreview, setResourcePreview] = useState<ResourcePreviewState>({ status: "idle" });
+  const [pdfLinkError, setPdfLinkError] = useState<{ key: string; message: string } | null>(null);
+  const [viewer, setViewer] = useState<ViewerRequest | null>(null);
+  const notePath = document?.filePath ?? "";
+  const imageCopy = useMemo(() => ({ notFound: t.visualImageNotFound, rejected: t.visualImagePathRejected }), [t.visualImageNotFound, t.visualImagePathRejected]);
+  const { handler: imagePreviewHandler } = useInlineImagePreview(notePath, imageCopy);
 
   const selectedNode = selectedNodeId
     ? document?.nodes.get(selectedNodeId)
@@ -197,6 +179,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const sourceFile = selectedNodeId ? workspaceSourceFile(document, selectedNodeId) : undefined;
   const linkResources = selectedNode ? extractLinksFromMarkdown(selectedNode.content) : [];
   const mapLinkResources = selectedNode && !isWorkspaceDocument ? extractMapLinksFromMarkdown(selectedNode.content) : [];
+  const pdfLinkResources = selectedNode && !isWorkspaceDocument ? extractPdfLinksFromMarkdown(selectedNode.content) : [];
   const workspaceReferences = document && selectedNode ? workspaceReferencesForNode(document, selectedNode.id) : [];
 
   useEffect(() => {
@@ -211,6 +194,10 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       assignee: metadata?.assignee ?? "",
     });
   }, [document?.filePath, selectedNodeId]);
+
+  useEffect(() => {
+    setPdfLinkError(null);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (editorRef.current && selectedNode) {
@@ -253,71 +240,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     [requestNodeFocus, setEditorVisible, setSelectedNodeId],
   );
 
-  const loadMapList = useCallback(async (): Promise<MindMapListEntry[]> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<MindMapListEntry[] | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<ListMapsRequest>("bloommd:list-maps", {
-          cancelable: true,
-          detail: {
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.files);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapsUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return shellResult;
-    }
+  const loadMapList = useCallback((): Promise<MindMapListEntry[]> => platform.files.list(), [platform]);
 
-    if (typeof fetch === "undefined") return [];
-    const response = await fetch("/api/mindmaps");
-    if (!response.ok) return [];
-    const data = await response.json() as ApiListResponse;
-    return data.files;
-  }, [t.mapsUnavailable]);
-
-  const loadMapDocument = useCallback(async (filename: string): Promise<MindMapDocument | null> => {
-    if (typeof window !== "undefined") {
-      const shellResult = await new Promise<ApiDocResponse | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LoadMapDocumentRequest>("bloommd:load-map-document", {
-          cancelable: true,
-          detail: {
-            filename,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.document);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-        if (!shellResponded) reject(new Error(t.mapUnavailable));
-        }, 10_000);
-      });
-      if (shellResult) return hydrateDocument(shellResult);
-    }
-
-    if (typeof fetch === "undefined") return null;
-    const response = await fetch(`/api/mindmaps/${encodeURIComponent(filename)}`);
-    if (!response.ok) return null;
-    return hydrateDocument(await response.json() as ApiDocResponse);
-  }, [t.mapUnavailable]);
+  const loadMapDocument = useCallback((filename: string): Promise<MindMapDocument> => platform.files.read(filename), [platform]);
 
   const openMapLink = useCallback(
     async (link: MapLinkResource) => {
@@ -340,7 +265,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
 
       try {
         const nextDoc = await loadMapDocument(targetFilename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         const resolved = resolveMapLinkInDocument(link, targetFilename, nextDoc.nodes.values());
         const nextSelection = resolved.status === "resolved" ? resolved.nodeId : nextDoc.rootId;
@@ -354,6 +278,23 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     [document, focusMapNode, loadMapDocument, setDocument],
   );
 
+  const openPdfLink = useCallback(
+    (link: PdfLink) => {
+      if (!selectedNodeId) return;
+      const key = `${link.line}:${link.raw}`;
+      setPdfLinkError(null);
+      // The shell opens the file at the page and reports back when it cannot, so a missing file is
+      // said out loud instead of the click doing nothing.
+      window.dispatchEvent(new CustomEvent("bloommd:open-resource", {
+        detail: {
+          ...pdfLinkOpenDetail(selectedNodeId, link),
+          respond: (result: { error: string }) => setPdfLinkError({ key, message: result.error }),
+        },
+      }));
+    },
+    [selectedNodeId],
+  );
+
   const openBacklink = useCallback(
     async (entry: BacklinkEntry) => {
       if (!document) return;
@@ -364,7 +305,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       }
       try {
         const nextDoc = await loadMapDocument(entry.filename);
-        if (!nextDoc) return;
         setDocument(nextDoc);
         setTimeout(() => {
           focusMapNode(entry.nodeId);
@@ -399,7 +339,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             if (file.filename === currentFilename) return;
             try {
               const doc = await loadMapDocument(file.filename);
-              if (doc) docs.set(file.filename, doc);
+              docs.set(file.filename, doc);
             } catch {
               // Skip unavailable files.
             }
@@ -553,6 +493,11 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     };
   }, [kind, resourcePath, t.localPreviewUnavailable, t.previewUnavailable]);
 
+  const visualsContext = useMemo<VisualsContextValue>(
+    () => ({ notePath, title: selectedNode?.title ?? "", readOnly, openViewer: setViewer }),
+    [notePath, readOnly, selectedNode?.title],
+  );
+
   if (!selectedNode) return null;
 
   const updateMetadata = (patch: Partial<MindMapNodeMetadata>) => {
@@ -580,44 +525,11 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     if (!url) return;
     setPreviewLoading(true);
     setPreviewError(null);
+    setPreviewEmpty(false);
     try {
-      const previewFromShell = await new Promise<{ title?: string; description?: string; image?: string } | null>((resolve, reject) => {
-        let shellResponded = false;
-        const event = new CustomEvent<LinkPreviewRequest>("bloommd:load-link-preview", {
-          cancelable: true,
-          detail: {
-            url,
-            respond: (result) => {
-              shellResponded = true;
-              if ("error" in result) reject(new Error(result.error));
-              else resolve(result.preview);
-            },
-          },
-        });
-        window.dispatchEvent(event);
-        if (!event.defaultPrevented) {
-          resolve(null);
-          return;
-        }
-        window.setTimeout(() => {
-          if (!shellResponded) reject(new Error(t.previewUnavailable));
-        }, 10_000);
-      });
-      let data: { preview?: { title?: string; description?: string; image?: string }; error?: string };
-      if (previewFromShell) {
-        data = { preview: previewFromShell };
-      } else {
-        const response = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`);
-        const raw = await response.text();
-        try {
-          data = JSON.parse(raw) as typeof data;
-        } catch {
-          throw new Error(`${t.previewServiceError} ${response.status || 500}.`);
-        }
-        if (!response.ok || !data.preview) throw new Error(data.error || t.previewUnavailable);
-      }
-      const preview = data.preview;
-      if (!preview) throw new Error(t.previewUnavailable);
+      const preview = await platform.api.linkPreview(url);
+      if (!preview.title && !preview.description && !preview.image) setPreviewEmpty(true);
+      setFetchedImage(preview.image || null);
       updateMetadata({
         ...(preview.title ? { previewTitle: preview.title } : {}),
         ...(preview.description ? { previewDescription: preview.description } : {}),
@@ -716,18 +628,18 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             </span>
           )}
         </div>
-        <h2 className={`${embedded ? "text-lg" : "text-xl"} font-semibold font-[var(--font-display,Outfit,sans-serif)] text-[var(--color-ink)] tracking-tight truncate`}>
+        <h2 className={`${embedded ? "text-lg" : "text-xl"} font-semibold font-[var(--font-display,Outfit,sans-serif)] text-[var(--color-ink)] tracking-tight truncate pointer-coarse:pr-16`}>
           {selectedNode.title}
         </h2>
         {readOnly && <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">{isWorkspaceDocument ? t.workspaceOverviewReadOnly : t.readOnlyMessage}</p>}
-        {sourceFile && <button type="button" className="mt-2 underline" onClick={() => openWorkspaceSource(sourceFile)}>{t.openSourceFile}</button>}
-        {!readOnly && selectedNode.id !== document?.rootId && <button type="button" onClick={() => { deleteNodeAction(selectedNode.id); setEditorVisible(false); }} className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50" title={t.deleteNodeBranch} aria-label={t.deleteNodeBranch} data-testid="node-editor-delete"><Trash2 size={16} /></button>}
+        {sourceFile && <button type="button" className="mt-2 underline pointer-coarse:min-h-11" onClick={() => openWorkspaceSource(sourceFile)}>{t.openSourceFile}</button>}
+        {!readOnly && selectedNode.id !== document?.rootId && <button type="button" onClick={() => { deleteNodeAction(selectedNode.id); setEditorVisible(false); }} className="absolute right-5 top-5 flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-red-600 hover:bg-red-50" title={t.deleteNodeBranch} aria-label={t.deleteNodeBranch} data-testid="node-editor-delete"><Trash2 size={16} /></button>}
       </div>
 
       <div className={`${embedded ? "px-4 py-3" : "px-5 py-4"} grid gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]`} data-testid="node-metadata-editor">
         <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
           {t.nodeType}
-          <select value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
+          <select value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
             {nodeKindOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -783,8 +695,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 <div className="mt-1 truncate text-sm font-medium text-[var(--color-ink)]">{resourcePath || t.noFileSelected}</div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={chooseResourceFile} className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><FileText size={15} />{t.chooseFile}</button>
-                <button type="button" onClick={openTypedResource} disabled={!resourcePath} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={15} />{t.open}</button>
+                <button type="button" onClick={chooseResourceFile} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><FileText size={15} />{t.chooseFile}</button>
+                <button type="button" onClick={openTypedResource} disabled={!resourcePath} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><ExternalLink size={15} />{t.open}</button>
               </div>
               <p className="text-xs leading-5 text-[var(--color-ink-muted)]">
                 {kind === "file"
@@ -831,16 +743,22 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             <div className="grid gap-2" data-testid="node-url-panel">
               <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
                 URL
-                <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
+                <input type="url" value={metadataDraft.url} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, url: event.target.value }))} onBlur={() => commitMetadataField("url")} placeholder="https://example.com" className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-url-input" />
               </label>
-              <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+              {metadataDraft.url.trim() && (
+                <p className="text-xs leading-5 text-[var(--color-ink-muted)]" data-testid="node-preview-disclosure">
+                  {t.previewDisclosure.replace("{url}", metadataDraft.url.trim()).replace("{host}", remoteHost(metadataDraft.url.trim()) ?? metadataDraft.url.trim())}
+                </p>
+              )}
+              <button type="button" onClick={() => void loadWebsitePreview()} disabled={!metadataDraft.url.trim() || previewLoading} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
                 {previewLoading ? <LoaderCircle size={15} className="animate-spin" /> : <ExternalLink size={15} />}
                 {previewLoading ? t.loadPreview : t.loadWebsitePreview}
               </button>
-              {previewError && <p className="text-xs text-red-700">{previewError}</p>}
+              {previewError && <p className="text-xs text-red-700" data-testid="node-preview-error">{previewError}</p>}
+              {previewEmpty && <p className="text-xs text-[var(--color-ink-muted)]" data-testid="node-preview-empty">{t.previewEmpty}</p>}
               {(metadata?.previewTitle || metadata?.previewDescription || metadata?.previewImage) && (
                 <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)]">
-                  {metadata.previewImage && <img src={metadata.previewImage} alt="Website preview" loading="lazy" className="h-28 w-full object-cover" />}
+                  {metadata.previewImage && <RemotePreviewImage key={`${selectedNodeId}:${metadata.previewImage}`} src={metadata.previewImage} alt="Website preview" className="h-28 w-full object-cover" autoLoad={fetchedImage === metadata.previewImage} />}
                   <div className="grid gap-1 p-3">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[#C94D20]">{t.savedPreview}</span>
                     <strong className="text-sm text-[var(--color-ink)]">{metadata.previewTitle || selectedNode.title}</strong>
@@ -851,13 +769,13 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
             </div>
           )}
           {(kind === "web" || kind === "source") && metadataDraft.url.trim() && (
-            <button type="button" onClick={openTypedResource} className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><ExternalLink size={15} />{t.openUrl}</button>
+            <button type="button" onClick={openTypedResource} className="inline-flex h-9 pointer-coarse:h-11 items-center justify-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-surface-sunken)]"><ExternalLink size={15} />{t.openUrl}</button>
           )}
         </div>
         {kind === "portal" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.targetMap}
-            <select value={metadataDraft.file} onChange={(event) => { setMetadataDraft((draft) => ({ ...draft, file: event.target.value })); updateMetadata({ file: event.target.value }); }} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-portal-map-select">
+            <select value={metadataDraft.file} onChange={(event) => { setMetadataDraft((draft) => ({ ...draft, file: event.target.value })); updateMetadata({ file: event.target.value }); }} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-portal-map-select">
               <option value="">{t.selectMap}</option>
               {mapOptions.map((map) => <option key={map.filename} value={map.filename}>{map.frontmatter.title || map.filename}</option>)}
             </select>
@@ -866,37 +784,37 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
         {kind === "portal" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.targetNode}
-            <input value={metadataDraft.targetNodeId} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, targetNodeId: event.target.value }))} onBlur={() => commitMetadataField("targetNodeId")} placeholder={t.optional} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
+            <input value={metadataDraft.targetNodeId} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, targetNodeId: event.target.value }))} onBlur={() => commitMetadataField("targetNodeId")} placeholder={t.optional} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
           </label>
         )}
         {kind === "source" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.citation}
-            <input value={metadataDraft.citation} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, citation: event.target.value }))} onBlur={() => commitMetadataField("citation")} placeholder={t.citationPlaceholder} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
+            <input value={metadataDraft.citation} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, citation: event.target.value }))} onBlur={() => commitMetadataField("citation")} placeholder={t.citationPlaceholder} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" />
           </label>
         )}
         {kind === "task" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.status}
-            <select value={metadata?.status ?? "open"} onChange={(event) => updateMetadata({ status: event.target.value as NonNullable<MindMapNodeMetadata["status"]> })} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-status"><option value="open">{t.openStatus}</option><option value="in_progress">{t.inProgressStatus}</option><option value="done">{t.doneStatus}</option></select>
+            <select value={metadata?.status ?? "open"} onChange={(event) => updateMetadata({ status: event.target.value as NonNullable<MindMapNodeMetadata["status"]> })} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-status"><option value="open">{t.openStatus}</option><option value="in_progress">{t.inProgressStatus}</option><option value="done">{t.doneStatus}</option></select>
           </label>
         )}
         {kind === "task" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.dueDate}
-            <input type="date" value={metadataDraft.due} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, due: event.target.value }))} onBlur={() => commitMetadataField("due")} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-due" />
+            <input type="date" value={metadataDraft.due} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, due: event.target.value }))} onBlur={() => commitMetadataField("due")} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-due" />
           </label>
         )}
         {(kind === "task" || kind === "decision") && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {kind === "task" ? t.responsible : t.decidedBy}
-            <input value={metadataDraft.assignee} maxLength={120} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, assignee: event.target.value }))} onBlur={() => commitMetadataField("assignee")} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-assignee" />
+            <input value={metadataDraft.assignee} maxLength={120} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, assignee: event.target.value }))} onBlur={() => commitMetadataField("assignee")} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-task-assignee" />
           </label>
         )}
         {kind === "decision" && (
           <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
             {t.decisionStatus}
-            <select value={metadata?.decision ?? "proposed"} onChange={(event) => updateMetadata({ decision: event.target.value as NonNullable<MindMapNodeMetadata["decision"]> })} className="h-9 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]"><option value="proposed">{t.proposedStatus}</option><option value="accepted">{t.acceptedStatus}</option><option value="rejected">{t.rejectedStatus}</option></select>
+            <select value={metadata?.decision ?? "proposed"} onChange={(event) => updateMetadata({ decision: event.target.value as NonNullable<MindMapNodeMetadata["decision"]> })} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]"><option value="proposed">{t.proposedStatus}</option><option value="accepted">{t.acceptedStatus}</option><option value="rejected">{t.rejectedStatus}</option></select>
           </label>
         )}
       </div>
@@ -907,9 +825,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
         </Suspense>
       )}
 
-      {(linkResources.length > 0 || mapLinkResources.length > 0 || backlinks.length > 0 || workspaceReferences.length > 0) && (
+      {(linkResources.length > 0 || mapLinkResources.length > 0 || pdfLinkResources.length > 0 || backlinks.length > 0 || workspaceReferences.length > 0) && (
         <details open className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-          <summary className="cursor-pointer list-none px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.linksAndReferences}</summary>
+          <summary className="cursor-pointer list-none px-5 py-3 pointer-coarse:py-[14px] text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.linksAndReferences}</summary>
           <div
             data-testid="node-resource-panel"
             className={`${embedded ? "px-4 py-3" : "px-5 py-4"}`}
@@ -934,7 +852,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                     </div>
                     {/^https?:\/\//i.test(resource.url) && ["image", "video", "audio"].includes(resource.kind) && (
                       <details className="mt-2 text-xs text-[var(--color-ink-muted)]">
-                        <summary className="cursor-pointer select-none hover:text-[var(--color-ink)]">{t.preview}</summary>
+                        <summary className="cursor-pointer select-none pointer-coarse:py-[14px] hover:text-[var(--color-ink)]">{t.preview}</summary>
                         {resource.kind === "image" && <img src={resource.url} alt={resource.label} loading="lazy" className="mt-2 max-h-48 max-w-full rounded-md border border-[var(--color-border)] object-contain" />}
                         {resource.kind === "video" && <video src={resource.url} controls preload="metadata" className="mt-2 max-h-48 max-w-full rounded-md border border-[var(--color-border)]" />}
                         {resource.kind === "audio" && <audio src={resource.url} controls preload="metadata" className="mt-2 max-w-full" />}
@@ -944,7 +862,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   <button
                     type="button"
                     onClick={() => copyUrl(resource.url)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"
                     title={t.copyLink}
                     aria-label={`${t.copyLink}: ${resource.url}`}
                   >
@@ -953,7 +871,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   <button
                     type="button"
                     onClick={() => openUrl(resource.url)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
                     title={t.openLink}
                     aria-label={`${t.openLink}: ${resource.url}`}
                   >
@@ -961,6 +879,56 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                   </button>
                 </div>
               ))}
+              {pdfLinkResources.map(({ link, quote }) => {
+                const key = `${link.line}:${link.raw}`;
+                const failure = pdfLinkError?.key === key ? pdfLinkError.message : null;
+                return (
+                  <div
+                    key={key}
+                    className="min-w-0 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)]"
+                    data-testid="pdf-link-resource"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openPdfLink(link)}
+                      className="flex w-full min-w-0 items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-[var(--color-surface-sunken)]"
+                      title={t.openPdfAtPage}
+                      aria-label={`${t.openPdfAtPage}: ${link.file}, ${t.pdfPage} ${link.page}`}
+                      data-testid="pdf-link-open"
+                      data-pdf-file={link.file}
+                      data-pdf-page={link.page}
+                    >
+                      <FileText size={16} className="shrink-0 text-[#FF6B35]" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-[var(--color-ink)]">
+                          {link.label === link.raw ? link.file : link.label}
+                        </span>
+                        <span className="block truncate text-xs text-[var(--color-ink-faint)]" data-testid="pdf-link-page">
+                          {t.pdfSource} · {t.pdfPage} {link.page}
+                        </span>
+                      </span>
+                      <ExternalLink size={15} className="shrink-0 text-[var(--color-ink-muted)]" />
+                    </button>
+                    {quote && (
+                      <blockquote
+                        className="mx-3 mb-3 border-l-2 border-[#FF6B35] pl-3 text-sm italic leading-6 text-[var(--color-ink-muted)] whitespace-pre-wrap"
+                        data-testid="pdf-quote"
+                      >
+                        <span className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase not-italic tracking-wide text-[var(--color-ink-faint)]">
+                          <Quote size={11} />
+                          {t.pdfQuote}
+                        </span>
+                        {quote}
+                      </blockquote>
+                    )}
+                    {failure && (
+                      <p role="alert" className="mx-3 mb-3 text-xs text-red-600" data-testid="pdf-link-error">
+                        {failure}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               {mapLinkResources.map((resource) => {
                 const resolution = mapLinkResolutions.get(resource.raw);
                 const broken = brokenMapLinks.has(resource.raw);
@@ -1040,8 +1008,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       {/* Editor */}
       {showPrimaryMarkdownEditor ? (
         <details open className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="node-content-panel">
-          <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
+          <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 pointer-coarse:py-[14px] text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
           <div className="min-h-0 flex-1 overflow-y-auto">
+            <VisualsContext.Provider value={visualsContext}>
             <MDXEditor
               ref={editorRef}
               markdown={selectedNode.content}
@@ -1054,9 +1023,9 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
                 thematicBreakPlugin(),
                 markdownShortcutPlugin(),
                 tablePlugin(),
-                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript" }),
-                codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", "": "Plain Text" } }),
-                imagePlugin(),
+                codeBlockPlugin({ defaultCodeBlockLanguage: "typescript", codeBlockEditorDescriptors: [mermaidCodeBlockDescriptor] }),
+                codeMirrorPlugin({ codeBlockLanguages: { typescript: "TypeScript", javascript: "JavaScript", css: "CSS", html: "HTML", json: "JSON", markdown: "Markdown", python: "Python", bash: "Bash", mermaid: "Mermaid", "": "Plain Text" } }),
+                imagePlugin({ imagePreviewHandler }),
                 linkPlugin(),
                 linkDialogPlugin(),
                 toolbarPlugin({
@@ -1075,6 +1044,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
               ]}
               contentEditableClassName={`bloommd-markdown-editor prose prose-sm max-w-none ${embedded ? "px-4 py-2" : "px-5 py-3"} min-h-[120px] focus:outline-none text-[var(--color-ink)]`}
             />
+            <LazyNodeImageGallery content={selectedNode.content} />
+            </VisualsContext.Provider>
           </div>
         </details>
       ) : (
@@ -1089,13 +1060,30 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     </>
   );
 
+  // The on-screen keyboard opens after the focus event and shrinks the viewport, so reveal the field
+  // again once the viewport changed (or after a moment, where the browser reports no resize).
+  const keepFocusedFieldVisible = (event: ReactFocusEvent<HTMLElement>) => {
+    // Only touch screens have an on-screen keyboard; with a mouse the editor never needs to scroll by itself.
+    if (!window.matchMedia?.("(pointer: coarse)").matches) return;
+    const target = event.target;
+    revealFocusedField(target);
+    const revealAgain = () => {
+      if (window.document.activeElement === target) revealFocusedField(target);
+    };
+    window.visualViewport?.addEventListener("resize", revealAgain, { once: true });
+    window.setTimeout(revealAgain, 400);
+  };
+
+  const viewerDialog = viewer ? <LazyVisualViewer kind={viewer.kind} src={viewer.src} alt={viewer.alt} actions={viewer.actions} onClose={() => setViewer(null)} /> : null;
+
   if (embedded) {
-    return <div className="flex flex-col overflow-hidden h-full">{content}</div>;
+    return <div className="flex flex-col overflow-hidden h-full" onFocus={keepFocusedFieldVisible}>{content}{viewerDialog}</div>;
   }
 
   return (
-    <aside className="h-full bg-[var(--color-surface-raised)] flex flex-col overflow-hidden">
+    <aside className="h-full bg-[var(--color-surface-raised)] flex flex-col overflow-hidden" onFocus={keepFocusedFieldVisible}>
       {content}
+      {viewerDialog}
     </aside>
   );
 }

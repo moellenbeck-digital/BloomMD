@@ -4,6 +4,7 @@ import { isE2ETestModeEnabled } from "./e2e-mode";
 import { publicAppUrl } from "./deployment";
 import { formatAuthDate, roleLabel, type AuthLocale } from "./auth-copy";
 import { serializeAuthParams } from "./invite-intent";
+import { WAITLIST_ACTIVATION_TTL_DAYS, WAITLIST_UNACTIVATED_RETENTION_DAYS } from "./waitlist-transfer-constants";
 
 /**
  * Where an account mail should point.
@@ -43,6 +44,11 @@ export function isEmailConfigured() {
 function e2eMailOutboxPath() {
   if (!isE2ETestModeEnabled()) return null;
   return process.env.BLOOMMD_E2E_MAIL_OUTBOX?.trim() || null;
+}
+
+/** Whether a mail can leave this process: a configured provider, or the E2E outbox of a test system. */
+export function isMailDeliveryAvailable() {
+  return isEmailConfigured() || e2eMailOutboxPath() !== null;
 }
 
 export async function sendTransactionalEmail(input: EmailInput) {
@@ -137,6 +143,74 @@ export async function sendPasswordResetEmail(email: string, token: string, optio
   });
 }
 
+/**
+ * One-time mail of the waitlist transfer (#105): the account is prepared but inactive, and this link
+ * is the only way to activate it. The page behind it asks for a password and the consent; opening
+ * the link changes nothing.
+ */
+export async function sendWaitlistActivationEmail(email: string, token: string, options?: { lang?: AuthLocale }) {
+  const locale = options?.lang ?? "de";
+  const urlParams = new URLSearchParams({ token });
+  if (locale === "en") urlParams.set("lang", locale);
+  const url = `${accountLinkBase()}/activate?${serializeAuthParams(urlParams)}`;
+  const ttl = WAITLIST_ACTIVATION_TTL_DAYS;
+  const retention = WAITLIST_UNACTIVATED_RETENTION_DAYS;
+  const copy = locale === "en"
+    ? {
+        subject: "BloomMD: your account is ready - activate it now",
+        intro: "You joined the BloomMD waitlist. The waitlist has ended, and we have prepared a BloomMD account for this email address. It is not active yet: nobody can sign in to it until you confirm.",
+        action: "Activate your account: confirm the address, choose a password and agree to the privacy policy and the terms.",
+        link: "Activate account",
+        footer: `The link works once and for ${ttl} days. This is the only message we send you about this. If you do not want an account, ignore this message: the prepared account and your waitlist entry are deleted ${retention} days after this email.`,
+      }
+    : {
+        subject: "BloomMD: Dein Account ist vorbereitet - jetzt aktivieren",
+        intro: "Du hast dich auf die BloomMD-Warteliste eingetragen. Die Warteliste ist beendet, und wir haben für diese E-Mail-Adresse einen BloomMD-Account vorbereitet. Er ist noch nicht aktiv: Ohne deine Bestätigung kann sich niemand dort anmelden.",
+        action: "Account aktivieren: Adresse bestätigen, Passwort wählen und der Datenschutzerklärung und den AGB zustimmen.",
+        link: "Account aktivieren",
+        footer: `Der Link funktioniert einmal und ${ttl} Tage lang. Das ist die einzige Nachricht, die wir dir dazu schicken. Wenn du keinen Account möchtest, ignoriere diese Nachricht: Der vorbereitete Account und dein Wartelisten-Eintrag werden ${retention} Tage nach dieser E-Mail gelöscht.`,
+      };
+  return sendTransactionalEmail({
+    to: email,
+    subject: copy.subject,
+    text: `${copy.intro}\n\n${copy.action}\n${url}\n\n${copy.footer}`,
+    html: `<p>${copy.intro}</p><p>${copy.action}</p><p><a href="${url}">${copy.link}</a></p><p>${copy.footer}</p>`,
+  });
+}
+
+/**
+ * Reminder that the free trial ends (#274), sent after 15 and after 23 days. `daysLeft` and
+ * `endsAt` come from the trial calculation (`trial.ts`); the date is shown in UTC so it does not
+ * depend on the server's time zone.
+ */
+export async function sendTrialReminderEmail(email: string, options: { lang?: AuthLocale; daysLeft: number; endsAt: Date | string }) {
+  const locale = options.lang ?? "de";
+  const url = accountLinkBase();
+  const endDate = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "de-DE", { dateStyle: "long", timeZone: "UTC" }).format(new Date(options.endsAt));
+  const days = options.daysLeft;
+  const copy = locale === "en"
+    ? {
+        subject: `Your BloomMD trial ends in ${days} ${days === 1 ? "day" : "days"}`,
+        intro: `Your free BloomMD trial account ends on ${endDate} (${days} ${days === 1 ? "day" : "days"} left).`,
+        after: "After that, your account is read-only and export remains possible. Nothing is deleted.",
+        link: "Open BloomMD",
+        footer: "This is a reminder about your account. We send it once per reminder; nothing else follows from it.",
+      }
+    : {
+        subject: `Dein BloomMD-Testzeitraum endet in ${days} ${days === 1 ? "Tag" : "Tagen"}`,
+        intro: `Dein kostenloser BloomMD-Testaccount endet am ${endDate} (noch ${days} ${days === 1 ? "Tag" : "Tage"}).`,
+        after: "Danach ist dein Konto nur noch lesbar, der Export bleibt möglich. Es wird nichts gelöscht.",
+        link: "BloomMD öffnen",
+        footer: "Das ist eine Erinnerung zu deinem Konto. Wir senden sie je Hinweis einmal; weitere Folgen hat sie nicht.",
+      };
+  return sendTransactionalEmail({
+    to: email,
+    subject: copy.subject,
+    text: `${copy.intro}\n\n${copy.after}\n\n${url}\n\n${copy.footer}`,
+    html: `<p>${escapeHtml(copy.intro)}</p><p>${escapeHtml(copy.after)}</p><p><a href="${url}">${copy.link}</a></p><p>${escapeHtml(copy.footer)}</p>`,
+  });
+}
+
 export async function sendBetaInviteEmail(email: string, options?: { lang?: AuthLocale }) {
   const locale = options?.lang ?? "de";
   const urlParams = new URLSearchParams({ email, next: "/app" });
@@ -144,22 +218,22 @@ export async function sendBetaInviteEmail(email: string, options?: { lang?: Auth
   const url = `${accountLinkBase()}/signup?${urlParams.toString()}`;
   const copy = locale === "en"
     ? {
-        subject: "Your BloomMD beta invitation",
-        intro: "You are invited to the closed BloomMD beta.",
+        subject: "Your free BloomMD trial account",
+        intro: "Your free BloomMD trial account is enabled for you. It is valid for 30 days from email confirmation.",
         linkIntro: "This link takes you directly to the right page: create your account.",
         htmlLinkIntro: "This link takes you directly to the right page: <strong>create your account</strong>.",
         link: "Create your BloomMD account",
-        instructions: "Use this invited email address there and set your own password. Then confirm your email address. No invitation code is needed.",
-        footer: "If you were not expecting this invitation, you can ignore this message.",
+        instructions: "Use this email address there and set your own password. Then confirm your email address. No access code is needed.",
+        footer: "If you were not expecting this message, you can ignore it.",
       }
     : {
-        subject: "Dein BloomMD Beta-Zugang",
-        intro: "Du bist zur geschlossenen BloomMD Beta eingeladen.",
+        subject: "Dein kostenloser BloomMD-Testaccount",
+        intro: "Dein kostenloser BloomMD-Testaccount ist für dich freigeschaltet. Er gilt 30 Tage ab E-Mail-Bestätigung.",
         linkIntro: "Dieser Link führt dich direkt zur richtigen Seite: Account erstellen.",
         htmlLinkIntro: "Dieser Link führt dich direkt zur richtigen Seite: <strong>Account erstellen</strong>.",
         link: "BloomMD Account erstellen",
-        instructions: "Nutze dort diese eingeladene E-Mail-Adresse und lege dein eigenes Passwort fest. Danach bestätigst du deine E-Mail-Adresse. Der Link braucht keinen Einladungscode.",
-        footer: "Wenn du diese Einladung nicht erwartet hast, kannst du diese Nachricht ignorieren.",
+        instructions: "Nutze dort diese E-Mail-Adresse und lege dein eigenes Passwort fest. Danach bestätigst du deine E-Mail-Adresse. Der Link braucht keinen Zugangscode.",
+        footer: "Wenn du diese Nachricht nicht erwartet hast, kannst du sie ignorieren.",
       };
   return sendTransactionalEmail({
     to: email,

@@ -5,8 +5,9 @@
  * here), e.g. `docker run -d -e POSTGRES_PASSWORD=qa -p 55433:5432 postgres:17-alpine`.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { testDatabaseUrl } from "./db-test-url";
 
-const url = process.env.BLOOMMD_TEST_DATABASE_URL;
+const url = testDatabaseUrl();
 
 describe.skipIf(!url)("jsonb columns are objects, legacy strings still read (Postgres)", () => {
   let db: typeof import("../../apps/app/src/lib/db");

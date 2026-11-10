@@ -24,6 +24,6 @@ export const NAVIGATOR_SHORTCUTS: readonly ShortcutHelp[] = [
 export const NAVIGATOR_FOCUS_AREAS: readonly string[] = [
   "Tree: the vault's folders.",
   "List: the Markdown notes of the selected folder.",
-  "Map: the BloomMD map (focus it with Tab or Open map, return with the command Focus navigator).",
+  "Map: the BloomMD map (focus it with Tab or Open map, return with Esc or the command Focus navigator).",
   "Search: reserved, not available yet.",
 ];

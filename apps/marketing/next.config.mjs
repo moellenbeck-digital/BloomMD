@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const plausibleOrigin = "https://plausible.moellenbeck-digital.io";
 
 function configuredOrigin(value) {
   if (!value) return null;
@@ -16,7 +15,6 @@ function configuredOrigin(value) {
 
 const connectSources = [
   "'self'",
-  plausibleOrigin,
   configuredOrigin(process.env.NEXT_PUBLIC_POSTHOG_HOST),
   configuredOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN),
 ].filter(Boolean);
@@ -27,7 +25,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `script-src 'self' ${plausibleOrigin} 'unsafe-inline'${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",

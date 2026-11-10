@@ -13,7 +13,7 @@ layout:
 
 # Software Architecture Map <!-- bloommd:id=software-architecture-root -->
 
-A practical architecture map for a subscription SaaS product that needs to ship quickly without losing operational clarity.
+A practical architecture map for a collaborative software product that needs to ship without losing operational clarity.
 
 ## System Goals <!-- bloommd:id=software-architecture-goals -->
 
@@ -41,7 +41,7 @@ The system is split into a public web app, an authenticated application shell, a
 
 ### Database <!-- bloommd:id=software-architecture-database -->
 
-- Postgres stores users, subscriptions, entitlements and auth tokens.
+- Postgres stores account and access data; Markdown documents remain portable.
 - Markdown documents stay in the user's workspace unless sync is explicitly enabled.
 - Template content is static and versioned in Git.
 
@@ -77,4 +77,4 @@ The system is split into a public web app, an authenticated application shell, a
 
 - Should website metadata previews be user-triggered only?
 - What is the long-term desktop update channel?
-- Which sync features belong in the free tier?
+- Which sync behaviors are needed for the first tested workflow?

@@ -205,7 +205,7 @@ async function expectOpenClawPluginDownload(
 }
 
 /** Strings that must not show up in the open registration (gate off); "Zur Beta-Warteliste" is the retired waitlist link. */
-const BETA_GATE_MARKERS = ['data-testid="beta-access-gate"', "Zur Beta-Warteliste", "Beta-Code (optional)"];
+const BETA_GATE_MARKERS = ['data-testid="beta-access-gate"', "Zur Beta-Warteliste", "Zugangscode (optional)"];
 
 function signupActual(response: Response, failureMatch: string, ok: boolean, okLabel: string, missingLabel: string) {
   const location = response.headers.get("location");
@@ -242,8 +242,8 @@ async function expectBetaGateSignupEntry(name: string, url: string, timeoutMs: n
     const response = await fetcher(url, { method: "GET", redirect: "manual" }, timeoutMs);
     const body = await response.text();
     const hasEntry = body.includes('data-testid="beta-access-gate"')
-      && body.includes("Dein Cloud-Zugang ist noch nicht freigeschaltet.")
-      && body.includes("Beta-Code (optional)")
+      && body.includes("Dein kostenloser Testaccount ist noch nicht freigeschaltet.")
+      && body.includes("Zugangscode (optional)")
       && !body.includes("Zur Beta-Warteliste");
     const failureMatch = body.match(SIGNUP_FAILURE_PATTERN)?.[0] ?? "";
     const ok = response.status === 200 && !response.headers.get("location") && hasEntry && !failureMatch;

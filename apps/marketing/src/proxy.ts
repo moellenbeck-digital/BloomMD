@@ -5,6 +5,15 @@ import { isRetiredWaitlistPath, waitlistSignupUrl } from "./lib/waitlist-redirec
 const DESKTOP_UPDATE_PUBLIC_PREFIX = "/_desktop-updates/";
 const DESKTOP_UPDATE_INTERNAL_PREFIX = "/desktop-updates/";
 const DESKTOP_UPDATE_PROXY_HEADER = "x-bloommd-desktop-proxy";
+// First-party Plausible proxy: public paths on our own origin, implemented by route handlers under an
+// internal segment (see src/lib/plausible-proxy.ts). A plain rewrite in next.config.mjs would forward
+// every request header, cookies included, and Next ignores `headers()` for external rewrites.
+const PLAUSIBLE_PUBLIC_ROUTES: Record<string, string> = {
+  "/_plausible/js/script.js": "/plausible-proxy/script",
+  "/_plausible/api/event": "/plausible-proxy/event",
+};
+const PLAUSIBLE_INTERNAL_PREFIX = "/plausible-proxy/";
+const PLAUSIBLE_PROXY_HEADER = "x-bloommd-plausible-proxy";
 
 /**
  * Marketing app proxy.
@@ -29,6 +38,23 @@ export function proxy(request: NextRequest) {
     if (request.headers.get(DESKTOP_UPDATE_PROXY_HEADER) !== "1") {
       return new NextResponse(null, { status: 404 });
     }
+  }
+
+  if (pathname === "/plausible-proxy" || pathname.startsWith(PLAUSIBLE_INTERNAL_PREFIX)) {
+    if (request.headers.get(PLAUSIBLE_PROXY_HEADER) !== "1") {
+      return new NextResponse(null, { status: 404 });
+    }
+  }
+
+  // No redirect, no gate, no caching decision here: the route handler owns the response. The
+  // rewritten request only carries the internal marker; the handler builds its own upstream request.
+  const plausibleTarget = PLAUSIBLE_PUBLIC_ROUTES[pathname];
+  if (plausibleTarget) {
+    const internalUrl = request.nextUrl.clone();
+    internalUrl.pathname = plausibleTarget;
+    const rewrittenRequestHeaders = new Headers(requestHeaders);
+    rewrittenRequestHeaders.set(PLAUSIBLE_PROXY_HEADER, "1");
+    return NextResponse.rewrite(internalUrl, { request: { headers: rewrittenRequestHeaders } });
   }
 
   if (pathname === "/_desktop-updates" || pathname.startsWith(DESKTOP_UPDATE_PUBLIC_PREFIX)) {

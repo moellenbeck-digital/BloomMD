@@ -1,8 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import { THEME_BOOT_SCRIPT } from "@bloommd/ui/theme-boot";
 import { AnalyticsProvider } from "./analytics-provider";
 import { getAppLocale } from "../lib/locale";
+import { plausibleBrowserConfig, plausibleRequestHost, plausibleScriptAttributes } from "../lib/plausible";
 import "./globals.css";
+
+// The on-screen keyboard shrinks the page (not only the visual viewport) where the browser supports it,
+// so the editor stays above the keyboard. Safari ignores this; `useVisualViewport` covers it.
+export const viewport: Viewport = { interactiveWidget: "resizes-content" };
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = getAppLocale((await headers()).get("x-bloommd-locale"));
@@ -39,6 +45,9 @@ export default async function RootLayout({
 }) {
   const requestHeaders = await headers();
   const lang = requestHeaders.get("x-bloommd-locale") === "en" ? "en" : "de";
+  // Read per request on the server (not NEXT_PUBLIC_*), so the environment of the running server decides.
+  // `null` for foreign hosts, the test system and when switched off: then no tag at all.
+  const plausible = plausibleBrowserConfig(plausibleRequestHost(requestHeaders));
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
@@ -56,12 +65,17 @@ export default async function RootLayout({
           "light" or "dark", anything else falls through to the system preference. Getting that
           wrong reintroduces the flash it exists to prevent: the script would pick one theme and
           the effect the other.
+
+          A stored custom theme (`bloommd-theme-custom`) is applied on top, with the same checks and
+          colour derivation as `useTheme`; an invalid value is ignored. The script text lives in
+          `@bloommd/ui/theme-boot`, where a test runs it against the hook's code.
         */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem("bloommd-theme");var d=s==="dark"||s==="light"?s==="dark":matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d)}catch(e){}})();`,
+            __html: THEME_BOOT_SCRIPT,
           }}
         />
+        {plausible && <script {...plausibleScriptAttributes(plausible)} />}
       </head>
       {/* Colours come from the tokens so the body follows the theme the script just picked. */}
       <body className="bg-[var(--color-surface)] text-[var(--color-ink)]">

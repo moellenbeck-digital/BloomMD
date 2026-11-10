@@ -61,6 +61,11 @@ Nur Funktionen, die im Code nachweisbar sind (`packages/mobile/src`, `@bloommd/u
 automatisches Erkennen externer Änderungen (kein File Watching), Dark Mode in der App, Stift-Gesten
 auf der Map (gibt es nur im Obsidian-Plugin), Android im iOS-Text.
 
+Import und Export werden vollständig genannt: Import von Markdown und OPML, Export als Markdown, OPML,
+PDF, PNG und SVG über das Teilen-Menü (`packages/ui/src/export`). Links in die App: `bloommd://open`;
+die https-Variante (`https://bloommd.io/open`) steht nicht in den Store-Texten, weil sie erst nach
+dem Setzen von `APPLE_TEAM_ID`/`ANDROID_CERT_SHA256` wirkt.
+
 Die Cloud wird als optionale Anmeldung mit einem BloomMD-Konto (Beta) beschrieben: Anmeldung im
 Browser (Authorization Code + PKCE, [Archiv #503](https://github.com/moellenbeck-digital/BloomMD-archiv/issues/503)), Token im iOS-Schlüsselbund bzw. Android Keystore,
 „Abmelden“ widerruft es, eigener Server unter „Erweitert“. Daten werden nur bei Anmeldung erhoben
@@ -73,9 +78,16 @@ Browser (Authorization Code + PKCE, [Archiv #503](https://github.com/moellenbeck
   `src/shell-text.ts`) und Entscheidungs-Status auf der Map.
 - **Mac mit Apple Silicon:** entschieden, die iPad-App wird dort angeboten (Anbieter Möllenbeck
   Digital); der Satz am Ende der iOS-Beschreibung bleibt.
-- **Support-URL:** zeigt auf `https://bloommd.io/docs`. Eine eigene Hilfeseite für die iPad/iPhone-App
-  gibt es noch nicht; Apple verlangt dort erreichbare Kontaktinformationen. Owner-Entscheidung:
-  Hilfeseite `docs/ipad` anlegen oder Kontaktseite.
+- **Support-URL:** zeigt auf die Hilfeseite `https://bloommd.io/docs/ipad` (EN: `?lang=en`), Quelle
+  `apps/marketing/content/docs/ipad.md` und `ipad-en.md`, mit Einrichtung, Ordner öffnen, Handschrift,
+  Anmeldung und Kontakt (`feedback@bloommd.io`, bereits auf der Website genannt). Die Seiten sind
+  `draft: true` und damit nicht erreichbar, bis der Owner sie mit dem Release freischaltet
+  (`OWNER-CHECKLIST.md`, Abschnitt 2).
+- **Datenschutzerklärung:** Der App-Abschnitt aus `PRIVACY-POLICY-APP-SECTION.md` steht jetzt in
+  `apps/marketing/src/app/datenschutz/page.tsx` (DE/EN). Vor dem Deployment: juristische Prüfung und
+  Owner-Freigabe. Das Impressum liest `BLOOMMD_LEGAL_*` aus der Umgebung (Liste in der Checkliste).
+- **Review und Owner:** `REVIEW-NOTES.md` (Englisch, für die Reviewer, nur Platzhalter für das
+  Demo-Konto) und `OWNER-CHECKLIST.md` (Deutsch) liegen hier. Zugangsdaten kommen nie ins Repo.
 - **Android (#28):** Der Play-Text beschreibt, was der Android-Zweig kann: Ordnerauswahl über das
   Storage Access Framework (interner Speicher, SD-Karte, Sync-Ordner), Konfliktschutz, Stifte
   (S Pen, USI) mit Druck und Handballen-Erkennung, `bloommd://open`-Links, Anmeldung mit Token im

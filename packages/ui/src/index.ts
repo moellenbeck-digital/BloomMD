@@ -5,6 +5,11 @@ export { MindMapEdge } from "./components/MindMapEdge";
 export { LazyNodeEditor } from "./components/LazyNodeEditor";
 export { ResizableEditor } from "./components/ResizableEditor";
 export { Toolbar, type ToolbarHandle } from "./components/Toolbar";
+export { buildExportFile, bytesToBase64, downloadExportFile, EXPORT_FORMATS, exportFilename, type ExportFile, type ExportFormat } from "./export/export-file";
+export { buildTextExport } from "./export/export-file";
+export { DELIVER_EXPORT_EVENT, type DeliverExportDetail } from "./visuals/visual-export";
+export { exportMapFile } from "./export/run-map-export";
+export { MapExportError } from "./export/capture-map";
 export { FileBrowser, fileEntryIsActive } from "./components/FileBrowser";
 export { CommandPalette } from "./components/CommandPalette";
 export { HelpModal } from "./components/HelpModal";
@@ -17,7 +22,22 @@ export { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 export { layoutMindMap, type MindMapNodeData, type EdgeMode, type EdgeRelation, type RootRenameEvent } from "./hooks/useMindMapLayout";
 export { LocaleProvider, useLocale } from "./i18n/LocaleContext";
 export { useTheme, type Theme } from "./hooks/useTheme";
+export {
+  THEME_PRESETS,
+  contrastRatio,
+  deriveCustomTokens,
+  isHexColor,
+  validateCustomTheme,
+  type CustomTheme,
+  type CustomThemeError,
+  type CustomThemeValidation,
+  type ThemeBase,
+  type ThemePreset,
+} from "./utils/theme-custom";
+export { ThemeCustomDialog, type ThemeCustomDialogProps } from "./components/ThemeCustomDialog";
 export { requestNodeFocus } from "./utils/nodeFocus";
+export { useVisualViewport } from "./hooks/useVisualViewport";
+export { VIEWPORT_ROOT_CLASS, VIEWPORT_ROOT_FILL_CLASS } from "./utils/visual-viewport";
 export { type Locale, type Translations } from "./i18n/translations";
 export { SyncProvider } from "./sync/SyncProvider";
 export { SyncStatus } from "./components/SyncStatus";
@@ -32,9 +52,26 @@ export {
 export { getPresenceInitials, getPresenceLabel } from "./sync/presence";
 export { type RemoteUser } from "./hooks/useMindMapStore";
 export { ConflictDialog, type ConflictResolution } from "./components/ConflictDialog";
+export { ConflictCopyBadge } from "./components/ConflictCopyBadge";
+export { ConflictCopyBanner, type ConflictCopyBannerProps } from "./components/ConflictCopyBanner";
+export { NoteHistoryDialog, type NoteHistoryDialogProps } from "./components/NoteHistoryDialog";
 export { WorkspaceMap, type WorkspaceMapProps } from "./components/WorkspaceMap";
 export { GraphLayerControls, type GraphLayerControlsProps } from "./components/GraphLayerControls";
 export { layoutWorkspaceMap, type WorkspaceMapNodeData } from "./hooks/useWorkspaceMapLayout";
 export { WorkspaceHealth, type WorkspaceHealthProps } from "./components/WorkspaceHealth";
 export { CreateEntryDialog, type CreateEntryDialogProps, type CreateEntryKind } from "./components/CreateEntryDialog";
 export { InkAttachmentsContext, inkEmbedNames, appendInkEmbed, type InkAttachments } from "./ink/attachments";
+export {
+  PlatformError,
+  hydrateDocument,
+  isPlatformError,
+  type LinkPreview,
+  type PlatformAdapter,
+  type PlatformApi,
+  type PlatformErrorCode,
+  type PlatformFiles,
+  type PlatformWriteResult,
+  type SerializedMindMapDocument,
+} from "./platform/platform-adapter";
+export { PlatformProvider, usePlatform } from "./platform/PlatformContext";
+export { createWebPlatformAdapter, type WebPlatformAdapterOptions } from "./platform/web-adapter";

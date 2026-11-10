@@ -17,6 +17,8 @@
     "feedback:verify-storage": "bun run scripts/verify-feedback-storage.ts",
     "db:maintenance": "bun run scripts/maintenance.ts",
     "db:purge-unconfirmed": "bun run scripts/purge-unconfirmed-accounts.ts",
+    "db:transfer-waitlist": "bun run scripts/transfer-waitlist-accounts.ts",
+    "db:trial-reminders": "bun run scripts/trial-reminders.ts",
     "start": "next start",
     "test": "bun scripts/test-isolated.ts",
     "test:e2e": "playwright test",
@@ -27,7 +29,8 @@
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "typecheck": "tsc --noEmit",
     "test:e2e:wiki": "playwright test --config playwright.wiki.config.ts",
-    "test:e2e:testsystem": "playwright test --config playwright.testsystem.config.ts"
+    "test:e2e:testsystem": "playwright test --config playwright.testsystem.config.ts",
+    "test:e2e:plausible": "playwright test --config playwright.plausible.config.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",
@@ -45,7 +48,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@types/bun": "^1.3.14",
+    "@types/bun": "^1.4.4",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.2.0",

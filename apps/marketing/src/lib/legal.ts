@@ -1,7 +1,13 @@
-export const LEGAL_STATUS = "13. August 2026";
+export const LEGAL_STATUS = "4. November 2026";
 
 function legalEnv(key: string, fallback = "Noch einzutragen vor Live-Verkauf") {
   return process.env[key]?.trim() || fallback;
+}
+
+/** True when an optional legal value is really filled in: not empty, not a dash, not the "Nicht angegeben" default. */
+export function hasLegalValue(value: string) {
+  const trimmed = value.trim();
+  return trimmed !== "" && !/^[-–—]+$/.test(trimmed) && trimmed.toLowerCase() !== "nicht angegeben";
 }
 
 export function getLegalProfile() {

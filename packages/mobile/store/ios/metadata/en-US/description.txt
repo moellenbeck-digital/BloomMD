@@ -14,7 +14,7 @@ MAP, OUTLINE, PRESENTATION
 Switch between the mind map, an outline for quick reading and a presentation view. Nodes can be tasks with status and due date, or decisions. The node editor opens as a side panel next to the map on iPad and as a bottom sheet on iPhone.
 
 NO ACCOUNT, WORKS OFFLINE
-BloomMD works without signing in and without an internet connection. If you don't pick a folder, your maps live in the app's own folder on the device. Import Markdown files, and share any map as Markdown from the share sheet.
+BloomMD works without signing in and without an internet connection. If you don't pick a folder, your maps live in the app's own folder on the device. Import Markdown or OPML files, and share any map as Markdown, OPML, PDF, PNG or SVG from the share sheet.
 
 LINKS INTO THE APP
 Links like bloommd://open open a note of the current folder right at a specific node – handy from Shortcuts or other notes.

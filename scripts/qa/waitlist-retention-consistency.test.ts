@@ -15,6 +15,11 @@ describe("waitlist retention wording", () => {
     expect(Number(match?.[1])).toBe(WAITLIST_PURGE_RETENTION_DAYS);
   });
 
+  test("prepared waitlist accounts nobody activated are deleted after the same number of days (#105)", () => {
+    const match = read("apps/app/src/lib/waitlist-transfer-constants.ts").match(/WAITLIST_UNACTIVATED_RETENTION_DAYS = (\d+);/);
+    expect(Number(match?.[1])).toBe(WAITLIST_PURGE_RETENTION_DAYS);
+  });
+
   test("the marketing privacy page reads the retention from the shared constant", () => {
     expect(read("apps/marketing/src/app/datenschutz/page.tsx")).toContain("WAITLIST_PURGE_RETENTION_DAYS");
   });

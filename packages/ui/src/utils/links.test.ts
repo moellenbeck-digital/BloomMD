@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, resolveMapLinkInDocument } from "./links";
+import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown, resolveMapLinkInDocument } from "./links";
 
 describe("resource link extraction", () => {
   test("classifies web, image, video, audio, PDF and local file references", () => {
@@ -91,5 +91,27 @@ describe("map link resolution", () => {
       nodeId: "heading:Buch_2FTeil-1_2FKapitel_201.md:0-kapitel-1",
       nodeTitle: "Kapitel 1",
     });
+  });
+});
+
+describe("PDF links", () => {
+  const markdown = "[[papers/smith.pdf#page=3]]\n\n> Quoted text\n\nSee [[Other map#node-1]] and [[x.pdf#page=9|Label]].";
+
+  test("are PDF links with file and page, no longer map links", () => {
+    expect(extractMapLinksFromMarkdown(markdown).map((link) => link.raw)).toEqual(["Other map#node-1"]);
+    expect(extractPdfLinksFromMarkdown(markdown).map((entry) => [entry.link.file, entry.link.page])).toEqual([
+      ["papers/smith.pdf", 3],
+      ["x.pdf", 9],
+    ]);
+  });
+
+  test("carry the quote below the link", () => {
+    expect(extractPdfLinksFromMarkdown(markdown)[0]!.quote).toBe("Quoted text");
+  });
+
+  test("a link without page and a labelled one keep working", () => {
+    const [plain, labelled] = extractPdfLinksFromMarkdown("[[a.pdf]] [[b.pdf#page=2|Kapitel]]");
+    expect(plain!.link.page).toBe(1);
+    expect(labelled!.link).toMatchObject({ file: "b.pdf", page: 2, label: "Kapitel" });
   });
 });

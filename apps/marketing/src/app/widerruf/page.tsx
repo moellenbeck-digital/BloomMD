@@ -30,15 +30,17 @@ export default async function WiderrufPage({ searchParams }: { searchParams: Pro
       </LegalSection>
 
       <LegalSection title={en ? "Right of withdrawal" : "Widerrufsrecht"}>
-        <p>{en ? "The closed M1 beta sells no paid plans and collects no payment data. If a user no longer wants beta access, they can request account deletion or, if an entry of the ended waitlist still exists, remove it through the unsubscribe link." : "In der geschlossenen M1-Beta werden keine kostenpflichtigen Pläne verkauft und keine Zahlungsdaten erhoben. Soweit ein Nutzer den Beta-Zugang nicht mehr nutzen möchte, kann er die Account-Löschung verlangen oder einen noch bestehenden Eintrag der beendeten Warteliste über den Abmeldelink entfernen."}</p>
+        <p>{en ? "The free trial account costs nothing. BloomMD currently sells no paid plans and collects no payment data." : "Der kostenlose Testaccount verursacht keine Kosten. BloomMD verkauft derzeit keine kostenpflichtigen Pläne und erhebt keine Zahlungsdaten."}</p>
+        <p>{en ? <>If you no longer want to use the trial account, you can delete your account at any time at <a href="https://bloommd.app/account">https://bloommd.app/account</a>. What is deleted is described in the <a href={`/datenschutz?lang=${locale}`}>privacy policy</a>, section “Retention and deletion”.</> : <>Wenn du den Testaccount nicht mehr nutzen möchtest, kannst du dein Konto jederzeit unter <a href="https://bloommd.app/account">https://bloommd.app/account</a> löschen. Was dabei gelöscht wird, beschreibt die <a href={`/datenschutz?lang=${locale}`}>Datenschutzerklärung</a> im Abschnitt „Speicherdauer und Löschung“.</>}</p>
+        <p>{en ? "If you joined the ended waitlist, you can withdraw your consent at any time through the unsubscribe link in the invitation email or in earlier waitlist messages, without an account or sign-in." : "Wenn du dich in die beendete Warteliste eingetragen hast, kannst du deine Einwilligung jederzeit über den Abmeldelink in der Einladungs-E-Mail oder in früheren Wartelisten-Nachrichten widerrufen, ohne Konto und ohne Anmeldung."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Digital content and software" : "Digitale Inhalte und Software"}>
-        <p>{en ? "Local desktop, Obsidian and CLI use operates on the user's files. Users remain responsible for local backups. M1 provides no recovery promise for cloud content." : "Lokale Desktop-, Obsidian- und CLI-Nutzung arbeitet auf Dateien des Nutzers. Nutzer bleiben für lokale Backups verantwortlich. Für Cloud-Inhalte gibt es in M1 keine Wiederherstellungszusage."}</p>
+        <p>{en ? "Local desktop, Obsidian and CLI use operates on the user's files. Users remain responsible for local backups. There is no recovery promise for cloud content; export your content regularly." : "Lokale Desktop-, Obsidian- und CLI-Nutzung arbeitet auf Dateien des Nutzers. Nutzer bleiben für lokale Backups verantwortlich. Für Cloud-Inhalte gibt es keine Wiederherstellungszusage; exportiere deine Inhalte regelmäßig."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "Refunds" : "Rückzahlungen"}>
-        <p>{en ? "Because M1 involves no payments, there is no payment reversal for beta use." : "Da in M1 keine Zahlungen stattfinden, gibt es keine Zahlungsrückabwicklung für die Beta-Nutzung."}</p>
+        <p>{en ? "Because no payments take place, there is no payment reversal." : "Da keine Zahlungen stattfinden, gibt es keine Zahlungsrückabwicklung."}</p>
       </LegalSection>
 
       <LegalSection title={en ? "As of" : "Stand"}>

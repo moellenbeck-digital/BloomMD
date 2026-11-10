@@ -37,12 +37,12 @@ function Item({ children }: { children: React.ReactNode }) {
 function platformRows(locale: AppLocale) {
   return locale === "en"
     ? [
-        { system: "macOS", status: "M1 Closed Beta", firstStart: <>Right-click the app → <em>Open</em> → <em>Open</em> again</> },
+        { system: "macOS", status: "M1 Beta", firstStart: <>Right-click the app → <em>Open</em> → <em>Open</em> again</> },
         { system: "Windows", status: "After M1", firstStart: "Separate Windows beta release after platform testing" },
         { system: "Linux", status: "After M1", firstStart: "Separate Linux beta release after platform testing" },
       ]
     : [
-        { system: "macOS", status: "M1 Closed Beta", firstStart: <>Rechtsklick auf die App → <em>Öffnen</em> → nochmal <em>Öffnen</em></> },
+        { system: "macOS", status: "M1 Beta", firstStart: <>Rechtsklick auf die App → <em>Öffnen</em> → nochmal <em>Öffnen</em></> },
         { system: "Windows", status: "Nach M1", firstStart: "Eigener Windows Beta Release nach Plattformtests" },
         { system: "Linux", status: "Nach M1", firstStart: "Eigener Linux Beta Release nach Plattformtests" },
       ];

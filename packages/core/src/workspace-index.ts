@@ -15,7 +15,8 @@
 import { isKnowledgeRetired, knowledgeLifecycle, localIsoDay, readKnowledgeFrontmatter } from "./knowledge";
 import { parseFile } from "./parser";
 import { normalizeMarkdownPath } from "./path-rules";
-import type { LintSeverity } from "./workspace-lint";
+import { checkPdfLinks } from "./pdf-links";
+import { pdfLinkFinding, type LintSeverity } from "./workspace-lint";
 import { anchorKey, headingNodeId, headingSections } from "./workspace-document";
 import { buildWorkspaceGraph, fileNodeId, type ReferenceEdge, type WorkspaceFileInput } from "./workspace-graph";
 
@@ -28,6 +29,8 @@ export type WorkspaceIndexFindingCode =
   | "stale-anchor"
   /** The link finds its file, but the frontmatter marks that file as veraltet/ersetzt/verworfen or past `stale_after`. */
   | "stale-document"
+  /** A `[[file.pdf#page=n]]` link names a PDF that is not in the workspace (same decision as `missing-resource` in the lint). */
+  | "missing-resource"
   /** The same `bloommd:id` appears more than once, in one file or across files. */
   | "duplicate-node-id"
   /** Set by a reader (CLI) for a file it could not load; the index itself never reads files. */
@@ -130,6 +133,8 @@ export interface WorkspaceIndex {
 export interface WorkspaceIndexOptions {
   /** `YYYY-MM-DD`; defaults to the local day. Injected so `stale_after` can be tested. */
   today?: string;
+  /** Workspace-relative paths of the non-Markdown files; without them PDF links are not checked. */
+  resources?: string[];
 }
 
 const ID_COMMENT_RE = /<!--\s*bloommd:id=([A-Za-z0-9_-]+)\s*-->/;
@@ -337,6 +342,12 @@ export function buildWorkspaceIndex(files: WorkspaceFileInput[], options: Worksp
         message: `Verweis auf veraltetes Ziel (${reasons.join(", ")}): ${reference.raw}`,
         detail: [`Ziel: ${targetPath}`, target.replacedBy ? `Nachfolger: ${target.replacedBy}` : null].filter(Boolean).join("; "),
       });
+    }
+  }
+
+  if (options.resources) {
+    for (const problem of checkPdfLinks(inputs, options.resources)) {
+      findings.push(pdfLinkFinding(problem));
     }
   }
 

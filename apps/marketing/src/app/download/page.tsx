@@ -97,7 +97,7 @@ export default async function DownloadPage({
             "Ordner als Workspace öffnen",
             "Direkt loslegen",
           ],
-          beta: "Web- und Cloud-Beta-Zugang",
+          beta: "Kostenloser Testaccount für Web und Cloud",
           docs: "Vollständige Anleitung",
           agent: "Optional: lokaler OpenClaw-Agent",
           agentDescription:
@@ -154,7 +154,7 @@ export default async function DownloadPage({
             "Open a folder as a workspace",
             "Start working",
           ],
-          beta: "Web and cloud beta access",
+          beta: "Free trial account for web and cloud",
           docs: "Full installation guide",
           agent: "Optional: local OpenClaw agent",
           agentDescription:
@@ -252,7 +252,7 @@ export default async function DownloadPage({
                 {directDownloadUrl ? (
                   <a
                     href={directDownloadUrl}
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
                   >
                     {copy.mac.action}
                     <Download size={17} aria-hidden="true" />
@@ -296,7 +296,7 @@ export default async function DownloadPage({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <a
                     href={FIRST_PARTY_LINUX_X86_64_URL}
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-center text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-center text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
                   >
                     {copy.linux.actionX86}
                     <Download size={16} aria-hidden="true" />
@@ -456,7 +456,7 @@ export default async function DownloadPage({
               </Link>
               <a
                 href={OPENCLAW_PLUGIN_DOWNLOAD_URL}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B94316] focus-visible:ring-offset-2"
               >
                 {copy.agentDownload}
                 <Download size={16} aria-hidden="true" />

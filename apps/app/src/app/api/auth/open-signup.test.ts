@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { createHash, randomUUID } from "node:crypto";
-import { localizeAuthError, MAIL_UNAVAILABLE_ERROR, SIGNUP_CONSENT_REQUIRED_ERROR, SIGNUP_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../lib/auth-copy";
+import { DUPLICATE_TRIAL_ERROR, localizeAuthError, MAIL_UNAVAILABLE_ERROR, SIGNUP_CONSENT_REQUIRED_ERROR, SIGNUP_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../lib/auth-copy";
+import { canonicalEmail } from "../../../lib/email-canonical";
 import { resetMailBudgetForTests } from "../../../lib/mail-budget";
 import { RateLimitError, SIGNUP_RATE_LIMIT, resetMemoryRateLimitsForTests } from "../../../lib/request-security";
 
@@ -52,8 +53,16 @@ mock.module("../../../lib/db", () => ({
     if (user) user.passwordHash = input.passwordHash;
     return Boolean(user);
   },
+  // Same rules as the SQL: another confirmed account of the mailbox blocks the confirmation (#277).
+  hasConfirmedMailboxTwin: async (email: string) => [...users.values()].some((user) => user.emailVerifiedAt && user.email !== email.trim().toLowerCase() && canonicalEmail(user.email) === canonicalEmail(email)),
   markEmailVerified: async (userId: string) => {
-    for (const user of users.values()) if (user.id === userId) user.emailVerifiedAt ??= new Date().toISOString();
+    for (const user of users.values()) {
+      if (user.id !== userId) continue;
+      const twin = [...users.values()].some((other) => other.id !== user.id && other.emailVerifiedAt && canonicalEmail(other.email) === canonicalEmail(user.email));
+      if (!user.emailVerifiedAt && twin) return "duplicate-trial" as const;
+      user.emailVerifiedAt ??= new Date().toISOString();
+    }
+    return "ok" as const;
   },
   createAuthToken: async (input: { userId: string; email: string; purpose: string }) => {
     const token = randomUUID() + randomUUID();
@@ -175,7 +184,7 @@ afterEach(() => {
   resetMemoryRateLimitsForTests();
 });
 
-describe("signup with the closed-beta gate off", () => {
+describe("signup with the access gate off", () => {
   test("registers without an invitation and sends the confirmation mail", async () => {
     const response = await signup(formRequest("/api/auth/signup", signupForm("new@example.test")));
 
@@ -196,7 +205,7 @@ describe("signup with the closed-beta gate off", () => {
   });
 });
 
-describe("signup with the closed-beta gate on", () => {
+describe("signup with the access gate on", () => {
   beforeEach(() => {
     mutableEnv.BLOOMMD_BETA_ACCESS = "1";
     mutableEnv.BLOOMMD_BETA_ALLOWED_EMAILS = "invited@example.test";
@@ -208,7 +217,7 @@ describe("signup with the closed-beta gate on", () => {
 
     expect(response.status).toBe(303);
     expect(decodedLocation(response)).toContain(`${ORIGIN}/signup?`);
-    expect(decodedLocation(response)).toContain("Diese E-Mail ist noch nicht für die Beta freigeschaltet.");
+    expect(decodedLocation(response)).toContain("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.");
     expect(users.size).toBe(0);
     expect(mails).toHaveLength(0);
   });
@@ -216,7 +225,7 @@ describe("signup with the closed-beta gate on", () => {
   test("rejects a wrong invite code", async () => {
     const response = await signup(formRequest("/api/auth/signup", signupForm("stranger@example.test", { inviteCode: "nope" })));
 
-    expect(decodedLocation(response)).toContain("Der Einladungscode ist ungültig.");
+    expect(decodedLocation(response)).toContain("Der Zugangscode ist ungültig.");
     expect(users.size).toBe(0);
   });
 
@@ -500,5 +509,101 @@ describe("global cap for outgoing account mails (#169)", () => {
   test("has English wording", () => {
     expect(localizeAuthError(SIGNUP_UNAVAILABLE_ERROR, "en")).toBe("Sign-up is temporarily unavailable. Please try again later.");
     expect(localizeAuthError(MAIL_UNAVAILABLE_ERROR, "en")).toBe("Sending email is temporarily unavailable. Please try again later.");
+  });
+});
+
+describe("several addresses of one mailbox (#277)", () => {
+  async function registerAndConfirm(email: string) {
+    await signup(formRequest("/api/auth/signup", signupForm(email)));
+    return confirmEmail(lastMail("verification", email)!.token);
+  }
+
+  function withoutEmail(response: Response) {
+    const url = new URL(decodedLocation(response));
+    url.searchParams.delete("email");
+    return url.toString();
+  }
+
+  test("a variant of a confirmed mailbox gets no account and no mail, and the answer of a confirmed address", async () => {
+    await registerAndConfirm("owner@example.test");
+    const confirmedAnswer = await signup(formRequest("/api/auth/signup", signupForm("owner@example.test")));
+    const mailsBefore = mails.length;
+    const usersBefore = users.size;
+
+    for (const variant of ["owner+2@example.test", "Owner+Shop+x@Example.test"]) {
+      const response = await signup(formRequest("/api/auth/signup", signupForm(variant)));
+      expect(response.status).toBe(303);
+      expect(withoutEmail(response)).toBe(withoutEmail(confirmedAnswer));
+      expect(decodedLocation(response)).toContain("verification=sent");
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+    expect(mails).toHaveLength(mailsBefore);
+    expect(users.size).toBe(usersBefore);
+  });
+
+  test("Gmail dots and googlemail.com belong to the same mailbox, other domains keep their dots", async () => {
+    await registerAndConfirm("first.last@gmail.com");
+    for (const variant of ["firstlast@gmail.com", "first.last+x@googlemail.com", "f.i.r.s.t.l.a.s.t@gmail.com"]) {
+      await signup(formRequest("/api/auth/signup", signupForm(variant)));
+      expect(users.has(variant)).toBe(false);
+    }
+    await registerAndConfirm("first.last@example.test");
+    await signup(formRequest("/api/auth/signup", signupForm("firstlast@example.test")));
+    expect(users.has("firstlast@example.test")).toBe(true);
+  });
+
+  test("an unconfirmed account does not block the mailbox, and a variant does not use up the mail budget", async () => {
+    mutableEnv.BLOOMMD_MAIL_DAILY_LIMIT = "2";
+    await signup(formRequest("/api/auth/signup", signupForm("open@example.test")));
+    const variant = await signup(formRequest("/api/auth/signup", signupForm("open+2@example.test")));
+    expect(decodedLocation(variant)).toContain("verification=sent");
+    expect(users.has("open+2@example.test")).toBe(true);
+    expect(mails).toHaveLength(2);
+
+    // Budget is used up (2 of 2). A blocked variant of a confirmed mailbox must not need any.
+    resetMailBudgetForTests();
+    await registerAndConfirm("budget@example.test");
+    const before = mails.length;
+    const blocked = await signup(formRequest("/api/auth/signup", signupForm("budget+2@example.test")));
+    expect(decodedLocation(blocked)).toContain("verification=sent");
+    expect(mails).toHaveLength(before);
+    const next = await signup(formRequest("/api/auth/signup", signupForm("another@example.test")));
+    expect(decodedLocation(next)).toContain("verification=sent");
+    expect(users.has("another@example.test")).toBe(true);
+  });
+
+  test("the signup limit per account counts the variants of one mailbox together", async () => {
+    for (let attempt = 0; attempt < SIGNUP_RATE_LIMIT.perAccount; attempt += 1) {
+      const response = await signup(formRequest("/api/auth/signup", signupForm(`rate+${attempt}@example.test`)));
+      expect(decodedLocation(response)).toContain("verification=sent");
+    }
+    const blocked = await signup(formRequest("/api/auth/signup", signupForm("rate+extra@example.test")));
+    expect(decodedLocation(blocked)).toContain("Zu viele Versuche");
+    const other = await signup(formRequest("/api/auth/signup", signupForm("rate2@example.test")));
+    expect(decodedLocation(other)).toContain("verification=sent");
+  });
+
+  test("a second account of the mailbox is not confirmed when its link is used after the first was confirmed", async () => {
+    await signup(formRequest("/api/auth/signup", signupForm("pair@example.test")));
+    await signup(formRequest("/api/auth/signup", signupForm("pair+2@example.test")));
+    const firstToken = lastMail("verification", "pair@example.test")!.token;
+    const secondToken = lastMail("verification", "pair+2@example.test")!.token;
+
+    expect(decodedLocation(await confirmEmail(firstToken))).toContain("verified=1");
+    const refused = await confirmEmail(secondToken);
+    expect(refused.status).toBe(303);
+    expect(decodedLocation(refused)).toContain(`${ORIGIN}/login?`);
+    expect(new URL(refused.headers.get("location")!).searchParams.get("error")).toBe(DUPLICATE_TRIAL_ERROR);
+    expect(decodedLocation(refused)).not.toContain("verified=1");
+    expect(users.get("pair+2@example.test")?.emailVerifiedAt).toBeNull();
+    expect(users.get("pair@example.test")?.emailVerifiedAt).not.toBeNull();
+
+    const attempt = await login(formRequest("/api/auth/login", { email: "pair+2@example.test", password: PASSWORD, next: "/app" }));
+    expect(attempt.headers.get("set-cookie")).toBeNull();
+  });
+
+  test("the refusal has English wording", () => {
+    expect(localizeAuthError(DUPLICATE_TRIAL_ERROR, "de")).toBe(DUPLICATE_TRIAL_ERROR);
+    expect(localizeAuthError(DUPLICATE_TRIAL_ERROR, "en")).not.toBe(DUPLICATE_TRIAL_ERROR);
   });
 });

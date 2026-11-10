@@ -1,0 +1,8 @@
+Protokoll: Statusbesprechung Kundenportal, 15.11.2026 (Beispieltext, frei erfunden)
+
+Frau Weber: Der Stand zu den Arbeitspaketen. Die Anmeldung und Rechteverwaltung ist fertig und von uns abgenommen.
+Herr Aydin: Die Rechnungsliste mit Download ist in Arbeit. Die Schnittstelle zur Buchhaltung ist seit dem Termin am 10.11. dokumentiert, das Risiko ist damit erledigt.
+Frau Lenz: Für die Anleitung brauche ich Bildschirmfotos aus der Rechnungsliste. Dafür gibt es noch keine Testumgebung.
+Frau Weber: Neu ist ein Pilotbetrieb mit drei Kunden im Januar. Das hängt an der Rechnungsliste. Wir halten fest: Frau Lenz sucht die drei Kunden bis zum 30.11.
+Offene Frage: Wer richtet die Testumgebung ein?
+Siehe auch [[Kundenportal]].

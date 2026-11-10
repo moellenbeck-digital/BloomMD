@@ -23,8 +23,8 @@ export default async function ObsidianPage({ searchParams }: { searchParams: Pro
         ],
         release: "Aktuellen Plugin-Release öffnen",
         guide: "Installationsanleitung lesen",
-        closed: "Was bedeutet Closed Beta hier?",
-        closedText: "Nur BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit erfordern ein Konto; die Registrierung ist offen. Das lokale Obsidian-Plugin kannst du sofort installieren. Die eigenständige BloomMD-App für iPad und iPhone ist ein anderes Produkt und noch nicht öffentlich im App Store verfügbar.",
+        closed: "Was bedeutet Beta hier?",
+        closedText: "Beta bedeutet hier: Das lokale Plugin ist nutzbar, aber noch im Test. Nur BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit erfordern ein Konto, den kostenlosen Testaccount (30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste). Das lokale Obsidian-Plugin kannst du sofort installieren. Die eigenständige BloomMD-App für iPad und iPhone ist ein anderes Produkt und noch nicht öffentlich im App Store verfügbar.",
         demo: "Browser-Demo öffnen",
         local: "Deine Notizen bleiben im Vault",
         localText: "BloomMD arbeitet mit normalen Markdown-Dateien. Vault-Inhalte, Dateinamen oder Notizen werden nicht ungefragt an BloomMD übertragen.",
@@ -43,8 +43,8 @@ export default async function ObsidianPage({ searchParams }: { searchParams: Pro
         ],
         release: "Open latest plugin release",
         guide: "Read installation guide",
-        closed: "What does closed beta mean here?",
-        closedText: "Only BloomMD Web, cloud workspaces, sync and collaboration require an account; registration is open. You can install the local Obsidian plugin now. The standalone BloomMD app for iPad and iPhone is a separate product and is not publicly available in the App Store yet.",
+        closed: "What does beta mean here?",
+        closedText: "Beta here means the local plugin is usable but still being tested. Only BloomMD Web, cloud workspaces, sync and collaboration require an account, the free trial account (30 days from email confirmation, no invitation and no waitlist). You can install the local Obsidian plugin now. The standalone BloomMD app for iPad and iPhone is a separate product and is not publicly available in the App Store yet.",
         demo: "Open browser demo",
         local: "Your notes stay in the vault",
         localText: "BloomMD works with normal Markdown files. Vault content, file names and notes are not sent to BloomMD without your permission.",
@@ -82,7 +82,7 @@ export default async function ObsidianPage({ searchParams }: { searchParams: Pro
               ))}
             </ol>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href={RELEASE_URL} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+              <a href={RELEASE_URL} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311]">
                 {copy.release} <Download size={16} aria-hidden="true" />
               </a>
               <a href={`${MIRROR_URL}#beta-via-brat`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#D4CFC8] px-4 text-sm font-semibold hover:bg-[#F2F0ED]">

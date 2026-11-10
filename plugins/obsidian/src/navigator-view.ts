@@ -12,10 +12,13 @@ import {
   canGoBack,
   canGoForward,
   createState,
+  enterMap,
+  focusAfterHistory,
   focusArea,
   goBack,
   goForward,
   handleKey,
+  leaveMap,
   listFiles,
   listIndex,
   normalizeState,
@@ -26,6 +29,7 @@ import {
   toggleFolder,
   treeIndex,
   type FocusArea,
+  type HistoryButton,
   type NavEffect,
   type NavKey,
   type NavResult,
@@ -44,6 +48,8 @@ export interface NavigatorHost {
   mapTarget(): { kind: "file" | "folder"; path: string } | null;
   /** Moves keyboard focus into the map; false when there is none. */
   focusMapView(): boolean;
+  /** Whether the map is the active view, i.e. where key presses go. */
+  mapViewActive(): boolean;
 }
 
 const ROW_HEIGHT = 28;
@@ -140,10 +146,20 @@ export class NavigatorView extends ItemView {
       this.app.workspace.on("file-open", (file) => {
         if (file?.extension === "md") this.revealActive(file, false);
       }),
-      this.app.workspace.on("active-leaf-change", () => this.renderContext()),
+      this.app.workspace.on("active-leaf-change", () => {
+        // The map is left when another view becomes active; the focus model must not stay on "map".
+        if (this.state.focus === "map" && !this.host.mapViewActive()) {
+          this.state = leaveMap(this.state);
+          this.render();
+        } else this.renderContext();
+      }),
     ];
     events.forEach((ref) => this.registerEvent(ref));
     this.register(() => window.clearTimeout(this.refreshTimer));
+    // The map takes no DOM focus (key presses land on <body>), so Escape out of it is heard on the document.
+    const onMapKey = (event: KeyboardEvent) => this.onMapKeyDown(event);
+    document.addEventListener("keydown", onMapKey);
+    this.register(() => document.removeEventListener("keydown", onMapKey));
 
     const active = this.app.workspace.getActiveFile();
     if (active?.extension === "md") this.state = revealFile(this.state, this.root, active.path);
@@ -296,8 +312,14 @@ export class NavigatorView extends ItemView {
     this.mapContext.createSpan({ text: `Map: ${mapLabel}` });
     this.mapContext.setAttribute("title", map?.path ?? "");
 
+    const focused: HistoryButton | null = document.activeElement === this.backButton ? "back" : document.activeElement === this.forwardButton ? "forward" : null;
     this.backButton.disabled = !canGoBack(this.state);
     this.forwardButton.disabled = !canGoForward(this.state);
+    // A button that has just been disabled drops focus onto <body>: hand it to something usable.
+    const next = focusAfterHistory(this.state, focused);
+    if (next === "back") this.backButton.focus();
+    else if (next === "forward") this.forwardButton.focus();
+    else if (next) this.focusPane(next);
     this.noteMapButton.disabled = this.state.file === null;
     this.folderMapButton.disabled = this.state.folder === ROOT_PATH;
   }
@@ -384,6 +406,17 @@ export class NavigatorView extends ItemView {
     this.apply(handleKey(this.state, this.root, input, { map: this.host.mapTarget() !== null, search: false }));
   }
 
+  /** Escape while the map is the active view: back to the list or tree the map was opened from. */
+  private onMapKeyDown(event: KeyboardEvent) {
+    if (this.state.focus !== "map" || event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    // Text fields, menus and dialogs own their Escape.
+    if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable='true'], .menu, .modal-container")) return;
+    if (!this.host.mapViewActive()) return;
+    event.preventDefault();
+    this.apply(handleKey(this.state, this.root, { key: "Escape" }, { map: this.host.mapTarget() !== null, search: false }));
+  }
+
   private apply(result: NavResult) {
     this.state = result.state;
     this.render();
@@ -438,7 +471,7 @@ export class NavigatorView extends ItemView {
       return;
     }
     await this.host.openMapFor(target);
-    this.state = focusArea(this.state, "map");
+    this.state = enterMap(this.state);
     this.render();
     this.host.focusMapView();
   }

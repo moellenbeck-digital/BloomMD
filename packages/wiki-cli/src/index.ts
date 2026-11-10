@@ -244,6 +244,7 @@ async function runLint(path: string, options: Options, withRoundtrip: boolean): 
   const result = lintWorkspace(workspace.files, {
     reportOrphans: options.orphans,
     checkRoundtrip: withRoundtrip,
+    resources: workspace.pdfFiles,
   });
 
   for (const failure of workspace.unreadable) {
@@ -284,7 +285,7 @@ async function runSearch(text: string, path: string, options: Options): Promise<
 
 async function runIndex(path: string, options: Options): Promise<number> {
   const workspace = await readWorkspace(path);
-  const index = buildWorkspaceIndex(workspace.files);
+  const index = buildWorkspaceIndex(workspace.files, { resources: workspace.pdfFiles });
 
   for (const failure of workspace.unreadable) {
     // The index never reads files, so a file the reader could not load is reported here.

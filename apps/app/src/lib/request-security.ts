@@ -59,11 +59,14 @@ export const ACCOUNT_MAIL_RATE_LIMIT = {
 
 export class RateLimitError extends Error {
   readonly retryAfterSeconds: number;
+  /** Which counter was exhausted: the hashed key, never the raw address. Lets callers log repeat offenders. */
+  readonly keyHash?: string;
 
-  constructor(retryAfterSeconds: number) {
+  constructor(retryAfterSeconds: number, keyHash?: string) {
     super("Zu viele Versuche. Bitte warte kurz und versuche es erneut.");
     this.name = "RateLimitError";
     this.retryAfterSeconds = retryAfterSeconds;
+    this.keyHash = keyHash;
   }
 }
 
@@ -243,7 +246,7 @@ export async function assertRateLimit(request: Request, options: RateLimitOption
     });
     const allowed = databaseResult?.allowed ?? memoryRateLimit(`${options.action}:${keyHash}:${windowStart}`, bucket.limit, expiresAt);
     if (!allowed) {
-      throw new RateLimitError(Math.max(1, Math.ceil((expiresAt - now) / 1000)));
+      throw new RateLimitError(Math.max(1, Math.ceil((expiresAt - now) / 1000)), keyHash);
     }
   }
 }

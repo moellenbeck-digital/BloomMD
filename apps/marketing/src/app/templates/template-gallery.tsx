@@ -101,7 +101,7 @@ export function TemplateGallery({ templates, locale }: TemplateGalleryProps) {
                   ))}
                 </div>
                 <div className="mt-5 grid gap-2">
-                  <Link href={`/demo?template=${template.slug}`} className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+                  <Link href={`/demo?template=${template.slug}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-3 text-sm font-semibold text-white hover:bg-[#963311]">
                     {copy.open}
                     <ArrowRight size={16} />
                   </Link>

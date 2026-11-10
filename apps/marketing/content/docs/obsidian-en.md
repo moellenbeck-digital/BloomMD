@@ -1,6 +1,6 @@
 ---
 title: Obsidian plugin
-description: Edit Markdown notes in Obsidian as a map, with handwriting in the node inspector – on the Mac and as a beta on iPad.
+description: Edit Markdown notes in Obsidian as a map, with handwriting in the node inspector – on desktop, iPad, iPhone and Android.
 order: 5
 draft: true
 ---
@@ -10,16 +10,48 @@ draft: true
 The BloomMD plugin shows an Obsidian note as a map. Every heading is a node, and the file stays an
 ordinary Markdown file in your vault.
 
+![Diagram, not a screenshot: the same Markdown file in the Obsidian vault appears as text in Obsidian and as a map through the BloomMD plugin](/docs/obsidian-flow-en.svg)
+
+## Quick start
+
+1. **Install the plugin** (see below): add `moellenbeck-digital/bloommd-obsidian` through BRAT and
+   turn on **BloomMD** under *Community plugins*. Obsidian must be version 1.13.0 or later.
+2. **Open a note** and choose **BloomMD: Visualize current note** from the command palette (also
+   available from the ribbon). Every heading becomes a node, and the text below it becomes its content.
+3. **Edit:** rename nodes, add siblings or children, move or delete branches. Confirmed changes write
+   the same file back.
+4. **Back to text:** the note stays an ordinary Markdown file; you can edit it as text in Obsidian at
+   any time.
+5. **Whole folder:** **BloomMD: Visualize current folder** puts the notes of the folder on one canvas.
+
+You do not need an account; the plugin works locally in your vault.
+
 ## Installation
 
 - **Obsidian on Mac, Windows or Linux:** via BRAT with the repository
   `moellenbeck-digital/bloommd-obsidian`, or by copying `manifest.json`, `main.js`,
   `shared-runtime.js` and `styles.css` to `.obsidian/plugins/bloommd/`.
-- **Obsidian on iPad (beta):** from version 0.6.0, also via BRAT. Mobile support is a beta; known
-  limits are listed below.
+- **Obsidian on iPad, iPhone and Android (beta):** with public release 0.7.0 or later, via BRAT
+  or the GitHub release. Version 0.6.0 was not released separately. Mobile limitations are
+  listed below.
 
 Commands: **Visualize current note** opens the current note as a map, **Visualize current folder**
 opens the folder.
+
+## What happens to your files
+
+- **BloomMD writes to the note you are viewing.** Try the plugin on a copy first if the vault is
+  important.
+- **One invisible comment per heading**, for example `## Goal <!-- bloommd:id=a1b2c3 -->`. It gives the
+  node a stable ID and does not show in Obsidian's preview. If you delete it, BloomMD generates a new
+  ID when needed.
+- **Left unchanged:** frontmatter, code blocks, HTML blocks, and text outside headings. Headings inside
+  code blocks do not count as nodes.
+- **Stored locally, not in the Markdown:** node positions, the viewport, and collapsed branches live
+  in `.obsidian/plugins/bloommd/data.json` in your vault.
+- **Nothing is uploaded.** Contents, file and folder names, node text, and layout stay on your
+  computer. That only changes when you explicitly share a single note with a BloomMD workspace
+  (desktop only).
 
 ## Open in BloomMD Desktop
 
@@ -124,7 +156,7 @@ In draw mode the whole map works with Apple Pencil (or the mouse):
 
 - **Long press** (iPad) or **right click** a node for a menu with all actions.
 - **Study mode** (hat icon): node contents are covered; tap to reveal them one by one.
-- **Export** (image icon): the whole map as PNG or PDF in the attachment folder.
+- **Export** (image icon): the whole map as Markdown, OPML, PDF, PNG or SVG in the attachment folder — the same five entries as in the apps, see [Export and import](/docs/export). The command **Import OPML** creates a new note from an OPML file (MindNode, Xmind).
 
 ## Learning progress on the map
 
@@ -148,6 +180,9 @@ reveals the selected node, **1–5** rate it and move on to the next one.
 
 ## Limits
 
+- **Sharing is always explicit:** a note only goes to a BloomMD workspace when you run
+  **Share current note with workspace**, and only that one note. The vault is never mirrored to the
+  cloud as a whole.
 - **Shared mode** (collaboration) is desktop-only for now.
 - **Apple Pencil Pro** gestures (squeeze, barrel roll) and double tap are not available to Obsidian
   plugins; switch tools in the toolbar.

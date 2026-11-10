@@ -5,6 +5,7 @@ import { agentGate } from "../../../lib/agent-gate";
 import { getApiRequestIdentity } from "../../../lib/auth";
 import { getWorkspaceForUser, normalizeUuid, readCloudDocument } from "../../../lib/db";
 import { assertRateLimit, assertSameOriginForIdentity, RateLimitError, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
+import { isTrialWriteLocked } from "../../../lib/trial-lock";
 import { workspaceForIdentity } from "../../../lib/token-workspace";
 import { buildSyncTicketWebSocketUrl } from "./sync-ticket-url";
 
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
 
     // A live editing session would bypass the rights of an agent token: it edits only where it may write.
     const gate = await agentGate(identity!, workspace.id, document.filename);
-    const permission = workspace.role === "viewer" || (gate && gate.access !== "write") ? "read" : "write";
+    // An account whose trial ended (read-only mode, #274) may still open its documents, not change them.
+    const permission = workspace.role === "viewer" || (gate && gate.access !== "write") || await isTrialWriteLocked(userId) ? "read" : "write";
 
     const exp = Math.floor(Date.now() / 1000) + 5 * 60;
     const ticket = signSyncTicket({

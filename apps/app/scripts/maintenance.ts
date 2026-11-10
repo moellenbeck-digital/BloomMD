@@ -1,5 +1,5 @@
 import { createSqlClient } from "../src/lib/sql-client";
-import { purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "../src/lib/unconfirmed-accounts";
+import { purgeUnactivatedWaitlistAccounts, purgeUnconfirmedAccounts, UNCONFIRMED_ACCOUNT_RETENTION_DAYS } from "../src/lib/unconfirmed-accounts";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required for maintenance.");
@@ -28,6 +28,8 @@ const [tokens, accessTokens, sessions, rates, documents, events, auditEvents] = 
 
 // Unconfirmed sign-ups (#169); `bun run db:purge-unconfirmed` shows what would go, without deleting.
 const unconfirmed = await purgeUnconfirmedAccounts(sql, { days: unconfirmedAccountDays, dryRun: false });
+// Prepared waitlist accounts nobody activated (#105), 90 days after the activation mail.
+const unactivatedWaitlist = await purgeUnactivatedWaitlistAccounts(sql, { dryRun: false });
 
 console.log(JSON.stringify({
   deletedAuthTokens: tokens.length,
@@ -38,4 +40,5 @@ console.log(JSON.stringify({
   deletedStripeEvents: events.length,
   deletedAuditEvents: auditEvents.length,
   deletedUnconfirmedAccounts: unconfirmed.accounts,
+  deletedUnactivatedWaitlistAccounts: unactivatedWaitlist.accounts,
 }));

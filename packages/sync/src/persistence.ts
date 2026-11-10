@@ -1,6 +1,7 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
 import {
   FileStore,
+  NOTE_HISTORY_LIMIT,
   parseFile,
   serializeToMarkdown,
   type MindMapDocument,
@@ -199,27 +200,57 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
       const expectedVersion = document.storage?.version;
       if (expectedVersion == null) throw new Error("Cloud document version is missing.");
       const markdown = serializeToMarkdown(document);
+      // One statement, so the version this save replaces is stored exactly when the save succeeds:
+      // `prev` locks the row the save may replace (a concurrent save makes it empty, and with it the
+      // revision and the pruning), `revision` keeps its old state and `pruned` drops every older
+      // revision beyond the newest NOTE_HISTORY_LIMIT - 1, which together with the new one makes 20.
       const rows = await sql`
-        update bloom_documents
-        set markdown = ${markdown},
-            frontmatter = ${jsonb(document.frontmatter)},
-            version = version + 1,
-            updated_by = ${descriptor.userId ?? null},
-            updated_at = now(),
-            sync_persistence_operation_id = ${operation?.id ?? null},
-            sync_persistence_base_version = ${operation?.expectedVersion ?? null}
-        where id = ${descriptor.documentId}
-          and workspace_id = ${descriptor.workspaceId}
-          and version = ${expectedVersion}
-          and deleted_at is null
-          and exists (
-            select 1
-            from bloom_workspace_members m
-            where m.workspace_id = bloom_documents.workspace_id
-              and m.user_id = ${descriptor.userId}
-              and m.role in ('owner', 'editor')
-          )
-        returning version
+        with prev as (
+          select d.id, d.workspace_id, d.version, d.markdown, d.updated_by, d.updated_at
+          from bloom_documents d
+          where d.id = ${descriptor.documentId}
+            and d.workspace_id = ${descriptor.workspaceId}
+            and d.version = ${expectedVersion}
+            and d.deleted_at is null
+            and exists (
+              select 1
+              from bloom_workspace_members m
+              where m.workspace_id = d.workspace_id
+                and m.user_id = ${descriptor.userId}
+                and m.role in ('owner', 'editor')
+            )
+          for update of d
+        ),
+        updated as (
+          update bloom_documents
+          set markdown = ${markdown},
+              frontmatter = ${jsonb(document.frontmatter)},
+              version = version + 1,
+              updated_by = ${descriptor.userId ?? null},
+              updated_at = now(),
+              sync_persistence_operation_id = ${operation?.id ?? null},
+              sync_persistence_base_version = ${operation?.expectedVersion ?? null}
+          where id in (select id from prev)
+          returning version
+        ),
+        revision as (
+          insert into bloom_document_revisions (workspace_id, document_id, version, markdown, saved_by, saved_at)
+          select workspace_id, id, version, markdown, updated_by, updated_at from prev
+          returning id
+        ),
+        pruned as (
+          delete from bloom_document_revisions
+          where document_id = ${descriptor.documentId}
+            and exists (select 1 from prev)
+            and id in (
+              select id from bloom_document_revisions
+              where document_id = ${descriptor.documentId}
+              order by version desc
+              offset ${NOTE_HISTORY_LIMIT - 1}
+            )
+          returning id
+        )
+        select version from updated
       `;
       const row = rows[0] as { version: string | number } | undefined;
       if (!row) {

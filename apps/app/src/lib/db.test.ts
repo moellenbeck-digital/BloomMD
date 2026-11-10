@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, migrateMarketSchema, normalizeWorkspaceName, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
+import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWorkspaceAgent, authenticateWorkspaceAgent, changeWorkspaceMemberRole, createBetaInvite, createFeedbackRecord, createTeamWorkspace, finishAgentTokenProposal, getAgentTokenRights, hasActiveBetaInvite, inviteWorkspaceMember, listAgentTokensForWorkspace, listCloudRevisions, migrateMarketSchema, normalizeWorkspaceName, readCloudRevisionMarkdown, recordAgentTokenChange, renameWorkspace, resolveAccessToken, revokeAccessToken, revokeWorkspaceAgent, setAgentTokenRights } from "./db";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SqlClient } from "./sql-client";
@@ -468,5 +468,167 @@ describe("agent token rights, proposals and log", () => {
     await migrateMarketSchema();
     expect(expected.length).toBe(2);
     for (const statement of expected) expect(statements).toContain(statement);
+  });
+
+  test("the migration file and the schema db:migrate applies create the same waitlist transfer table (#105)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/011_waitlist_transfers.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(1);
+    for (const statement of expected) expect(statements).toContain(statement);
+  });
+  test("the migration file and the schema db:migrate applies create the same document revision table (#3)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/012_document_revisions.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(2);
+    for (const statement of expected) expect(statements).toContain(statement);
+  });
+
+  test("the migration file and the schema db:migrate applies add the same trial columns and reminder table (#274)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/013_trial_period.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(7);
+    for (const statement of expected) expect(statements).toContain(statement);
+    // The backfill must come after the column that marks existing rows, and run after the waitlist table exists.
+    const order = expected.map((statement) => statements.indexOf(statement));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(statements.indexOf(expected[0]!)).toBeGreaterThan(statements.findIndex((statement) => statement.startsWith("create table if not exists bloom_waitlist_transfers")));
+  });
+
+  test("the migration file and the schema db:migrate applies add the same canonical address column, guard flag and indexes (#277)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/014_email_canonical.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected.length).toBe(5);
+    for (const statement of expected) expect(statements).toContain(statement);
+    const order = expected.map((statement) => statements.indexOf(statement));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    // The flag that marks existing rows must come with its default switch right after, and the
+    // unique index must only cover guarded, confirmed accounts (so it never fails on old data).
+    expect(expected[1]).toContain("add column if not exists trial_guarded boolean not null default false");
+    expect(expected[2]).toBe("alter table bloom_users alter column trial_guarded set default true");
+    expect(expected[4]).toContain("create unique index if not exists bloom_users_trial_canonical_idx");
+    expect(expected[4]).toContain("where email_verified_at is not null and trial_guarded");
+  });
+
+  test("a confirmation that would start a second trial for a mailbox is part of the update, and a unique violation counts as blocked (#277)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const statements: string[] = [];
+    let failWith: unknown = null;
+    const sql = ((parts: TemplateStringsArray) => {
+      const statement = parts.join("?").replace(/\s+/g, " ").trim();
+      statements.push(statement);
+      if (statement.startsWith("update bloom_users u set email_verified_at")) return failWith ? Promise.reject(failWith) : Promise.resolve([]);
+      if (statement.startsWith("select 1 as known")) return Promise.resolve([{ known: 1 }]);
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    (sql as unknown as { json: (value: unknown) => unknown }).json = (value) => value;
+    __setMarketSqlForTest(sql);
+    const { markEmailVerified } = await import("./db");
+
+    // Nothing updated although the account exists: blocked.
+    expect(await markEmailVerified(userId)).toBe("duplicate-trial");
+    const update = statements.find((statement) => statement.startsWith("update bloom_users u set email_verified_at"))!;
+    expect(update).toContain("not u.trial_guarded");
+    expect(update).toContain("o.email_canonical = u.email_canonical and o.id <> u.id and o.email_verified_at is not null");
+    expect(statements.some((statement) => statement.startsWith("insert into bloom_audit_events"))).toBe(true);
+
+    // The unique index lost a race: the same answer. Any other error is not swallowed.
+    failWith = Object.assign(new Error("duplicate key"), { code: "23505" });
+    expect(await markEmailVerified(userId)).toBe("duplicate-trial");
+    failWith = Object.assign(new Error("boom"), { code: "XX000" });
+    await expect(markEmailVerified(userId)).rejects.toThrow("boom");
+  });
+});
+
+describe("cloud document revisions (#3)", () => {
+  const callerId = "11111111-1111-4111-8111-111111111111";
+  const ownWorkspace = "33333333-3333-4333-8333-333333333333";
+  const revisionId = "44444444-4444-4444-8444-444444444444";
+
+  function revisionSql(rows: unknown[]) {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const statements: Array<{ statement: string; params: unknown[] }> = [];
+    const sql = ((parts: TemplateStringsArray, ...params: unknown[]) => {
+      const statement = parts.join("?").replace(/\s+/g, " ").trim();
+      statements.push({ statement, params });
+      if (statement.startsWith("select w.id, w.name, w.slug, w.kind, m.role")) return Promise.resolve([{ id: ownWorkspace, name: "Team", slug: "team", kind: "team", role: "viewer" }]);
+      if (statement.startsWith("select r.")) return Promise.resolve(rows);
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    return statements;
+  }
+
+  test("lists the newest versions of a document of the caller's own workspace, readers included", async () => {
+    const statements = revisionSql([
+      { id: revisionId, version: "6", replaced_at: "2026-11-03T09:00:00.000Z", size: "42", author: "Ada" },
+    ]);
+
+    const revisions = await listCloudRevisions(callerId, "Notiz.md", ownWorkspace);
+
+    expect(revisions).toEqual([{ id: revisionId, version: 6, replacedAt: "2026-11-03T09:00:00.000Z", size: 42, author: "Ada" }]);
+    const query = statements.find(({ statement }) => statement.startsWith("select r."))!;
+    // The workspace comes from the membership lookup, and rows are matched against it, never against a client value.
+    expect(query.statement).toContain("d.workspace_id = ? and lower(d.filename) = lower(?)");
+    expect(query.statement).toContain("r.workspace_id = d.workspace_id");
+    expect(query.statement).toContain("order by r.version desc limit ?");
+    expect(query.params).toEqual([ownWorkspace, "Notiz.md", 20]);
+  });
+
+  test("reads one version only inside the caller's workspace and only for a well-formed id", async () => {
+    const statements = revisionSql([{ markdown: "# Old" }]);
+
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", revisionId, ownWorkspace)).toBe("# Old");
+    const query = statements.find(({ statement }) => statement.startsWith("select r."))!;
+    expect(query.statement).toContain("d.workspace_id = ?");
+    expect(query.statement).toContain("r.workspace_id = d.workspace_id");
+    expect(query.params).toEqual([ownWorkspace, "Notiz.md", revisionId]);
+
+    const before = statements.length;
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", "not-a-uuid", ownWorkspace)).toBeNull();
+    expect(statements.length).toBe(before);
+  });
+
+  test("a version of another workspace's document is not found", async () => {
+    revisionSql([]);
+
+    expect(await readCloudRevisionMarkdown(callerId, "Notiz.md", revisionId, ownWorkspace)).toBeNull();
+    expect(await listCloudRevisions(callerId, "Notiz.md", ownWorkspace)).toEqual([]);
   });
 });

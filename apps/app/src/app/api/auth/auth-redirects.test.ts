@@ -70,7 +70,7 @@ describe("production auth redirects", () => {
     expect(location.startsWith("https://bloommd.app/signup?")).toBe(true);
     expect(location).not.toContain("localhost");
     expect(decodeURIComponent(location)).toContain("email=blocked@example.test");
-    expect(decodeURIComponent(location)).toContain("Diese E-Mail ist noch nicht für die Beta freigeschaltet.");
+    expect(decodeURIComponent(location)).toContain("Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.");
   });
 
   test("login errors use the public app origin, not the incoming localhost origin", async () => {

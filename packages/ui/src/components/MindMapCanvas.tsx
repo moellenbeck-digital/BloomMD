@@ -25,8 +25,6 @@ import {
   ClipboardCopy,
   ClipboardPaste,
   Focus,
-  Globe2,
-  Link2,
   ListTree,
   Network,
   Pencil,
@@ -37,12 +35,14 @@ import {
 } from "lucide-react";
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { MindMapNode } from "./MindMapNode";
+import { WebsitePreviewCard } from "./WebsitePreviewCard";
 import { MindMapEdge } from "./MindMapEdge";
 import { useMindMapStore, type LocalViewState } from "../hooks/useMindMapStore";
 import type { RootRenameEvent } from "../hooks/useMindMapLayout";
 import { dropTargetToMoveIntent, findCanvasDropTarget, type CanvasDropTarget } from "../utils/canvas-drag";
 import { isNodeVisibleInViewport, focusNodeElement, isCurrentNodeFocusRequest, type NodeFocusRequest } from "../utils/nodeFocus";
 import { useLocale } from "../i18n/LocaleContext";
+import { CANVAS_ZOOM_VAR } from "../utils/canvas-zoom";
 
 const nodeTypes: NodeTypes = { mindmap: MindMapNode };
 const edgeTypes: EdgeTypes = { mindmap: MindMapEdge };
@@ -54,7 +54,7 @@ interface SavedLocalView extends LocalViewState {
 }
 
 function iconButton(active = false): string {
-  return `flex h-8 w-8 items-center justify-center rounded-md border transition-colors ${active
+  return `flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-md border transition-colors ${active
     ? "border-[#FF6B35] bg-[#FFF4EE] text-[#C94D20]"
     : "border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)]"}`;
 }
@@ -132,30 +132,12 @@ function PresentationView() {
   const currentIndex = Math.max(0, ordered.indexOf(selectedNodeId ?? ""));
   const current = doc?.nodes.get(ordered[currentIndex] ?? "");
   if (!current) return null;
-  const websitePreview = (current.metadata?.kind === "web" || current.metadata?.kind === "source") && current.metadata.url
-    ? current.metadata
-    : null;
-  let websiteHost = "";
-  if (websitePreview?.url) {
-    try { websiteHost = new URL(websitePreview.url).hostname.replace(/^www\./, ""); } catch { /* Keep the URL visible if it is incomplete. */ }
-  }
-
   return (
     <section className="flex h-full flex-col bg-[var(--color-surface)] px-5 pb-5 pt-32 sm:p-10" data-testid="presentation-view">
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center">
         <div className="font-mono text-xs font-semibold uppercase text-[#C94D20]">H{current.level} · {currentIndex + 1}/{ordered.length}</div>
         <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight text-[var(--color-ink)] sm:text-6xl">{current.title}</h1>
-        {websitePreview && (
-          <article className="mt-7 max-w-2xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-sm" data-testid="presentation-website-preview">
-            {websitePreview.previewImage && <img src={websitePreview.previewImage} alt={websitePreview.previewTitle || current.title} loading="lazy" className="max-h-64 w-full object-cover" />}
-            <div className="grid gap-2 p-5">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#C94D20]"><Globe2 size={14} /> {websiteHost || t.website}</div>
-              <h2 className="text-xl font-semibold text-[var(--color-ink)]">{websitePreview.previewTitle || current.title}</h2>
-              {(websitePreview.previewDescription || current.content) && <p className="text-sm leading-6 text-[var(--color-ink-muted)]">{websitePreview.previewDescription || current.content.slice(0, 280)}</p>}
-              <a href={websitePreview.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#C94D20] hover:underline">{t.openWebsite} <Link2 size={14} /></a>
-            </div>
-          </article>
-        )}
+        <WebsitePreviewCard node={current} />
         {current.content && <div className="mt-7 max-w-3xl whitespace-pre-wrap text-lg leading-8 text-[var(--color-ink-muted)]">{current.content}</div>}
       </div>
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between border-t border-[var(--color-border)] pt-4">
@@ -191,6 +173,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const edgeMode = useMindMapStore((state) => state.edgeMode);
   const setEdgeMode = useMindMapStore((state) => state.setEdgeMode);
   const canvasMode = useMindMapStore((state) => state.canvasMode);
+  const exportRenderAll = useMindMapStore((state) => state.exportRenderAll);
   const setCanvasMode = useMindMapStore((state) => state.setCanvasMode);
   const focusNodeId = useMindMapStore((state) => state.focusNodeId);
   const setFocusNodeId = useMindMapStore((state) => state.setFocusNodeId);
@@ -216,6 +199,10 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const fittedDocumentRef = useRef<string | null>(null);
   const pendingFocusRef = useRef<NodeFocusRequest | null>(null);
   const { fitView, getNode, getViewport, setCenter, setViewport } = useReactFlow();
+  // Node controls cancel the zoom on touch screens (see `CANVAS_ZOOM_VAR`), so the variable follows every viewport change.
+  const publishZoom = useCallback((_event: unknown, viewport: Viewport) => {
+    window.document.getElementById("mindmap-canvas")?.style.setProperty(CANVAS_ZOOM_VAR, String(viewport.zoom));
+  }, []);
   const viewStorageKey = `bloommd:views:${document?.frontmatter.id || document?.filePath || "none"}`;
   const documentViewKey = document ? `${document.frontmatter.id}:${document.filePath}` : null;
 
@@ -369,7 +356,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
       <label className="sr-only" htmlFor="edge-mode">{t.edgeMode}</label>
-      <select id="edge-mode" className="h-8 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
+      <select id="edge-mode" className="h-8 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
         <option value="hierarchy">{t.structure}</option>
         <option value="links">{t.links}</option>
         <option value="backlinks">{t.backlinks}</option>
@@ -384,7 +371,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <button type="button" className={iconButton()} onClick={() => pasteBranches()} title={t.pasteBranches} aria-label={t.pasteBranches} data-testid="canvas-paste"><ClipboardPaste size={16} /></button>
       <button type="button" className={iconButton()} onClick={saveLocalView} title={t.saveLocalView} aria-label={t.saveLocalView}><BookmarkPlus size={16} /></button>
       {savedViews.length > 0 && <>
-        <select className="h-8 max-w-32 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={selectedViewId} onChange={(event) => { setSelectedViewId(event.target.value); loadView(event.target.value); }} aria-label={t.loadSavedView}><option value="" disabled>{t.views}</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
+        <select className="h-8 pointer-coarse:h-11 max-w-32 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={selectedViewId} onChange={(event) => { setSelectedViewId(event.target.value); loadView(event.target.value); }} aria-label={t.loadSavedView}><option value="" disabled>{t.views}</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
         <button type="button" className={iconButton()} disabled={!selectedViewId} onClick={() => renameView(selectedViewId)} title={t.renameSavedView} aria-label={t.renameSavedView}><Pencil size={15} /></button>
         <button type="button" className={iconButton()} disabled={!selectedViewId} onClick={() => { deleteView(selectedViewId); setSelectedViewId(""); }} title={t.deleteSavedView} aria-label={t.deleteSavedView}><Trash2 size={15} /></button>
       </>}
@@ -409,11 +396,11 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       {modeToolbar}
       {(layoutPending || layoutFailed) && <div role="status" className="absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-md bg-[var(--color-surface-raised)] px-3 py-2 text-sm text-[var(--color-ink)] shadow-md">
         {layoutPending ? t.layoutInProgress : t.layoutFailed}
-        {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline">{t.retryLayout}</button>}
+        {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline pointer-coarse:min-h-11 pointer-coarse:min-w-11">{t.retryLayout}</button>}
       </div>}
       {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
-            onlyRenderVisibleElements={onlyRenderVisibleElements}
+            onlyRenderVisibleElements={onlyRenderVisibleElements && !exportRenderAll}
             nodes={styledNodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -444,6 +431,8 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
 
             setSelectedNodeIds(orderedIds);
             }}
+            onInit={(instance) => publishZoom(null, instance.getViewport())}
+            onMove={publishZoom}
             onNodeDragStart={onNodeDragStart}
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
@@ -456,6 +445,8 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             deleteKeyCode={null}
             selectionKeyCode="Shift"
             multiSelectionKeyCode="Shift"
+            // Touch (docs/MOBILE-MATRIX.md): with `panOnDrag === true` one finger pans on empty space and drags a node on a node,
+            // so `selectionOnDrag` draws no selection box there. Pinch zooms; `zoomOnDoubleClick` stays off for double-tap rename.
             selectionOnDrag
             panOnDrag
             panOnScroll
@@ -474,7 +465,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
               <Panel position="top-center" className="mt-14">
                 <div role="status" className="flex items-center gap-3 rounded-md border border-[#FF6B35] bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs text-[var(--color-ink)] shadow-md">
                   <span>{statusMessage}</span>
-                  <button type="button" onClick={() => setStatusMessage(null)} aria-label={t.dismissMessage} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">×</button>
+                  <button type="button" onClick={() => setStatusMessage(null)} aria-label={t.dismissMessage} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] pointer-coarse:min-h-11 pointer-coarse:min-w-11">×</button>
                 </div>
               </Panel>
             )}

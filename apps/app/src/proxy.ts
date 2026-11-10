@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { publicMarketingUrl } from "./lib/deployment";
 import { mobileCorsHeaders } from "./lib/mobile-cors";
+import { PLAUSIBLE_EVENT_PATH, PLAUSIBLE_SCRIPT_PATH } from "./lib/plausible";
+import { isTrialGuardedWrite, isTrialReadonlyEnabled } from "./lib/trial-readonly";
+
+// Public paths on our own origin, implemented by route handlers under an internal segment (see
+// src/lib/plausible-proxy.ts). `rewrites()` in next.config.mjs is not used on purpose.
+const PLAUSIBLE_PUBLIC_ROUTES: Record<string, string> = {
+  [PLAUSIBLE_SCRIPT_PATH]: "/plausible-proxy/script",
+  [PLAUSIBLE_EVENT_PATH]: "/plausible-proxy/event",
+};
+const PLAUSIBLE_INTERNAL_PREFIX = "/plausible-proxy";
 
 function configuredOrigin(value: string | undefined) {
   if (!value) return null;
@@ -62,13 +72,29 @@ function contentSecurityPolicy() {
  * The product app is always private and noindex. Marketing and waitlist routes are not part of this
  * app root, so route separation is enforced by the build boundary rather than a runtime mode switch.
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-bloommd-locale", request.nextUrl.searchParams.get("lang") === "en" ? "en" : "de");
 
   if (pathname.startsWith("/_next/static/") && pathname.endsWith(".map")) {
     return new NextResponse(null, { status: 404 });
+  }
+
+  // First-party Plausible proxy (#299). Decided before every guard below: no marketing redirect, no
+  // trial block, no CORS, no CSP. The route handler owns the whole response. Auth is not a concern of
+  // this file (it lives in the routes), and these two handlers read no session.
+  // A rewritten request does not pass this function again, so any request that arrives here with the
+  // internal path is a direct one from outside.
+  if (pathname === PLAUSIBLE_INTERNAL_PREFIX || pathname.startsWith(`${PLAUSIBLE_INTERNAL_PREFIX}/`)) {
+    return new NextResponse(null, { status: 404 });
+  }
+  const plausibleTarget = PLAUSIBLE_PUBLIC_ROUTES[pathname];
+  if (plausibleTarget) {
+    const internalUrl = request.nextUrl.clone();
+    internalUrl.pathname = plausibleTarget;
+    internalUrl.search = "";
+    return NextResponse.rewrite(internalUrl, { request: { headers: requestHeaders } });
   }
 
   if ((request.method === "GET" || request.method === "HEAD") && isMarketingPageRoute(pathname)) {
@@ -79,6 +105,18 @@ export function proxy(request: NextRequest) {
   const cors = mobileCorsHeaders(request.headers.get("Origin"), pathname);
   if (cors && request.method === "OPTIONS") {
     return new NextResponse(null, { status: 204, headers: { ...cors, "X-Robots-Tag": "noindex, nofollow" } });
+  }
+
+  // Read-only mode of expired trial accounts (#274), off unless BLOOMMD_TRIAL_READONLY=1. One check
+  // for every write to the API; the database is only asked for writes, and only with the switch on.
+  if (isTrialReadonlyEnabled() && isTrialGuardedWrite(request.method, pathname)) {
+    const { trialWriteBlock } = await import("./lib/trial-guard");
+    const refusal = await trialWriteBlock(request);
+    if (refusal) {
+      if (cors) for (const [key, value] of Object.entries(cors)) refusal.headers.set(key, value);
+      refusal.headers.set("X-Robots-Tag", "noindex, nofollow");
+      return refusal;
+    }
   }
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });

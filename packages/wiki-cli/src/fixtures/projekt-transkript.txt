@@ -1,0 +1,12 @@
+Protokoll: Projektstart Kundenportal, 01.11.2026 (Beispieltext, frei erfunden)
+
+Ziel: Bis Ende Januar ein Portal, in dem Kunden ihre Rechnungen einsehen und herunterladen können.
+Beteiligt: Frau Weber (Projektleitung), Herr Aydin (Entwicklung), Frau Lenz (Kundenbetreuung).
+
+Arbeitspakete:
+1. Anmeldung und Rechteverwaltung. Herr Aydin, bis 20.11.
+2. Rechnungsliste mit Download. Herr Aydin, bis 15.12.
+3. Anleitung für Kunden. Frau Lenz, bis 10.01.
+
+Risiken: Die Schnittstelle zur Buchhaltung ist noch nicht dokumentiert. Gegenmaßnahme: Termin mit der Buchhaltung bis 10.11. Dies gefährdet das Arbeitspaket 2.
+Entscheidung: Das Portal startet zunächst ohne Zahlungsfunktion (beschlossen).

@@ -14,6 +14,16 @@ export interface Translations {
   reload: string;
   importMd: string;
   exportMd: string;
+  exportMenu: string;
+  exportMarkdown: string;
+  exportOpml: string;
+  exportPdf: string;
+  exportPng: string;
+  exportSvg: string;
+  exportFailed: string;
+  exportSavedTo: string;
+  exportNoMap: string;
+  importOpmlFailed: string;
   shareReadOnlyLink: string;
   documentActions: string;
   fileActions: string;
@@ -84,6 +94,9 @@ export interface Translations {
   loadPreview: string;
   loadWebsitePreview: string;
   savedPreview: string;
+  previewDisclosure: string;
+  previewEmpty: string;
+  previewImageRequest: string;
   openUrl: string;
   targetMap: string;
   selectMap: string;
@@ -106,6 +119,28 @@ export interface Translations {
   targetNode: string;
   ambiguousReference: string;
   targetNotFound: string;
+  pdfSource: string;
+  pdfPage: string;
+  pdfQuote: string;
+  openPdfAtPage: string;
+  pdfOpenFailed: string;
+  insertPdfCitation: string;
+  pdfCitationHint: string;
+  pdfCitationFile: string;
+  pdfCitationFilePlaceholder: string;
+  pdfCitationPage: string;
+  pdfCitationQuote: string;
+  pdfCitationInsert: string;
+  pdfCitationCancel: string;
+  pdfCitationErrorFile: string;
+  pdfCitationErrorPage: string;
+  pdfCitationNoMap: string;
+  pdfCitationFailed: string;
+  bibliographyFailed: string;
+  exportBibtex: string;
+  exportBibliographyMd: string;
+  bibliographyHint: string;
+  bibliographyEmpty: string;
   backlinkFrom: string;
   workspaceReference: string;
   content: string;
@@ -148,6 +183,36 @@ export interface Translations {
   conflictLoadStored: string;
   conflictSaveCopy: string;
   conflictKeepMine: string;
+  conflictCopyBadge: string;
+  conflictCopyTooltip: string;
+  conflictCopyBannerTitle: string;
+  conflictCopyBannerBody: string;
+  conflictCopyOriginal: string;
+  conflictCopyOpenOriginal: string;
+  conflictCopyOriginalMissing: string;
+  historyAction: string;
+  historyAriaLabel: string;
+  historyTitle: string;
+  historyDescription: string;
+  historyLoading: string;
+  historyLoadFailed: string;
+  historyEmptyTitle: string;
+  historyEmpty: string;
+  historySourceLocal: string;
+  historySourceCloud: string;
+  historyReplacedAt: string;
+  historyVersion: string;
+  historyAuthor: string;
+  historyRestore: string;
+  historyRestoreConfirmTitle: string;
+  historyRestoreConfirm: string;
+  historyRestoreConfirmAction: string;
+  historyRestoring: string;
+  historyRestoreFailed: string;
+  historyRestoreConflict: string;
+  historyRestoreRoomActive: string;
+  historyRestoreReadOnly: string;
+  historyRestored: string;
   syncOffline: string;
   syncConnecting: string;
   syncReconnecting: string;
@@ -263,7 +328,6 @@ export interface Translations {
   previewUnavailable: string;
   mapsUnavailable: string;
   mapUnavailable: string;
-  previewServiceError: string;
   localPreviewUnavailable: string;
   unsupportedResource: string;
   resourceSelectionFailed: string;
@@ -331,6 +395,33 @@ export interface Translations {
   feedbackScreenshotSize: string;
   feedbackVideoSize: string;
   resourcePreviewFailed: string;
+  visualMermaidTitle: string;
+  visualMermaidEditSource: string;
+  visualMermaidShowPreview: string;
+  visualMermaidSourceLabel: string;
+  visualMermaidRendering: string;
+  visualMermaidEmpty: string;
+  visualMermaidErrorTitle: string;
+  visualMermaidErrorLine: string;
+  visualMermaidErrorHint: string;
+  visualMermaidLoadFailed: string;
+  visualEnlarge: string;
+  visualViewerImage: string;
+  visualViewerDiagram: string;
+  visualZoomIn: string;
+  visualZoomOut: string;
+  visualZoomReset: string;
+  visualZoomLevel: string;
+  visualClose: string;
+  visualViewerHint: string;
+  visualSaveImage: string;
+  visualSaveDiagramSvg: string;
+  visualSaveDiagramPng: string;
+  visualSaveFailed: string;
+  visualImageNotFound: string;
+  visualImagePathRejected: string;
+  visualEmbeddedImages: string;
+  visualImageLoading: string;
   serverUrl: string;
   accessToken: string;
   connecting: string;
@@ -452,6 +543,26 @@ export interface Translations {
   theme: string;
   lightMode: string;
   darkMode: string;
+  themeCustom: string;
+  themeCustomTitle: string;
+  themeCustomDescription: string;
+  themePresets: string;
+  themeName: string;
+  themeBase: string;
+  themeAccent: string;
+  themeSurface: string;
+  themeInk: string;
+  themeOptionalHint: string;
+  themeAuto: string;
+  themePickColor: string;
+  themeContrastInk: string;
+  themeContrastAccent: string;
+  themeSave: string;
+  themeReset: string;
+  themeErrorName: string;
+  themeErrorHex: string;
+  themeErrorInk: string;
+  themeErrorAccent: string;
   // Language
   language: string;
 }
@@ -467,8 +578,18 @@ export const translations: Record<Locale, Translations> = {
     saved: "Gespeichert",
     saveFailed: "Speichern fehlgeschlagen",
     reload: "Neu laden (von Festplatte)",
-    importMd: "Markdown importieren",
+    importMd: "Markdown oder OPML importieren",
     exportMd: "Markdown exportieren",
+    exportMenu: "Exportieren",
+    exportMarkdown: "Markdown (.md)",
+    exportOpml: "OPML (.opml)",
+    exportPdf: "PDF (.pdf)",
+    exportPng: "PNG (.png)",
+    exportSvg: "SVG (.svg)",
+    exportFailed: "Der Export ist fehlgeschlagen.",
+    exportSavedTo: "Exportiert nach:",
+    exportNoMap: "Die Karte ist nicht sichtbar. Wechsle in die Kartenansicht und exportiere erneut.",
+    importOpmlFailed: "OPML konnte nicht importiert werden:",
     shareReadOnlyLink: "Lese-Links für Kolleg:innen",
     documentActions: "Dokumentaktionen",
     fileActions: "Dateiaktionen",
@@ -537,6 +658,9 @@ export const translations: Record<Locale, Translations> = {
     loadPreview: "Vorschau laden...",
     loadWebsitePreview: "Website-Vorschau laden",
     savedPreview: "Gespeicherte Vorschau",
+    previewDisclosure: "Beim Klick wird nur diese URL abgerufen: {url} (Host: {host}). Daraus werden Titel, Beschreibung und Vorschaubild gelesen. Inhalte, Dateinamen und Ordnernamen deiner Maps werden nicht gesendet. Das Vorschaubild lädt dein Browser vom Host der Seite.",
+    previewEmpty: "Keine Metadaten gefunden",
+    previewImageRequest: "Vorschaubild von {host} laden",
     openUrl: "URL öffnen",
     targetMap: "Ziel-Map",
     selectMap: "Map auswählen",
@@ -559,6 +683,28 @@ export const translations: Record<Locale, Translations> = {
     targetNode: "Ziel-Node-ID",
     ambiguousReference: "Mehrdeutiger Verweis",
     targetNotFound: "Ziel nicht gefunden",
+    pdfSource: "PDF-Quelle",
+    pdfPage: "Seite",
+    pdfQuote: "Zitat",
+    openPdfAtPage: "PDF an dieser Seite öffnen",
+    pdfOpenFailed: "Das PDF „%file%“ konnte nicht geöffnet werden.",
+    insertPdfCitation: "PDF-Zitat einfügen",
+    pdfCitationHint: "Legt einen Quell-Knoten mit Link zur PDF-Seite und Zitat an.",
+    pdfCitationFile: "PDF-Datei",
+    pdfCitationFilePlaceholder: "papers/quelle.pdf",
+    pdfCitationPage: "Seite",
+    pdfCitationQuote: "Zitat",
+    pdfCitationInsert: "Einfügen",
+    pdfCitationCancel: "Abbrechen",
+    pdfCitationErrorFile: "Gib den Pfad einer PDF-Datei an (endet auf .pdf, ohne ] | #).",
+    pdfCitationErrorPage: "Die Seite muss eine ganze Zahl ab 1 sein.",
+    pdfCitationNoMap: "Öffne zuerst eine Map, in die das Zitat eingefügt werden soll.",
+    pdfCitationFailed: "Das Zitat konnte nicht eingefügt werden. Ist die Map schreibgeschützt?",
+    bibliographyFailed: "Die Literaturliste konnte nicht erstellt werden.",
+    exportBibtex: "Literaturliste exportieren (BibTeX)",
+    exportBibliographyMd: "Literaturliste exportieren (Markdown)",
+    bibliographyHint: "citekey dieser Map und der verlinkten Maps",
+    bibliographyEmpty: "Keine Zitierschlüssel (citekey im Frontmatter) in dieser Map und den verlinkten Maps gefunden.",
     backlinkFrom: "Backlink von %title%",
     workspaceReference: "Workspace-Referenz",
     content: "Inhalt",
@@ -600,6 +746,36 @@ export const translations: Record<Locale, Translations> = {
     conflictLoadStored: "Gespeicherte Fassung laden",
     conflictSaveCopy: "Als Kopie speichern",
     conflictKeepMine: "Meine Fassung behalten",
+    conflictCopyBadge: "Konfliktkopie",
+    conflictCopyTooltip: "Diese Notiz entstand, weil sie auf zwei Geräten gleichzeitig geändert wurde. Sie enthält die Änderungen, die sich nicht in das Original übernehmen ließen.",
+    conflictCopyBannerTitle: "Das ist eine Konfliktkopie",
+    conflictCopyBannerBody: "Die Notiz wurde auf zwei Geräten gleichzeitig geändert. Diese Kopie enthält die Änderungen, die sich nicht übernehmen ließen. Vergleiche sie mit dem Original und lösche sie, wenn du sie nicht mehr brauchst.",
+    conflictCopyOriginal: "Original: %filename%",
+    conflictCopyOpenOriginal: "Original öffnen",
+    conflictCopyOriginalMissing: "Die Originalnotiz „%filename%“ gibt es nicht mehr.",
+    historyAction: "Verlauf",
+    historyAriaLabel: "Versionsverlauf",
+    historyTitle: "Verlauf: %filename%",
+    historyDescription: "Die letzten Fassungen dieser Notiz, die neueste zuerst. Beim Wiederherstellen bleibt die aktuelle Fassung im Verlauf erhalten.",
+    historyLoading: "Verlauf wird geladen …",
+    historyLoadFailed: "Der Verlauf konnte nicht geladen werden.",
+    historyEmptyTitle: "Noch kein Verlauf",
+    historyEmpty: "Sobald sich diese Notiz beim Speichern ändert, erscheint hier die jeweils vorherige Fassung.",
+    historySourceLocal: "Lokal",
+    historySourceCloud: "Cloud",
+    historyReplacedAt: "Fassung bis %time%",
+    historyVersion: "Version %version%",
+    historyAuthor: "von %author%",
+    historyRestore: "Wiederherstellen",
+    historyRestoreConfirmTitle: "Diese Fassung wiederherstellen?",
+    historyRestoreConfirm: "Die Notiz wird auf die Fassung bis %time% zurückgesetzt. Die aktuelle Fassung bleibt im Verlauf erhalten.",
+    historyRestoreConfirmAction: "Ja, wiederherstellen",
+    historyRestoring: "Wird wiederhergestellt …",
+    historyRestoreFailed: "Die Fassung konnte nicht wiederhergestellt werden.",
+    historyRestoreConflict: "Die Notiz wurde zwischenzeitlich geändert. Öffne den Verlauf noch einmal und versuche es erneut.",
+    historyRestoreRoomActive: "Die Notiz ist gerade in einer Sitzung geöffnet. Versuche es in einem Moment noch einmal.",
+    historyRestoreReadOnly: "Du darfst diese Notiz nur lesen und deshalb keine Fassung wiederherstellen.",
+    historyRestored: "Fassung wiederhergestellt.",
     syncOffline: "Offline",
     syncConnecting: "Verbinde...",
     syncReconnecting: "Verbinde erneut...",
@@ -715,7 +891,6 @@ export const translations: Record<Locale, Translations> = {
     previewUnavailable: "Vorschau ist in dieser Umgebung nicht verfügbar.",
     mapsUnavailable: "Maps sind nicht verfügbar.",
     mapUnavailable: "Map ist nicht verfügbar.",
-    previewServiceError: "Vorschau-Service meldet HTTP",
     localPreviewUnavailable: "Für diese lokale Datei ist aktuell keine Vorschau verfügbar.",
     unsupportedResource: "Dieser Ressourcentyp wird nicht unterstützt.",
     resourceSelectionFailed: "Ressource konnte nicht ausgewählt werden.",
@@ -783,6 +958,33 @@ export const translations: Record<Locale, Translations> = {
     feedbackScreenshotSize: "Screenshots dürfen maximal 10 MB groß sein.",
     feedbackVideoSize: "Das Video darf maximal 50 MB groß sein.",
     resourcePreviewFailed: "Ressourcen-Vorschau konnte nicht geladen werden.",
+    visualMermaidTitle: "Mermaid-Diagramm",
+    visualMermaidEditSource: "Quelltext bearbeiten",
+    visualMermaidShowPreview: "Vorschau anzeigen",
+    visualMermaidSourceLabel: "Mermaid-Quelltext",
+    visualMermaidRendering: "Diagramm wird gerendert …",
+    visualMermaidEmpty: "Der Mermaid-Block ist leer.",
+    visualMermaidErrorTitle: "Das Diagramm konnte nicht dargestellt werden",
+    visualMermaidErrorLine: "Zeile",
+    visualMermaidErrorHint: "Der Quelltext bleibt unverändert und lässt sich über „Quelltext bearbeiten“ korrigieren.",
+    visualMermaidLoadFailed: "Die Diagramm-Bibliothek konnte nicht geladen werden.",
+    visualEnlarge: "Vergrößern",
+    visualViewerImage: "Bildansicht",
+    visualViewerDiagram: "Diagrammansicht",
+    visualZoomIn: "Hineinzoomen",
+    visualZoomOut: "Herauszoomen",
+    visualZoomReset: "Zoom zurücksetzen",
+    visualZoomLevel: "Zoomstufe",
+    visualClose: "Großansicht schließen",
+    visualViewerHint: "Ziehen oder Pfeiltasten zum Verschieben, Mausrad oder +/− zum Zoomen, 0 zum Zurücksetzen, Esc zum Schließen.",
+    visualSaveImage: "Bild speichern",
+    visualSaveDiagramSvg: "Diagramm als SVG speichern",
+    visualSaveDiagramPng: "Diagramm als PNG speichern",
+    visualSaveFailed: "Das Speichern ist fehlgeschlagen.",
+    visualImageNotFound: "Bild nicht gefunden:",
+    visualImagePathRejected: "Pfad nicht erlaubt:",
+    visualEmbeddedImages: "Bilder in diesem Knoten",
+    visualImageLoading: "Bild wird geladen …",
     serverUrl: "Server-URL",
     accessToken: "Persönliches Zugriffstoken",
     connecting: "Verbinde...",
@@ -901,6 +1103,26 @@ export const translations: Record<Locale, Translations> = {
     theme: "Design",
     lightMode: "Hell",
     darkMode: "Dunkel",
+    themeCustom: "Eigenes Theme…",
+    themeCustomTitle: "Eigenes Theme",
+    themeCustomDescription: "Wähle eine Vorlage oder lege Farben selbst fest. Text und Akzent müssen auf der Oberfläche gut lesbar bleiben, sonst wird das Theme nicht gespeichert. Die Auswahl bleibt nur in diesem Browser.",
+    themePresets: "Vorlagen",
+    themeName: "Name",
+    themeBase: "Basis",
+    themeAccent: "Akzentfarbe",
+    themeSurface: "Oberfläche (optional)",
+    themeInk: "Text (optional)",
+    themeOptionalHint: "Hex-Wert wie #B94316. Leer lassen für den Standard der Basis.",
+    themeAuto: "automatisch",
+    themePickColor: "Farbe wählen",
+    themeContrastInk: "Text auf Oberfläche: %ratio%:1 (mindestens 4,5:1)",
+    themeContrastAccent: "Akzent auf Oberfläche: %ratio%:1 (mindestens 3:1)",
+    themeSave: "Theme speichern",
+    themeReset: "Standard-Theme wiederherstellen",
+    themeErrorName: "Bitte einen Namen mit 1 bis 40 Zeichen eingeben.",
+    themeErrorHex: "Das ist kein gültiger Hex-Wert. Erlaubt sind z. B. #B94316 oder #B41.",
+    themeErrorInk: "Der Text hat auf dieser Oberfläche nur %ratio%:1 Kontrast, nötig sind 4,5:1. Wähle einen dunkleren oder helleren Text oder eine andere Oberfläche.",
+    themeErrorAccent: "Der Akzent hat auf dieser Oberfläche nur %ratio%:1 Kontrast, nötig sind 3:1. Wähle einen kräftigeren Akzent oder eine andere Oberfläche.",
     language: "Sprache",
   },
   en: {
@@ -913,8 +1135,18 @@ export const translations: Record<Locale, Translations> = {
     saved: "Saved",
     saveFailed: "Save failed",
     reload: "Reload from disk",
-    importMd: "Import Markdown",
+    importMd: "Import Markdown or OPML",
     exportMd: "Export Markdown",
+    exportMenu: "Export",
+    exportMarkdown: "Markdown (.md)",
+    exportOpml: "OPML (.opml)",
+    exportPdf: "PDF (.pdf)",
+    exportPng: "PNG (.png)",
+    exportSvg: "SVG (.svg)",
+    exportFailed: "The export failed.",
+    exportSavedTo: "Exported to:",
+    exportNoMap: "The map is not visible. Switch to the map view and export again.",
+    importOpmlFailed: "OPML could not be imported:",
     shareReadOnlyLink: "Read-only links for colleagues",
     documentActions: "Document actions",
     fileActions: "File actions",
@@ -983,6 +1215,9 @@ export const translations: Record<Locale, Translations> = {
     loadPreview: "Loading preview...",
     loadWebsitePreview: "Load website preview",
     savedPreview: "Saved preview",
+    previewDisclosure: "On click, only this URL is requested: {url} (host: {host}). Title, description and preview image are read from it. The contents, file names and folder names of your maps are not sent. Your browser loads the preview image from the page's host.",
+    previewEmpty: "No metadata found",
+    previewImageRequest: "Load preview image from {host}",
     openUrl: "Open URL",
     targetMap: "Target map",
     selectMap: "Select map",
@@ -1005,6 +1240,28 @@ export const translations: Record<Locale, Translations> = {
     targetNode: "Target node ID",
     ambiguousReference: "Ambiguous reference",
     targetNotFound: "Target not found",
+    pdfSource: "PDF source",
+    pdfPage: "Page",
+    pdfQuote: "Quote",
+    openPdfAtPage: "Open PDF at this page",
+    pdfOpenFailed: "The PDF “%file%” could not be opened.",
+    insertPdfCitation: "Insert PDF citation",
+    pdfCitationHint: "Creates a source node with a link to the PDF page and the quote.",
+    pdfCitationFile: "PDF file",
+    pdfCitationFilePlaceholder: "papers/source.pdf",
+    pdfCitationPage: "Page",
+    pdfCitationQuote: "Quote",
+    pdfCitationInsert: "Insert",
+    pdfCitationCancel: "Cancel",
+    pdfCitationErrorFile: "Enter the path of a PDF file (ends in .pdf, without ] | #).",
+    pdfCitationErrorPage: "The page must be a whole number from 1.",
+    pdfCitationNoMap: "Open a map first to insert the citation into.",
+    pdfCitationFailed: "The citation could not be inserted. Is the map read-only?",
+    bibliographyFailed: "The bibliography could not be created.",
+    exportBibtex: "Export bibliography (BibTeX)",
+    exportBibliographyMd: "Export bibliography (Markdown)",
+    bibliographyHint: "citekey of this map and the maps it links to",
+    bibliographyEmpty: "No citation keys (citekey in the frontmatter) found in this map or the maps it links to.",
     backlinkFrom: "Backlink from %title%",
     workspaceReference: "Workspace reference",
     content: "Content",
@@ -1046,6 +1303,36 @@ export const translations: Record<Locale, Translations> = {
     conflictLoadStored: "Load stored version",
     conflictSaveCopy: "Save as copy",
     conflictKeepMine: "Keep my version",
+    conflictCopyBadge: "Conflict copy",
+    conflictCopyTooltip: "This note was created because it was changed on two devices at the same time. It holds the changes that could not be merged into the original.",
+    conflictCopyBannerTitle: "This is a conflict copy",
+    conflictCopyBannerBody: "The note was changed on two devices at the same time. This copy holds the changes that could not be merged. Compare it with the original and delete it when you no longer need it.",
+    conflictCopyOriginal: "Original: %filename%",
+    conflictCopyOpenOriginal: "Open original",
+    conflictCopyOriginalMissing: "The original note “%filename%” no longer exists.",
+    historyAction: "History",
+    historyAriaLabel: "Version history",
+    historyTitle: "History: %filename%",
+    historyDescription: "The latest versions of this note, newest first. Restoring keeps the current version in the history.",
+    historyLoading: "Loading history …",
+    historyLoadFailed: "The history could not be loaded.",
+    historyEmptyTitle: "No history yet",
+    historyEmpty: "Once this note changes on save, the version it replaced appears here.",
+    historySourceLocal: "Local",
+    historySourceCloud: "Cloud",
+    historyReplacedAt: "Version until %time%",
+    historyVersion: "Version %version%",
+    historyAuthor: "by %author%",
+    historyRestore: "Restore",
+    historyRestoreConfirmTitle: "Restore this version?",
+    historyRestoreConfirm: "The note is reset to the version until %time%. The current version stays in the history.",
+    historyRestoreConfirmAction: "Yes, restore",
+    historyRestoring: "Restoring …",
+    historyRestoreFailed: "The version could not be restored.",
+    historyRestoreConflict: "The note changed in the meantime. Open the history again and retry.",
+    historyRestoreRoomActive: "The note is open in a session right now. Try again in a moment.",
+    historyRestoreReadOnly: "You can only read this note, so you cannot restore a version.",
+    historyRestored: "Version restored.",
     syncOffline: "Offline",
     syncConnecting: "Connecting...",
     syncReconnecting: "Reconnecting...",
@@ -1161,7 +1448,6 @@ export const translations: Record<Locale, Translations> = {
     previewUnavailable: "Preview unavailable in this environment.",
     mapsUnavailable: "Maps are unavailable.",
     mapUnavailable: "Map is unavailable.",
-    previewServiceError: "Preview service returned HTTP",
     localPreviewUnavailable: "No preview is currently available for this local file.",
     unsupportedResource: "This resource type is not supported.",
     resourceSelectionFailed: "Resource selection failed.",
@@ -1229,6 +1515,33 @@ export const translations: Record<Locale, Translations> = {
     feedbackScreenshotSize: "Screenshots must be no larger than 10 MB.",
     feedbackVideoSize: "The video must be no larger than 50 MB.",
     resourcePreviewFailed: "The resource preview could not be loaded.",
+    visualMermaidTitle: "Mermaid diagram",
+    visualMermaidEditSource: "Edit source",
+    visualMermaidShowPreview: "Show preview",
+    visualMermaidSourceLabel: "Mermaid source",
+    visualMermaidRendering: "Rendering diagram…",
+    visualMermaidEmpty: "The Mermaid block is empty.",
+    visualMermaidErrorTitle: "The diagram could not be rendered",
+    visualMermaidErrorLine: "Line",
+    visualMermaidErrorHint: "The source is unchanged; fix it with “Edit source”.",
+    visualMermaidLoadFailed: "The diagram library could not be loaded.",
+    visualEnlarge: "Enlarge",
+    visualViewerImage: "Image viewer",
+    visualViewerDiagram: "Diagram viewer",
+    visualZoomIn: "Zoom in",
+    visualZoomOut: "Zoom out",
+    visualZoomReset: "Reset zoom",
+    visualZoomLevel: "Zoom level",
+    visualClose: "Close viewer",
+    visualViewerHint: "Drag or use the arrow keys to pan, mouse wheel or +/− to zoom, 0 to reset, Esc to close.",
+    visualSaveImage: "Save image",
+    visualSaveDiagramSvg: "Save diagram as SVG",
+    visualSaveDiagramPng: "Save diagram as PNG",
+    visualSaveFailed: "Saving failed.",
+    visualImageNotFound: "Image not found:",
+    visualImagePathRejected: "Path not allowed:",
+    visualEmbeddedImages: "Images in this node",
+    visualImageLoading: "Loading image…",
     serverUrl: "Server URL",
     accessToken: "Personal access token",
     connecting: "Connecting...",
@@ -1347,6 +1660,26 @@ export const translations: Record<Locale, Translations> = {
     theme: "Theme",
     lightMode: "Light",
     darkMode: "Dark",
+    themeCustom: "Custom theme…",
+    themeCustomTitle: "Custom theme",
+    themeCustomDescription: "Pick a preset or choose your own colours. Text and accent must stay clearly readable on the surface, otherwise the theme is not saved. Your choice stays in this browser only.",
+    themePresets: "Presets",
+    themeName: "Name",
+    themeBase: "Base",
+    themeAccent: "Accent colour",
+    themeSurface: "Surface (optional)",
+    themeInk: "Text (optional)",
+    themeOptionalHint: "Hex value like #B94316. Leave empty for the base default.",
+    themeAuto: "automatic",
+    themePickColor: "Pick colour",
+    themeContrastInk: "Text on surface: %ratio%:1 (at least 4.5:1)",
+    themeContrastAccent: "Accent on surface: %ratio%:1 (at least 3:1)",
+    themeSave: "Save theme",
+    themeReset: "Restore default theme",
+    themeErrorName: "Please enter a name of 1 to 40 characters.",
+    themeErrorHex: "That is not a valid hex value. Use something like #B94316 or #B41.",
+    themeErrorInk: "Text on this surface has only %ratio%:1 contrast, 4.5:1 is required. Choose darker or lighter text, or another surface.",
+    themeErrorAccent: "The accent on this surface has only %ratio%:1 contrast, 3:1 is required. Choose a stronger accent, or another surface.",
     language: "Language",
   },
 };

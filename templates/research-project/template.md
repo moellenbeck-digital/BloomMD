@@ -40,7 +40,7 @@ Evidence should link back to its source and note confidence level. Separate obse
 
 ## Findings <!-- bloommd:id=research-findings -->
 
-Initial finding: users understand BloomMD faster when they see a domain-specific example before an empty canvas.
+Hypothesis: a domain-specific example may help people understand BloomMD before they start from an empty canvas.
 
 ## Sources <!-- bloommd:id=research-sources -->
 

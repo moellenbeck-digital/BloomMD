@@ -4,7 +4,10 @@ import { Awareness } from "y-protocols/awareness";
 import type { ServerWebSocket } from "bun";
 import { KnowledgeNodeNotFoundError } from "@bloommd/core/knowledge";
 import { createSyncServer, getSyncRoomOpenFailure, isSyncOriginAllowed, isSyncTokenAuthorized, processSyncClientMessage, refreshSyncClientPermission, type SyncWebSocketState } from "./server";
-import { SyncRoomBusyError, SyncRoomCapacityError } from "./rooms";
+import { createRoomManager, SyncRoomBusyError, SyncRoomCapacityError } from "./rooms";
+import { TestClock } from "./clock";
+import { SyncDocumentVersionConflictError, type DocumentPersistence } from "./persistence";
+import { parseFile } from "@bloommd/core";
 import { createSyncTelemetry } from "./observability";
 import type { SyncRoom, WebSocketData } from "./types";
 
@@ -173,6 +176,70 @@ describe("sync health", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ status: "degraded", rooms: 1, clients: 1, persistenceFailures: 1, inFlightRoomOperations: 0, pendingPersistenceRooms: 0 });
+  });
+
+  test("keeps a room degraded and visible after a version conflict, without retrying", async () => {
+    // Ticket #46: the server is the only writer and reports VERSION_CONFLICT instead of overwriting.
+    // That terminal state must stay observable and must not turn into a retry storm.
+    const events: Array<Record<string, unknown>> = [];
+    const telemetry = createSyncTelemetry({ write: (line) => { events.push(JSON.parse(line)); } });
+    let saveAttempts = 0;
+    const persistence: DocumentPersistence = {
+      authorize: async () => "write",
+      load: async (descriptor) => ({
+        ...parseFile(descriptor.filename, "# Synthetic\n\nBody.\n"),
+        storage: { mode: "database", documentId: descriptor.documentId!, workspaceId: descriptor.workspaceId!, version: 3 },
+      }),
+      save: async () => {
+        saveAttempts += 1;
+        throw new SyncDocumentVersionConflictError();
+      },
+    };
+    const clock = new TestClock();
+    const roomManager = createRoomManager({ baseDir: "", port: 0, persistDebounceMs: 50, destroyDelayMs: 100, telemetry }, persistence, clock);
+    const { app } = createSyncServer(roomManager);
+    const settle = async () => { for (let i = 0; i < 10; i += 1) await new Promise<void>((resolve) => setImmediate(resolve)); };
+    const room = await roomManager.getOrCreateRoom({ key: "doc", filename: "synthetic.md", documentId: "doc", workspaceId: "ws", userId: "user-a" });
+    const ws = { sendBinary() {}, readyState: 1, data: { roomName: "doc" } } as unknown as ServerWebSocket<WebSocketData>;
+    roomManager.addClient(room, ws);
+    expect((await app.request("/ready")).status).toBe(200);
+
+    const rootId = room.yDoc.getMap("meta").get("rootId") as string;
+    (room.yDoc.getMap("nodes").get(rootId) as Y.Map<unknown>).set("title", "Edited");
+    await clock.advanceBy(50);
+    await settle();
+
+    expect(room.lastPersistError).toBe("VERSION_CONFLICT");
+    const ready = await app.request("/ready");
+    expect(ready.status).toBe(503);
+    expect(await ready.json()).toEqual({ status: "degraded" });
+    const health = await app.request("/health");
+    expect(health.status).toBe(200);
+    expect(await health.json()).toMatchObject({ status: "degraded", persistenceFailures: 1, pendingPersistenceRooms: 0 });
+    expect(telemetry.snapshot()).toMatchObject({
+      counters: { sync_persistence_errors_total: 1 },
+      gauges: { sync_degraded_rooms: 1, sync_pending_persistence_rooms: 0 },
+    });
+    expect(events.some((event) => event.operation === "persistence" && event.outcome === "error" && event.errorClass === "SyncDocumentVersionConflictError")).toBe(true);
+
+    // No retry storm: time passing alone neither saves again nor frees the room.
+    for (let step = 0; step < 30; step += 1) {
+      await clock.advanceBy(10_000);
+      await settle();
+    }
+    expect(saveAttempts).toBe(1);
+
+    // The last client leaving makes one final flush, which conflicts again; then it stays quiet.
+    roomManager.removeClient(room, ws);
+    await settle();
+    for (let step = 0; step < 30; step += 1) {
+      await clock.advanceBy(10_000);
+      await settle();
+    }
+    expect(saveAttempts).toBe(2);
+    expect(roomManager.getRooms().has("doc")).toBe(true);
+    expect((await app.request("/ready")).status).toBe(503);
+    await roomManager.shutdown();
   });
 
   test("reports draining as not ready and rejects new internal mutations", async () => {

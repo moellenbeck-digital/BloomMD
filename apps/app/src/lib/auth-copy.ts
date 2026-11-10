@@ -28,13 +28,17 @@ export const SIGNUP_CONSENT_REQUIRED_ERROR = "Bitte stimme der Datenschutzerklä
 export const VERIFICATION_NOT_SENT_ERROR = "Bestätigungs-E-Mail konnte nicht gesendet werden.";
 /** Global mail cap reached (#169): nothing is wrong with the input, so say it is temporary and nobody's fault. */
 export const SIGNUP_UNAVAILABLE_ERROR = "Die Registrierung ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
+/** Activation link of a prepared waitlist account (#105): unknown, used, expired, or the account is already active. */
+export const ACTIVATION_LINK_INVALID_ERROR = "Der Aktivierungslink ist ungültig oder abgelaufen.";
+/** Confirming would start a second trial for one mailbox (#277): another address variant of it is already confirmed. */
+export const DUPLICATE_TRIAL_ERROR = "Für dieses Postfach gibt es bereits einen bestätigten Testaccount (auch Schreibweisen wie name+zusatz@… oder Punkte bei Gmail gehören zum selben Postfach). Bitte melde dich mit diesem Konto an; dieses Konto wurde nicht bestätigt.";
 export const MAIL_UNAVAILABLE_ERROR = "Der E-Mail-Versand ist vorübergehend nicht verfügbar. Bitte versuche es später noch einmal.";
 
 export function localizeAuthError(value: string, locale: AuthLocale) {
   if (locale === "de") return value;
   const messages: Record<string, string> = {
-    "Diese E-Mail ist noch nicht für die Beta freigeschaltet.": "This email is not enabled for the beta yet.",
-    "Der Einladungscode ist ungültig.": "The beta code is invalid.",
+    "Dein kostenloser Testaccount ist für diese E-Mail-Adresse noch nicht freigeschaltet.": "Your free trial account is not enabled for this email address yet.",
+    "Der Zugangscode ist ungültig.": "The access code is invalid.",
     "Bitte gib eine gültige E-Mail-Adresse ein.": "Enter a valid email address.",
     "Diese E-Mail ist für diese BloomMD-Instanz nicht freigeschaltet.": "This email is not allowed for this BloomMD instance.",
     "E-Mail oder Passwort ist falsch.": "The email or password is incorrect.",
@@ -53,6 +57,8 @@ export function localizeAuthError(value: string, locale: AuthLocale) {
     [VERIFICATION_NOT_SENT_ERROR]: "The confirmation email could not be sent.",
     [SIGNUP_UNAVAILABLE_ERROR]: "Sign-up is temporarily unavailable. Please try again later.",
     [MAIL_UNAVAILABLE_ERROR]: "Sending email is temporarily unavailable. Please try again later.",
+    [ACTIVATION_LINK_INVALID_ERROR]: "This activation link is invalid or expired.",
+    [DUPLICATE_TRIAL_ERROR]: "A confirmed trial account already exists for this mailbox (spellings such as name+tag@… or dots in Gmail addresses belong to the same mailbox). Please sign in with that account; this account was not confirmed.",
     [SIGNUP_CONSENT_REQUIRED_ERROR]: "Please accept the privacy policy and the terms.",
     "Zu viele Versuche. Bitte warte kurz und versuche es erneut.": "Too many attempts. Please wait a moment and try again.",
     "Bitte lade die Seite neu und versuche es erneut.": "Reload the page and try again.",
@@ -73,7 +79,7 @@ export const authCopy = {
     joinStep: "Beitreten",
     language: "Sprache",
     createAccount: "Account erstellen",
-    accountSubtitle: "Lege deinen BloomMD-Account an. Danach bestätigst du deine E-Mail-Adresse.",
+    accountSubtitle: "Lege deinen kostenlosen BloomMD-Testaccount an. Er gilt 30 Tage ab E-Mail-Bestätigung; danach bleibt dein Konto lesbar, der Export bleibt möglich.",
     consent: { before: "Ich habe die ", privacy: "Datenschutzerklärung", between: " und die ", terms: "AGB", after: " gelesen und stimme ihnen zu." },
     personalWorkspace: "Deine persönliche Arbeitsumgebung.",
     signIn: "Anmelden",
@@ -86,12 +92,12 @@ export const authCopy = {
     checkInboxText: (email: string) => `Wir haben eine Bestätigungs-E-Mail an ${email} gesendet.`,
     resendVerification: "E-Mail erneut senden",
     changeEmail: "E-Mail-Adresse ändern",
-    betaAccess: "Beta-Zugang",
-    betaAccessUnavailable: "Dein Cloud-Zugang ist noch nicht freigeschaltet.",
-    betaAccessExplanation: "Der Beta-Zugang ist unabhängig von einer Workspace-Mitgliedschaft.",
+    betaAccess: "Zugang zum Testaccount",
+    betaAccessUnavailable: "Dein kostenloser Testaccount ist noch nicht freigeschaltet.",
+    betaAccessExplanation: "Der kostenlose Testaccount ist unabhängig von einer Workspace-Mitgliedschaft.",
     checkBetaAccess: "Zugang prüfen",
-    betaEmailHint: "Gib die E-Mail-Adresse aus deiner Beta-Einladung ein.",
-    betaCodeOptional: "Beta-Code (optional)",
+    betaEmailHint: "Gib die E-Mail-Adresse ein, mit der du den kostenlosen Testaccount nutzen möchtest.",
+    betaCodeOptional: "Zugangscode (optional)",
     betaCodeHint: "Nur nötig, wenn du einen Code erhalten hast.",
     invitation: "Einladung zum Workspace",
     invitedBy: (inviter: string, workspace: string) => `${inviter} lädt dich zu „${workspace}“ ein.`,
@@ -135,7 +141,7 @@ export const authCopy = {
     joinStep: "Join",
     language: "Language",
     createAccount: "Create account",
-    accountSubtitle: "Create your BloomMD account. Then confirm your email address.",
+    accountSubtitle: "Create your free BloomMD trial account. It is valid for 30 days from email confirmation; afterwards your account stays readable and export remains possible.",
     consent: { before: "I have read the ", privacy: "privacy policy", between: " and the ", terms: "terms", after: " and agree to them." },
     personalWorkspace: "Your personal workspace.",
     signIn: "Sign in",
@@ -148,12 +154,12 @@ export const authCopy = {
     checkInboxText: (email: string) => `We sent a confirmation email to ${email}.`,
     resendVerification: "Resend confirmation email",
     changeEmail: "Change email address",
-    betaAccess: "Beta access",
-    betaAccessUnavailable: "Your cloud access is not enabled yet.",
-    betaAccessExplanation: "Beta access is separate from workspace membership.",
+    betaAccess: "Free trial account access",
+    betaAccessUnavailable: "Your free trial account is not enabled yet.",
+    betaAccessExplanation: "The free trial account is separate from workspace membership.",
     checkBetaAccess: "Check access",
-    betaEmailHint: "Enter the email address from your beta invitation.",
-    betaCodeOptional: "Beta code (optional)",
+    betaEmailHint: "Enter the email address you want to use for the free trial account.",
+    betaCodeOptional: "Access code (optional)",
     betaCodeHint: "Only needed if you received a code.",
     invitation: "Workspace invitation",
     invitedBy: (inviter: string, workspace: string) => `${inviter} invited you to “${workspace}”.`,

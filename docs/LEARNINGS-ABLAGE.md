@@ -264,5 +264,43 @@ Abgelaufenes aus (b) prüft der architect (siehe `docs/LEARNINGS.md`, „Bestät
 6. Prüfen: Learning per MCP anlegen, mit einer anderen Rolle per `bloommd_search` finden, `agent log` ansehen,
    Export öffnen.
 
+### Betrieb und Cluster-Teil: Kurzanleitung im Ops-Repo
+
+Betrieb und Cluster-Teil stehen in der Kurzanleitung „Learnings-Ablage einrichten“ in `md-brand-cluster-base`
+(Ops-Chief): PVC-Vorlage, Chart-Werte, der `system.md`-Abschnitt `adapter.wissen`, Rechte, Backup und Export. Dieses
+Dokument deckt den Anwendungs- und Werkzeugteil ab (Binary, Vault, Rechte, MCP, Export-Skript, Prüfung). Die
+Anleitung wird hier nicht wiederholt; beide ergänzen sich.
+
+### Checkliste je Brand
+
+Die Checkliste ergänzt die sechs Schritte, sie ersetzt sie nicht. Jede Brand arbeitet sie einmal ab; die
+Verweise führen zum passenden Abschnitt.
+
+- [ ] **Backend-Wahl:** Vor Schritt 1 festlegen, ob die Brand einen lokalen Vault (`--vault <ordner>`) oder die Cloud
+  (`--cloud <url> [--workspace <id>]` mit `BLOOMMD_TOKEN`) nutzt. Der Vault braucht keinen Server und kein Netzziel,
+  die Rechte gelten dort für alle Agenten gleich. Rechte je Agent gibt es nur mit `--cloud` über Agent-Tokens; das ist
+  der einzige Weg im Code, der Netzwerkzugriff nutzt (siehe [Überblick](#überblick), [Rechte](#rechte) und
+  „Rechte je Rolle“ unter [Einzelbefehle für Skripte und den Adapter](#einzelbefehle-für-skripte-und-den-adapter)).
+  Die weiteren Punkte beschreiben den Vault.
+- [ ] **Rechte:** `agent setup <vault> --access read --area Learnings=write` ausführen und mit `agent rights <vault>`
+  prüfen. Es gilt **eine** Rechtedatei für alle Agenten, nicht je Agent; die Trennung nach Rolle ist die Konvention
+  `Learnings/<rolle>/` (siehe [Rechte](#rechte)).
+- [ ] **Vault-Name und Pfad:** Pfad des Vault-Ordners, Pfad des Export-Ordners **außerhalb** des Vaults und die
+  MCP-Einträge `bloommd-<rolle>` (je Rolle einer) einmal festlegen und in allen Schritten und Skripten gleich
+  verwenden (`LEARNINGS_VAULT`, `LEARNINGS_EXPORT_DIR`). Der Name der Brand gehört nicht in die Doku, sondern in die
+  Konfiguration der Brand (siehe [Bausteine](#bausteine) und
+  [MCP-Einträge in OpenClaw](#mcp-einträge-in-openclaw)).
+- [ ] **Velero (Backup/Restore-Test des Volumes):** Anlage von Volume, Backup und Restore-Test gehören dem Betrieb;
+  die Brand fordert sie dort an und prüft nach einem Restore `agent rights` und den Export (siehe
+  [Wiederherstellung](#wiederherstellung)). Eine Velero-Konfiguration steht in diesem Repository nicht.
+- [ ] **Täglicher statischer Export** (im Ticket „Wave-Export“ genannt): `scripts/learnings-export.sh` als Automation einrichten und die
+  Zugriffsfrage klären, bevor der Export veröffentlicht wird; er enthält Learnings als Klartext (siehe
+  [Statischer Export für Menschen und den Chief of Staff](#statischer-export-für-menschen-und-den-chief-of-staff)).
+- [ ] **Verantwortlicher:** Je Aufgabe eine Rolle eintragen, keine Person: Backup (laut [Bausteine](#bausteine) der
+  Betrieb), Rechte, Export und Wochenreview (laut [Wochenroutine](#wochenroutine-review-für-den-chief-of-staff)
+  entscheidet der Chief of Staff, Abgelaufenes prüft der architect). Rechte und Export legt die Brand fest.
+
+Ein Beispiel für eine zweite Brand ist content-world; die Checkliste gilt unabhängig davon für jede Brand.
+
 Zugangsdaten gibt es in diesem Muster nicht; legt niemand welche an, gehören sie auch nicht in die Learnings
 (siehe „Verbote“ in [LEARNINGS.md](LEARNINGS.md)).

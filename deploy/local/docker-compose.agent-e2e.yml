@@ -36,6 +36,9 @@ services:
       # private sync:4100 endpoint, so the E2E stack exercises the same split as a real browser.
       NEXT_PUBLIC_SITE_URL: http://web:3000
       BLOOMMD_REQUIRE_AUTH: "1"
+      # CI/E2E sends no Plausible server signal (server-start). Not E2E_TEST_MODE: that would also
+      # change auth and test behaviour and distort the real agent flow.
+      BLOOMMD_PLAUSIBLE_DISABLED: "true"
     # The production readiness route intentionally checks deployment-only legal and mail settings
     # that are absent from an isolated E2E stack. Version is dynamic and proves the built app is
     # serving before the orchestrator creates authenticated state.

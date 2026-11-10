@@ -52,7 +52,7 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
       // Suites that need their own server env/ports (see their own configs), plus the mobile smoke suite.
-      testIgnore: [/mobile-smoke\.spec\.ts/, /wiki\.spec\.ts/, /beta-gate\.spec\.ts/, /open-signup\.spec\.ts/, /collaboration\.spec\.ts/, /visual-regression\.spec\.ts/],
+      testIgnore: [/mobile-(smoke|matrix)\.spec\.ts/, /wiki\.spec\.ts/, /beta-gate\.spec\.ts/, /open-signup\.spec\.ts/, /collaboration\.spec\.ts/, /visual-regression\.spec\.ts/, /plausible-tracking-local\.spec\.ts/],
     },
   ],
 });

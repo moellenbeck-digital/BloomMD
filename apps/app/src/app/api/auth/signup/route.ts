@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, isE2EAuthBypassEnabled, safeNextPath, sessionCookieName, shouldUseSecureCookies, validateLoginEmail } from "../../../../lib/auth";
 import { assertBetaSignupAllowedForRequest } from "../../../../lib/betaAccess";
-import { acceptBetaInvite, createAuthToken, createPasswordUser, findPasswordUserByEmail, getWorkspaceInvitationPreviewById, updatePasswordForEmail } from "../../../../lib/db";
+import { acceptBetaInvite, createAuthToken, createPasswordUser, findPasswordUserByEmail, getWorkspaceInvitationPreviewById, hasConfirmedMailboxTwin, updatePasswordForEmail } from "../../../../lib/db";
+import { canonicalEmail } from "../../../../lib/email-canonical";
 import { appRedirectUrl } from "../../../../lib/deployment";
 import { SIGNUP_CONSENT_FIELD, SIGNUP_CONSENT_REQUIRED_ERROR, SIGNUP_UNAVAILABLE_ERROR, VERIFICATION_NOT_SENT_ERROR } from "../../../../lib/auth-copy";
 import { sendVerificationEmail } from "../../../../lib/email";
@@ -38,7 +39,8 @@ export async function POST(request: Request) {
     if (form.get(SIGNUP_CONSENT_FIELD) !== "1") throw new Error(SIGNUP_CONSENT_REQUIRED_ERROR);
     await assertRateLimit(request, {
       action: "signup",
-      identifier: email,
+      // The canonical address, so +tag and Gmail-dot variants of one mailbox share one limit (#277).
+      identifier: canonicalEmail(email),
       limit: SIGNUP_RATE_LIMIT.perAccount,
       sourceLimit: SIGNUP_RATE_LIMIT.perSource,
       windowMs: SIGNUP_RATE_LIMIT.windowMs,
@@ -68,15 +70,23 @@ export async function POST(request: Request) {
     }
     const passwordHash = hashPassword(password);
     const existing = await findPasswordUserByEmail(email);
+    // Another confirmed account of the same mailbox (#277): no account, no mail, no change to an
+    // unconfirmed one, and the very answer a confirmed address gets, so a signup reveals nothing.
+    if (!existing?.emailVerifiedAt && (await hasConfirmedMailboxTwin(email))) {
+      const twinParams = new URLSearchParams({ next, verification: "sent", lang });
+      if (invite) twinParams.set("invite", invite);
+      twinParams.set("email", email);
+      return NextResponse.redirect(appRedirectUrl(`/login?${serializeAuthParams(twinParams)}`, request.url), 303);
+    }
     // Global mail cap (#169), checked before the account is created: when it is reached no mail
     // goes out, and no unconfirmed account is left behind that could never be confirmed.
     if (!existing?.emailVerifiedAt) await assertAccountMailBudget("verification");
-    const user = existing ?? await createPasswordUser({ email, name, passwordHash });
+    const user = existing ?? await createPasswordUser({ email, name, passwordHash, locale: lang as "de" | "en" });
     // With open registration anyone can register an address they do not own. If the account is
     // still unconfirmed, the latest signup wins, so a password set by someone else beforehand does
     // not survive the real owner's registration (account pre-hijacking). Confirmed accounts are
     // never touched; the password-reset flow is the only way to change those.
-    if (existing && !existing.emailVerifiedAt) await updatePasswordForEmail({ email: existing.email, passwordHash });
+    if (existing && !existing.emailVerifiedAt) await updatePasswordForEmail({ email: existing.email, passwordHash, locale: lang as "de" | "en" });
     await acceptBetaInvite(user.email);
     let verificationFailed = false;
     if (!user.emailVerifiedAt) {

@@ -29,5 +29,5 @@
     <text x="1058" y="426" fill="#C9C1BB" font-family="Arial, sans-serif" font-size="21">Du übernimmst oder verwirfst ihn.</text>
     <rect x="1058" y="458" width="286" height="46" rx="23" fill="#332018"/><text x="1083" y="488" fill="#FFC5B0" font-family="Arial, sans-serif" font-size="18" font-weight="700">Deine Entscheidung bleibt sichtbar</text>
   </g>
-  <text x="100" y="658" fill="#D7D0CB" font-family="Arial, sans-serif" font-size="26">Der Agent schreibt nie direkt. Jeder Schritt bleibt im Workspace nachvollziehbar und widerrufbar.</text>
+  <text x="100" y="658" fill="#D7D0CB" font-family="Arial, sans-serif" font-size="26">Der Agent schreibt nie direkt. Erst deine Freigabe übernimmt einen Vorschlag.</text>
 </svg>

@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return marketingMetadata({
     title: locale === "en" ? "BloomMD Documentation" : "BloomMD Dokumentation",
     description: locale === "en"
-      ? "Web, desktop, collaboration, OKF and LLM wiki documentation for the closed beta."
-      : "Dokumentation zu Web, Desktop, Zusammenarbeit, OKF und LLM-Wiki für die Closed Beta.",
+      ? "Web, desktop, collaboration, OKF and LLM wiki documentation for the free trial account and the local beta software."
+      : "Dokumentation zu Web, Desktop, Zusammenarbeit, OKF und LLM-Wiki für den kostenlosen Testaccount und die lokale Beta-Software.",
     path: locale === "en" ? "/docs?lang=en" : "/docs",
     locale,
   });

@@ -50,7 +50,13 @@ export default {
       icons: "assets/AppIcon.iconset",
       codesign: signedMacOSRelease,
       notarize: signedMacOSRelease,
-      entitlements: { "com.apple.security.get-task-allow": false },
+      // Electrobun merges these over its defaults (allow-jit, allow-unsigned-executable-memory,
+      // disable-library-validation: true). Library validation stays on, so the default is overridden
+      // explicitly; `scripts/verify-macos-release.ts` fails the release if it ever turns back on.
+      entitlements: {
+        "com.apple.security.get-task-allow": false,
+        "com.apple.security.cs.disable-library-validation": false,
+      },
     },
     linux: { bundleCEF: false, icon: "assets/AppIcon.iconset/icon_128x128.png" },
     win: { bundleCEF: false },

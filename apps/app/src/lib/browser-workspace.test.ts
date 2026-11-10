@@ -130,6 +130,29 @@ describe("local handoff stays local", () => {
     expect(networkCalls).toEqual([]);
   });
 
+  test("opening a PDF at a page appends #page=n to the object URL, still without network", async () => {
+    const opened: string[] = [];
+    (globalThis as { window?: unknown }).window = {
+      open: (url: string) => {
+        opened.push(url);
+        return null;
+      },
+      setTimeout: () => 0,
+    };
+    const root = directoryHandle("vault", [
+      ["note.md", fileHandle("note.md", "# Note")],
+      ["papers/smith.pdf", fileHandle("smith.pdf", "%PDF-1.4")],
+    ]);
+    const workspace = new BrowserWorkspace(root as never);
+    await workspace.refresh();
+
+    await workspace.openResource("smith.pdf", 12);
+    await workspace.openResource("papers/smith.pdf");
+
+    expect(opened).toEqual(["blob:mock/0#page=12", "blob:mock/1"]);
+    expect(networkCalls).toEqual([]);
+  });
+
   test("a local attachment can provide a preview object URL without a network request", async () => {
     const image = fileHandle("diagram.png", "PNG");
     const root = directoryHandle("vault", [
@@ -140,6 +163,21 @@ describe("local handoff stays local", () => {
     await workspace.refresh();
 
     expect(await workspace.resourceObjectUrl("diagram.png")).toBe("blob:mock/0");
+    expect(networkCalls).toEqual([]);
+  });
+
+  test("the attachment itself is available for saving the original, again without a network request", async () => {
+    const image = fileHandle("diagram.png", "PNG");
+    const root = directoryHandle("vault", [
+      ["note.md", fileHandle("note.md", "# Note")],
+      ["bilder/diagram.png", image],
+    ]);
+    const workspace = new BrowserWorkspace(root as never);
+    await workspace.refresh();
+
+    const file = await workspace.resourceFile("bilder/diagram.png");
+    expect(await file.text()).toBe("PNG");
+    await expect(workspace.resourceFile("../../etc/passwd")).rejects.toThrow(/not part of this workspace/);
     expect(networkCalls).toEqual([]);
   });
 

@@ -1,5 +1,6 @@
 import Electrobun, { Electroview } from "electrobun/view";
-import type { BloomMDRPC, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus, NativeDialogMethod, NativeDialogStarted } from "../shared/rpc-types";
+import type { BloomMDRPC, DesktopFolderDecision, DesktopE2EStateUpdate, DesktopFeedbackRequest, DesktopUpdateStatus, NativeDialogMethod, NativeDialogStarted } from "../shared/rpc-types";
+import type { SharedFolderConflictStrategy } from "@bloommd/core/shared-folder-publication";
 import { RPC_MAX_REQUEST_TIME_MS } from "../shared/native-dialog";
 import { createNativeDialogClient } from "./native-dialog-client";
 
@@ -92,6 +93,14 @@ export async function saveMindmap(filePath: string, markdown: string, storage?: 
   return electrobun.rpc!.request.saveMindmap({ filePath, markdown, storage });
 }
 
+export async function listNoteHistory(filePath: string) {
+  return electrobun.rpc!.request.listNoteHistory({ filePath });
+}
+
+export async function restoreNoteVersion(filePath: string, revisionId: string) {
+  return electrobun.rpc!.request.restoreNoteVersion({ filePath, revisionId });
+}
+
 export async function chooseDirectory() {
   return nativeDialogs.open("chooseDirectory");
 }
@@ -102,6 +111,38 @@ export async function chooseResourceFile(kind: "file" | "pdf") {
 
 export async function importFile() {
   return nativeDialogs.open("importFile");
+}
+
+export async function choosePublicationFolder() {
+  return nativeDialogs.open("choosePublicationFolder");
+}
+
+export async function selectOpenFolderForPublication() {
+  return electrobun.rpc!.request.selectOpenFolderForPublication({});
+}
+
+export async function previewFolderPublication(input: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[] }) {
+  return electrobun.rpc!.request.previewFolderPublication(input);
+}
+
+export async function listFolderShares(withActivity: boolean) {
+  return electrobun.rpc!.request.listFolderShares({ withActivity });
+}
+
+export async function getFolderActivity(folderId: string) {
+  return electrobun.rpc!.request.getFolderActivity({ folderId });
+}
+
+export async function resolveFolderActivity(folderId: string, decision: DesktopFolderDecision) {
+  return electrobun.rpc!.request.resolveFolderActivity({ folderId, decision });
+}
+
+export async function disconnectFolderShare(folderId: string) {
+  return electrobun.rpc!.request.disconnectFolderShare({ folderId });
+}
+
+export async function publishFolderAsWorkspace(input: { profileId: string; workspaceId: string; strategy: SharedFolderConflictStrategy; excluded: string[]; confirmedUploads: string[] }) {
+  return electrobun.rpc!.request.publishFolderAsWorkspace(input);
 }
 
 export async function createFolder(folderPath: string) {
@@ -130,6 +171,10 @@ export async function openExternalUrl(url: string) {
 
 export async function createMindmap(filename: string, markdown: string) {
   return electrobun.rpc!.request.createMindmap({ filename, markdown });
+}
+
+export async function saveExport(filename: string, dataBase64: string) {
+  return electrobun.rpc!.request.saveExport({ filename, dataBase64 });
 }
 
 export async function serializeMindmap(doc: { filePath: string; frontmatter: unknown; nodes: Record<string, unknown>; rootId: string; preamble?: string }) {

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
+import { AgentWorkflowSection } from "../components/agent-workflow-section";
+import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -37,10 +39,10 @@ import {
 const headerNavItems = [
   { label: "Produkt", href: "#produkt" },
   { label: "Demo", href: "/demo" },
-  { label: "Desktop", href: "#desktop" },
-  { label: "Downloads", href: "/download" },
-  { label: "Beta", href: "#beta" },
-  { label: "News", href: "/news" },
+  { label: "Agenten", href: "#agenten" },
+  { label: "Roadmap", href: "/roadmap" },
+  { label: "Download", href: "/download" },
+  { label: "Testaccount", href: "#beta" },
   { label: "Hilfe", href: "/docs" },
 ];
 
@@ -48,11 +50,7 @@ const secondaryNavItems = [
   { label: "Blog", href: "/blog" },
   { label: "News", href: "/news" },
   { label: "Templates", href: "/templates" },
-  { label: "LLM Wiki", href: "#llm-wiki" },
-  { label: "Roadmap", href: "/roadmap" },
-  { label: "Workflow", href: "#workflow" },
   { label: "Obsidian", href: "/obsidian" },
-  { label: "Local-first", href: "#local-first" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -88,15 +86,14 @@ const footerSections = [
   {
     title: "Arbeiten",
     links: [
-      { label: "Desktop", href: "#desktop" },
+      { label: "Desktop", href: "/download" },
       { label: "Obsidian", href: "/obsidian" },
-      { label: "LLM Wiki", href: "#llm-wiki" },
-      { label: "Workflow", href: "#workflow" },
-      { label: "Local-first", href: "#local-first" },
+      { label: "Agenten", href: "#agenten" },
+      { label: "Wissensplattform", href: "#vision" },
     ],
   },
   {
-    title: "Beta",
+    title: "Testaccount",
     links: [
       { label: "Registrierung", href: "#beta" },
       { label: "Login", href: appLoginUrl },
@@ -109,45 +106,38 @@ const footerSections = [
 ];
 
 const markdownLines = [
-  "# Product Strategy",
-  "## North Star",
-  "- Visual thinking for real files",
-  "- No locked workspace format",
+  "# Produktstrategie",
+  "## Leitbild",
+  "- Visuell mit echten Dateien arbeiten",
+  "- Offenes Markdown-Format",
   "",
-  "## Initiatives",
-  "### Local-first editor",
-  "### Pro workflows",
-  "### Optional sync",
+  "## Initiativen",
+  "### Lokaler Editor",
+  "### Zusammenarbeit",
+  "### Optionaler Sync",
 ];
 
 const audiencePaths = [
   {
     icon: FileText,
-    title: "Ich habe Markdown-Dateien",
-    text: "Teste eine echte Datei im Browser oder lade die Desktop-Beta für macOS und Omarchy/Linux herunter.",
+    title: "Lokal ausprobieren",
+    text: "Teste eine Markdown-Datei im Browser. Die Desktop-Beta gibt es für macOS und Omarchy/Linux.",
     href: "/demo",
-    cta: "Demo ohne Account testen",
-  },
-  {
-    icon: RefreshCw,
-    title: "Ich nutze Obsidian",
-    text: "Sieh dir an, wie lokale Obsidian-Notizen als BloomMD-Map sichtbar werden.",
-    href: "/obsidian",
-    cta: "Obsidian-Status ansehen",
+    cta: "Demo ohne Konto testen",
   },
   {
     icon: MonitorSmartphone,
-    title: "Ich will Team/Cloud testen",
-    text: "Die private App mit Auth, Sync und Collaboration kannst du dir mit einem Konto freischalten.",
+    title: "Web und Team nutzen",
+    text: "Teste Web-Workspaces, Sync und Zusammenarbeit 30 Tage kostenlos ab E-Mail-Bestätigung.",
     href: "#beta",
-    cta: "Jetzt registrieren",
+    cta: "Testaccount erstellen",
   },
   {
-    icon: LayoutTemplate,
-    title: "Ich will Vorlagen",
-    text: "Starte mit Markdown-Templates für Strategie, Architektur, Research oder Obsidian.",
-    href: "/templates",
-    cta: "Templates ansehen",
+    icon: GitBranch,
+    title: "Richtung mitgestalten",
+    text: "Sieh dir den Stand der Wissensplattform-Roadmap an und teile deine Idee.",
+    href: "/roadmap",
+    cta: "Roadmap ansehen",
   },
 ];
 
@@ -197,76 +187,76 @@ const useCases = [
   {
     id: "strategy",
     label: "Produktstrategie",
-    file: "strategy.md",
+    file: "strategie.md",
     heading: "Ziele, Initiativen und Risiken zusammenführen",
     text: "Verbinde Ziele, Entscheidungen und offene Fragen in einer Map, während die Strategie als lesbares Markdown-Dokument erhalten bleibt.",
-    markdown: ["# Strategy", "## Goals", "## Initiatives", "### Retention", "### Launch risk"].join("\n"),
+    markdown: ["# Strategie", "## Ziele", "## Initiativen", "### Kundenbindung", "### Startrisiko"].join("\n"),
   },
   {
     id: "research",
     label: "Forschung",
-    file: "literature-review.md",
+    file: "literaturrecherche.md",
     heading: "Quellen und Argumente sichtbar machen",
     text: "Ordne Literatur, Beobachtungen und Hypothesen so, dass du Muster erkennst, ohne deine Notizen in ein geschlossenes System zu verschieben.",
-    markdown: ["# Literature Review", "## Sources", "## Claims", "### Open questions", "### Evidence"].join("\n"),
+    markdown: ["# Literaturrecherche", "## Quellen", "## Aussagen", "### Offene Fragen", "### Belege"].join("\n"),
   },
   {
     id: "architecture",
     label: "Softwarearchitektur",
-    file: "architecture.md",
+    file: "architektur.md",
     heading: "Systeme, Constraints und Entscheidungen ordnen",
     text: "Halte ADRs, Module und Abhängigkeiten in Markdown fest und nutze die Map, um technische Zusammenhänge schneller zu prüfen.",
-    markdown: ["# Architecture", "## Modules", "## ADRs", "### Sync", "### Storage"].join("\n"),
+    markdown: ["# Architektur", "## Module", "## Entscheidungen", "### Sync", "### Speicherung"].join("\n"),
   },
   {
     id: "docs",
     label: "Dokumentation",
-    file: "docs-outline.md",
+    file: "dokumentation.md",
     heading: "Dokumentationsstrukturen planen",
     text: "Baue Guides, Referenzen und Roadmaps visuell um, während die fertige Dokumentation weiter als Markdown bearbeitbar bleibt.",
-    markdown: ["# Docs", "## Guides", "## Reference", "### API", "### Tutorials"].join("\n"),
+    markdown: ["# Dokumentation", "## Anleitungen", "## Referenz", "### API", "### Beispiele"].join("\n"),
   },
 ];
 
 const heroPreviewDocument = parseFile("strategy.md", markdownLines.join("\n"));
-const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## MVP", "## Pro", "## Sync", "## Docs"].join("\n"));
+const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
   {
-    title: "Software Architecture Map",
-    category: "Development",
+    title: "Software-Architektur-Map",
+    category: "Entwicklung",
     href: "/templates/software-architecture",
-    text: "Systemziele, Frontend, Backend, Datenbank, Integrationen, Security und Roadmap in einer Map.",
+    text: "Systemziele, Frontend, Backend, Datenbank, Integrationen, Sicherheit und Roadmap in einer Map.",
   },
   {
-    title: "Startup Operating System",
-    category: "Business",
+    title: "Startup-Betriebssystem",
+    category: "Geschäft",
     href: "/templates/startup-operating-system",
-    text: "Vision, Produkt, Kunden, Positionierung, Marketing, Sales, Metriken, Entscheidungen und Risiken.",
+    text: "Vision, Produkt, Kunden, Positionierung, Marketing, Vertrieb, Metriken und Entscheidungen.",
   },
   {
-    title: "Obsidian Vault Starter",
-    category: "Knowledge Management",
+    title: "Obsidian-Vault-Starter",
+    category: "Wissensmanagement",
     href: "/templates/obsidian-vault-starter",
-    text: "Inbox, Projekte, Areas, Ressourcen, Personen, Meetings, Ideen und Archiv als startbare Vault-Struktur.",
+    text: "Posteingang, Projekte, Bereiche, Ressourcen, Personen, Treffen, Ideen und Archiv als Vault-Struktur.",
   },
   {
-    title: "Research Project Map",
-    category: "Research",
+    title: "Forschungsprojekt-Map",
+    category: "Forschung",
     href: "/templates/research-project",
-    text: "Research Question, Hypothesen, Literatur, Methoden, Evidenz, Findings, Quellen und nächste Schritte.",
+    text: "Forschungsfrage, Hypothesen, Literatur, Methoden, Belege, Ergebnisse und nächste Schritte.",
   },
   {
-    title: "Novel Writing Map",
-    category: "Writing",
+    title: "Roman-Map",
+    category: "Schreiben",
     href: "/templates/novel-writing",
-    text: "Premise, Worldbuilding, Characters, Plot, Acts, Chapters, Themes, Conflicts und offene Fragen.",
+    text: "Prämisse, Welt, Figuren, Handlung, Akte, Kapitel, Themen und offene Fragen.",
   },
   {
-    title: "Content Strategy Map",
+    title: "Content-Strategie-Map",
     category: "Marketing",
     href: "/templates/content-strategy",
-    text: "Audience, Positioning, Content Pillars, Channels, Campaigns, Produktion, Distribution und Metrics.",
+    text: "Zielgruppe, Positionierung, Themen, Kanäle, Kampagnen, Produktion und Metriken.",
   },
 ];
 
@@ -284,7 +274,7 @@ const featureModules = [
     icon: PenLine,
   },
   {
-    title: "Template Library",
+    title: "Vorlagenbibliothek",
     text: "Mit realistischen Markdown-Vorlagen starten, statt vor einer leeren Fläche zu stehen.",
     className: "",
     icon: LayoutTemplate,
@@ -339,8 +329,8 @@ const faqItems = [
     answer: "Deine Inhalte bleiben als Markdown-Dateien erhalten. Du verlierst nicht den Zugriff auf dein Wissen, nur weil du das Tool wechselst.",
   },
   {
-    question: "Wie lange läuft die Beta?",
-    answer: "Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin sind ohne Konto verfügbar. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich mit einem Konto. Preise veröffentlichen wir erst nach der Beta.",
+    question: "Wie lange gilt der kostenlose Testaccount?",
+    answer: "Der kostenlose Testaccount für BloomMD Web, Cloud, Sync und Zusammenarbeit gilt 30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste. Nach 15 und 23 Tagen erinnern wir dich per E-Mail. Danach ist dein Konto nur noch lesbar, der Export bleibt möglich und nichts geht verloren. Für bestehende Konten zählt der Testzeitraum ab dem 15.11.2026. Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin (Beta) sind ohne Konto verfügbar. Preise und Leistungsumfang werden vor Einführung veröffentlicht.",
   },
   {
     question: "Ist Sync erforderlich?",
@@ -402,7 +392,7 @@ function Header() {
           <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#F2F0ED] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
             Login
           </a>
-          <a href="#beta" className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+          <a href={appSignupUrl} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
             Jetzt registrieren
             <ArrowRight size={16} aria-hidden="true" />
           </a>
@@ -458,7 +448,7 @@ function Header() {
               <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-3 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
                 Login
               </a>
-              <a href="#beta" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+              <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
                 Jetzt registrieren
                 <ArrowRight size={16} aria-hidden="true" />
               </a>
@@ -529,7 +519,7 @@ function AudiencePathSection() {
   return (
     <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]" data-testid="landing-paths">
       <div className="mx-auto max-w-7xl px-5 py-8 lg:py-10">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-3">
           {audiencePaths.map((path) => {
             const Icon = path.icon;
             return (
@@ -571,7 +561,7 @@ function WhatIsNewSection() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-white/68">Der Agent arbeitet nur auf ausdrücklichen Auftrag und nur mit dem Kontext des gewählten Knotens. Er schlägt vor – du entscheidest.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
-          <Link href="/docs/openclaw-agent" className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link href="/docs/openclaw-agent" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
           <Link href="/blog/openclaw-lokale-workspace-agenten" className="inline-flex h-10 items-center justify-center rounded-md border border-white/18 px-4 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">Was daran neu ist</Link>
         </div>
       </div>
@@ -709,11 +699,11 @@ function UseCasesSection() {
     <section className="border-y border-[#E8E4DF] bg-white">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
         <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Use Cases</p>
+          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Anwendungsfälle</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Für Wissen, das zu komplex für eine lineare Liste wird.</h2>
         </div>
-        <div className="grid gap-6 lg:grid-cols-[290px_1fr]">
-          <div className="grid gap-2" role="tablist" aria-label="Anwendungsfälle">
+        <div className="space-y-5">
+          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Anwendungsfälle">
             {useCases.map((item) => (
               <button
                 key={item.id}
@@ -723,7 +713,7 @@ function UseCasesSection() {
                 aria-selected={active.id === item.id}
                 aria-controls={`usecase-panel-${item.id}`}
                 onClick={() => setActiveId(item.id)}
-                className={`rounded-md border px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
+                className={`min-h-11 rounded-md border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
                   active.id === item.id ? "border-[#FF6B35] bg-[#FFF4EE] text-[#1A1A1A]" : "border-[#E8E4DF] bg-[#FCFBFA] text-[#666666] hover:bg-white"
                 }`}
               >
@@ -735,16 +725,16 @@ function UseCasesSection() {
             id={`usecase-panel-${active.id}`}
             role="tabpanel"
             aria-labelledby={`usecase-tab-${active.id}`}
-            className="grid gap-4 rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4 lg:grid-cols-[0.8fr_1.2fr]"
+            className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4"
           >
-            <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
-              <div className="mb-3 text-sm font-semibold">{active.file}</div>
-              <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
-            </div>
-            <div>
+            <h3 className="text-xl font-semibold">{active.heading}</h3>
+            <p className="mt-2 max-w-3xl leading-7 text-[#555555]">{active.text}</p>
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+              <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
+                <div className="mb-3 text-sm font-semibold">{active.file}</div>
+                <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
+              </div>
               <MindMapPreview document={previewDocument} className="min-h-[250px]" ariaLabel={`${active.label} Markdown mind map preview`} />
-              <h3 className="mt-4 text-xl font-semibold">{active.heading}</h3>
-              <p className="mt-2 leading-7 text-[#666666]">{active.text}</p>
             </div>
           </div>
         </div>
@@ -759,10 +749,10 @@ function TemplatesSection() {
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Template Library</p>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Vorlagen</p>
             <h2 className="text-3xl font-semibold sm:text-4xl">Nicht mit einer leeren Map starten.</h2>
             <p className="mt-4 text-lg leading-8 text-[#666666]">
-              Die ersten Templates sind echte Markdown-Dateien mit Beispielinhalten. Sie funktionieren als Onboarding, Demo, SEO-Seiten und Startpunkte für eigene Dateien.
+              Jede Vorlage ist eine normale Markdown-Datei. Öffne sie als Map und ersetze die Beispielinhalte durch deine eigenen.
             </p>
           </div>
           <Link href="/templates" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1A1A1A]/20">
@@ -771,7 +761,7 @@ function TemplatesSection() {
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templateCards.map((template) => (
+          {templateCards.slice(0, 3).map((template) => (
             <article key={template.href} className="rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="rounded-md border border-[#FFD4BF] bg-[#FFF4EE] px-2.5 py-1 text-xs font-semibold text-[#B64A1F]">{template.category}</span>
@@ -779,14 +769,9 @@ function TemplatesSection() {
               </div>
               <h3 className="text-lg font-semibold">{template.title}</h3>
               <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#666666]">{template.text}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                <Link href={`/demo?template=${template.href.split("/").pop()}`} className="inline-flex h-9 items-center justify-center rounded-md bg-[#FF6B35] px-3 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
-                  Open in BloomMD
-                </Link>
-                <Link href={template.href} className="inline-flex h-9 items-center justify-center rounded-md border border-[#D4CFC8] px-3 text-sm font-semibold text-[#1A1A1A] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                  Vorschau
-                </Link>
-              </div>
+              <Link href={`/demo?template=${template.href.split("/").pop()}`} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
+                In der Demo öffnen <ArrowRight size={16} aria-hidden="true" />
+              </Link>
             </article>
           ))}
         </div>
@@ -806,7 +791,7 @@ function ObsidianSection() {
             Das Plugin ist für Obsidian auf Desktop, iPad, iPhone und Android als Beta über BRAT oder GitHub-Releases verfügbar. Die Aufnahme zeigt eine echte lokale Notiz.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-4 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
+            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
               Status ansehen
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
@@ -901,7 +886,7 @@ function DesktopSection() {
     {
       icon: HardDrive,
       title: "Deine Dateien, dein Rechner",
-      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund.",
+      text: "Die App arbeitet direkt auf einem Ordner auf deiner Platte. Kein Upload, kein Account, kein Netz — auch nicht im Hintergrund. Deine Dateien gehören dir: Alle Exporte (Markdown, OPML, PDF, PNG, SVG) sind für jeden frei.",
     },
     {
       icon: RefreshCw,
@@ -946,10 +931,10 @@ function DesktopSection() {
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">
+            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white hover:bg-[#963311]">
               Desktop-Builds herunterladen
             </Link>
-            <a href="#beta" className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
+            <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8">
               Cloud-Zugang anfragen
             </a>
           </div>
@@ -988,6 +973,9 @@ function WikiSection() {
             BloomMD schreibt und liest das <strong className="font-semibold text-[#1A1A1A]">Open Knowledge Format</strong> (OKF v0.2),
             Googles offene Markdown-Spezifikation für Agenten-Wissen. Kein proprietärer Index, keine versteckte Modell-Erinnerung:
             eine Ordnerstruktur aus Markdown-Dateien, die du selbst verwaltest und jederzeit in deinen gewohnten Werkzeugen öffnest.
+          </p>
+          <p className="mt-5 text-sm leading-6 text-[#666666]">
+            Unsere <Link href="/roadmap" className="font-semibold text-[#B94316] underline-offset-4 hover:underline">Wissensplattform-Roadmap</Link> zeigt die Richtung von Quellen und Sync über Rechte und belegte Suche bis zu Agenten-Workflows. Der Learnings-Pilot ist der erste interne Backend-Nutzungsfall; lokales Markdown bleibt der Kern.
           </p>
         </div>
 
@@ -1048,79 +1036,6 @@ function WikiSection() {
   );
 }
 
-function BetaProgramSection() {
-  return (
-    <section id="pricing" className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Beta</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Kostenlos — und bewusst noch klein.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Demo und Templates kannst du sofort ausprobieren. Desktop-Builds und das Obsidian-Plugin
-            kannst du ohne Konto laden. Für BloomMD Web mit Cloud-Workspaces, Sync und Zusammenarbeit
-            registrierst du dich; wir wachsen bewusst langsam, damit wir Rückmeldungen beantworten können.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              icon: Check,
-              title: "Was du bekommst",
-              items: [
-                "Voller Funktionsumfang ohne Limits",
-                "Demo und Templates ohne Einladung",
-                "Web, macOS-, Omarchy/Linux-Desktop und Obsidian-Kompatibilität",
-                "LLM-Wiki-Werkzeuge und OKF-Bundles",
-                "Direkter Draht zu uns bei Bugs und Wünschen",
-              ],
-            },
-            {
-              icon: ShieldCheck,
-              title: "Was wir zusagen",
-              items: [
-                "Deine Dateien bleiben normales Markdown",
-                "Kein Verkauf oder Training mit deinen Inhalten",
-                "Export und Löschung jederzeit möglich",
-                "Preise kündigen wir vorher an, nicht rückwirkend",
-              ],
-            },
-            {
-              icon: RefreshCw,
-              title: "Was noch fehlt",
-              items: [
-                "Cloud-Zugang nur mit Registrierung",
-                "Die eigenständige Mobile-App und Windows-Desktop sind noch nicht öffentlich verfügbar",
-                "Der Agent-Workflow ist bewusst review-pflichtig",
-                "Rechne mit Bugs — und melde sie uns",
-              ],
-            },
-          ].map((card) => (
-            <div key={card.title} className="rounded-xl border border-[#E8E4DF] bg-[#FCFBFA] p-6">
-              <card.icon size={20} className="text-[#B64A1F]" />
-              <h3 className="mt-4 text-lg font-semibold">{card.title}</h3>
-              <ul className="mt-4 grid gap-2.5 text-sm leading-6 text-[#666666]">
-                {card.items.map((item) => (
-                  <li key={item} className="flex gap-2.5">
-                    <span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#FF6B35]" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        <p className="mt-8 max-w-3xl text-sm leading-6 text-[#666666]">
-          Nach der Beta wird es eine kostenlose Stufe für lokales Arbeiten geben und eine bezahlte für Cloud- und
-          Team-Funktionen. Beta-Teilnehmer informieren wir vorher und rechnen nichts rückwirkend ab. Wenn du
-          die Cloud-Beta nutzen willst, registriere dich einfach — eine Einladung brauchst du nicht.
-        </p>
-      </div>
-    </section>
-  );
-}
-
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState(0);
 
@@ -1173,13 +1088,13 @@ export default function LandingPage() {
               Ebene — lokal, portabel und ohne neues Dateiformat.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white transition hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Demo ohne Account testen
+              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+                Demo ohne Konto testen
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <a href="#beta" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Jetzt registrieren
-              </a>
+              <Link href="/download" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+                Desktop herunterladen
+              </Link>
             </div>
             <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
           </div>
@@ -1191,71 +1106,12 @@ export default function LandingPage() {
         <SplitDemo />
       </section>
 
+      <AgentWorkflowSection locale="de" />
+      <KnowledgeVisionSection locale="de" />
       <AudiencePathSection />
-      <WhatIsNewSection />
-
-      <section className="mx-auto grid max-w-7xl gap-8 px-5 py-16 motion-safe:animate-[sectionIn_.45s_ease-out_both] lg:grid-cols-[0.75fr_1.25fr] lg:py-20">
-        <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Positionierung</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Markdown ist offen und langlebig. Aber große Dokumente sind schwer zu überblicken.</h2>
-          <p className="mt-5 text-lg leading-8 text-[#666666]">
-            BloomMD behält die offene Datei und ergänzt genau die räumliche Sicht, die linearem Text fehlt.
-          </p>
-        </div>
-        <div className="grid gap-4">
-          {problemItems.map((item, index) => (
-            <article key={item.title} className="grid gap-4 rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm sm:grid-cols-[44px_1fr]">
-              <div className="flex h-11 w-11 items-center justify-center rounded-md bg-[#FFF4EE] text-sm font-semibold text-[#B64A1F]">{index + 1}</div>
-              <div>
-                <h3 className="font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#666666]">{item.text}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <WorkflowSection />
       <UseCasesSection />
       <TemplatesSection />
-      <ObsidianSection />
-      <DesktopSection />
-      <LocalFirstSection />
-      <WikiSection />
-      <FeatureBento />
-      <BetaProgramSection />
       <AvailabilityOverview locale="de" />
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]">
-        <div className="mx-auto grid max-w-7xl gap-4 px-5 py-10 md:grid-cols-4">
-          {[
-            { icon: FileText, label: "Offene Markdown-Dateien" },
-            { icon: HardDrive, label: "Lokale Speicherung" },
-            { icon: Code2, label: "Git- und Editor-kompatibel" },
-            { icon: ShieldCheck, label: "Lokale Backups" },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center gap-3 rounded-lg border border-[#E8E4DF] bg-white p-4">
-              <item.icon size={20} className="text-[#FF6B35]" aria-hidden="true" />
-              <span className="text-sm font-semibold">{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-y border-[#E8E4DF] bg-[#FFF4EE]">
-        <div className="mx-auto grid max-w-7xl gap-6 px-5 py-14 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div>
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Jetzt testen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Demo sofort. Registrieren, wenn du mehr willst.</h2>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-[#666666]">Demo, macOS- und Omarchy/Linux-Desktop sowie das Obsidian-Plugin kannst du ohne Konto nutzen. Für BloomMD Web, Cloud, Sync und Zusammenarbeit registrierst du dich.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-            <Link href="/demo" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F]">Demo testen <ArrowRight size={16} /></Link>
-            <Link href="/download" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Desktop herunterladen</Link>
-            <Link href="/obsidian" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold hover:bg-[#F2F0ED]">Obsidian-Status</Link>
-          </div>
-        </div>
-      </section>
       <FAQSection />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}
@@ -1263,8 +1119,10 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-5 py-14">
           <h2 className="text-3xl font-semibold text-[#1A1A1A]">Jetzt registrieren</h2>
           <p className="mt-3 max-w-2xl text-[#514C46]">
-            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir ein Konto an. Die Warteliste
-            gibt es nicht mehr. Demo, lokale Desktop-Builds und das Obsidian-Plugin brauchen kein Konto.
+            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an,
+            ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto
+            lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin
+            brauchen kein Konto.
           </p>
           <div className="mt-6">
             <a
@@ -1276,24 +1134,6 @@ export default function LandingPage() {
               Jetzt registrieren
               <ArrowRight size={17} aria-hidden="true" />
             </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-[#E8E4DF] bg-[#1F1D1B] text-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-12 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-3xl font-semibold">Deine Dateien sind bereits da. BloomMD macht sie sichtbar.</h2>
-            <p className="mt-3 text-white/68">Starte mit einem Template oder teste eine echte Markdown-Datei direkt im Browser.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link href="/demo" className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#FF6B35] px-5 text-sm font-semibold text-white hover:bg-[#E95F2F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-              Demo öffnen
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-            <Link href="/templates" className="inline-flex h-12 items-center justify-center rounded-md border border-white/18 px-5 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">
-              Templates ansehen
-            </Link>
           </div>
         </div>
       </section>
@@ -1313,7 +1153,7 @@ export default function LandingPage() {
                 zur Verfügung gestellt.
               </p>
               <p className="mt-5 inline-flex rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/58">
-                Closed Beta · macOS + Omarchy/Linux
+                Beta · macOS + Omarchy/Linux
               </p>
             </div>
 

@@ -133,6 +133,8 @@ class SafFolder(private val resolver: ContentResolver, private val tree: Uri) : 
 
     override fun list(extensions: Set<String>, limit: Int): FolderListing {
         val files = ArrayList<FolderEntry>()
+        val folders = ArrayList<String>()
+        var truncated = false
         val pending = ArrayDeque<Pair<String, String>>()
         pending.add(root().id to "")
         while (pending.isNotEmpty()) {
@@ -145,15 +147,34 @@ class SafFolder(private val resolver: ContentResolver, private val tree: Uri) : 
             }
             for (entry in entries.sortedBy { it.name }) {
                 if (entry.isDirectory) {
-                    if (!FolderRules.skipsFolder(entry.name)) pending.add(entry.id to "$prefix${entry.name}/")
+                    if (!FolderRules.skipsFolder(entry.name)) {
+                        if (folders.size < limit) folders.add("$prefix${entry.name}") else truncated = true
+                        pending.add(entry.id to "$prefix${entry.name}/")
+                    }
                     continue
                 }
                 if (FolderRules.isHidden(entry.name) || !FolderRules.matchesExtension(entry.name, extensions)) continue
-                if (files.size >= limit) return FolderListing(files, true)
+                if (files.size >= limit) return FolderListing(files, true, folders)
                 files.add(FolderEntry("$prefix${entry.name}", entry.size, entry.modified))
             }
         }
-        return FolderListing(files, false)
+        return FolderListing(files, truncated, folders)
+    }
+
+    override fun mkdir(segments: List<String>) {
+        synchronized(lock) {
+            val name = segments.last()
+            val parent = parentOf(segments, create = true) ?: throw IOException("The folder could not be created.")
+            val existing = find(children(parent), name)
+            if (existing != null) {
+                if (!existing.isDirectory) throw FolderException(FolderError.EXISTS)
+                return
+            }
+            // createChild answers null when another writer took the name meanwhile; a folder of that name is fine.
+            if (createChild(parent, name, Document.MIME_TYPE_DIR) == null && find(children(parent), name)?.isDirectory != true) {
+                throw IOException("\"$name\" could not be created.")
+            }
+        }
     }
 
     private fun existingFile(segments: List<String>): Doc {

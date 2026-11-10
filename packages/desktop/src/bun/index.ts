@@ -1,7 +1,9 @@
 import Electrobun, { BrowserWindow, BrowserView, Updater, Utils } from "electrobun/bun";
 import {
   FileStore,
+  OpmlError,
   buildWorkspaceMindMap,
+  importOpml,
   normalizeMarkdownFilename,
   normalizeMarkdownPath,
   parseFile,
@@ -10,17 +12,19 @@ import {
   serializeToMarkdown,
 } from "@bloommd/core";
 import { watchWorkspace } from "./workspace-watcher";
+import { saveExportFile } from "./save-export";
 import { copyFile, mkdir, readFile, rename, access, stat } from "node:fs/promises";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { arch, homedir, platform, release, tmpdir, userInfo } from "node:os";
-import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type {
   BloomMDRPC,
   DesktopConnectionProfile,
   DesktopBuildInfo,
   DesktopFeedbackAttachment,
   DesktopFeedbackRequest,
+  DesktopFolderShareInfo,
   DesktopUpdateResult,
   DesktopUpdateState,
   DesktopUpdateStatus,
@@ -31,8 +35,19 @@ import {
   transitionSharedDocumentState,
   validateSharedDocumentBinding,
   type MindMapNode,
+  type SharedDocumentBinding,
+  type SharedFolderConflictStrategy,
 } from "@bloommd/core";
 import { ApiFileStore } from "./api-file-store";
+import { prepareFolderPublication, publishFolderPlan, scanFolderForPublication, singleFileSharesInsideFolder } from "./folder-publish";
+import {
+  findSharedLocalFile as findSharedLocalFileIn,
+  sharedDocumentBindingForFilename as sharedDocumentBindingForFilenameIn,
+  sharedDocumentInfo as sharedDocumentInfoIn,
+  sharedLocalFileInfo as sharedLocalFileInfoIn,
+  type SharedLocalFileMatch,
+} from "./shared-local-file";
+import { applyFolderDecision, auditFolderUnbinding, createFolderFileHasher, classifyAccessFailure, computeFolderActivity, markFolderRevoked, type FolderShareCloud } from "./folder-share";
 import { installApplicationMenu, setApplicationMenuLocale } from "./menu";
 import {
   loadSettings,
@@ -44,6 +59,7 @@ import {
   type ConnectionProfile,
   type DesktopSettings,
   type DesktopSharedDocumentBinding,
+  type DesktopSharedFolderBinding,
 } from "./settings";
 import { createSecureStorage, SecureStorageUnavailableError, type SecureStorage } from "./secure-storage";
 import { validateAndActivateConnection } from "./connection-profile-flow";
@@ -88,6 +104,12 @@ let mode: ConnectionMode = { type: "local", dir: bloommdDir };
 let reconnectFailedProfile: { profileId: string; name: string; url: string } | null = null;
 const secureStorage: SecureStorage = createSecureStorage();
 let desktopSettings: DesktopSettings = {};
+/**
+ * The folder the person picked (or confirmed as the open one) for "publish folder as shared
+ * workspace". Preview and publish read only this folder, so the webview can never point them at a
+ * path that was not chosen through the native dialog or the explicit "use open folder" step.
+ */
+let publicationFolder: string | null = null;
 let mainWindow: BrowserWindow | null = null;
 let pendingExternalFilename: string | null = null;
 let pendingExternalKind: "file" | "folder" | null = null;
@@ -139,6 +161,11 @@ const RESOURCE_MIME_TYPES: Record<string, string> = {
 
 function isRemote(): boolean {
   return mode.type === "remote";
+}
+
+/** The note's name relative to the local folder: the webview knows it by path, the store by name. */
+function localNoteName(filePath: string): string {
+  return isAbsolute(filePath) ? relative(bloommdDir, filePath) : filePath;
 }
 
 function resourceMimeType(path: string): string | null {
@@ -534,22 +561,31 @@ function connectionProfileError(error: unknown, fallback: string): string {
 }
 
 function sharedDocumentBindingForFilename(localFilename: string): DesktopSharedDocumentBinding | undefined {
-  return desktopSettings.sharedDocumentBindings?.find((entry) => entry.localFilename === localFilename);
+  return sharedDocumentBindingForFilenameIn(desktopSettings, localFilename);
 }
 
 function sharedDocumentInfo(entry: DesktopSharedDocumentBinding): import("../shared/rpc-types").DesktopSharedDocumentInfo {
-  const profile = desktopSettings.profiles?.find((candidate) => candidate.id === entry.profileId);
-  return {
-    localFilename: entry.localFilename,
-    profileId: entry.profileId,
-    profileName: profile?.name ?? "Unavailable profile",
-    workspaceId: entry.binding.workspaceId,
-    documentId: entry.binding.documentId,
-    cloudFilename: entry.binding.cloudFilename,
-    lastAcknowledgedMarkdownHash: entry.binding.lastAcknowledgedMarkdownHash,
-    lastKnownCloudVersion: entry.binding.lastKnownCloudVersion,
-    connectionState: entry.binding.connectionState,
-  };
+  return sharedDocumentInfoIn(desktopSettings, entry);
+}
+
+function findSharedLocalFile(localFilename: string): SharedLocalFileMatch | undefined {
+  return findSharedLocalFileIn(desktopSettings, bloommdDir, localFilename);
+}
+
+function sharedLocalFileInfo(match: SharedLocalFileMatch, localFilename: string): import("../shared/rpc-types").DesktopSharedDocumentInfo {
+  return sharedLocalFileInfoIn(desktopSettings, match, localFilename);
+}
+
+async function replaceSharedLocalFileBinding(match: SharedLocalFileMatch, binding: SharedDocumentBinding): Promise<void> {
+  if (match.kind === "file") {
+    await replaceSharedDocumentBinding({ ...match.entry, binding });
+    return;
+  }
+  const current = desktopSettings.sharedFolderBindings?.find((candidate) => candidate.id === match.folder.id) ?? match.folder;
+  await replaceFolderShare({
+    ...current,
+    files: current.files.map((file) => file.relativePath === match.file.relativePath ? { ...file, binding } : file),
+  });
 }
 
 async function replaceSharedDocumentBinding(entry: DesktopSharedDocumentBinding): Promise<void> {
@@ -719,6 +755,200 @@ async function runChooseDirectory() {
   }
 }
 
+/** Picks the folder to publish. Unlike `runChooseDirectory` it changes nothing about the open workspace. */
+async function runChoosePublicationFolder() {
+  if (isRemote()) return { path: null };
+
+  try {
+    const paths = await Utils.openFileDialog({
+      startingFolder: bloommdDir,
+      canChooseFiles: false,
+      canChooseDirectory: true,
+      allowsMultipleSelection: false,
+    });
+    const selected = firstSelectedPath(paths);
+    if (!selected) return { path: null };
+
+    const info = await stat(selected);
+    if (!info.isDirectory()) return { path: null, error: "Selected path is not a directory." };
+
+    publicationFolder = resolve(selected);
+    return { path: publicationFolder };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[BloomMD] choosePublicationFolder error:", message);
+    return { path: null, error: message };
+  }
+}
+
+/** Saved profile + workspace for a folder publication; viewer workspaces are refused like for a single file. */
+async function connectPublicationTarget(profileId: string, workspaceId: string) {
+  const profile = profileById(profileId);
+  const accessToken = await secureStorage.get(profile.tokenRef);
+  if (!accessToken) throw new Error("No access token is stored for this profile.");
+
+  const apiStore = new ApiFileStore({ baseUrl: profile.url, accessToken });
+  await apiStore.listWorkspaces();
+  const workspaceContext = await apiStore.selectWorkspace(workspaceId);
+  const workspace = workspaceContext.workspace;
+  if (!workspace) throw new Error("WORKSPACE_NOT_FOUND");
+  if (workspace.role === "viewer") throw new Error("WORKSPACE_READ_ONLY");
+  return { apiStore, workspace };
+}
+
+/** Reads the chosen folder and the target's file names and plans the upload. Uploads nothing. */
+async function prepareFolderPublicationRequest(input: {
+  profileId: string;
+  workspaceId: string;
+  strategy: unknown;
+  excluded: unknown;
+}) {
+  if (isRemote()) throw new Error("FOLDER_PUBLICATION_LOCAL_ONLY");
+  const folderPath = publicationFolder;
+  if (!folderPath) throw new Error("PUBLICATION_FOLDER_NOT_SELECTED");
+  if (input.strategy !== "keep-cloud" && input.strategy !== "suffix") throw new Error("INVALID_CONFLICT_STRATEGY");
+  const strategy: SharedFolderConflictStrategy = input.strategy === "suffix" ? "suffix" : "keep-cloud";
+  if (!Array.isArray(input.excluded) || !input.excluded.every((entry): entry is string => typeof entry === "string")) {
+    throw new Error("INVALID_EXCLUSIONS");
+  }
+  const excluded: string[] = input.excluded;
+
+  const { apiStore, workspace } = await connectPublicationTarget(input.profileId, input.workspaceId);
+  const [files, cloudFiles] = await Promise.all([scanFolderForPublication(folderPath), apiStore.list()]);
+  const alreadyPublished = new Set((desktopSettings.sharedFolderBindings ?? [])
+    .filter((entry) => entry.folderPath === folderPath && entry.profileId === input.profileId && entry.workspaceId === input.workspaceId)
+    .flatMap((entry) => entry.files.map((file) => file.relativePath)));
+  const alreadyShared = singleFileSharesInsideFolder(bloommdDir, folderPath, (desktopSettings.sharedDocumentBindings ?? []).map((entry) => entry.localFilename));
+  const prepared = prepareFolderPublication({
+    files,
+    excluded,
+    strategy,
+    existingCloudFilenames: cloudFiles.map((file) => file.filename),
+    alreadyPublished,
+    alreadyShared,
+  });
+  return { ...prepared, folderPath, apiStore, workspace, strategy, excluded, scannedPaths: files.map((file) => file.relativePath) };
+}
+
+async function rememberPublishedFolder(input: {
+  folderPath: string;
+  profileId: string;
+  workspaceId: string;
+  strategy: DesktopSharedFolderBinding["strategy"];
+  excluded: string[];
+  files: DesktopSharedFolderBinding["files"];
+  /** Everything the folder held when the person looked at it; later files are "new". */
+  scannedPaths: string[];
+}): Promise<void> {
+  const bindings = desktopSettings.sharedFolderBindings ?? [];
+  const existing = bindings.find((entry) => entry.folderPath === input.folderPath && entry.profileId === input.profileId && entry.workspaceId === input.workspaceId);
+  const published = new Set(input.files.map((file) => file.relativePath));
+  const next: DesktopSharedFolderBinding = {
+    id: existing?.id ?? `folder-${crypto.randomUUID()}`,
+    folderPath: input.folderPath,
+    profileId: input.profileId,
+    workspaceId: input.workspaceId,
+    strategy: input.strategy,
+    excluded: input.excluded,
+    publishedAt: new Date().toISOString(),
+    files: [...(existing?.files.filter((file) => !published.has(file.relativePath)) ?? []), ...input.files],
+    state: "connected",
+    knownPaths: [...new Set([...(existing?.knownPaths ?? []), ...input.scannedPaths])],
+    splitRenames: existing?.splitRenames ?? [],
+  };
+  await persistDesktopSettings({
+    sharedFolderBindings: existing ? bindings.map((entry) => entry.id === existing.id ? next : entry) : [...bindings, next],
+  });
+}
+
+// --- Published folders (activity list, revoked access, disconnect) ---
+
+function folderShareById(folderId: string): DesktopSharedFolderBinding {
+  const folder = desktopSettings.sharedFolderBindings?.find((entry) => entry.id === folderId);
+  if (!folder) throw new Error("FOLDER_SHARE_NOT_FOUND");
+  return folder;
+}
+
+async function replaceFolderShare(next: DesktopSharedFolderBinding): Promise<void> {
+  const bindings = desktopSettings.sharedFolderBindings ?? [];
+  await persistDesktopSettings({ sharedFolderBindings: bindings.map((entry) => entry.id === next.id ? next : entry) });
+}
+
+function folderShareInfo(folder: DesktopSharedFolderBinding, pendingCount: number | null, folderAvailable = pendingCount !== null): DesktopFolderShareInfo {
+  const profile = desktopSettings.profiles?.find((candidate) => candidate.id === folder.profileId);
+  return {
+    id: folder.id,
+    folderPath: folder.folderPath,
+    folderName: basename(folder.folderPath),
+    profileId: folder.profileId,
+    profileName: profile?.name ?? "Unavailable profile",
+    workspaceId: folder.workspaceId,
+    strategy: folder.strategy,
+    state: folder.state,
+    fileCount: folder.files.length,
+    publishedAt: folder.publishedAt,
+    pendingCount,
+    folderAvailable,
+  };
+}
+
+type FolderShareAccess =
+  | { state: "ok"; apiStore: ApiFileStore }
+  | { state: "revoked" }
+  | { state: "unreachable"; error: string };
+
+/**
+ * Asks the server whether the share may still sync. Only an explicit refusal (401/403/404 or the
+ * viewer role) counts as revoked; a missing network or token is "unreachable" and ends nothing.
+ */
+async function checkFolderShareAccess(folder: DesktopSharedFolderBinding): Promise<FolderShareAccess> {
+  const profile = desktopSettings.profiles?.find((candidate) => candidate.id === folder.profileId);
+  if (!profile) return { state: "unreachable", error: "Connection profile not found." };
+  try {
+    const accessToken = await secureStorage.get(profile.tokenRef);
+    if (!accessToken) return { state: "unreachable", error: "No access token is stored for this profile." };
+    const apiStore = new ApiFileStore({ baseUrl: profile.url, accessToken });
+    await apiStore.listWorkspaces();
+    const context = await apiStore.selectWorkspace(folder.workspaceId);
+    if (context.workspace?.role === "viewer") return { state: "revoked" };
+    return { state: "ok", apiStore };
+  } catch (error) {
+    if (classifyAccessFailure(error) === "revoked") return { state: "revoked" };
+    return { state: "unreachable", error: connectionProfileError(error, "The server could not be reached.") };
+  }
+}
+
+/** Stops the share. Local files stay as they are and nothing is deleted anywhere. */
+async function stopRevokedFolderShare(folder: DesktopSharedFolderBinding): Promise<DesktopSharedFolderBinding> {
+  if (folder.state === "revoked") return folder;
+  const stopped = markFolderRevoked(folder);
+  await replaceFolderShare(stopped);
+  return stopped;
+}
+
+/**
+ * Sync ticket for the open file of a published folder, so it is mirrored like a single shared file.
+ * A refusal by the server stops the whole folder share; any other failure only marks this file offline.
+ */
+async function folderFileSyncTicket(match: Extract<SharedLocalFileMatch, { kind: "folder" }>, localFilename: string) {
+  const { folder, file } = match;
+  if (folder.state === "revoked" || file.binding.connectionState === "revoked") throw new Error("FOLDER_ACCESS_REVOKED");
+  const access = await checkFolderShareAccess(folder);
+  if (access.state === "revoked") {
+    await stopRevokedFolderShare(folder);
+    throw new Error("FOLDER_ACCESS_REVOKED");
+  }
+  if (access.state === "unreachable") {
+    if (file.binding.connectionState === "connected") {
+      const next = transitionSharedDocumentState({ kind: "connected", binding: file.binding }, { type: "connection_lost" });
+      if (next.kind === "offline") await replaceSharedLocalFileBinding(match, next.binding);
+    }
+    throw new Error(access.error);
+  }
+  const ticket = await access.apiStore.fetchSyncTicket(file.binding.cloudFilename);
+  return { ...ticket, sharedDocument: sharedLocalFileInfo(findSharedLocalFile(localFilename) ?? match, localFilename) };
+}
+
 async function runChooseResourceFile(kind: "file" | "pdf") {
   if (isRemote()) {
     return { path: null, error: "Resource files can currently only be selected for local workspaces." };
@@ -770,8 +1000,20 @@ async function runImportFile() {
       return { filePath: null };
     }
 
-    const content = await readFile(srcPath, "utf-8");
-    const filename = sanitizeMarkdownFilename(srcPath.split("/").pop() || "imported.md");
+    let content = await readFile(srcPath, "utf-8");
+    let sourceName = srcPath.split("/").pop() || "imported.md";
+    if (/\.opml$/i.test(sourceName)) {
+      // OPML becomes a new Markdown map; the title follows the file name, as for .md files.
+      try {
+        content = importOpml(content).markdown;
+      } catch (err) {
+        if (!(err instanceof OpmlError)) throw err;
+        console.error("[BloomMD] OPML import failed:", err);
+        return { filePath: null, error: err.message };
+      }
+      sourceName = sourceName.replace(/\.opml$/i, ".md");
+    }
+    const filename = sanitizeMarkdownFilename(sourceName);
 
     if (isRemote()) {
       // Upload to remote server
@@ -889,6 +1131,34 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
         return { success: true };
       },
 
+      listNoteHistory: async ({ filePath }) => {
+        try {
+          if (isRemote()) {
+            return await remoteStore!.listHistory(filePath.split("/").pop() ?? "");
+          }
+          return { revisions: await localStore.listBackups(localNoteName(filePath)), canRestore: true };
+        } catch (err) {
+          console.error("[BloomMD] listNoteHistory error:", err);
+          return { revisions: [], canRestore: false, error: "HISTORY_FAILED" };
+        }
+      },
+
+      restoreNoteVersion: async ({ filePath, revisionId }) => {
+        try {
+          if (isRemote()) {
+            await remoteStore!.restoreVersion(filePath.split("/").pop() ?? "", revisionId);
+          } else {
+            await localStore.restoreBackup(localNoteName(filePath), revisionId);
+          }
+          return { success: true };
+        } catch (err) {
+          console.error("[BloomMD] restoreNoteVersion error:", err);
+          const message = err instanceof Error ? err.message : "";
+          const error = message === "VERSION_CONFLICT" || message === "SYNC_ROOM_ACTIVE" || message === "SYNC_ROOM_PENDING" || message === "READ_ONLY" ? message : "RESTORE_FAILED";
+          return { success: false, error };
+        }
+      },
+
       chooseDirectory: ({ dialogId }) =>
         startNativeDialog(dialogId, "chooseDirectory", runChooseDirectory, (message) => mainRPC.send.nativeDialogResult(message)),
 
@@ -897,6 +1167,208 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
 
       importFile: ({ dialogId }) =>
         startNativeDialog(dialogId, "importFile", runImportFile, (message) => mainRPC.send.nativeDialogResult(message)),
+
+      choosePublicationFolder: ({ dialogId }) =>
+        startNativeDialog(dialogId, "choosePublicationFolder", runChoosePublicationFolder, (message) => mainRPC.send.nativeDialogResult(message)),
+
+      selectOpenFolderForPublication: async () => {
+        if (isRemote()) return { path: null, error: "FOLDER_PUBLICATION_LOCAL_ONLY" };
+        publicationFolder = resolve(bloommdDir);
+        return { path: publicationFolder };
+      },
+
+      previewFolderPublication: async ({ profileId, workspaceId, strategy, excluded }) => {
+        try {
+          const prepared = await prepareFolderPublicationRequest({ profileId, workspaceId, strategy, excluded });
+          return {
+            success: true,
+            preview: {
+              folderPath: prepared.folderPath,
+              workspace: prepared.workspace,
+              strategy: prepared.strategy,
+              items: prepared.plan.items,
+              totals: prepared.plan.totals,
+              alreadyPublished: prepared.alreadyPublished,
+              alreadyShared: prepared.alreadyShared,
+            },
+          };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder could not be previewed.");
+          console.error("[BloomMD] Folder publication preview failed:", message);
+          return { success: false, error: message };
+        }
+      },
+
+      publishFolderAsWorkspace: async ({ profileId, workspaceId, strategy, excluded, confirmedUploads }) => {
+        const nothing = { published: 0, skipped: [], failed: [], rollbackFailures: [] };
+        try {
+          if (!Array.isArray(confirmedUploads) || !confirmedUploads.every((entry) => typeof entry === "string")) {
+            throw new Error("INVALID_CONFIRMATION");
+          }
+          const prepared = await prepareFolderPublicationRequest({ profileId, workspaceId, strategy, excluded });
+          const folderStore = new FileStore({ baseDir: prepared.folderPath, backupsEnabled: false });
+          const result = await publishFolderPlan({
+            plan: prepared.plan,
+            confirmed: confirmedUploads,
+            workspaceId,
+            readMarkdown: async (relativePath) => serializeToMarkdown(await folderStore.read(relativePath)),
+            fingerprintOf: createFolderFileHasher(prepared.folderPath),
+            cloud: {
+              create: (filename, markdown) => prepared.apiStore.create(filename, markdown),
+              delete: (filename) => prepared.apiStore.delete(filename),
+              recordFolderBinding: (documentIds) => prepared.apiStore.recordSharedFolderBinding("bound", documentIds),
+            },
+          });
+
+          let error: string | undefined;
+          if (result.auditError) {
+            error = result.rollbackFailures.length > 0 ? "SHARE_AUDIT_FAILED_CLOUD_DOCUMENTS_CREATED" : "SHARE_AUDIT_FAILED";
+          } else if (result.published.length === 0) {
+            error = "NOTHING_PUBLISHED";
+          } else {
+            try {
+              await rememberPublishedFolder({
+                folderPath: prepared.folderPath,
+                profileId,
+                workspaceId,
+                strategy: prepared.strategy,
+                excluded: prepared.excluded,
+                files: result.published,
+                scannedPaths: prepared.scannedPaths,
+              });
+            } catch (persistError) {
+              console.error("[BloomMD] Published folder could not be remembered locally:", persistError);
+              error = "FOLDER_BINDING_NOT_SAVED";
+            }
+          }
+          return {
+            success: !result.auditError && result.published.length > 0,
+            ...(error ? { error } : {}),
+            published: result.published.length,
+            skipped: result.skipped,
+            failed: result.failed,
+            rollbackFailures: result.rollbackFailures,
+          };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder could not be published.");
+          console.error("[BloomMD] Folder publication failed:", message);
+          return { success: false, error: message, ...nothing };
+        }
+      },
+
+      listFolderShares: async ({ withActivity }) => {
+        const shares: DesktopFolderShareInfo[] = [];
+        for (let folder of desktopSettings.sharedFolderBindings ?? []) {
+          let pendingCount: number | null = null;
+          if (withActivity) {
+            // The status shown next to the folder must not wait for the dialog: ask the server once per refresh.
+            if (folder.state === "connected" && (await checkFolderShareAccess(folder)).state === "revoked") folder = await stopRevokedFolderShare(folder);
+            try {
+              const local = await scanFolderForPublication(folder.folderPath);
+              pendingCount = (await computeFolderActivity({ folder, local, hashOf: createFolderFileHasher(folder.folderPath), cloudFilenames: [] })).length;
+            } catch (error) {
+              console.warn("[BloomMD] Published folder could not be read:", error instanceof Error ? error.message : error);
+            }
+          }
+          shares.push(folderShareInfo(folder, pendingCount, withActivity ? pendingCount !== null : true));
+        }
+        return { shares };
+      },
+
+      getFolderActivity: async ({ folderId }) => {
+        try {
+          let folder = folderShareById(folderId);
+          const access = await checkFolderShareAccess(folder);
+          if (access.state === "revoked") folder = await stopRevokedFolderShare(folder);
+          const local = await scanFolderForPublication(folder.folderPath).catch((error: unknown) => {
+            console.warn("[BloomMD] Published folder could not be read:", error instanceof Error ? error.message : error);
+            throw new Error("FOLDER_NOT_FOUND");
+          });
+          const cloudFilenames = access.state === "ok" ? (await access.apiStore.list()).map((file) => file.filename) : [];
+          const entries = await computeFolderActivity({ folder, local, hashOf: createFolderFileHasher(folder.folderPath), cloudFilenames });
+          return {
+            success: true,
+            share: folderShareInfo(folder, entries.length),
+            entries,
+            ...(access.state === "unreachable" ? { unreachable: true } : {}),
+          };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder activity could not be read.");
+          console.error("[BloomMD] Folder activity failed:", message);
+          return { success: false, error: message };
+        }
+      },
+
+      resolveFolderActivity: async ({ folderId, decision }) => {
+        try {
+          const folder = folderShareById(folderId);
+          if (folder.state === "revoked") throw new Error("FOLDER_ACCESS_REVOKED");
+          const local = await scanFolderForPublication(folder.folderPath);
+
+          // The server is asked only when a decision needs it, so ignoring or re-assigning works offline.
+          let access: FolderShareAccess | null = null;
+          const connected = async (): Promise<ApiFileStore> => {
+            access ??= await checkFolderShareAccess(folder);
+            if (access.state === "revoked") {
+              await stopRevokedFolderShare(folder);
+              throw new Error("FOLDER_ACCESS_REVOKED");
+            }
+            if (access.state === "unreachable") throw new Error(access.error);
+            return access.apiStore;
+          };
+          const cloud: FolderShareCloud = {
+            create: async (filename, markdown) => (await connected()).create(filename, markdown),
+            delete: async (filename) => (await connected()).delete(filename),
+            recordFolderBinding: async (documentIds) => (await connected()).recordSharedFolderBinding("bound", documentIds),
+            recordFolderUnbinding: async (documentIds) => (await connected()).recordSharedFolderBinding("unbound", documentIds),
+          };
+          const cloudFilenames = decision.kind === "new" && decision.action === "upload"
+            ? (await (await connected()).list()).map((file) => file.filename)
+            : [];
+          const folderStore = new FileStore({ baseDir: folder.folderPath, backupsEnabled: false });
+          const next = await applyFolderDecision({
+            folder,
+            decision,
+            local,
+            cloudFilenames,
+            readMarkdown: async (relativePath) => serializeToMarkdown(await folderStore.read(relativePath)),
+            fingerprintOf: createFolderFileHasher(folder.folderPath),
+            cloud,
+          });
+          await replaceFolderShare(next);
+          return { success: true };
+        } catch (error) {
+          const message = connectionProfileError(error, "The decision could not be applied.");
+          console.error("[BloomMD] Folder decision failed:", message);
+          return { success: false, error: message };
+        }
+      },
+
+      disconnectFolderShare: async ({ folderId }) => {
+        try {
+          const folder = folderShareById(folderId);
+          // The local binding ends first, like for a single file; the audit afterwards cannot undo it.
+          await persistDesktopSettings({
+            sharedFolderBindings: (desktopSettings.sharedFolderBindings ?? []).filter((entry) => entry.id !== folderId),
+          });
+          if (publicationFolder === folder.folderPath) publicationFolder = null;
+          const access = await checkFolderShareAccess(folder);
+          if (access.state === "ok") {
+            const outcome = await auditFolderUnbinding(
+              (documentIds) => access.apiStore.recordSharedFolderBinding("unbound", documentIds),
+              folder.files.map((file) => file.binding.documentId),
+            );
+            if (outcome.failed > 0) console.warn(`[BloomMD] Folder share was disconnected, ${outcome.failed} unbinding(s) could not be audited.`);
+          } else {
+            console.warn("[BloomMD] Folder share was disconnected but could not be audited:", access.state);
+          }
+          return { success: true };
+        } catch (error) {
+          const message = connectionProfileError(error, "The folder share could not be disconnected.");
+          console.error("[BloomMD] Folder share disconnect failed:", message);
+          return { success: false, error: message };
+        }
+      },
 
       /**
        * Creates a folder in the local workspace.
@@ -980,6 +1452,17 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
           rootId: doc.rootId,
           preamble: doc.preamble,
         };
+      },
+
+      saveExport: async ({ filename, dataBase64 }) => {
+        try {
+          const result = await saveExportFile(Utils.paths.downloads, filename, dataBase64);
+          if ("path" in result) Utils.showItemInFolder(result.path);
+          return result;
+        } catch (err) {
+          console.error("[BloomMD] saveExport error:", err);
+          return { error: err instanceof Error ? err.message : String(err) };
+        }
       },
 
       serializeMindmap: async (data) => {
@@ -1150,15 +1633,15 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
 
       getSharedDocument: async ({ localFilename }) => {
         const safeLocalFilename = normalizeMarkdownPath(localFilename);
-        const entry = sharedDocumentBindingForFilename(safeLocalFilename);
-        return { sharedDocument: entry ? sharedDocumentInfo(entry) : null };
+        const match = findSharedLocalFile(safeLocalFilename);
+        return { sharedDocument: match ? sharedLocalFileInfo(match, safeLocalFilename) : null };
       },
 
       shareLocalMindmap: async ({ localFilename, profileId, workspaceId, cloudFilename }) => {
         try {
           const safeLocalFilename = normalizeMarkdownPath(localFilename);
           const safeCloudFilename = sanitizeMarkdownFilename(cloudFilename);
-          if (sharedDocumentBindingForFilename(safeLocalFilename)) {
+          if (findSharedLocalFile(safeLocalFilename)) {
             throw new Error("LOCAL_DOCUMENT_ALREADY_SHARED");
           }
 
@@ -1222,6 +1705,8 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
       unshareLocalMindmap: async ({ localFilename }) => {
         try {
           const safeLocalFilename = normalizeMarkdownPath(localFilename);
+          // A file of a published folder is released with the whole folder share, never on its own.
+          if (findSharedLocalFile(safeLocalFilename)?.kind === "folder") return { success: false, error: "PART_OF_FOLDER_SHARE" };
           const bindings = desktopSettings.sharedDocumentBindings ?? [];
           const entry = bindings.find((candidate) => candidate.localFilename === safeLocalFilename);
           if (!entry) {
@@ -1252,7 +1737,11 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
       getSharedSyncTicket: async ({ localFilename }) => {
         const safeLocalFilename = normalizeMarkdownPath(localFilename);
         const entry = sharedDocumentBindingForFilename(safeLocalFilename);
-        if (!entry) throw new Error("LOCAL_DOCUMENT_NOT_SHARED");
+        if (!entry) {
+          const match = findSharedLocalFile(safeLocalFilename);
+          if (match?.kind !== "folder") throw new Error("LOCAL_DOCUMENT_NOT_SHARED");
+          return folderFileSyncTicket(match, safeLocalFilename);
+        }
         try {
           const profile = profileById(entry.profileId);
           const accessToken = await secureStorage.get(profile.tokenRef);
@@ -1271,17 +1760,21 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
       updateSharedDocumentBinding: async ({ localFilename, binding }) => {
         try {
           const safeLocalFilename = normalizeMarkdownPath(localFilename);
-          const existing = sharedDocumentBindingForFilename(safeLocalFilename);
+          const existing = findSharedLocalFile(safeLocalFilename);
           if (!existing) throw new Error("LOCAL_DOCUMENT_NOT_SHARED");
+          const currentBinding = existing.kind === "file" ? existing.entry.binding : existing.file.binding;
           const validBinding = validateSharedDocumentBinding(binding);
-          if (validBinding.workspaceId !== existing.binding.workspaceId
-            || validBinding.documentId !== existing.binding.documentId
-            || validBinding.cloudFilename !== existing.binding.cloudFilename) {
+          if (validBinding.workspaceId !== currentBinding.workspaceId
+            || validBinding.documentId !== currentBinding.documentId
+            || validBinding.cloudFilename !== currentBinding.cloudFilename) {
             throw new Error("SHARED_DOCUMENT_IDENTITY_MISMATCH");
           }
-          const updated: DesktopSharedDocumentBinding = { ...existing, binding: validBinding };
-          await replaceSharedDocumentBinding(updated);
-          return { success: true, sharedDocument: sharedDocumentInfo(updated) };
+          // A stopped folder share never takes a state back from the open file.
+          if (existing.kind === "folder" && existing.folder.state === "revoked") throw new Error("FOLDER_ACCESS_REVOKED");
+          await replaceSharedLocalFileBinding(existing, validBinding);
+          const updated = findSharedLocalFile(safeLocalFilename);
+          if (!updated) throw new Error("LOCAL_DOCUMENT_NOT_SHARED");
+          return { success: true, sharedDocument: sharedLocalFileInfo(updated, safeLocalFilename) };
         } catch (error) {
           const message = error instanceof Error ? error.message : "Shared document state could not be updated.";
           console.error("[BloomMD] Shared document binding update failed:", message);

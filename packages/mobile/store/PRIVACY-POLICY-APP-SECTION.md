@@ -1,20 +1,30 @@
-# Vorschlag: App-Abschnitt für die Datenschutzerklärung
+# App-Abschnitt der Datenschutzerklärung (Quelltext des Vorschlags)
 
-Die Datenschutzerklärung (`apps/marketing/src/app/datenschutz/page.tsx`) ist eine TSX-Seite ohne
-Entwurfsmechanismus. Deshalb steht der Vorschlag hier und wird erst nach Owner-Freigabe (und am
-besten juristischer Prüfung) als eigene `LegalSection` übernommen; danach `LEGAL_STATUS` in
-`apps/marketing/src/lib/legal.ts` aktualisieren.
+Dieser Text ist am 4. November 2026 als eigene `LegalSection` in
+`apps/marketing/src/app/datenschutz/page.tsx` übernommen worden (DE und EN; zusätzlich Share-Links
+und Workspace-Agenten), `LEGAL_STATUS` in `apps/marketing/src/lib/legal.ts` steht auf dem gleichen
+Datum. **Maßgeblich ist jetzt die Seite.** Die Fassung dort ergänzt gegenüber diesem Vorschlag: Hinweis
+auf die Datensicherung von Android, Universal Links (`https://bloommd.io/open`), Export-Formate, Laufzeit
+des Zugangs (ein Jahr) und die Gerätebezeichnung; die Angabe zum Hosting-Anbieter fehlt bewusst, bis
+der Owner sie bestätigt hat. Vor dem Deployment: juristische Prüfung und Owner-Freigabe.
 
 Grundlage: Code-Stand `packages/mobile` und `apps/app` (Share-Links), siehe `PRIVACY-ANSWERS.md`.
 
 ## Was die bestehende Seite abdeckt
 
-- Verantwortlicher, Accountdaten, local-first, keine Zahlungen in M1, Resend, Sentry/Plausible/
-  PostHog (Marketing/Web), optionaler Sync, Cookies, Warteliste (beendet; Einträge werden 90 Tage nach der
-  Einladungs-E-Mail gelöscht), Rechtsgrundlagen, Betroffenenrechte.
-- **Fehlt:** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Standort, Speicherdauer der
-  Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
-  kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen.
+- Verantwortlicher, Accountdaten, local-first, keine Zahlungen, Resend, Sentry/Plausible/
+  PostHog (Marketing/Web), optionaler Sync, Cookies, Hinweis-E-Mails zum Testzeitraum, Warteliste (beendet; Einträge werden 90 Tage nach der
+  Einladungs-E-Mail gelöscht), Empfänger und Auftragsverarbeiter, Speicherdauer und Löschung (Ticket #199,
+  Entwurf), Rechtsgrundlagen, Betroffenenrechte.
+- **Fehlte (App, Share-Links, Agenten, Speicherdauer sind jetzt ergänzt; Hosting-Anbieter und Serverstandort bleiben offen):** Mobile-App, Share-Links, Workspace-Agenten, Hosting-Anbieter und -Standort,
+  Speicherdauer der Cloud-Inhalte. Die neuen Abschnitte unten schließen die App-Lücke; Share-Links und Agenten sind
+  kurz mit aufgenommen, weil App-Nutzer sie über den Workspace erreichen. Die Speicherdauer steht seit Ticket #199 (Entwurf)
+  im Abschnitt „Speicherdauer und Löschung“ der Seite, die Empfänger im Abschnitt „Empfänger und Auftragsverarbeiter“. Der
+  Hosting-Anbieter fehlt dort weiterhin, bis der Owner ihn und den Standort bestätigt hat (die Hetzner-Angabe unten bleibt
+  deshalb ein Platzhalter und gehört nicht in die öffentliche Seite).
+- **Abgleich (Ticket #199):** Die App-Texte unten passen zur Seite: Konto löschen unter `https://bloommd.app/account`, Zugangs-Token
+  widerrufen beim Abmelden, Inhalte bleiben bis zur Löschung. Die Mobile-App hat keine Feedback-Funktion; Feedback entsteht in der
+  Web-App und bleibt nach der Konto-Löschung bestehen (siehe Seite).
 
 ## Impressum / Anbieterkennzeichnung (Owner-Todo)
 

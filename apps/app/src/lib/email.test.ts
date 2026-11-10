@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sendBetaInviteEmail, sendPasswordResetEmail, sendVerificationEmail, sendWorkspaceInvitationEmail } from "./email";
+import { sendBetaInviteEmail, sendPasswordResetEmail, sendTrialReminderEmail, sendVerificationEmail, sendWaitlistActivationEmail, sendWorkspaceInvitationEmail } from "./email";
 
 const originalFetch = globalThis.fetch;
 const originalEnv = {
@@ -74,6 +74,40 @@ describe("account email links", () => {
     expect(body.html).not.toContain("localhost");
   });
 
+  test("waitlist activation mails link to the activation page of the app, in German by default and in English on request (#105)", async () => {
+    configureEmailTest();
+
+    const german = await captureMail(() => sendWaitlistActivationEmail("max@example.test", "token with space"));
+    expect(german.text).toContain("https://bloommd.app/activate?token=token%20with%20space\n");
+    expect(german.text).not.toContain("lang=");
+    expect(german.text).toContain("noch nicht aktiv");
+    expect(german.text).toContain("Der Link funktioniert einmal und 14 Tage lang.");
+    expect(german.text).toContain("90 Tage nach dieser E-Mail gelöscht");
+    expect(german.html).not.toContain("localhost");
+    expect(german.html).toContain("<a href=\"https://bloommd.app/activate?token=token%20with%20space\">Account aktivieren</a>");
+
+    const english = await captureMail(() => sendWaitlistActivationEmail("max@example.test", "abc", { lang: "en" }));
+    expect(english.text).toContain("https://bloommd.app/activate?token=abc&lang=en");
+    expect(english.text).toContain("not active yet");
+    expect(english.text).not.toContain("Warteliste");
+  });
+
+  test("trial reminder mails name the days left, the end date in UTC and the app link, in German and English (#274)", async () => {
+    configureEmailTest();
+
+    const german = await captureMail(() => sendTrialReminderEmail("max@example.test", { daysLeft: 15, endsAt: "2026-12-15T00:00:00.000Z" }));
+    expect(german.text).toContain("Dein kostenloser BloomMD-Testaccount endet am 15. Dezember 2026 (noch 15 Tage).");
+    expect(german.text).toContain("nur noch lesbar, der Export bleibt möglich");
+    expect(german.text).toContain("https://bloommd.app\n");
+    expect(german.html).toContain("<a href=\"https://bloommd.app\">BloomMD öffnen</a>");
+    expect(german.html).not.toContain("localhost");
+
+    const english = await captureMail(() => sendTrialReminderEmail("max@example.test", { lang: "en", daysLeft: 1, endsAt: new Date("2026-12-08T23:59:59.000Z") }));
+    expect(english.text).toContain("ends on December 8, 2026 (1 day left)");
+    expect(english.text).toContain("read-only and export remains possible");
+    expect(english.text).not.toContain("Testaccount");
+  });
+
   test("beta invite mails point to the app signup form with the invited address", async () => {
     configureEmailTest();
 
@@ -81,10 +115,10 @@ describe("account email links", () => {
 
     expect(body.text).toContain("https://bloommd.app/signup?email=max%40example.test&next=%2Fapp");
     expect(body.text).toContain("Account erstellen.");
-    expect(body.text).toContain("Der Link braucht keinen Einladungscode.");
+    expect(body.text).toContain("Der Link braucht keinen Zugangscode.");
     expect(body.html).not.toContain("localhost");
     expect(body.html).toContain("<strong>Account erstellen</strong>");
-    expect(body.html).toContain("Der Link braucht keinen Einladungscode.");
+    expect(body.html).toContain("Der Link braucht keinen Zugangscode.");
   });
 
   test("English beta invite mails keep the signup journey in English", async () => {
@@ -92,10 +126,11 @@ describe("account email links", () => {
 
     const body = await captureMail(() => sendBetaInviteEmail("max@example.test", { lang: "en" }));
 
-    expect(body.text).toContain("You are invited to the closed BloomMD beta.");
+    expect(body.text).toContain("Your free BloomMD trial account is enabled for you.");
     expect(body.text).toContain("https://bloommd.app/signup?email=max%40example.test&next=%2Fapp&lang=en");
-    expect(body.text).toContain("No invitation code is needed.");
-    expect(body.text).not.toContain("Du bist zur geschlossenen");
+    expect(body.text).toContain("No access code is needed.");
+    expect(body.text).not.toContain("Dein kostenloser BloomMD-Testaccount");
+    expect(body.text).not.toContain("geschlossen");
   });
 
   test("workspace invitation mails preserve the one-time token and invite context", async () => {

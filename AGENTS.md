@@ -112,6 +112,16 @@ Messages (Bun → Webview, fire-and-forget) vs. Requests (bidirektional, mit Res
 Electrobun kennt nur ein globales `maxRequestTime` (60 s, `RPC_MAX_REQUEST_TIME_MS`), kein Timeout je Request. Native Dialoge, die auf einen Menschen warten (`chooseDirectory`, `chooseResourceFile`, `importFile`), laufen deshalb nicht als Request mit Ergebnis: der Request quittiert nur den Start, das Ergebnis kommt als Message `nativeDialogResult` (`bun/native-dialog.ts`, `mainview/native-dialog-client.ts`). Neue Dialog-Requests genauso anbinden.
 File Watcher nutzt chokidar mit `awaitWriteFinish: { stabilityThreshold: 500 }`.
 
+### Platform Adapter (`packages/ui/src/platform`)
+
+`@bloommd/ui` ruft weder `fetch("/api/...")` auf noch liest es `process.env`/`import.meta.env`. Datei- und API-Zugriffe laufen über den `PlatformAdapter` (`files`: list/read/create/write/remove/rename, `api`: linkPreview), den der Host per `PlatformProvider` bereitstellt; Komponenten holen ihn mit `usePlatform()`. Fehler sind `PlatformError` mit `code` (`unauthorized`, `not-found`, `conflict`, `unsupported`, `unavailable`).
+
+- Web: `createWebPlatformAdapter({ workspaceId })` (UI-Paket, einzige Datei mit HTTP) — in `apps/app/src/app/app/page.tsx` eingebunden. Ohne `PlatformProvider` ist er der Fallback.
+- Desktop: `packages/desktop/src/mainview/platform-adapter.ts` (RPC an den Bun-Prozess, Dateisystem bleibt dort).
+- Mobile: `packages/mobile/src/platform-adapter.ts` (nur Lesen über `MobileStore`/Remote-Client; Schreiben bleibt bei `NoteSaver`).
+- Obsidian: kein Adapter; das Plugin nutzt nur die schmalen Exporte `sync-provider` und `map-export-core`, der Vault-Zugriff bleibt im Plugin.
+- `platform/no-direct-access.test.ts` schlägt an, wenn ein anderes Modul im UI-Paket `fetch(`, eine `/api/`-URL oder die Umgebung anfasst. Neue Host-Zugriffe werden als Methode am Adapter ergänzt, nicht als `fetch` oder Fensterereignis.
+
 ### Web API (Next.js 16)
 
 - Route Handler exportieren HTTP-Verben: `export async function GET(request: Request) { ... }`
@@ -166,6 +176,7 @@ oder die Produktdatenbank.
 
 - `packages/mobile/src/storage.ts` — Wrapper um `@capacitor/filesystem`
 - Festes Verzeichnis `Documents/bloommd/` (nicht konfigurierbar wie Desktop)
+- Ordner sind echte Unterverzeichnisse, im App-Speicher wie im geöffneten Ordner (`MobileStore.list()` liefert `folders` inkl. leerer Ordner, `createFolder` legt sie an). Pfadregeln nur aus core (`normalizeMarkdownPath`, `normalizeFolderPath`); Ordner entstehen per `mkdir` (Plugin `capacitor-folder`, Filesystem `mkdir`), nie über Platzhalterdateien (`.gitkeep` o. Ä.)
 - Kein File Watching — externe Änderungen werden nicht erkannt
 
 ### Dateizugriff pro Plattform

@@ -72,11 +72,11 @@ function plausibleConfigErrors(env: NodeJS.ProcessEnv) {
   if (env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN !== "bloommd.io") {
     errors.push("NEXT_PUBLIC_PLAUSIBLE_DOMAIN must be bloommd.io.");
   }
-  if (env.NEXT_PUBLIC_PLAUSIBLE_SRC !== "https://plausible.moellenbeck-digital.io/js/script.js") {
-    errors.push("NEXT_PUBLIC_PLAUSIBLE_SRC must be https://plausible.moellenbeck-digital.io/js/script.js.");
+  if (env.NEXT_PUBLIC_PLAUSIBLE_SRC !== "/_plausible/js/script.js") {
+    errors.push("NEXT_PUBLIC_PLAUSIBLE_SRC must be /_plausible/js/script.js.");
   }
-  if (env.NEXT_PUBLIC_PLAUSIBLE_API_HOST !== "https://plausible.moellenbeck-digital.io") {
-    errors.push("NEXT_PUBLIC_PLAUSIBLE_API_HOST must be https://plausible.moellenbeck-digital.io.");
+  if (env.NEXT_PUBLIC_PLAUSIBLE_API_HOST !== "/_plausible") {
+    errors.push("NEXT_PUBLIC_PLAUSIBLE_API_HOST must be /_plausible.");
   }
   return errors;
 }

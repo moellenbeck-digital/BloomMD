@@ -56,8 +56,16 @@ if (!row || Number(row.version) !== 8 || frontmatter?.restoreDrillSyncPersistenc
   throw new Error("Sync persistence save was not visible in the restored database.");
 }
 
+// The save keeps the version it replaced (#3), in the restored database like anywhere else.
+const revisions = await sql`select version, markdown from bloom_document_revisions where document_id = ${ids.document} and workspace_id = ${ids.workspace}`;
+const revision = revisions[0] as { version: string | number; markdown: string } | undefined;
+if (revisions.length !== 1 || !revision || Number(revision.version) !== 7 || !revision.markdown.includes("Restore Drill")) {
+  throw new Error("Sync persistence save did not keep the replaced version as a revision.");
+}
+
 console.log(JSON.stringify({
   syncRestorePersistence: "ok",
+  revisionKept: true,
   authorization: authorized,
   loadedVersion: 7,
   savedVersion: 8,

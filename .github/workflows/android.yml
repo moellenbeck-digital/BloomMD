@@ -39,33 +39,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
-      - uses: actions/setup-java@v4
+          bun-version: 1.4.4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           # The default also installs the legacy `tools` package, which current SDK managers no longer offer.
           packages: platform-tools
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
       - name: Unit tests (app)
+        id: unit
         working-directory: packages/mobile
         run: bun run test
       - name: Build web assets with the emulator self-test
+        id: web
         working-directory: packages/mobile
         env:
           VITE_BLOOMMD_SELFTEST: "1"
         run: bun run build
       - name: Sync Capacitor Android project
+        id: sync
         working-directory: packages/mobile
         run: bunx cap sync android
       - name: Debug APK and Kotlin unit tests (folder plugin)
+        id: gradle
         working-directory: packages/mobile/android
         run: ./gradlew --no-daemon assembleDebug :bloommd-capacitor-folder:testDebugUnitTest
       - name: Free disk space for the emulator
@@ -79,7 +83,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Run the self-test on an Android tablet emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        id: selftest
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           target: google_apis
@@ -90,14 +95,32 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash packages/mobile/scripts/android-selftest.sh packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/android-selftest.png"
       - name: Keep the APK and the emulator screenshot
+        id: upload
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-debug
           path: |
             packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk
             ${{ runner.temp }}/android-selftest.png
           if-no-files-found: ignore
+      - name: Job summary
+        if: always()
+        working-directory: packages/mobile
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          node scripts/ci-summary.mjs --title "Android: debug build and self-test (tablet emulator)" \
+            --step unit="Unit tests (app)" \
+            --step web="Web assets with the self-test" \
+            --step sync="Capacitor Android sync" \
+            --step gradle="Debug APK and Kotlin unit tests (folder plugin)" \
+            --step selftest="Self-test on the Android tablet emulator" \
+            --step upload="Artifact upload (APK and emulator screenshot)" \
+            --artifact-name android-debug --artifact-file "$GITHUB_WORKSPACE/packages/mobile/android/app/build/outputs/apk/debug/app-debug.apk" --artifact-step upload \
+            --artifact-missing "the Gradle build did not produce app-debug.apk (see the build step above)." \
+            --extra "the phone form factor (the self-test runs on a tablet emulator only)" \
+            --extra "the signed release bundle and the Google Play upload (release job, tags only)" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     if: startsWith(github.ref, 'refs/tags/mobile-v') || (github.event_name == 'workflow_dispatch' && inputs.release)
@@ -105,16 +128,16 @@ jobs:
     timeout-minutes: 30
     environment: android-release
     steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
-      - uses: actions/setup-java@v4
+          bun-version: 1.4.4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           # The default also installs the legacy `tools` package, which current SDK managers no longer offer.
           packages: platform-tools
@@ -158,13 +181,13 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
       - name: Keep the AAB
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: android-release-${{ github.run_number }}
           path: packages/mobile/android/app/build/outputs/bundle/release/app-release.aab
       - name: Upload to Google Play internal testing
         if: steps.signing.outputs.signed == 'true' && steps.signing.outputs.play == 'true'
-        uses: r0adkll/upload-google-play@v1
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: app.bloommd.mobile

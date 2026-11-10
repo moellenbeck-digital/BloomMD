@@ -1,0 +1,98 @@
+name: Mobile touch views
+
+# Touch check of the built mobile assets (packages/mobile/dist): the production build is served with
+# `vite preview` and opened with iPhone SE, iPad (portrait) and Pixel 5 device profiles. Per device:
+# no horizontal overflow, every operable element at least 44 px, the editor opens from the map.
+# The job summary lists what was measured and what is not covered. The native builds and their
+# self-tests live in ios.yml and android.yml.
+on:
+  pull_request:
+    paths:
+      - packages/mobile/**
+      - packages/capacitor-folder/**
+      - packages/ui/**
+      - packages/ink/**
+      - packages/core/**
+      - bun.lock
+      - .github/workflows/mobile.yml
+  push:
+    branches:
+      - main
+    paths:
+      - packages/mobile/**
+      - packages/capacitor-folder/**
+      - packages/ui/**
+      - packages/ink/**
+      - packages/core/**
+      - bun.lock
+      - .github/workflows/mobile.yml
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  touch-views:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Build web assets (with the bundle budget)
+        working-directory: packages/mobile
+        run: bun run build
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            playwright-chromium-${{ runner.os }}-
+      # PackageKit is not needed in CI. In runs 42179754419 (touch-views) and 42179754589
+      # (full-e2e) all 6 attempts of `apt-get install -y --no-install-recommends libasound2t64 ...`
+      # hung for 120 s, and in each of them a packagekitd (/usr/libexec/packagekitd) that had started
+      # seconds before ran next to the stuck apt-get. Jobs without it installed in 10 to 21 s (#307).
+      # The cause inside apt is not proven: if a hang still happens, the annotation names wchan,
+      # children and lock owners.
+      - name: Stop PackageKit before apt runs
+        timeout-minutes: 2
+        run: sudo systemctl mask --now packagekit.service || echo "::warning title=PackageKit::could not mask packagekit.service"
+      # Same cache key, two steps and retries as the end-to-end job in ci.yml: the browser cache only
+      # covers the download, the system packages are installed on every run. The wait for apt/dpkg
+      # (--lock-wait) and the 15-minute limit are explained in ci.yml.
+      - name: Install Playwright system dependencies
+        working-directory: packages/mobile
+        timeout-minutes: 15
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15 --lock-wait 120
+          -- ./node_modules/.bin/playwright install-deps chromium
+      - name: Install Playwright browser
+        working-directory: packages/mobile
+        timeout-minutes: 10
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright browser download" --attempts 3 --timeout 120 --pause 15
+          -- ./node_modules/.bin/playwright install chromium
+      - name: Touch views (iPhone SE, iPad, Pixel 5)
+        working-directory: packages/mobile
+        run: bun run test:touch
+      - name: Job summary
+        if: always()
+        working-directory: packages/mobile
+        run: node e2e/summary.mjs >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep screenshots and traces of failed views
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mobile-touch-views
+          path: packages/mobile/test-results
+          if-no-files-found: ignore

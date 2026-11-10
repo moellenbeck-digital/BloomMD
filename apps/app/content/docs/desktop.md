@@ -1,6 +1,6 @@
 ---
 title: Desktop-App
-description: Der empfohlene Weg für die Closed Beta — lokal, ohne Konto.
+description: Der empfohlene Weg für die Beta — lokal, ohne Konto.
 order: 2
 ---
 
@@ -13,13 +13,13 @@ Der Hauptweg der Beta. Läuft lokal, ohne Konto, ohne Netzwerk.
 Die feste Download-Stelle für Tester ist [bloommd.io/download](/download). Dort steht der aktuell
 freigegebene macOS-arm64-Build für M1 mit Version, Plattformstatus und Installationshinweis.
 
-In der geschlossenen Beta ist der Build nicht öffentlich gelistet. Wenn dein Account freigeschaltet
-ist, bekommst du den konkreten Download-Link über die Beta-Freigabe. Falls der Link fehlt oder
-abgelaufen ist, schreibe an `feedback@bloommd.io`.
+Der Desktop-Build ist öffentlich verlinkt und lässt sich ohne Einladung oder BloomMD-Konto
+herunterladen. Der kostenlose Testaccount gilt nur für Web-App, Cloud, Sync und Zusammenarbeit.
+Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 
-## Installation in der Closed Beta
+## Installation in der Beta
 
-Der native Desktop-Client startet in der Closed Beta **macOS-first**. Der freigegebene M1-Build ist
+Der native Desktop-Client startet in der Beta **macOS-first**. Der freigegebene M1-Build ist
 macOS arm64. Windows und Linux folgen als eigene Beta-Releases, sobald Installer, OS-Handoff,
 Tastaturverhalten und Plattform-Smokes sauber geprüft sind.
 
@@ -27,8 +27,8 @@ Tastaturverhalten und Plattform-Smokes sauber geprüft sind.
 Die finale Apple-Signatur wartet auf die Freigabe des Apple Developer Accounts.
 
 - **macOS:** Gatekeeper meldet einen unbekannten Entwickler. Rechtsklick → Öffnen → Öffnen.
-- **Windows:** nicht Teil der M1 Closed Beta; eigener Windows Beta Release folgt.
-- **Linux:** nicht Teil der M1 Closed Beta; eigener Linux Beta Release folgt.
+- **Windows:** nicht Teil der M1 Beta; eigener Windows Beta Release folgt.
+- **Linux:** nicht Teil der M1 Beta; eigener Linux Beta Release folgt.
 
 ## Dateien und Ordner öffnen
 
@@ -39,6 +39,18 @@ Doppelklick im Dateimanager oder von der Kommandozeile:
 bloommd ./notizen        # Ordner als Workspace
 bloommd notiz.md         # einzelne Datei
 ```
+
+## Ordner als gemeinsamen Workspace veröffentlichen
+
+Im lokalen Modus kannst du einen ganzen Ordner bewusst in einen Cloud-Workspace veröffentlichen.
+Der Einstieg **Ordner als gemeinsamen Workspace veröffentlichen** in der Seitenleiste ist getrennt
+von **Diese lokale Datei teilen**; keiner der beiden Wege ändert den anderen. Du wählst Ordner,
+Server-Profil und einen beschreibbaren Workspace (Viewer-Workspaces sind gesperrt), prüfst die
+Vorschau mit Dateianzahl, Größe, Konfliktstrategie und einem Ausschluss-Häkchen je Datei und
+Unterordner und bestätigst erst dann mit **Veröffentlichen**. Übertragen werden nur die angehakten
+Markdown-Dateien; die lokalen Dateien bleiben die Quelle, und der Ordnerpfad verlässt dein Gerät
+nicht. Entzieht der Server den Zugriff, stoppt der Abgleich, ohne dass lokale Dateien verändert
+oder gelöscht werden. Den vollständigen Ablauf beschreibt [Zusammenarbeit](/docs/collaboration).
 
 ## Mit der Web-App verbinden
 
@@ -55,7 +67,7 @@ Der genaue gemeinsame Ablauf steht unter [Zusammenarbeit](/docs/collaboration).
 ## Windows und Linux
 
 Windows und Linux sind bewusst aus dem M1-Desktop-Scope herausgenommen. Das schließt Tester auf
-diesen Systemen zunächst aus, verhindert aber, dass die Closed Beta an noch nicht belegtem
+diesen Systemen zunächst aus, verhindert aber, dass die Beta an noch nicht belegtem
 Plattform-Packaging hängt.
 
 Vor dem Windows-Beta-Release wird zusätzlich geprüft, wie Zugriffstoken im Cloud-Modus gespeichert

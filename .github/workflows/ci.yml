@@ -35,7 +35,7 @@ jobs:
       critical: ${{ steps.filter.outputs.critical }}
       release: ${{ steps.filter.outputs.release }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Classify changed paths
@@ -93,21 +93,47 @@ jobs:
       BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
       BLOOMMD_REQUIRE_AUTH: "1"
       NEXT_PUBLIC_SITE_URL: http://localhost:3211
+      # CI sends no Plausible server signal; the plausible spec toggles this itself.
+      BLOOMMD_PLAUSIBLE_DISABLED: "true"
+      # Throwaway database below; tests/integration/*-db.integration.test.ts fail in CI without it.
+      BLOOMMD_TEST_DATABASE_URL: postgres://bloommd:bloommd-ci-only@localhost:5432/bloommd_test
+    services:
+      # Same image tag as deploy/local/docker-compose.yml. Database and credentials exist only for the
+      # lifetime of this job and are not secrets.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: bloommd
+          POSTGRES_PASSWORD: bloommd-ci-only
+          POSTGRES_DB: bloommd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bloommd -d bloommd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
           restore-keys: |
             bun-${{ runner.os }}-
+      - name: Verify Bun version matches packageManager
+        run: |
+          set -euo pipefail
+          expected="$(jq -r .packageManager package.json | cut -d@ -f2)"
+          echo "bun --version: $(bun --version) (packageManager: $expected)"
+          test "$(bun --version)" = "$expected"
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
       - name: Install Obsidian plugin dependencies
@@ -120,8 +146,27 @@ jobs:
         run: bun audit
       - name: Typecheck all surfaces
         run: bun run typecheck
+      - name: Migrate test database
+        env:
+          DATABASE_URL: ${{ env.BLOOMMD_TEST_DATABASE_URL }}
+        run: bun run --cwd apps/app db:migrate
+      - name: Migrate test database again (must be idempotent)
+        env:
+          DATABASE_URL: ${{ env.BLOOMMD_TEST_DATABASE_URL }}
+        run: bun run --cwd apps/app db:migrate
       - name: Run unit tests
         run: bun run test
+      - name: DB tests ran without skips
+        # Second run on the already used database (order/isolation check); the counts go into a
+        # notice annotation on the run, and a skipped or missing DB test fails the job.
+        run: |
+          set -euo pipefail
+          bun test tests/integration/*-db.integration.test.ts 2>&1 | tee "$RUNNER_TEMP/db-tests.log"
+          count() { { grep -E "^ *[0-9]+ $1\$" "$RUNNER_TEMP/db-tests.log" || true; } | awk '{print $1}' | tail -1; }
+          pass="$(count pass)"; skip="$(count skip)"; fail="$(count fail)"
+          echo "::notice title=DB tests::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
+          test "${pass:-0}" -gt 0
+          test "${skip:-0}" -eq 0
       - name: Validate M1 QA matrix and test plan
         run: bun run test:qa
       - name: Build web
@@ -156,6 +201,19 @@ jobs:
             -c 'archive="$(find /plugin -maxdepth 1 -name "bloommd-openclaw-plugin-*.tgz" -print -quit)"; test -n "$archive"; OPENCLAW_ENTRYPOINT=/app/openclaw.mjs /opt/bloommd-plugin/scripts/install-plugin.sh "$archive" --force; node /app/openclaw.mjs bloommd --help' \
             | tee /tmp/bloommd-openclaw-archive-help.txt
           grep -Fq "openclaw bloommd" /tmp/bloommd-openclaw-archive-help.txt
+      - name: Verify Bun version and size in container images
+        run: |
+          set -euo pipefail
+          expected="$(jq -r .packageManager package.json | cut -d@ -f2)"
+          docker build --file deploy/openclaw/Dockerfile --target plugin-build --tag bloommd-openclaw-plugin-build:ci .
+          docker build --file Dockerfile --target deps --tag bloommd-app-deps:ci .
+          for image in bloommd-openclaw-plugin-build:ci bloommd-app-deps:ci; do
+            actual="$(docker run --rm --entrypoint bun "$image" --version)"
+            echo "$image: bun --version $actual"
+            test "$actual" = "$expected"
+          done
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E '^bloommd-' | sort
+          echo "::notice title=bun --version in images::plugin-build=$(docker run --rm --entrypoint bun bloommd-openclaw-plugin-build:ci --version) app-deps=$(docker run --rm --entrypoint bun bloommd-app-deps:ci --version) runner=$(bun --version)"
 
   full-e2e:
     runs-on: ubuntu-latest
@@ -173,16 +231,18 @@ jobs:
       BLOOMMD_AUTH_SECRET: ci-only-auth-secret-that-is-long-and-random
       BLOOMMD_REQUIRE_AUTH: "1"
       NEXT_PUBLIC_SITE_URL: http://localhost:3211
+      # CI sends no Plausible server signal; the plausible spec toggles this itself.
+      BLOOMMD_PLAUSIBLE_DISABLED: "true"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
@@ -191,16 +251,49 @@ jobs:
       - name: Install workspace dependencies
         run: bun install --frozen-lockfile
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock', 'apps/app/package.json', 'apps/marketing/package.json') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            playwright-${{ runner.os }}-
-      - name: Install Playwright browser and system dependencies
+            playwright-chromium-${{ runner.os }}-
+      # PackageKit is not needed in CI. In runs 42179754419 (touch-views) and 42179754589
+      # (full-e2e) all 6 attempts of `apt-get install -y --no-install-recommends libasound2t64 ...`
+      # hung for 120 s, and in each of them a packagekitd (/usr/libexec/packagekitd) that had started
+      # seconds before ran next to the stuck apt-get. Jobs without it installed in 10 to 21 s (#307).
+      # The cause inside apt is not proven: if a hang still happens, the annotation names wchan,
+      # children and lock owners.
+      - name: Stop PackageKit before apt runs
+        timeout-minutes: 2
+        run: sudo systemctl mask --now packagekit.service || echo "::warning title=PackageKit::could not mask packagekit.service"
+      # Two steps instead of `playwright install --with-deps`: the browser cache above only covers
+      # the browser download, while the apt part runs on every job. Each part retries on its own, and
+      # only for network or package-source errors (3 attempts, 120 s each, 15 s pause). A hang is cut
+      # off per attempt instead of eating the whole 10 minutes; every failed attempt is a
+      # ::warning:: in the log with the last apt error line, and the last failure is a hard red
+      # (#141). A cut-off attempt does not stop the root-owned apt-get: it keeps the dpkg lock, and an
+      # immediate retry failed with "Unable to acquire the dpkg frontend lock". In runs 42172271748
+      # and 42178351349 that apt-get was the one of the first attempt itself, still running after
+      # 385 s, next to a packagekitd (#307). With --lock-wait the system-dependencies step ends the
+      # apt processes a failed attempt left behind (never dpkg), waits up to 120 s before every
+      # attempt until apt/dpkg is idle, and names every process in a warning. Worst case
+      # 3 x (120 s wait + 120 s attempt + 5 s ending) + 2 x 15 s pause = 765 s, hence the 15-minute
+      # step limit. The cache key is the same as in mobile.yml (one Playwright version, set by
+      # bun.lock), so a run on main fills the cache for both workflows.
+      - name: Install Playwright system dependencies
+        working-directory: apps/app
+        timeout-minutes: 15
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright system dependencies" --attempts 3 --timeout 120 --pause 15 --lock-wait 120
+          -- ./node_modules/.bin/playwright install-deps chromium
+      - name: Install Playwright browser
         working-directory: apps/app
         timeout-minutes: 10
-        run: ./node_modules/.bin/playwright install --with-deps chromium
+        run: >-
+          "$GITHUB_WORKSPACE/scripts/ci-retry-network.sh"
+          --label "Playwright browser download" --attempts 3 --timeout 120 --pause 15
+          -- ./node_modules/.bin/playwright install chromium
       # Eats its own cooking: the repository's own Markdown goes through the checks BloomMD ships.
       # A broken link in our docs should fail our pipeline, not just other people's.
       - name: Lint repository Markdown
@@ -229,9 +322,19 @@ jobs:
           --project=chromium-mobile
           e2e/accessibility.spec.ts
           e2e/auth-shortcuts.spec.ts
+          e2e/theme-custom.spec.ts
           e2e/release-contracts.spec.ts
           e2e/mobile-smoke.spec.ts
           e2e/workspace-agent-node.spec.ts
+          e2e/link-preview-abuse-t210.spec.ts
+      # Plausible tracking (#299): the spec starts the production build above twice with different env
+      # (tracking on, then BLOOMMD_PLAUSIBLE_DISABLED=true) and a local counterpart, so it needs no rebuild.
+      # The default run above cannot cover it: its servers run in E2E test mode, which switches tracking off.
+      - name: Run Plausible tracking end-to-end tests
+        working-directory: apps/app
+        env:
+          PLAYWRIGHT_SERVER_MODE: production
+        run: bun run test:e2e:plausible
       - name: Reclaim Docker disk before workspace-agent end-to-end test
         # GitHub-hosted runners arrive with preloaded images and BuildKit cache. The isolated
         # stack needs several large images at the same time (app, sync, Postgres, OpenClaw and
@@ -260,14 +363,21 @@ jobs:
           NEXT_PUBLIC_SITE_URL: http://localhost:3211
           NEXT_PUBLIC_MARKETING_URL: http://localhost:3211
           NEXT_PUBLIC_APP_URL: https://bloommd.app
-          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: bloommd.io
-          NEXT_PUBLIC_PLAUSIBLE_SRC: https://plausible.moellenbeck-digital.io/js/script.js
-          NEXT_PUBLIC_PLAUSIBLE_API_HOST: https://plausible.moellenbeck-digital.io
+          # The script only loads on the configured domain; this server is reached as localhost.
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: localhost
+          NEXT_PUBLIC_PLAUSIBLE_SRC: /_plausible/js/script.js
+          NEXT_PUBLIC_PLAUSIBLE_API_HOST: /_plausible
           NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL: https://bloommd.io/_desktop-updates/stable-macos-arm64-BloomMD.dmg
           BLOOMMD_REQUIRE_AUTH: "1"
           BLOOMMD_WAITLIST_ADMIN_USER: admin
           BLOOMMD_WAITLIST_ADMIN_PASSWORD: secret
         run: bun run build
+      - name: Verify the Plausible values in the marketing bundle
+        working-directory: apps/marketing
+        env:
+          # Must match the build step above: the check compares the baked-in domain with this value.
+          NEXT_PUBLIC_PLAUSIBLE_DOMAIN: localhost
+        run: bun run verify:plausible-build
       - name: Run marketing production end-to-end tests
         working-directory: apps/marketing
         env:
@@ -320,15 +430,15 @@ jobs:
       )
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock', 'plugins/obsidian/bun.lock') }}
@@ -365,19 +475,19 @@ jobs:
           tar -tzf "$package_file" | grep -Fx 'package/dist/index.js'
           tar -tzf "$package_file" | grep -Fx 'package/skills/bloommd-workspace-agent/SKILL.md'
       - name: Upload Obsidian release artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-obsidian
           path: plugins/obsidian/release/
           if-no-files-found: error
       - name: Upload OpenClaw workspace-agent artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-openclaw-plugin
           path: artifacts/openclaw-plugin/*.tgz
           if-no-files-found: error
       - name: Upload agent, Wiki and sync release binaries
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: bloommd-command-binaries
           path: |

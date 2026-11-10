@@ -94,8 +94,9 @@ Erwartung:
   Viewport und Dark Mode mit `maxDiffPixelRatio: 0.015`
 - Desktop-Renderer innerhalb Bundle-Budget
 - Stable-Artefakte unter `packages/desktop/artifacts/`
-- macOS-App-Bundle ist ad-hoc signiert und besteht `codesign --verify`; Gatekeeper bleibt wegen
-  fehlender Developer-ID/Notarisierung erwartbar, bis der Apple Developer Account freigegeben ist
+- macOS-App-Bundle besteht `codesign --verify`. Der Release-Build (ab v0.5.7) ist Developer-ID-signiert
+  und notarisiert, geprüft durch `bun run --cwd packages/desktop verify:release:macos`; nur lokale und
+  PR-Builds sind ad-hoc signiert und nicht notarisiert, dort ist eine Gatekeeper-Warnung erwartbar
 - Keine neuen high/critical Audit-Findings ohne akzeptierte Ausnahme
 
 ## Aktuelle macOS-Evidenz

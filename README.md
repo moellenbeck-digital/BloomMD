@@ -310,9 +310,13 @@ The Next.js apps are **not** shipped as Bun single binaries for M1. The containe
 supported deployment target; `next-bun-compile` stays out of the beta release path until there is a
 concrete target environment that cannot run containers.
 
-The M1 macOS Desktop artifact is ad-hoc signed so the bundle passes `codesign --verify`; it is not
-Developer-ID-signed or notarized yet because the Apple Developer Account approval is still pending.
-Gatekeeper will therefore still show the expected beta warning.
+Since v0.5.7 the macOS arm64 release is signed with a Developer ID and notarized by Apple. The
+stable release workflow (`.github/workflows/desktop-release.yml`) runs `bun run verify:release:macos`
+in `packages/desktop` before publication; it checks the Developer ID signature, Hardened Runtime,
+stapled notarization tickets and the Gatekeeper assessment of the app and the DMG.
+
+Local, pull request and ordinary matrix builds are only ad-hoc signed so the bundle passes
+`codesign --verify`; they are not notarized, so a Gatekeeper warning is expected there.
 Use `bun run verify:desktop-macos` after every local or CI build before publishing the DMG.
 
 The Linux beta track is built natively for x86_64 and ARM64/aarch64 and packaged with `makepkg`

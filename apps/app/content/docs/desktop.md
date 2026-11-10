@@ -23,10 +23,12 @@ Der native Desktop-Client startet in der Beta **macOS-first**. Der freigegebene 
 macOS arm64. Windows und Linux folgen als eigene Beta-Releases, sobald Installer, OS-Handoff,
 Tastaturverhalten und Plattform-Smokes sauber geprüft sind.
 
-**Der macOS-Build ist ad-hoc signiert, aber noch nicht Developer-ID-signiert oder notarisiert.**
-Die finale Apple-Signatur wartet auf die Freigabe des Apple Developer Accounts.
+**Ab Version 0.5.7 ist der macOS-arm64-Release mit Developer ID signiert und von Apple notarisiert.**
 
-- **macOS:** Gatekeeper meldet einen unbekannten Entwickler. Rechtsklick → Öffnen → Öffnen.
+- **macOS:** DMG öffnen, BloomMD in den Programme-Ordner ziehen und dort per Doppelklick starten.
+  Eine manuelle Gatekeeper-Ausnahme ist für diesen Release nicht vorgesehen. Falls macOS den Start
+  blockiert, melde Version und Meldung an `feedback@bloommd.io`; die Schritte stehen unter
+  [Fehlerbehebung](https://bloommd.io/docs/fehlerbehebung).
 - **Windows:** nicht Teil der M1 Beta; eigener Windows Beta Release folgt.
 - **Linux:** nicht Teil der M1 Beta; eigener Linux Beta Release folgt.
 

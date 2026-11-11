@@ -53,7 +53,7 @@ describe.skipIf(!url)("trial period (Postgres)", () => {
     for (const email of [plain, waitlist, confirmed]) {
       const row = await userRow(email);
       expect(row.trial_legacy).toBe(true);
-      expect(row.trial_ends_at?.toISOString()).toBe("2026-12-15T00:00:00.000Z");
+      expect(row.trial_ends_at?.toISOString()).toBe("2027-01-14T00:00:00.000Z");
     }
     expect((await userRow(plain)).locale).toBe("de");
     expect((await userRow(waitlist)).locale).toBe("en");
@@ -67,6 +67,25 @@ describe.skipIf(!url)("trial period (Postgres)", () => {
     expect(await userRow(created.email)).toMatchObject({ trial_legacy: false, trial_ends_at: null });
     expect((await userRow(plain)).trial_legacy).toBe(true);
     expect((await userRow(waitlist)).locale).toBe("en");
+  });
+
+  test("migration 015 moves only the end that migration 013 wrote, for existing accounts, and runs again without changes (#364)", async () => {
+    const old = address("m015-old");
+    const hand = address("m015-hand");
+    const fresh = address("m015-new");
+    await sql`insert into bloom_users (auth_provider, auth_user_id, email, password_hash, trial_legacy, trial_ends_at) values ('password', ${old}, ${old}, ${HASH}, true, '2026-12-15T00:00:00Z')`;
+    await sql`insert into bloom_users (auth_provider, auth_user_id, email, password_hash, trial_legacy, trial_ends_at) values ('password', ${hand}, ${hand}, ${HASH}, true, '2026-12-20T12:00:00Z')`;
+    await sql`insert into bloom_users (auth_provider, auth_user_id, email, password_hash, trial_legacy, trial_ends_at) values ('password', ${fresh}, ${fresh}, ${HASH}, false, '2026-12-15T00:00:00Z')`;
+
+    await db.migrateMarketSchema();
+    expect((await userRow(old)).trial_ends_at?.toISOString()).toBe("2027-01-14T00:00:00.000Z");
+    expect((await userRow(hand)).trial_ends_at?.toISOString()).toBe("2026-12-20T12:00:00.000Z");
+    expect((await userRow(fresh)).trial_ends_at?.toISOString()).toBe("2026-12-15T00:00:00.000Z");
+
+    await db.migrateMarketSchema();
+    expect((await userRow(old)).trial_ends_at?.toISOString()).toBe("2027-01-14T00:00:00.000Z");
+    expect((await userRow(hand)).trial_ends_at?.toISOString()).toBe("2026-12-20T12:00:00.000Z");
+    expect((await userRow(fresh)).trial_ends_at?.toISOString()).toBe("2026-12-15T00:00:00.000Z");
   });
 
   test("signup stores the language; a prepared waitlist account keeps its own", async () => {
@@ -97,10 +116,10 @@ describe.skipIf(!url)("trial period (Postgres)", () => {
 
   test("an existing account keeps its fixed end when it confirms later", async () => {
     const email = address("legacy-late");
-    await sql`insert into bloom_users (auth_provider, auth_user_id, email, password_hash, trial_legacy, trial_ends_at) values ('password', ${email}, ${email}, ${HASH}, true, '2026-12-15T00:00:00Z')`;
+    await sql`insert into bloom_users (auth_provider, auth_user_id, email, password_hash, trial_legacy, trial_ends_at) values ('password', ${email}, ${email}, ${HASH}, true, '2027-01-14T00:00:00Z')`;
     const row = await userRow(email);
     await db.markEmailVerified(row.id);
-    expect((await userRow(email)).trial_ends_at?.toISOString()).toBe("2026-12-15T00:00:00.000Z");
+    expect((await userRow(email)).trial_ends_at?.toISOString()).toBe("2027-01-14T00:00:00.000Z");
   });
 
   test("activating a prepared waitlist account sets the end once", async () => {

@@ -3,6 +3,7 @@ import { __setMarketSqlForTest, acceptBetaInvite, addFeedbackAttachments, addWor
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SqlClient } from "./sql-client";
+import { LEGACY_TRIAL_ENDS_AT } from "./trial";
 
 const originalDatabaseUrl = process.env.DATABASE_URL;
 
@@ -519,6 +520,29 @@ describe("agent token rights, proposals and log", () => {
     const order = expected.map((statement) => statements.indexOf(statement));
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(statements.indexOf(expected[0]!)).toBeGreaterThan(statements.findIndex((statement) => statement.startsWith("create table if not exists bloom_waitlist_transfers")));
+  });
+
+  test("the migration file and the schema db:migrate move the existing accounts to the 60-day end and nothing else (#364)", async () => {
+    process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
+    const normalize = (text: string) => text.replace(/\s+/g, " ").replace(/\( /g, "(").replace(/ \)/g, ")").trim();
+    const file = readFileSync(join(import.meta.dir, "../../db/015_trial_legacy_60_days.sql"), "utf8");
+    const expected = file.split("\n").filter((line) => !line.trim().startsWith("--")).join("\n").split(";").map(normalize).filter(Boolean);
+    const statements: string[] = [];
+    const sql = ((parts: TemplateStringsArray) => {
+      statements.push(normalize(parts.join("?")));
+      return Promise.resolve([]);
+    }) as unknown as SqlClient;
+    __setMarketSqlForTest(sql);
+    await migrateMarketSchema();
+    expect(expected).toEqual(["update bloom_users set trial_ends_at = '2027-01-14T00:00:00Z' where trial_legacy and trial_ends_at = '2026-12-15T00:00:00Z'"]);
+    for (const statement of expected) expect(statements).toContain(statement);
+    // Only the value that migration 013 wrote is moved, so it has to run after 013's own backfill and never touches other values.
+    const backfill013 = statements.indexOf("update bloom_users set trial_ends_at = '2026-12-15T00:00:00Z' where trial_legacy and trial_ends_at is null");
+    expect(backfill013).toBeGreaterThanOrEqual(0);
+    expect(statements.indexOf(expected[0]!)).toBeGreaterThan(backfill013);
+    expect(statements.filter((statement) => statement.includes("trial_ends_at = '2027-01-14T00:00:00Z'")).length).toBe(1);
+    // The end in the file is the end in the trial code.
+    expect(`'${LEGACY_TRIAL_ENDS_AT.replace(".000Z", "Z")}'`).toBe("'2027-01-14T00:00:00Z'");
   });
 
   test("the migration file and the schema db:migrate applies add the same canonical address column, guard flag and indexes (#277)", async () => {

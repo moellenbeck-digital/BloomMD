@@ -95,15 +95,15 @@ describe("account email links", () => {
   test("trial reminder mails name the days left, the end date in UTC and the app link, in German and English (#274)", async () => {
     configureEmailTest();
 
-    const german = await captureMail(() => sendTrialReminderEmail("max@example.test", { daysLeft: 15, endsAt: "2026-12-15T00:00:00.000Z" }));
-    expect(german.text).toContain("Dein kostenloser BloomMD-Testaccount endet am 15. Dezember 2026 (noch 15 Tage).");
+    const german = await captureMail(() => sendTrialReminderEmail("max@example.test", { daysLeft: 15, endsAt: "2027-01-14T00:00:00.000Z" }));
+    expect(german.text).toContain("Dein kostenloser BloomMD-Testaccount endet am 14. Januar 2027 (noch 15 Tage).");
     expect(german.text).toContain("nur noch lesbar, der Export bleibt möglich");
     expect(german.text).toContain("https://bloommd.app\n");
     expect(german.html).toContain("<a href=\"https://bloommd.app\">BloomMD öffnen</a>");
     expect(german.html).not.toContain("localhost");
 
-    const english = await captureMail(() => sendTrialReminderEmail("max@example.test", { lang: "en", daysLeft: 1, endsAt: new Date("2026-12-08T23:59:59.000Z") }));
-    expect(english.text).toContain("ends on December 8, 2026 (1 day left)");
+    const english = await captureMail(() => sendTrialReminderEmail("max@example.test", { lang: "en", daysLeft: 1, endsAt: new Date("2027-01-13T23:59:59.000Z") }));
+    expect(english.text).toContain("ends on January 13, 2027 (1 day left)");
     expect(english.text).toContain("read-only and export remains possible");
     expect(english.text).not.toContain("Testaccount");
   });

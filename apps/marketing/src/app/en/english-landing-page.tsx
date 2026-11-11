@@ -190,7 +190,7 @@ const faqItems = [
   },
   {
     question: "What is included in the free trial account and the beta?",
-    answer: "The free trial account for BloomMD Web, cloud workspaces, sync and collaboration is valid for 30 days from email confirmation, with no invitation and no waitlist. We remind you by email after 15 and 23 days. After it ends, your account is read-only, export remains possible and nothing is lost. For existing accounts the trial period counts from November 15, 2026. The browser demo, macOS and Omarchy/Linux desktop builds, and the Obsidian plugin (beta) are available without an account. Pricing and scope will be published before launch.",
+    answer: "The free trial account for BloomMD Web, cloud workspaces, sync and collaboration is valid for 30 days from email confirmation, with no invitation and no waitlist. We remind you by email after 15 and 23 days. After it ends, your account is read-only, export remains possible and nothing is lost. For existing accounts the trial period counts from November 15, 2026 and lasts 60 days (until January 14, 2027). The browser demo, macOS and Omarchy/Linux desktop builds, and the Obsidian plugin (beta) are available without an account. Pricing and scope will be published before launch.",
   },
   {
     question: "Can I give feedback with screenshots?",

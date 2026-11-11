@@ -55,11 +55,11 @@ test.describe("Rechtsseiten @t199", () => {
     expect(marketingURL, "PLAYWRIGHT_MARKETING_URL bzw. PLAYWRIGHT_BASE_URL muss gesetzt sein").toMatch(/^https?:\/\//);
   });
 
-  test("K1: /lizenz nennt Testaccount, 30 Tage, Bestandskonten bis 15.12.2026, nur lesen und exportieren, Link auf AGB; kein „Beta“ @t199", async ({ page }) => {
+  test("K1: /lizenz nennt Testaccount, 30 Tage, Bestandskonten bis 14.01.2027, nur lesen und exportieren, Link auf AGB; kein „Beta“ @t199", async ({ page }) => {
     const heading = { de: "Zugang zu BloomMD Web und Cloud", en: "Access to BloomMD Web and Cloud" } as const;
     const expected = {
-      de: [/kostenlosen Testaccount/, /30 Tage ab der Bestätigung/, /15\.12\.2026/, /nur noch lesbar/, /lesen und exportieren/],
-      en: [/free trial account/, /30 days from confirmation/, /December 15, 2026/, /read-only/, /read and export/],
+      de: [/kostenlosen Testaccount/, /30 Tage ab der Bestätigung/, /14\.01\.2027/, /nur noch lesbar/, /lesen und exportieren/],
+      en: [/free trial account/, /30 days from confirmation/, /January 14, 2027/, /read-only/, /read and export/],
     } as const;
     for (const host of HOSTS) {
       for (const lang of LANGS) {

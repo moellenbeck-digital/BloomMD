@@ -3,8 +3,9 @@
  * the database, so every boundary can be tested exactly.
  *
  * New accounts: the trial lasts 30 days from the email confirmation, with a reminder after 15 and
- * after 23 days. Accounts that existed when migration 013 ran share one fixed end; their start is
- * counted as 15 Nov 2026, so the same arithmetic gives their reminders (30 Nov and 8 Dec).
+ * after 23 days. Accounts that existed when migration 013 ran share one fixed end (60 days, #364);
+ * their start is counted as 15 Nov 2026, so the same arithmetic, counted back from the end, gives
+ * their reminders (30 Dec and 7 Jan).
  */
 
 export const TRIAL_DAYS = 30;
@@ -13,8 +14,12 @@ export type TrialReminderKind = "15" | "23";
 export const TRIAL_REMINDER_DAYS: Record<TrialReminderKind, number> = { "15": 15, "23": 23 };
 export const TRIAL_REMINDER_KINDS = Object.keys(TRIAL_REMINDER_DAYS) as TrialReminderKind[];
 
-/** End of the trial of every account that existed when migration 013 ran (db/013_trial_period.sql). */
-export const LEGACY_TRIAL_ENDS_AT = "2026-12-15T00:00:00.000Z";
+/**
+ * End of the trial of every account that existed when migration 013 ran: 60 days from 15 Nov 2026
+ * (db/013_trial_period.sql, moved by db/015_trial_legacy_60_days.sql). The one place for this date
+ * in code; the migration file and the legal pages are checked against it by tests.
+ */
+export const LEGACY_TRIAL_ENDS_AT = "2027-01-14T00:00:00.000Z";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -62,7 +67,7 @@ export function dueTrialReminder(
   return null;
 }
 
-/** The end date as shown to people ("15.12.2026" / "15 Dec 2026"), in UTC like the mails. */
+/** The end date as shown to people ("14.01.2027" / "14 Jan 2027"), in UTC like the mails. */
 export function formatTrialEnd(endsAt: Date | string | number, locale: "de" | "en"): string {
   return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "de-DE", locale === "en" ? { dateStyle: "medium", timeZone: "UTC" } : { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" }).format(new Date(endsAt));
 }

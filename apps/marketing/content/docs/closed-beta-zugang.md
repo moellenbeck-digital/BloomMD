@@ -24,7 +24,7 @@ Zusammenarbeit eingeschränkt.** Die [Browser-Demo](/demo), [Desktop-Builds](/do
 - Nach Ablauf ist dein Konto nur noch lesbar. Der Export bleibt möglich, es erscheint ein Hinweis.
   Nichts geht verloren.
 - Bestehende Konten, auch von früheren Wartelisten-Teilnehmern: Der Testzeitraum zählt wegen der
-  Beta-Beteiligung ab dem **15.11.2026**.
+  Beta-Beteiligung ab dem **15.11.2026** und dauert **60 Tage** (bis 14.01.2027).
 - Preise und Leistungsumfang werden vor Einführung veröffentlicht.
 
 ## Registrierung (Normalfall)

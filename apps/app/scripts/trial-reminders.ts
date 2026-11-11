@@ -12,8 +12,8 @@ import { runTrialReminders } from "../src/lib/trial-reminders";
  * Run it regularly (daily is enough). A late run sends only the latest due reminder and nothing
  * after the trial ended; a failed send is repeated by the next run.
  *
- * Accounts that existed when migration 013 ran (fixed trial end 15 Dec 2026, reminders 30 Nov and
- * 8 Dec) are held back, in the dry run as `heldBackExisting`. They get their mails only with
+ * Accounts that existed when migration 013 ran (fixed trial end 14 Jan 2027 since migration 015,
+ * reminders 30 Dec and 7 Jan) are held back, in the dry run as `heldBackExisting`. They get their mails only with
  * BLOOMMD_TRIAL_REMINDERS_EXISTING=1, after the admin's go.
  *
  * `--jetzt` only moves the clock of this run. On a test system, mails go to the E2E outbox

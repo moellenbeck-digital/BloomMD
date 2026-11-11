@@ -3,19 +3,19 @@
 - **Ticket:** #103 (Epic #196, erster Schritt von #204). **Datum der Prüfung:** 2026-11-10.
 - **Gehört zu:** [ADR 0001](0001-payload-cms.md), Abschnitte 3, 5, 8, 11 und offene Punkte O12, O14, O16, O17.
 - **Art:** Ergebnis eines Wegwerf-Prototyps. Der Prototyp liegt außerhalb des Repos und ist nicht eingecheckt. Belege sind Befehle und gekürzte Ausgaben in diesem Dokument. Es gibt keinen Produktivcode, keine Änderung an `apps/app`, `apps/marketing` oder Prod.
-- **Wichtigster Vorbehalt:** Es lief **kein Produktions-Build** (`next build`) und **kein Browser-Test** der Admin-Oberfläche. Der Pod hat 4 GiB Speicher, und die Payload-Vorlage setzt für den Build `--max-old-space-size=8000`. Beides gehört in #204 (CI) und zum tester (#206). Was nur im Dev-Modus belegt ist, steht an der Stelle.
+- **Wichtigster Vorbehalt (Stand des Spikes, 10.11.):** Es lief **kein Produktions-Build** (`next build`) und **kein Browser-Test** der Admin-Oberfläche. Der Pod hat 4 GiB Speicher, und die Payload-Vorlage setzt für den Build `--max-old-space-size=8000`. Beides gehört in #204 (CI) und zum tester (#206). Was nur im Dev-Modus belegt ist, steht an der Stelle. **Stand #204 (11.11.):** Produktions-Build und -Start sind in der CI belegt, siehe [Ergebnis #204](#ergebnis-204); der Browser-Test der Admin-Oberfläche bleibt offen (#206).
 
 ## Ergebnis in Kürze
 
 | Frage | Antwort |
 |---|---|
 | Payload-Version | **3.93.0** (npm `latest`, geprüft 2026-11-10, veröffentlicht 2026-11-04) |
-| Läuft Payload auf Bun? | Die **Local API und `/svc/v1`-Handler laufen unter Bun**. `next dev` unter Bun nur mit `--webpack`; mit Turbopack Fehler 500. Produktions-Build unter Bun **nicht geprüft**. **Empfehlung: CMS-Image mit Node ≥ 22.23.4** (Installation mit `bun install` geht) |
+| Läuft Payload auf Bun? | Die **Local API und `/svc/v1`-Handler laufen unter Bun**. `next dev` unter Bun nur mit `--webpack`; mit Turbopack Fehler 500. Produktions-Build unter Bun **nicht geprüft** (und seit #204 nicht mehr nötig: Build und Start laufen unter Node 22.23.4, siehe [Ergebnis #204](#ergebnis-204)). **Empfehlung: CMS-Image mit Node ≥ 22.23.4** (Installation mit `bun install` geht) |
 | Passt zum Repo? | Next 16.4.2 und React 19.2.8 passen. **`.nvmrc` 22.22.2 liegt unter Payloads Engine `^22.23.4 \|\| >=24.22.1`** und muss angehoben werden |
 | O14 (Auth für Endnutzer) | Trägt, aber nur **mit Hooks und Eigenbau** an vier Stellen: Passwort-Regel (auch beim Reset), Token als Hash mit Ablauf, partieller Eindeutigkeitsindex, Rate-Limit. Sperre, Reset-Token, Sitzungen und Widerruf gehen nativ. **Kein zweiter Faktor nativ**, nur Community-Plugin |
 | O16 (`/svc/v1`, Token) | **Machbar.** `/svc/v1` als Next-Route-Handler neben `/api`. Option T funktioniert. `/api` lässt sich per Wächter sperren. **`graphQL.disable` allein reicht nicht**: der Playground antwortete trotzdem, erst das Löschen der Route-Dateien sperrt ihn |
 | O12 (News) | Das CMS kann Release-Notes selbst abrufen (c): als Job der Payload-Queue belegt. Braucht Egress zu GitHub und ein Token |
-| O17 (Aufwand) | **77 bis 122 Personentage** (vorher 70 bis 109), weiterhin Annahme |
+| O17 (Aufwand) | **77 bis 122 Personentage** (vorher 70 bis 109), weiterhin Annahme; **nach #204 bestätigt, keine neue Spanne** ([Abschnitt „Ergebnis #204“](#ergebnis-204)) |
 
 ## Prüfumgebung
 
@@ -70,7 +70,7 @@ CREATE UNIQUE INDEX users_trial_canonical_idx ON public.users USING btree (email
 | `bun --bun next dev` (Turbopack) | **500**: `Failed to load external module @payloadcms/db-postgres-<hash>: Cannot find package …` |
 | `bun --bun next dev --webpack` | funktioniert; die HTTP-Tests (Abschnitt O16) liefern **dieselben Statuscodes** wie unter Node/Turbopack |
 | `bun install` | 440 Pakete in 6 s (Bun blockiert Lifecycle-Skripte; für den Spike nicht nötig) |
-| `next build` / `next start` (Node und Bun) | **nicht geprüft** (Pod-Speicher, Regel des Teams) |
+| `next build` / `next start` (Node und Bun) | **nicht geprüft** (Pod-Speicher, Regel des Teams). **Seit #204 unter Node 22.23.4 in der CI belegt** (42 s, Spitze 1983 MB RSS); unter Bun weiterhin nicht geprüft und nicht vorgesehen |
 
 **Empfehlung:** CMS-Image auf **Node 22 (≥ 22.23.4)** als Laufzeit, Installation und Skripte weiter mit Bun. Gründe: Payload deklariert Node als Engine, Turbopack unter Bun scheitert, Next ist auf Node ausgelegt. Das ist der Posten „CMS-Image auf Node statt Bun“, der in ADR 11 „nicht eingerechnet“ war; er steht jetzt in Zeile 1 der Aufwandstabelle. Der Produktions-Build und sein Speicherbedarf sind das erste, was #204 in der CI belegen muss.
 
@@ -179,7 +179,7 @@ Token auf /admin                                -> 200 (Anmeldeseite, ohne Sitzu
 
 **Ja: `/api` lässt sich per Prüfung sperren, sodass nur `/svc/v1` und der Admin-Pfad antworten.** Zwei Bedingungen:
 
-1. Die Route-Dateien `api/graphql` und `api/graphql-playground` der Vorlage **müssen gelöscht** werden. `graphQL.disable: true` allein sperrt den Playground im Dev-Lauf nicht. `disablePlaygroundInProduction` wurde nicht geprüft (kein Produktions-Build). Das ist ein Prüfpunkt für den Inventar-Test.
+1. Die Route-Dateien `api/graphql` und `api/graphql-playground` der Vorlage **müssen gelöscht** werden. `graphQL.disable: true` allein sperrt den Playground im Dev-Lauf nicht. `disablePlaygroundInProduction` wurde im Spike nicht geprüft (kein Produktions-Build). **Stand #204:** `apps/cms` setzt `graphQL: { disable: true, disablePlaygroundInProduction: true }` und hat die Route-Dateien nicht; der Inventar-Test und die Routen-Probe gegen den laufenden Produktions-Dienst (`/api/graphql`, `/api/graphql-playground`: je 404) belegen es.
 2. Die Admin-Oberfläche ruft im Browser dieselbe REST-API desselben Ursprungs auf (ADR 2). Der Wächter lässt `/api` deshalb **mit Betreiber-Sitzung** durch. Für App und Marketing (Netzwerk) ist `/api` ohne Sitzung 404.
 
 Der Wächter (rund 15 Zeilen, `src/app/(payload)/api/[...slug]/route.ts`):
@@ -252,12 +252,12 @@ Prüfung der Payload-Job-Queue (Skript `jobs.ts`): ein Task `release-news` ruft 
 
 ## 5. O17: Aufwand neu geschätzt
 
-Weiterhin **Annahme, kein Beleg, Streuung hoch** (ADR A8). Personentage; „alt“ ist die Spanne aus ADR 11. Der Spike selbst ist erledigt; sein Rest (Dinge, die er nicht belegt hat) steht in Zeile 2.
+Weiterhin **Annahme, kein Beleg, Streuung hoch** (ADR A8). Personentage; „alt“ ist die Spanne aus ADR 11. Der Spike selbst ist erledigt; sein Rest (Dinge, die er nicht belegt hat) steht in Zeile 2. Die Einschätzung nach #204 steht in [Ergebnis #204, Abschnitt „O17 nach #204“](#o17-nach-204); die Tabelle unten ist der Stand des Spikes.
 
 | Paket | alt | neu | Begründung |
 |---|---|---|---|
 | `apps/cms` aufsetzen (Workspace, Image, Release-Check, CI, Doku) | 4 bis 6 | **5 bis 8** | CMS-Image mit Node ≥ 22.23.4 (Bun-Basisimage reicht nach Spike nicht, früher „nicht eingerechnet“: +1 bis 2). `.nvmrc` 22.22.2 anheben (die CI nutzt `node-version-file`, betrifft alle Jobs). Build-Speicher von Payload/Next (Vorlage 8 GB Heap) in der CI belegen. `bun install` selbst läuft (6 s) |
-| Spike (O14/O16) | 3 bis 5 | **1 bis 2** | Erledigt mit diesem Dokument. Rest in #204: Produktions-Build und -Start, Inventar-Test als Code, Oberflächenablauf der Admin-App und des zweiten Faktors, `disablePlaygroundInProduction` |
+| Spike (O14/O16) | 3 bis 5 | **1 bis 2** | Erledigt mit diesem Dokument. Rest in #204: Produktions-Build und -Start, Inventar-Test als Code, Oberflächenablauf der Admin-App und des zweiten Faktors, `disablePlaygroundInProduction` (Stand #204: alles bis auf Oberfläche und zweiten Faktor erledigt, die in #206 liegen) |
 | Datenmodell und Collections | 6 bis 9 | **8 bis 12** | Mehr als angenommen: eigenes `id`-Feld (UUID 1:1), eigene Token-Collection mit Hash und Ablauf (Payload speichert Klartext, Verifizierung ohne Ablauf), partieller Eindeutigkeitsindex per Hand-Migration, Hooks für Passwort-Regel (Anlegen, Ändern **und** Reset), kanonische Adresse, `sessionsValidAfter`, Betreiberkonten mit derselben Regel, Zugriff überall verweigern, Versionen für Blog/News |
 | Schnittstelle `/svc/v1`, Dienst-Authentisierung, OpenAPI, Vertragstests | 6 bis 9 | **8 bis 12** | Routen und Signatur gehen (belegt). Dazu: geteilter Nonce-Speicher für ≥ 2 Replikas, eigenes Rate-Limit (nicht nativ, geteilter Zähler), Wächter für `/api`, einheitliche Fehlerabbildung (Sperre und „Postfach vergeben“ dürfen nichts verraten), Lese-Token mit Rotation (0,5 bis 1) |
 | Umbau von `apps/app` | 10 bis 15 | **10 bis 15** | Unverändert, nicht Gegenstand des Spikes. Befund stützt die Schätzung eher: PKCE, Mobile-Codes und Sitzungen bleiben in der App (A1), das CMS liefert nur ID, Status und `sessionsValidAfter` |
@@ -276,14 +276,14 @@ Summe nachgerechnet: untere Werte 5+1+8+8+10+3+6+4+8+4+5+5+3+7 = 77, obere 8+2+1
 
 ### Risiken, die die Spanne treiben
 
-1. **Produktions-Build und Speicher** (nicht belegt): Payload-Vorlage setzt 8 GB Heap für `next build`; CI-Runner, Docker-Build und Pod müssen das tragen. Scheitert das, wächst Zeile 1.
+1. **Produktions-Build und Speicher** (Stand Spike: nicht belegt; **Stand #204: belegt**): Payload-Vorlage setzt 8 GB Heap für `next build`. Gemessen in der CI (GitHub-Runner, Node 22.23.4, Heap-Grenze 4096 MB): 42 s, Spitze 1983 MB RSS, `next start` 181 MB. Das Risiko für Zeile 1 ist damit ausgeräumt, offen bleibt nur der Speicher innerhalb des Docker-Builds (der Build läuft dort durch, ein Spitzenwert ist nicht gemessen) und im Pod.
 2. **Enge Versionskopplung:** Payload gibt Next (`>=16.3.3 <17`) und Node (`^22.23.4`) eng vor, mit Veröffentlichungen im Wochen-Takt. Das Ziel „Sicherheitsfixes in 14 Tagen“ (ADR 12, O4) bedeutet laufende Pflege von Next, Node-Pin und Payload gemeinsam; Next-Updates der beiden anderen Apps sind an die Payload-Spanne gebunden.
 3. **Eigenbau an sicherheitskritischen Stellen:** Token-Collection, Rate-Limit, Signatur mit Wiederholschutz, Passwort-Regel beim Reset. Jede Lücke dort ist eine Lücke der Anmeldung der gesamten Cloud. Die Hooks sind dünn, aber ein vergessener Hook (Reset!) lässt schwache Passwörter zu.
 4. **Zweiter Faktor:** Plugin eines Einzelmaintainers oder Eigenbau; Oberfläche ungeprüft. Fällt das Plugin durch, +3 bis 5.
 5. **Mesh und Ingress (O15)** vom Spike nicht beantwortet. Fehlt die Pfadregel, trägt allein der Wächter und der Inventar-Test; die Schichten 2 und 4 der ADR werden schwerer.
 6. **CPU je Login** (600 000 Iterationen, ca. 184 ms) gegenüber 310 000 heute: Das CMS braucht mehr Replikas oder die Iterationen müssen auf 100 000 gesenkt werden (schwächer als heute). Die Lastprobe fehlt.
 7. **Migration mit Hook-Umgehung** (`db.create`): schnell, aber ohne Validierung. Ein Fehler in der Migration erzeugt Konten, die die Hooks nie gesehen haben.
-8. **Datenbankversion:** getestet nur mit Postgres 18, das Repo (CI) nutzt 17; CNPG-Version in Prod ist nicht bekannt. Risiko gering, Prüfung in #204 mit `postgres:17` der CI.
+8. **Datenbankversion** (Stand Spike; **Stand #204: geprüft**): getestet im Spike nur mit Postgres 18, das Repo (CI) nutzt 17. Die Migrationen und alle 44 DB-Tests von `apps/cms` laufen in der CI gegen `postgres:17-alpine`. Die CNPG-Version in Prod ist weiterhin nicht bekannt (O15, #205).
 
 ## Abweichungen von der ADR (Stand der Nacharbeit)
 
@@ -309,13 +309,64 @@ Bestätigt ohne Abweichung: Next 16.4.2 passt (Peer `>=16.3.3 <17`); `/svc/v1` a
 
 ## Was der Spike nicht belegt
 
-- Produktions-Build und -Start (Node und Bun), Speicherbedarf des Builds.
-- Admin-Oberfläche im Browser: Anmeldung, Benutzerliste, Einrichtung des zweiten Faktors, Wirkung des Wächters auf alle Oberflächenaufrufe (nur `/admin` und `/admin/login` als HTML und die REST-Aufrufe mit Cookie geprüft).
-- `disablePlaygroundInProduction`; `jobs.autoRun` mit mehreren Replikas; API-Schlüssel über HTTP.
-- Mesh, Ingress, NetworkPolicy (O15), Medien-S3, Mails, Last.
+- ~~Produktions-Build und -Start (Node und Bun), Speicherbedarf des Builds.~~ **Belegt in #204** für Node (nicht für Bun, nicht vorgesehen); der Speicher innerhalb des Docker-Builds ist nicht gemessen.
+- Admin-Oberfläche im Browser: Anmeldung, Benutzerliste, Einrichtung des zweiten Faktors, Wirkung des Wächters auf alle Oberflächenaufrufe (nur `/admin` und `/admin/login` als HTML und die REST-Aufrufe mit Cookie geprüft). **Offen nach #204** (#206): #204 liefert kein Oberflächenwerk, geprüft ist nur, dass die Anmeldeseite die Version zeigt und `/admin/login` antwortet.
+- ~~`disablePlaygroundInProduction`~~ (**belegt in #204**, siehe Ergebnis #204); `jobs.autoRun` mit mehreren Replikas und API-Schlüssel über HTTP bleiben **nicht belegt**.
+- Mesh, Ingress, NetworkPolicy (O15, #205), Medien-S3 (der Adapter ist in #204 konfigurierbar, gegen einen echten S3-Dienst nicht geprüft), Mails, Last.
 - Passwort-Mails, Wartelisten-Konten, Testzeitraum, DSGVO-Abläufe: bewusst nicht Teil des Spikes.
-- **Nur vom coder gemessen, nicht unabhängig nachgeprüft:** Der tester hat Version, Engines, ADR-Änderungen und die Läufe von `o14`, `o16`, `inv.ts` nachvollzogen. Folgendes steht im Dokument, wurde aber nicht unabhängig geprüft: die Bun-Läufe (Local API, `next dev` mit Turbopack und mit `--webpack`, `bun install`); `next build` und `next start` (nicht gelaufen); die Admin-Oberfläche im Browser (nicht gelaufen); der Ablauf des TOTP-Plugins (nur Laden der Konfiguration und die zusätzlichen Endpunkte); der API-Schlüssel (nur Local API); die Job-Queue für News (ein Lauf gegen die öffentliche GitHub-API); die Migrationen (`migrate:create`, `migrate`, `status`, `down`, Hand-Migration für den Index); die Prüfungen zu eigener `id` und Konto ohne Passwort; die Zeit von ca. 184 ms je Hash und alle Speicher- und Größenangaben (`node_modules` 702 und 935 MB, Speicher von `next dev`); die Download-Zahlen und Alter der Plugins (npm, Stand 10.11.). Der Wiederholungsablauf am Ende deckt nur `o14`, `o16`, `inv.ts` und den Playground-Beleg ab.
+- **Nur vom coder gemessen, nicht unabhängig nachgeprüft:** Der tester hat Version, Engines, ADR-Änderungen und die Läufe von `o14`, `o16`, `inv.ts` nachvollzogen. Folgendes steht im Dokument, wurde aber nicht unabhängig geprüft: die Bun-Läufe (Local API, `next dev` mit Turbopack und mit `--webpack`, `bun install`); `next build` und `next start` (im Spike nicht gelaufen, seit #204 in der CI belegt); die Admin-Oberfläche im Browser (nicht gelaufen); der Ablauf des TOTP-Plugins (nur Laden der Konfiguration und die zusätzlichen Endpunkte); der API-Schlüssel (nur Local API); die Job-Queue für News (ein Lauf gegen die öffentliche GitHub-API); die Migrationen (`migrate:create`, `migrate`, `status`, `down`, Hand-Migration für den Index); die Prüfungen zu eigener `id` und Konto ohne Passwort; die Zeit von ca. 184 ms je Hash und alle Speicher- und Größenangaben (`node_modules` 702 und 935 MB, Speicher von `next dev`); die Download-Zahlen und Alter der Plugins (npm, Stand 10.11.). Der Wiederholungsablauf am Ende deckt nur `o14`, `o16`, `inv.ts` und den Playground-Beleg ab.
 - **Zur Einordnung:** `bun run docs:verify` prüft nur `docs/ARCHITECTURE.md` gegen den Quellstand, nicht die ADR oder diesen Anhang. Ein grüner Lauf ist kein Beleg für deren Inhalt.
+
+## Ergebnis #204
+
+Stand 11.11.2026, PR #369 (squash-merged nach `main`, 445c330), Ticket #204. Der Abschnitt ergänzt den Spike um das, was die Umsetzung belegt. **Quelle der Messwerte ist ein CI-Lauf** (GitHub-Runner, Node v22.23.4, `next build --webpack`, Heap-Grenze `CMS_BUILD_HEAP_MB=4096`); sie stehen als Annotation `CMS production build and start` am Lauf und im Skript `apps/cms/scripts/verify-production.ts`. Sie sind eine Messung auf einem Runner, kein Pod-Wert.
+
+### Messwerte und belegte Punkte
+
+| Punkt | Spike (10.11.) | Stand #204 (11.11.) |
+|---|---|---|
+| `next build` (Dauer) | nicht gelaufen | **42 s** |
+| `next build` (Spitze, Prozessbaum) | nicht gelaufen (Vorlage: 8 GB Heap) | **1983 MB RSS** bei Heap-Grenze 4096 MB; die 8 GB der Vorlage sind nicht nötig |
+| `next start` (Spitze nach den Prüfaufrufen) | nicht gelaufen | **181 MB RSS** |
+| Laufzeit | Node 22.22.2 (`.nvmrc`) unter der Engine | **Node 22.23.4** (`.nvmrc` angehoben, die CI prüft `node --version` gegen `.nvmrc`; das Image meldet dieselbe Version) |
+| `disablePlaygroundInProduction` | nicht geprüft | **gesetzt und belegt**: `graphQL: { disable: true, disablePlaygroundInProduction: true }`, Route-Dateien gelöscht, `/api/graphql` und `/api/graphql-playground` antworten im Produktions-Dienst mit 404 |
+| Datenbank | Postgres 18 | **`postgres:17-alpine`** (CI-Dienst): Migrationen (`initial`, `svc_support`) und alle DB-Tests laufen |
+| Image | nicht gebaut | Dockerfile-Ziel `cms` (Basis `node:22.23.4-slim`) wird in der CI gebaut; es meldet die gepinnte Node-Version und **verweigert den Start ohne Konfiguration** |
+| Produktions-Start mit Prüfaufrufen | nicht gelaufen | Routen-Probe, signierter Login-Aufruf an `/svc/v1` (gültige Signatur: 401 `invalid_credentials`; dieselbe Nonce erneut: 401 `unauthorized`) und Build-Info auf der Anmeldeseite des Admin laufen gegen den gestarteten Dienst |
+
+**Inventar-Test** (`apps/cms/src/inventory`, 10 Tests): Die Positivliste nennt **13 Dateien** unter `src/app` (9 Routen von `/svc/v1`, der Fang-alles-Handler von `/api`, Admin-Seite, Admin-`not-found`, Layout) und es gibt **186 registrierte Payload-Endpunkte** in der gespeicherten Liste (71 GET, 66 POST, 24 PATCH, 25 DELETE). Der Test scheitert für jede Route-Datei und jeden Endpunkt, der nicht auf der Liste steht, für GraphQL und Playground und für jede Collection oder Global, die nicht ausdrücklich verweigert. Die Routen-Probe (`scripts/probe-routes.ts`) fragt **49 Pfade** am laufenden Dienst ohne Anmeldung ab (Betreiber-Anmeldung und Health offen, `/svc/v1` mit 401, alles andere 404).
+
+**Tests von `apps/cms`:** 50 Tests ohne Datenbank (Inventar, Vertrag gegen `openapi/svc-v1.yaml`, Signatur, Identitätsregeln, REST-Wächter, Umgebungsprüfung; Token-Fälle stecken in den DB-Tests) und **44 DB-Tests** gegen Postgres, in der CI ohne Überspringen erzwungen (`BLOOMMD_TEST_DATABASE_URL`, sonst scheitert der Lauf). Die DB-Tests laufen in einem eigenen `bun test`-Prozess (Grund unten). Die App-DB-Tests (72) laufen unverändert daneben.
+
+### Abweichungen vom Spike und neue Funde
+
+| # | Stelle | Befund in #204 | Folge |
+|---|---|---|---|
+| 14 | Heap für `next build` | Der Spike nahm die 8 GB der Vorlage an; gemessen sind 1983 MB Spitze | Voreinstellung 4096 MB, über `CMS_BUILD_HEAP_MB` einstellbar; Risiko 1 aus Abschnitt 5 entfällt, der Speicher innerhalb des Docker-Builds bleibt ungemessen |
+| 15 | Abhängigkeits-Layer im Dockerfile | Der Auftrag sah einen mit App und Marketing geteilten Layer vor; Payload braucht Node ≥ 22.23.4, die anderen Images laufen auf Bun | eigene Stufe `cms-deps` auf der Node-Basis (`bun install --filter @bloommd/cms`); `deps` und das OpenClaw-Plugin-Image installieren mit `--filter '!@bloommd/cms'`, damit sie die Payload-Abhängigkeiten nicht mehr ziehen |
+| 16 | Umgebung des CMS | Die CI-Umgebung trägt App-Secrets (`BLOOMMD_AUTH_SECRET`); `runtimeConfigErrors` lässt das CMS **absichtlich nicht starten**, wenn App-Secrets gesetzt sind (ADR 4) | Das Prüfskript entfernt sie für den geprüften Dienst; das Verhalten ist gewollt und im Text belegt: der Start brach in der CI zuerst genau daran ab |
+| 17 | Abhängigkeitsprüfung | `bun audit` meldet `deepmerge` ≤ 4.3.1 (GHSA-gcqx-w48m-w2h4, niedrig) über `payload`; kein behobenes Release | In den beiden Audit-Schritten der CI ignoriert, mit Kommentar; entfernen, sobald `deepmerge` ein Release hat. Der Befund war im Spike nicht sichtbar |
+| 18 | Test-Aufbau | Die Payload-Konfiguration liest `PAYLOAD_SECRET` und `CMS_DATABASE_URL` beim Import; ein früherer Import durch den Inventar-Test (ohne diese Werte) bleibt im Modul-Cache desselben Prozesses | DB-Tests in eigenem Prozess (`"test"` in `apps/cms/package.json`); sonst „missing secret key“ |
+| 19 | Aufräumen der DB-Tests | `payload.db.destroy()` setzt nur den Zustand zurück und lässt den Pool offen; `pool.end()` hängt an einem Client, den ein Test offen lässt | Teardown löscht zuerst die Datenbank, schluckt den Verbindungsabbruch und wartet nicht auf `end()`. **Ursache des offenen Clients nicht gesucht.** Kein Produktfehler bekannt |
+| 20 | Anzahl der Endpunkte | Spike-Gerüst: 126 Endpunkte, erster Prototyp ca. 163; `apps/cms` hat mehr Collections | 186 in der gespeicherten Liste; die Bewertung (verweigert, 404 vom Wächter) gilt unverändert |
+
+Bestätigt ohne Abweichung: Next 16.4.2 und React 19.2.8 passen, Payload 3.93.0, Installation mit Bun und Betrieb mit Node, eigene Token-Collection mit Hash, Passwort-Hook auch für den Reset, Wächter vor `/api`, Signatur mit geteiltem Nonce-Speicher.
+
+**Weiter offen nach #204:** Speicher innerhalb des Docker-Builds und im Pod; Zweiter Faktor und Oberfläche der Admin-App (#206); Mesh, Ingress, NetworkPolicy und Deployment (O15, #205); Medien-S3 gegen einen echten Dienst; Mails; Last (Login-Iterationen).
+
+### O17 nach #204
+
+**Annahme, kein Beleg.** Es gibt keine Zeiterfassung zu #204; die Einschätzung stützt sich auf den gelieferten Umfang, die Messwerte oben und die Zahl der Korrekturschleifen (in der CI waren es drei Fehlerklassen: Audit-Ausnahme, Test-Prozess und Teardown, App-Secrets in der Prüfumgebung). Keine neue Gesamtspanne: **77 bis 122 Personentage bleiben stehen.**
+
+| Paket | Spanne (Spike) | Nach #204 | Grund |
+|---|---|---|---|
+| `apps/cms` aufsetzen (Workspace, Image, Release-Check, CI, Doku) | 5 bis 8 | **Schätzung bestätigt, 5 bis 8** | Geliefert: Workspace, Node-Anhebung, Image-Ziel, Produktionsprüfung und CI-Schritte. Das Speicherrisiko (8 GB Heap) ist ausgeräumt, dafür war die Pflege der CI (Audit, getrennte Dependency-Stufe, Umgebung) aufwendiger als im Spike gedacht; beides gleicht sich aus. Offen: Speicher im Docker-Build |
+| Rest des Spikes (Produktions-Build und -Start, Inventar-Test, Playground) | 1 bis 2 | **Schätzung bestätigt, 1 bis 2** | Alle Punkte bis auf Oberfläche und zweiten Faktor erledigt. Oberfläche und zweiter Faktor liegen in der Zeile „Admin-Oberfläche“ (#206, unverändert 8 bis 12) |
+| Datenmodell und Collections | 8 bis 12 | **Schätzung bestätigt, 8 bis 12** | Alle Sammlungen der ADR sind angelegt (Konten, Zugänge, Testzeitraum, Token mit Hash, Lese-Token, Betreiber, Blog, News, Medien), samt Hooks und Hand-Migration. Der Befund des Spikes (Eigenbau an vier Stellen) hat sich nicht erweitert |
+| Schnittstelle `/svc/v1` (Signatur, OpenAPI, Vertragstests) | 8 bis 12 | **Schätzung bestätigt, 8 bis 12** | Neun Pfade, Signatur mit geteiltem Nonce-Speicher und Rate-Limit, OpenAPI-Datei und Vertragstest sind geliefert. **Nicht** enthalten und weiter offen: Zahlungsbezug und Rückerstattungsanträge (#368, #276), die der Vertragstest ausdrücklich ausnimmt |
+| Tests (Unit, Integration, E2E, Ausfall) | 7 bis 12 | **Schätzung bestätigt, 7 bis 12** | Geliefert: Inventar-, Vertrags-, Signatur-, Token- und 44 DB-Tests unter `postgres:17`, Lauf unter der Ziel-Node-Version. Offen: E2E der Oberfläche (tester, #206) und Ausfalltests; die Zeile bleibt deshalb ungeändert |
+
+Alle anderen Pakete der Tabelle in Abschnitt 5 sind von #204 nicht berührt und bleiben, wie sie sind. Die Schätzung ist nach #206 (Oberfläche, zweiter Faktor) und #205 (Betrieb) erneut zu prüfen.
 
 ## Wiederholung ohne den Pod des coders
 

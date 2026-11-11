@@ -114,11 +114,29 @@ describe("retention periods named in the privacy policy match the code", () => {
     const trial = read("apps/app/src/lib/trial.ts");
     expect(trial).toContain("TRIAL_DAYS = 30;");
     expect(trial).toContain('TRIAL_REMINDER_DAYS: Record<TrialReminderKind, number> = { "15": 15, "23": 23 };');
-    expect(trial).toContain('LEGACY_TRIAL_ENDS_AT = "2026-12-15T00:00:00.000Z";');
-    expect(read("docs/TRIAL.md")).toContain("fest 15.12.2026 00:00 UTC (Zählung ab 15.11.2026)");
+    expect(trial).toContain('LEGACY_TRIAL_ENDS_AT = "2027-01-14T00:00:00.000Z";');
+    expect(read("docs/TRIAL.md")).toContain("fest 14.01.2027 00:00 UTC (Zählung ab 15.11.2026, 60 Tage");
     for (const app of ["app", "marketing"] as const) {
-      expect(page(app, "agb")).toContain("15.12.2026 um 00:00 Uhr UTC");
-      expect(page(app, "lizenz")).toContain("15.12.2026");
+      expect(page(app, "agb")).toContain("14.01.2027 um 00:00 Uhr UTC");
+      expect(page(app, "lizenz")).toContain("14.01.2027");
+      // Reminders of the existing accounts count back from the end: 30 Dec 2026 and 7 Jan 2027.
+      for (const name of ["agb", "datenschutz"] as const) {
+        expect(page(app, name)).toContain("30.12.2026");
+        expect(page(app, name)).toContain("07.01.2027");
+        expect(page(app, name)).toContain("December 30, 2026");
+        expect(page(app, name)).toContain("January 7, 2027");
+      }
+      for (const name of ["agb", "datenschutz", "lizenz"] as const) {
+        expect(page(app, name)).not.toMatch(/15\.12\.2026|December 15, 2026|30\.11\.2026|08\.12\.2026|November 30, 2026|December 8, 2026/);
+      }
     }
+  });
+
+  test("the migration for the existing accounts moves exactly the old end to the end of the trial code (#364)", () => {
+    const migration = read("apps/app/db/015_trial_legacy_60_days.sql");
+    const legacyEnd = read("apps/app/src/lib/trial.ts").match(/LEGACY_TRIAL_ENDS_AT = "([^"]+)"/)![1]!;
+    expect(migration).toContain(`set trial_ends_at = '${legacyEnd.replace(".000Z", "Z")}'`);
+    expect(migration).toContain("where trial_legacy and trial_ends_at = '2026-12-15T00:00:00Z'");
+    expect(migration).not.toMatch(/\b(delete|drop|truncate)\b/i);
   });
 });

@@ -999,6 +999,9 @@ async function createMarketSchema() {
   await sql`alter table bloom_users alter column trial_guarded set default true`;
   await sql`create index if not exists bloom_users_email_canonical_idx on bloom_users (email_canonical) where email_verified_at is not null`;
   await sql`create unique index if not exists bloom_users_trial_canonical_idx on bloom_users (email_canonical) where email_verified_at is not null and trial_guarded`;
+
+  // Existing accounts get 60 instead of 30 days; see db/015_trial_legacy_60_days.sql, which explains the statement.
+  await sql`update bloom_users set trial_ends_at = '2027-01-14T00:00:00Z' where trial_legacy and trial_ends_at = '2026-12-15T00:00:00Z'`;
 }
 
 export interface WorkspaceRecord {

@@ -330,7 +330,7 @@ const faqItems = [
   },
   {
     question: "Wie lange gilt der kostenlose Testaccount?",
-    answer: "Der kostenlose Testaccount für BloomMD Web, Cloud, Sync und Zusammenarbeit gilt 30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste. Nach 15 und 23 Tagen erinnern wir dich per E-Mail. Danach ist dein Konto nur noch lesbar, der Export bleibt möglich und nichts geht verloren. Für bestehende Konten zählt der Testzeitraum ab dem 15.11.2026. Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin (Beta) sind ohne Konto verfügbar. Preise und Leistungsumfang werden vor Einführung veröffentlicht.",
+    answer: "Der kostenlose Testaccount für BloomMD Web, Cloud, Sync und Zusammenarbeit gilt 30 Tage ab E-Mail-Bestätigung, ohne Einladung und ohne Warteliste. Nach 15 und 23 Tagen erinnern wir dich per E-Mail. Danach ist dein Konto nur noch lesbar, der Export bleibt möglich und nichts geht verloren. Für bestehende Konten zählt der Testzeitraum ab dem 15.11.2026 und dauert 60 Tage (bis 14.01.2027). Demo, Desktop-Builds für macOS und Omarchy/Linux sowie das Obsidian-Plugin (Beta) sind ohne Konto verfügbar. Preise und Leistungsumfang werden vor Einführung veröffentlicht.",
   },
   {
     question: "Ist Sync erforderlich?",

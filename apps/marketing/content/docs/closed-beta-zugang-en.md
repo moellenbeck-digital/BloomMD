@@ -23,7 +23,7 @@ restricted.** The [browser demo](/demo?lang=en), [desktop builds](/download?lang
 - After it ends, your account is read-only. Export remains possible, and a notice is shown. Nothing
   is lost.
 - Existing accounts, including former waitlist participants: because of their beta participation,
-  the trial period counts from **November 15, 2026**.
+  the trial period counts from **November 15, 2026** and lasts **60 days** (until January 14, 2027).
 - Pricing and scope will be published before launch.
 
 ## Registration (normal case)

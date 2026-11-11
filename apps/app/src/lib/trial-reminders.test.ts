@@ -132,9 +132,9 @@ describe("trial reminder run (#274)", () => {
 
   test("existing accounts are held back until their own switch is on", async () => {
     const entry = candidate("old", { existingAccount: true, trialEndsAt: LEGACY_TRIAL_ENDS_AT });
-    const now = new Date("2026-11-30T06:00:00.000Z");
+    const now = new Date("2026-12-30T06:00:00.000Z");
 
-    const held = fakes([entry, candidate("new", { trialEndsAt: trialEndsAt(new Date("2026-11-14T12:00:00.000Z")).toISOString() })]);
+    const held = fakes([entry, candidate("new", { trialEndsAt: trialEndsAt(new Date("2026-12-14T12:00:00.000Z")).toISOString() })]);
     const heldResult = await runTrialReminders({ apply: true, now }, held.deps);
     expect(heldResult).toMatchObject({ includeExisting: false, due: 2, heldBackExisting: 1, mailSent: 1 });
     expect(held.mails.map((mail) => mail.to)).toEqual(["new@example.test"]);
@@ -145,13 +145,13 @@ describe("trial reminder run (#274)", () => {
     expect(open.mails).toEqual([{ to: "old@example.test", locale: "de", daysLeft: 15 }]);
   });
 
-  test("existing accounts: the second reminder on 8 Dec, nothing from 15 Dec on", async () => {
+  test("existing accounts: the second reminder on 7 Jan, nothing from 14 Jan on", async () => {
     const entry = candidate("old", { existingAccount: true, trialEndsAt: LEGACY_TRIAL_ENDS_AT });
-    const eighth = fakes([entry]);
-    expect(await runTrialReminders({ apply: true, includeExisting: true, now: new Date("2026-12-08T00:00:00.000Z") }, eighth.deps)).toMatchObject({ dueByKind: { "15": 0, "23": 1 }, mailSent: 1 });
-    expect(eighth.mails[0]?.daysLeft).toBe(7);
+    const seventh = fakes([entry]);
+    expect(await runTrialReminders({ apply: true, includeExisting: true, now: new Date("2027-01-07T00:00:00.000Z") }, seventh.deps)).toMatchObject({ dueByKind: { "15": 0, "23": 1 }, mailSent: 1 });
+    expect(seventh.mails[0]?.daysLeft).toBe(7);
     const after = fakes([entry]);
-    expect((await runTrialReminders({ apply: true, includeExisting: true, now: new Date("2026-12-15T00:00:00.000Z") }, after.deps)).due).toBe(0);
+    expect((await runTrialReminders({ apply: true, includeExisting: true, now: new Date("2027-01-14T00:00:00.000Z") }, after.deps)).due).toBe(0);
   });
 
   test("the mail budget stops the run; the rest is deferred and untouched", async () => {

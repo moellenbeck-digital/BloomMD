@@ -1,6 +1,6 @@
 {
   "name": "@bloommd/marketing",
-  "version": "0.5.9",
+  "version": "0.6.0-develop.1",
   "license": "Elastic-2.0",
   "private": true,
   "type": "module",

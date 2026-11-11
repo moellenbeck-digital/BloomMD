@@ -115,6 +115,9 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
 
   afterAll(async () => {
     for (const extra of extraPools) await extra.end();
+    // Payload's destroy() only resets the adapter state and keeps the pool open; an open pool would get
+    // "terminating connection" (an unhandled error) when the database is dropped below.
+    await (payload?.db as unknown as { pool?: { end(): Promise<void> } } | undefined)?.pool?.end();
     await payload?.db.destroy?.();
     await database?.drop();
   });

@@ -1,0 +1,526 @@
+openapi: 3.1.0
+info:
+  title: BloomMD CMS, internal interface /svc/v1
+  version: 1.0.0
+  description: |
+    The fixed, versioned set of endpoints that `apps/app` and `apps/marketing` call inside the cluster mesh
+    (ADR 0001, section 3). It is not a public API and not Payload's REST API; Payload's `/api` answers 404
+    without an operator session.
+
+    **Not part of this version** (they arrive with #368 and #276, routes without content do not exist):
+    `POST /svc/v1/payment-refs`, `GET /svc/v1/refund-requests` and `POST /svc/v1/refund-requests/{id}/result`.
+
+    ## Signed calls (apps/app)
+    Every endpoint except `health/ready` and `content/{kind}` needs three headers:
+
+    | Header | Value |
+    |---|---|
+    | `X-Svc-Timestamp` | milliseconds since the epoch, tolerance ±60 s |
+    | `X-Svc-Nonce` | 16 to 128 characters of `[A-Za-z0-9_-]`, used once (remembered in the shared database for 120 s, replay is 401) |
+    | `X-Svc-Signature` | lowercase hex HMAC-SHA256 with the app key over the lines `v1`, METHOD, path with query string exactly as sent, SHA-256 (hex) of the body (empty body: of the empty string), timestamp, nonce, joined by `\n` |
+
+    Two keys are valid at the same time (`CMS_SVC_APP_KEY`, `CMS_SVC_APP_KEY_NEXT`) for rotation. Any failure
+    of the signature is the same `401 {"error":"unauthorized"}`.
+
+    ## Common rules
+    - Every answer carries `requestId` (JSON) and `X-Request-Id`. A caller may send its own `X-Request-Id`
+      (8 to 64 characters of `[A-Za-z0-9._-]`); it is kept for the audit.
+    - Answers are never cached (`Cache-Control: no-store`) except the access state (see there).
+    - No answer contains a password hash, a token hash or the password.
+    - Bodies are JSON, at most 64 KiB (`413` above).
+    - `429` carries `Retry-After` in seconds.
+servers:
+  - url: http://cms.internal
+    description: Service name inside the mesh (ClusterIP); no public address exists.
+security:
+  - appSignature: []
+paths:
+  /svc/v1/health/ready:
+    get:
+      operationId: healthReady
+      summary: Readiness for Kubernetes (database and media directory)
+      security: []
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+        "503":
+          description: Not ready (no detail)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+  /svc/v1/auth/login:
+    post:
+      operationId: authLogin
+      summary: Check e-mail and password
+      description: |
+        A wrong password, a locked account (5 failed attempts, 15 minutes), an unknown address, an account without
+        a password and an account in deletion are **one and the same** `401 invalid_credentials`. Only after a
+        correct password does `403 email_not_verified` say that the address is not confirmed yet. The CMS also
+        counts attempts per account (10 per 15 minutes, `429`); the app keeps its own limits.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Correct credentials
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, status, access, requestId]
+                properties:
+                  userId: { type: string, format: uuid }
+                  status: { $ref: "#/components/schemas/UserStatus" }
+                  access: { $ref: "#/components/schemas/AccessState" }
+                  requestId: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/InvalidCredentialsOrUnauthorized" }
+        "403":
+          description: Correct password, address not confirmed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /svc/v1/users:
+    post:
+      operationId: usersRegister
+      summary: Register an account
+      description: |
+        Creates the account with the UUID the app already holds (A2) and returns a one-time token (only its hash is
+        stored) for the confirmation. `origin: waitlist` creates a passwordless account (#105) and returns a
+        `waitlist_activation` token (14 days). The protection "one confirmed account per mailbox" (#169) is decided
+        when the address is confirmed (`tokens/redeem`, `409 mailbox_taken`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, email]
+              properties:
+                id: { type: string, format: uuid }
+                email: { type: string }
+                password: { type: string, description: "At least 10 characters, letters and digits. Absent for origin waitlist." }
+                locale: { type: string, enum: [de, en], default: de }
+                origin: { type: string, enum: [registration, waitlist], default: registration }
+                name: { type: string, maxLength: 200 }
+                ttlMinutes: { type: integer, minimum: 5, maximum: 43200, description: "Lifetime of the token; default 1440 (registration) or 20160 (waitlist)." }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [userId, status, token, tokenPurpose, tokenExpiresAt, requestId]
+                properties:
+                  userId: { type: string, format: uuid }
+                  status: { $ref: "#/components/schemas/UserStatus" }
+                  token: { type: string, description: "Shown once; the app puts it into the link of the mail." }
+                  tokenPurpose: { type: string, enum: [email_verification, waitlist_activation] }
+                  tokenExpiresAt: { type: string, format: date-time }
+                  requestId: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: The address or the ID exists
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, requestId]
+                properties:
+                  error: { type: string, enum: [email_taken, id_taken] }
+                  requestId: { type: string }
+    get:
+      operationId: usersLookup
+      summary: Display fields for member lists
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: 1 to 100 comma-separated UUIDs. Unknown IDs are left out.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Display fields
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users, requestId]
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, email, name]
+                      properties:
+                        id: { type: string, format: uuid }
+                        email: { type: string }
+                        name: { type: [string, "null"] }
+                  requestId: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /svc/v1/tokens/redeem:
+    post:
+      operationId: tokensRedeem
+      summary: Redeem a one-time link
+      description: |
+        E-mail confirmation (`email_verification`, no password), setting or resetting a password (`password_reset`)
+        and waitlist activation (`waitlist_activation`, sets the password and confirms the address). A token works
+        once (atomic claim); unknown, expired and used tokens are the same `400 invalid_token`. A weak password is a
+        `400` and leaves the token valid. Confirming sets the trial end once. A password change ends the sessions
+        (`sessionsValidAfter`) and lifts the lock.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Redeemed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [purpose, userId, status, access, requestId]
+                properties:
+                  purpose: { type: string, enum: [email_verification, password_reset, waitlist_activation] }
+                  userId: { type: string, format: uuid }
+                  status: { $ref: "#/components/schemas/UserStatus" }
+                  access: { $ref: "#/components/schemas/AccessState" }
+                  requestId: { type: string }
+        "400":
+          description: Invalid token, or invalid password (with `fields`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: Another confirmed account holds the mailbox; the token stays valid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, requestId]
+                properties:
+                  error: { type: string, enum: [mailbox_taken] }
+                  requestId: { type: string }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /svc/v1/password-resets:
+    post:
+      operationId: passwordResetsRequest
+      summary: Request a link to set or reset the password
+      description: |
+        Always `200 {"accepted": true}`. For an unknown or unusable account `token` and `expiresAt` are `null`; only
+        the app, which sends the mail, sees the difference and never passes it on. A new request revokes earlier
+        unused tokens of the same purpose. Default lifetime 60 minutes. The CMS limits requests per address
+        (3 per hour, `429`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                ttlMinutes: { type: integer, minimum: 5, maximum: 43200 }
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, token, expiresAt, requestId]
+                properties:
+                  accepted: { type: boolean, enum: [true] }
+                  token: { type: [string, "null"] }
+                  expiresAt: { type: [string, "null"], format: date-time }
+                  requestId: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /svc/v1/users/{id}/access:
+    get:
+      operationId: usersAccess
+      summary: Rights state of an account
+      description: |
+        With `ETag` and `Cache-Control: private, max-age=60` (A3). `If-None-Match` with the current ETag answers `304`.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Rights state
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access, requestId]
+                properties:
+                  access: { $ref: "#/components/schemas/AccessState" }
+                  requestId: { type: string }
+        "304": { description: Not modified }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /svc/v1/users/{id}/export:
+    get:
+      operationId: usersExport
+      summary: Right of access (Auskunft), the CMS part
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      responses:
+        "200":
+          description: Everything the CMS holds about the account; token metadata without hashes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [export, requestId]
+                properties:
+                  export:
+                    type: object
+                    required: [exportedAt, account, entitlements, trialReminders, tokens]
+                    properties:
+                      exportedAt: { type: string, format: date-time }
+                      account: { type: object }
+                      entitlements: { type: array, items: { type: object } }
+                      trialReminders: { type: array, items: { type: object } }
+                      tokens: { type: array, items: { type: object } }
+                  requestId: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /svc/v1/users/{id}/deletion:
+    post:
+      operationId: usersDeletion
+      summary: Deletion order, idempotent through a key (ADR 13)
+      description: |
+        Phase `request` (default) locks the account at once (`status: deletion_requested`, no sign-in, no mails) and
+        answers `202`; repeating it with the same key is harmless. Phase `complete` deletes the account with its
+        access, tokens and reminders and answers `200`; it needs the key of the request (`409` otherwise) and may
+        be repeated (a missing account is a completed deletion).
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phase: { type: string, enum: [request, complete], default: request }
+      responses:
+        "200":
+          description: Phase complete done
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletionResult" }
+        "202":
+          description: Phase request accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DeletionResult" }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Deletion not requested with this key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /svc/v1/content/{kind}:
+    get:
+      operationId: contentList
+      summary: Published blog or news entries (marketing)
+      description: |
+        Option T: a random read token of at least 256 bit as `Authorization: Bearer`, checked in the handler
+        (never as a Payload authentication; it does nothing on `/api` and `/admin`). Only entries with status
+        published; never drafts, users or media write access. Rate limit per token (600 per minute) with a shared
+        counter, misses throttled in one shared window. Rotation: two tokens valid at once; revocation by
+        deleting the row, effective at once. Audit: a counter and the time of the last use. The media URL is not
+        part of the answer yet (O11).
+      security:
+        - readToken: []
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string, enum: [blog, news] }
+        - name: locale
+          in: query
+          schema: { type: string, enum: [de, en] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        "200":
+          description: Entries, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kind, page, totalPages, totalDocs, items, requestId]
+                properties:
+                  kind: { type: string, enum: [blog, news] }
+                  page: { type: integer }
+                  totalPages: { type: integer }
+                  totalDocs: { type: integer }
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/ContentItem" }
+                  requestId: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+components:
+  securitySchemes:
+    appSignature:
+      type: apiKey
+      in: header
+      name: X-Svc-Signature
+      description: HMAC signature of apps/app together with X-Svc-Timestamp and X-Svc-Nonce (see the description above).
+    readToken:
+      type: http
+      scheme: bearer
+      description: Read token of marketing.
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    InvalidRequest:
+      description: Invalid request; `fields` names the offending fields
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or invalid signature or token, stale timestamp, replayed nonce
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    InvalidCredentialsOrUnauthorized:
+      description: Invalid credentials (one answer for every reason) or an unauthorized call
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Unknown account or kind
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error, requestId]
+      properties:
+        error: { type: string }
+        fields: { type: object, additionalProperties: { type: string } }
+        requestId: { type: string }
+    Ready:
+      type: object
+      required: [ready, requestId]
+      properties:
+        ready: { type: boolean }
+        requestId: { type: string }
+    UserStatus:
+      type: string
+      enum: [active, deletion_requested]
+    DeletionResult:
+      type: object
+      required: [status, repeated, requestId]
+      properties:
+        status: { type: string, enum: [deletion_requested, deleted] }
+        repeated: { type: boolean }
+        requestId: { type: string }
+    AccessState:
+      type: object
+      required: [userId, status, emailVerified, emailVerifiedAt, cloudAccess, entitlements, trial, platformRole, locale, sessionsValidAfter]
+      properties:
+        userId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/UserStatus" }
+        emailVerified: { type: boolean }
+        emailVerifiedAt: { type: [string, "null"], format: date-time }
+        cloudAccess: { type: boolean, description: "Account active and cloud access not withdrawn." }
+        entitlements:
+          type: array
+          items:
+            type: object
+            required: [feature, source, active, expiresAt]
+            properties:
+              feature: { type: string }
+              source: { type: string }
+              active: { type: boolean }
+              expiresAt: { type: [string, "null"], format: date-time }
+        trial:
+          type: object
+          required: [endsAt, legacy, daysOverride]
+          properties:
+            endsAt: { type: [string, "null"], format: date-time }
+            legacy: { type: boolean }
+            daysOverride: { type: [integer, "null"] }
+        platformRole: { type: string, enum: [user, beta] }
+        locale: { type: string, enum: [de, en] }
+        sessionsValidAfter: { type: [string, "null"], format: date-time }
+    ContentItem:
+      type: object
+      required: [id, slug, locale, title, summary, body, tags, version, date, updatedAt, image]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        locale: { type: string, enum: [de, en] }
+        title: { type: string }
+        summary: { type: [string, "null"] }
+        body: { type: string, description: Markdown }
+        tags: { type: array, items: { type: string } }
+        version: { type: [string, "null"] }
+        date: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        image:
+          type: [object, "null"]
+          required: [alt]
+          properties:
+            alt: { type: string }
+            filename: { type: [string, "null"] }
+            mimeType: { type: [string, "null"] }
+            width: { type: [integer, "null"] }
+            height: { type: [integer, "null"] }

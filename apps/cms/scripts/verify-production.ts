@@ -163,7 +163,13 @@ async function waitReady(): Promise<void> {
 }
 
 try {
-  console.log(`node ${process.version}; build heap cap ${buildHeapMb} MB; container limit ${cgroupMax ? `${mb(cgroupMax)} MB` : "none"}`);
+  const nodeVersion = await new Promise<string>((resolve) => {
+    const child = spawn("node", ["--version"], { stdio: ["ignore", "pipe", "inherit"] });
+    let out = "";
+    child.stdout.on("data", (chunk) => (out += String(chunk)));
+    child.on("exit", () => resolve(out.trim()));
+  });
+  console.log(`node ${nodeVersion}; build heap cap ${buildHeapMb} MB; container limit ${cgroupMax ? `${mb(cgroupMax)} MB` : "none"}`);
   await sql(`create database ${dbName}`);
 
   const build = await run("bun", ["run", "build"], "build");
@@ -201,7 +207,7 @@ try {
 
   serverWatch.stop();
   console.log(`START peakTreeRssMB=${mb(serverWatch.peak.treeRss)} peakContainerMB=${mb(serverWatch.peak.cgroup)}`);
-  console.log(`SUMMARY node=${process.version} buildSeconds=${build.seconds} buildPeakRssMB=${mb(build.peak.treeRss)} startPeakRssMB=${mb(serverWatch.peak.treeRss)} heapCapMB=${buildHeapMb}`);
+  console.log(`SUMMARY node=${nodeVersion} buildSeconds=${build.seconds} buildPeakRssMB=${mb(build.peak.treeRss)} startPeakRssMB=${mb(serverWatch.peak.treeRss)} heapCapMB=${buildHeapMb}`);
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 } finally {

@@ -12,6 +12,7 @@ import { claimNonce, hitRateLimit, poolOf, type SqlPool } from "../lib/shared-st
 import { signCall } from "../lib/signature";
 import { generateToken, hashToken } from "../lib/token";
 import { createTestDatabase, testDatabaseUrl, type TestDatabase } from "./db";
+import { loadSpec, operations, responseSchema, templateOf, validate } from "./openapi";
 
 const adminUrl = testDatabaseUrl();
 
@@ -36,6 +37,8 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
   let pool: SqlPool;
   const extraPools: Pool[] = [];
   const route: Record<string, any> = {};
+  /** Every answer of the run, for the contract check at the end. */
+  const recorded: { method: string; path: string; status: number; json: Record<string, any> }[] = [];
   const run = Date.now().toString(36);
   const domain = `cms${run}.test`;
 
@@ -52,7 +55,9 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
     const context = options.params ? { params: Promise.resolve(options.params) } : undefined;
     const response = await handler(new Request(BASE + path, { method, headers, body: text || undefined }), context as never);
     const raw = response.status === 304 ? "" : await response.text();
-    return { status: response.status, json: raw ? (JSON.parse(raw) as Record<string, any>) : {}, headers: response.headers, raw };
+    const json = raw ? (JSON.parse(raw) as Record<string, any>) : {};
+    recorded.push({ method, path: path.split("?")[0] ?? path, status: response.status, json });
+    return { status: response.status, json, headers: response.headers, raw };
   }
 
   const login = (email: string, password: string) => call(route.login.POST, "POST", "/svc/v1/auth/login", { email, password });
@@ -665,6 +670,46 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
         await expect(payload.find({ collection, overrideAccess: false }), collection).rejects.toThrow();
       }
       await expect(payload.findGlobal({ slug: "platform-settings", overrideAccess: false })).rejects.toThrow();
+    });
+  });
+  describe("contract: the answers match openapi/svc-v1.yaml", () => {
+    const spec = loadSpec();
+
+    test("every recorded answer is documented and conforms to its schema", () => {
+      const problems: string[] = [];
+      for (const entry of recorded) {
+        // 413 (body too large) and 503 (service not configured) are the same for every endpoint and described once in the file header.
+        if (entry.status === 413) continue;
+        const template = templateOf(spec, entry.path);
+        if (!template) {
+          problems.push(`${entry.method} ${entry.path}: no such path in the file`);
+          continue;
+        }
+        const documented = responseSchema(spec, template, entry.method, entry.status);
+        if (!documented.documented) {
+          problems.push(`${entry.method} ${template} -> ${entry.status}: status not documented`);
+          continue;
+        }
+        if (documented.schema && entry.status !== 304) problems.push(...validate(spec, documented.schema, entry.json).map((problem) => `${entry.method} ${template} -> ${entry.status}: ${problem}`));
+      }
+      expect(problems).toEqual([]);
+    });
+
+    test("every documented operation was called at least once, with its success status", () => {
+      const seen = new Set(recorded.filter((entry) => entry.status < 300 || entry.status === 304).map((entry) => `${entry.method} ${templateOf(spec, entry.path)}`));
+      expect(operations(spec).filter((operation) => !seen.has(operation))).toEqual([]);
+    });
+
+    test("every documented error status of the main flows was provoked", () => {
+      const seen = new Set(recorded.map((entry) => `${entry.method} ${templateOf(spec, entry.path)} ${entry.status}`));
+      for (const expected of [
+        "POST /svc/v1/auth/login 200", "POST /svc/v1/auth/login 401", "POST /svc/v1/auth/login 403", "POST /svc/v1/auth/login 429",
+        "POST /svc/v1/users 201", "POST /svc/v1/users 400", "POST /svc/v1/users 409",
+        "POST /svc/v1/tokens/redeem 200", "POST /svc/v1/tokens/redeem 400", "POST /svc/v1/tokens/redeem 409",
+        "GET /svc/v1/users/{id}/access 304", "GET /svc/v1/users/{id}/access 404",
+        "POST /svc/v1/users/{id}/deletion 202", "POST /svc/v1/users/{id}/deletion 200", "POST /svc/v1/users/{id}/deletion 409",
+        "GET /svc/v1/content/{kind} 429", "GET /svc/v1/content/{kind} 404",
+      ]) expect(seen.has(expected), expected).toBe(true);
     });
   });
 });

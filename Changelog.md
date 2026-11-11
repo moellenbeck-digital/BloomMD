@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Admin-App `apps/cms` aufgesetzt (Ticket 204): eigener Dienst auf Payload 3.93.0 unter Node ≥ 22.23.4 (`.nvmrc` angehoben) mit Collections für Konten, Zugänge, Testzeitraum, Token (nur Hash), Betreiber, Blog, News und Medien sowie der internen, signierten Schnittstelle `/svc/v1` (OpenAPI-Datei, Vertragstest); GraphQL ist aus, jede Collection verweigert standardmäßig, ein Wächter vor `/api` antwortet ohne Betreiber-Sitzung mit 404. Dockerfile-Ziel `cms`, Build, Typecheck, Tests (auch gegen Postgres 17) und Produktions-Start laufen in der CI. Es wird nichts ausgerollt, die App und die Marketing-Seite verhalten sich unverändert
+- Admin app `apps/cms` set up (ticket 204): a service of its own on Payload 3.93.0 under Node ≥ 22.23.4 (`.nvmrc` raised) with collections for accounts, access, trial period, tokens (hash only), operators, blog, news and media, and the internal signed interface `/svc/v1` (OpenAPI file, contract test); GraphQL is off, every collection denies by default, a guard in front of `/api` answers 404 without an operator session. Dockerfile target `cms`; build, typecheck, tests (also against Postgres 17) and the production start run in CI. Nothing is rolled out; the app and the marketing site behave as before
+
 - Payload-Spike, Doku-Korrekturen (Ticket 103): Anker-Links zwischen ADR und Spike-Anhang repariert, Zeilenzahl des Auth-Laufs, Stelle der Passwort-Regel beim Zurücksetzen und die Aussage zu „nur veröffentlicht“ bei News berichtigt; der Anhang nennt jetzt, welche Messungen nicht unabhängig nachgeprüft sind; keine Änderung an App oder Marketing-Seite
 - Payload spike, documentation fixes (ticket 103): anchor links between the ADR and the spike appendix repaired, line count of the auth run, location of the password rule on reset and the statement on "published only" for news corrected; the appendix now lists which measurements were not independently verified; no change to the app or the marketing site
 

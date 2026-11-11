@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+## [Web-App 0.6.0-develop.1, Marketing 0.6.0-develop.1, Sync 0.6.0-develop.1] - 2026-11-11
+
 - Testsystem-Probe für `/api/version` (Ticket 375): Neuer Playwright-Test `apps/app/e2e/api-version-t375.spec.ts` (Marke `@t375`) liest `GET /api/version` und prüft HTTP 200, JSON, eine nicht leere `version` und `shortSha` (Schlüssel vorhanden, Wert `null` oder nicht leerer Text). Er läuft gegen die `baseURL` der Config, also auch gegen das Testsystem (`playwright.testsystem.config.ts` mit `PLAYWRIGHT_BASE_URL`, `--grep @t375`); er ist nur lesend, legt nichts an und schickt nichts ab. Kein Produktivcode, keine Änderung an Route oder Config
 - Test-system probe for `/api/version` (ticket 375): a new Playwright test `apps/app/e2e/api-version-t375.spec.ts` (tag `@t375`) reads `GET /api/version` and checks HTTP 200, JSON, a non-empty `version` and `shortSha` (key present, value `null` or a non-empty string). It runs against the `baseURL` of the config, so also against the test system (`playwright.testsystem.config.ts` with `PLAYWRIGHT_BASE_URL`, `--grep @t375`); it is read-only, creates nothing and submits nothing. No production code, no change to the route or the config
 

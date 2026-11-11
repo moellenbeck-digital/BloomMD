@@ -115,12 +115,16 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
 
   afterAll(async () => {
     for (const extra of extraPools) await extra.end();
-    // Payload's destroy() only resets the adapter state and keeps the pool open; an open pool would get
-    // "terminating connection" (an unhandled error) when the database is dropped below.
-    await (payload?.db as unknown as { pool?: { end(): Promise<void> } } | undefined)?.pool?.end();
-    await payload?.db.destroy?.();
+    // Payload's destroy() only resets the adapter state and keeps the pool open. Dropping the database
+    // (WITH FORCE) terminates the pool's idle connections, which would surface as an unhandled "terminating
+    // connection" error; the listener below swallows exactly that. Waiting for pool.end() can hang on a
+    // client that a test left checked out, so it is not awaited.
+    const payloadPool = (payload?.db as unknown as { pool?: { on(event: "error", listener: () => void): void; end(): Promise<void> } } | undefined)?.pool;
+    payloadPool?.on("error", () => {});
     await database?.drop();
-  });
+    void payloadPool?.end().catch(() => {});
+    await payload?.db.destroy?.();
+  }, 60_000);
 
   describe("migrations", () => {
     test("run again without changes and create the hand-written objects", async () => {

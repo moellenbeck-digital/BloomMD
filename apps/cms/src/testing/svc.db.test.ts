@@ -3,6 +3,8 @@
  * handlers are called with signed `Request`s, the services run on the Local API of Payload. Every run
  * creates a database of its own and migrates it with the real migrations (initial and `svc_support`).
  * Runs only with BLOOMMD_TEST_DATABASE_URL (in CI it must exist, see `testDatabaseUrl`).
+ * Runs in a process of its own (see "test" in package.json): it sets the environment first and then imports the
+ * configuration, which other test files import without it (module cache of one bun process).
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash, randomBytes, randomUUID } from "node:crypto";

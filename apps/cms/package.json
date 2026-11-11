@@ -13,7 +13,7 @@
     "build": "NODE_OPTIONS=\"--no-deprecation --max-old-space-size=${CMS_BUILD_HEAP_MB:-4096}\" next build --webpack",
     "start": "NODE_OPTIONS=--no-deprecation next start -p ${PORT:-3300}",
     "typecheck": "tsc --noEmit",
-    "test": "bun test src",
+    "test": "bun test --path-ignore-patterns \"**/svc.db.test.ts\" src && bun test src/testing/svc.db.test.ts",
     "payload": "NODE_OPTIONS=--no-deprecation payload",
     "generate:importmap": "NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "generate:types": "NODE_OPTIONS=--no-deprecation payload generate:types",

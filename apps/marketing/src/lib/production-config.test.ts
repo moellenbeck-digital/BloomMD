@@ -42,6 +42,37 @@ describe("marketing app production config", () => {
     ]));
   });
 
+  test("allows exactly one CMS value: the read token, checked for its shape (ADR 0001, section 4)", () => {
+    const withToken = marketingEnv();
+    withToken.CMS_READ_TOKEN = "k3V9x2mQ7rT1yU5iO8pA4sD6fG0hJ2lZ9wE3bN7cM1x";
+    expect(productionConfigErrors(withToken)).toEqual([]);
+
+    const message = "CMS_READ_TOKEN must be a random read token of at least 256 bit (43 URL-safe characters), not a placeholder.";
+    for (const bad of ["short", "TODO_REPLACE_CMS_READ_TOKEN", "replace-with-a-random-token-0000000000000000000", "contains spaces and is far too long to be a token 1234", "k3V9x2mQ7rT1yU5iO8pA4sD6fG0hJ2lZ9wE3bN7c"]) {
+      const env = marketingEnv();
+      env.CMS_READ_TOKEN = bad;
+      expect(productionConfigErrors(env)).toContain(message);
+    }
+    const empty = marketingEnv();
+    empty.CMS_READ_TOKEN = "";
+    expect(productionConfigErrors(empty)).toEqual([]);
+  });
+
+  test("rejects every other CMS value: database, Payload secret and the keys that sign the app's calls", () => {
+    const env = marketingEnv();
+    env.CMS_READ_TOKEN = "k3V9x2mQ7rT1yU5iO8pA4sD6fG0hJ2lZ9wE3bN7cM1x";
+    env.CMS_DATABASE_URL = "postgresql://u:p@cms-db:5432/cms?sslmode=require";
+    env.PAYLOAD_SECRET = "payload-secret-with-enough-variety-123456789";
+    env.CMS_SVC_APP_KEY = "svc-key-with-enough-variety-123456789012345";
+    env.CMS_SVC_APP_KEY_NEXT = "svc-key-next-with-enough-variety-123456789";
+    env.CMS_OPERATOR_PASSWORD = "Operator123456";
+    const errors = productionConfigErrors(env);
+    for (const key of ["CMS_DATABASE_URL", "PAYLOAD_SECRET", "CMS_SVC_APP_KEY", "CMS_SVC_APP_KEY_NEXT", "CMS_OPERATOR_PASSWORD"]) {
+      expect(errors).toContain(`${key} must not be set for the marketing app.`);
+    }
+    expect(errors.filter((error) => error.includes("CMS_READ_TOKEN"))).toEqual([]);
+  });
+
   test("rejects app database, auth, sync and billing secrets", () => {
     const env = marketingEnv();
     env.DATABASE_URL = "postgresql://u:p@app-db:5432/bloommd?sslmode=require";

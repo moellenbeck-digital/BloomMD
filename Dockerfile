@@ -18,9 +18,12 @@ COPY packages/sync/package.json packages/sync/package.json
 COPY packages/ui/package.json packages/ui/package.json
 COPY apps/app/package.json apps/app/package.json
 COPY apps/marketing/package.json apps/marketing/package.json
+COPY apps/cms/package.json apps/cms/package.json
 COPY plugins/obsidian/package.json plugins/obsidian/package.json
 COPY plugins/openclaw/package.json plugins/openclaw/package.json
-RUN bun install --frozen-lockfile
+# The admin app has its own dependency stage (cms-deps below): its manifest must be here for the frozen
+# lockfile, but its dependencies stay out of the app, marketing and sync images.
+RUN bun install --frozen-lockfile --filter '!@bloommd/cms'
 
 FROM deps AS workspace
 COPY . .
@@ -91,3 +94,55 @@ ENV NODE_ENV=production
 ENV SYNC_PORT=4100
 EXPOSE 4100
 CMD ["bun", "run", "--cwd", "packages/sync", "start"]
+
+# Admin app (apps/cms, ADR 0001): Payload requires Node ^22.23.4, so the image is Node 22.23.4. The
+# dependencies are installed with Bun like everywhere else; build and start run under Node (`next` has a
+# Node shebang). Own dependency stage: only the CMS dependencies, no sources, so the layer is cached until
+# bun.lock or a package.json changes. Version and build info reach the admin UI through the BLOOMMD_*
+# values below; there is no public version endpoint.
+FROM node:22.23.4-slim AS cms-deps
+COPY --from=oven/bun:1.4.4-slim /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY patches patches
+COPY packages/core/package.json packages/core/package.json
+COPY packages/agent-runtime/package.json packages/agent-runtime/package.json
+COPY packages/wiki-cli/package.json packages/wiki-cli/package.json
+COPY packages/desktop/package.json packages/desktop/package.json
+COPY packages/mobile/package.json packages/mobile/package.json
+COPY packages/capacitor-folder/package.json packages/capacitor-folder/package.json
+COPY packages/capacitor-keychain/package.json packages/capacitor-keychain/package.json
+COPY packages/ink/package.json packages/ink/package.json
+COPY packages/sync/package.json packages/sync/package.json
+COPY packages/ui/package.json packages/ui/package.json
+COPY apps/app/package.json apps/app/package.json
+COPY apps/marketing/package.json apps/marketing/package.json
+COPY apps/cms/package.json apps/cms/package.json
+COPY plugins/obsidian/package.json plugins/obsidian/package.json
+COPY plugins/openclaw/package.json plugins/openclaw/package.json
+RUN bun install --frozen-lockfile --filter @bloommd/cms
+
+FROM cms-deps AS cms-build
+ARG BLOOMMD_BUILD_SHA=unknown
+ARG BLOOMMD_BUILD_TAG=
+ARG BLOOMMD_BUILD_TIME=
+ARG BLOOMMD_RELEASE_VERSION=
+ENV BLOOMMD_BUILD_SHA=$BLOOMMD_BUILD_SHA
+ENV BLOOMMD_BUILD_TAG=$BLOOMMD_BUILD_TAG
+ENV BLOOMMD_BUILD_TIME=$BLOOMMD_BUILD_TIME
+ENV BLOOMMD_RELEASE_VERSION=$BLOOMMD_RELEASE_VERSION
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY tsconfig.base.json ./
+COPY apps/cms apps/cms
+# No CMS_* value is needed to build: secrets exist only at runtime (External Secrets).
+RUN node --version && bun run --cwd apps/cms build
+
+FROM cms-build AS cms
+ENV NODE_ENV=production
+ENV PORT=3300
+ENV CMS_MEDIA_DIR=/data/media
+RUN mkdir -p /data/media && chown -R node:node /data /app/apps/cms/.next
+USER node
+WORKDIR /app/apps/cms
+EXPOSE 3300
+CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3300"]

@@ -7,7 +7,7 @@ Vollständige Architektur, Datenmodell und Projektplan: [docs/ARCHITECTURE.md](d
 
 - **Sprache:** TypeScript (strict), kein `any`
 - **Runtime / Package Manager:** Bun
-- **Monorepo:** Bun Workspaces (`apps/app`, `apps/marketing`, `packages/core`, `packages/ui`, `packages/desktop`, `packages/mobile`, `packages/sync`, `plugins/obsidian`)
+- **Monorepo:** Bun Workspaces (`apps/app`, `apps/marketing`, `apps/cms`, `packages/core`, `packages/ui`, `packages/desktop`, `packages/mobile`, `packages/sync`, `plugins/obsidian`)
 - **UI:** React 19, Tailwind CSS v4, Lucide React (Icons)
 - **Mindmap-Rendering:** @xyflow/react + dagre (Layout)
 - **Markdown-Parsing:** unified + remark + gray-matter (Frontmatter)
@@ -37,6 +37,12 @@ cd packages/mobile && bunx cap sync
 # Sync Server
 cd packages/sync && bun run dev  # Sync-Server starten (localhost:4100)
 
+# Admin-App (apps/cms, Payload headless, nicht öffentlich)
+bun run --cwd apps/cms dev     # localhost:3300; braucht apps/cms/.env.local auf Basis von .env.example und eine Datenbank (CMS_DATABASE_URL)
+bun run --cwd apps/cms migrate # Migrationen (Schema nur per Migration, nie push)
+bun run --cwd apps/cms test    # Unit-/Inventar-/Vertragstests; die DB-Tests brauchen BLOOMMD_TEST_DATABASE_URL (Wegwerf-Postgres, legt je Lauf eine eigene Datenbank an)
+bun run --cwd apps/cms scripts/verify-production.ts  # Produktions-Build + next start + Routen-Probe (im Pod nur über scripts/team-lauf)
+
 # Tests
 bun test ./packages/core/src/parser.test.ts
 ```
@@ -64,6 +70,7 @@ scripts/team-lauf bun run test:e2e         # E2E
 - `@bloommd/ui` — React-Komponenten (MindMapCanvas, NodeEditor, Toolbar, etc.)
 - `@bloommd/web-app` — Private Next.js App (`apps/app`) mit Auth, Workspaces, Sync, Collaboration, OKF/llm-wiki
 - `@bloommd/marketing` — Public Next.js App (`apps/marketing`) mit Landingpage, Docs/Fumadocs, Legal, Templates, Demo
+- `@bloommd/cms` — Admin-App (`apps/cms`, Payload headless, **nicht öffentlich**): Plattform-Identität (Konten, Zugänge, Testzeitraum), Betreiber, Blog/News und die interne Schnittstelle `/svc/v1` ([ADR 0001](docs/adr/0001-payload-cms.md)); Node ≥ 22.23.4, eigene Datenbank
 - `@bloommd/desktop` — Electrobun App mit RPC + File Watcher
 - `@bloommd/mobile` — Capacitor App mit Filesystem API
 - `@bloommd/sync` — Yjs Sync-Server (Bun + Hono, y-protocols, Room-per-file)
@@ -139,7 +146,10 @@ BloomMD hat ab M1 zwei getrennte Next.js-Anwendungen im selben Monorepo:
 `BLOOMMD_DEPLOYMENT` ist nach dem Split obsolet und wird von `release:check` abgelehnt. Die Trennung
 passiert über getrennte App-Roots und getrennte Builds, nicht über Runtime-Routing in einem gemeinsamen
 Image. Marketing darf keine App-Secrets tragen: kein `DATABASE_URL`, kein `BLOOMMD_AUTH_SECRET`, kein
-`BLOOMMD_SYNC_SECRET`, keine Stripe-Secrets und kein `NEXT_PUBLIC_SYNC_URL`. Die beendete Waitlist
+`BLOOMMD_SYNC_SECRET`, keine Stripe-Secrets und kein `NEXT_PUBLIC_SYNC_URL`. **Einzige Ausnahme** (ADR 0001, Abschnitt 4):
+der lesende CMS-Token `CMS_READ_TOKEN` (liest nur veröffentlichte Blog- und News-Einträge über `/svc/v1/content`; nur über
+1Password und External Secrets). `production-config.ts` prüft ihn auf Form (43 URL-sichere Zeichen, kein Platzhalter) und lehnt alle
+anderen CMS-Werte ab (`CMS_DATABASE_URL`, `PAYLOAD_SECRET`, `CMS_SVC_APP_KEY`, `CMS_SVC_APP_KEY_NEXT`). Die beendete Waitlist
 liegt nur noch in `BLOOMMD_WAITLIST_DATABASE_URL` (eigene Tabelle) bis zu Export, Einladung und Löschung
 (`apps/marketing/scripts/waitlist.ts`). Die Produkt-App setzt global
 `X-Robots-Tag: noindex, nofollow`. App-Routen existieren im Marketing-Build nicht; Demo-/
@@ -149,16 +159,26 @@ Die öffentliche Demo darf nicht die private App freischalten. Sie lebt in `apps
 browser-sichere Core-/UI-Teile und hat keinen Zugriff auf Accounts, Workspaces, Sync-Tickets, Billing
 oder die Produktdatenbank.
 
+### Admin-App (`apps/cms`)
+
+Dritter auslieferbarer Dienst neben App und Marketing, entschieden in [ADR 0001](docs/adr/0001-payload-cms.md). Er ist nur im Cluster-Mesh erreichbar (Admins über den wave-Ingress), hat eine **eigene Datenbank** (`CMS_DATABASE_URL`, nie die der App) und bekommt nie App-Secrets (`DATABASE_URL`, `BLOOMMD_AUTH_SECRET`, `BLOOMMD_SYNC_SECRET`, Stripe); `runtimeConfigErrors` bricht den Start bei einer solchen Konfiguration ab.
+
+- **Keine öffentliche API.** Die App ruft nur die enumerierte Schnittstelle `/svc/v1` (`apps/cms/openapi/svc-v1.yaml`) mit HMAC-Signatur (`X-Svc-Signature`), Marketing nur `GET /svc/v1/content/{blog|news}` mit dem Lese-Token. Ein Wächter vor `/api` antwortet ohne Betreiber-Sitzung 404; GraphQL ist aus und seine Route-Dateien existieren nicht; jede Collection verweigert standardmäßig.
+- **Neue Route oder neue Collection** heißt: `apps/cms/src/inventory/routes.ts` (Positivliste) und `payload-endpoints.txt` bewusst anpassen (`UPDATE_INVENTORY=1 bun test src/inventory`) und die OpenAPI-Datei nachziehen; der Inventar- und der Vertragstest scheitern sonst.
+- **Schema nur per Migration** (`push: false`): `bun run --cwd apps/cms migrate:create <name>` für Payload-Änderungen; was Payload nicht erzeugen kann (partieller Index, Nonce-/Rate-Limit-Tabellen), steht von Hand in `src/migrations/*_svc_support.ts`. Migrationen erweitern zuerst, räumen später auf (ein laufendes altes Image muss die Datenbank noch lesen).
+- **Laufzeit:** Node ≥ 22.23.4 (Engine von Payload, einziger Pin ist `.nvmrc`), Installation mit Bun, Build und Start unter Node (Dockerfile-Ziel `cms`).
+
 ### Version und Build-Info
 
 - Alle auslieferbaren Apps und Services zeigen bzw. melden die laufende BloomMD-Version, damit Nutzer, Support und Feedback eindeutig referenzieren können, was gerade live ist.
 - Bei jedem Release oder Deployment, das Nutzer sichtbar betrifft, muss die SemVer-Version der betroffenen auslieferbaren Packages passend erhöht werden; nur den Git-Hash/Image-Pin zu ändern reicht nicht.
-- Dazu gehören insbesondere `apps/app/package.json`, `apps/marketing/package.json`, `packages/desktop/package.json`, `packages/sync/package.json`, `packages/agent-runtime/package.json`, `packages/wiki-cli/package.json` und bei Mobile-Releases `packages/mobile/package.json`.
+- Dazu gehören insbesondere `apps/app/package.json`, `apps/marketing/package.json`, `apps/cms/package.json`, `packages/desktop/package.json`, `packages/sync/package.json`, `packages/agent-runtime/package.json`, `packages/wiki-cli/package.json` und bei Mobile-Releases `packages/mobile/package.json`.
 - Gemeinsame Release-Artefakte müssen dieselbe SemVer-Version tragen, z. B. Web-App + Marketing + Sync bei einem gemeinsamen Hosted-Beta-Release oder Desktop + CLI bei einem Desktop-Beta-Release. Interne Libraries (`packages/core`, `packages/ui`) werden mitgezogen, wenn sie als Teil dieses Release-Artefakts versioniert oder veröffentlicht werden.
 - Die sichtbare Kurzform bleibt konsistent: `BloomMD <version> (<short-sha>)`, z. B. `BloomMD 0.1.0-beta.2 (2269618)`.
 - Git-SHA, Git-Tag und Image-Digest sind Nachweis- und Rollout-Metadaten; die fachliche Produktversion bleibt SemVer.
 - App-Flächen mit sichtbarer Version: Login, Account/About, Help/Feedback und App-Shell, soweit der Viewport Platz hat; im Desktop zusätzlich der Splash (nativ, vor der App-Shell). Der Splash zeigt dieselbe Zeichenkette wie About und entsteht beim Build aus den Build-Metadaten (`packages/desktop/src/shared/display-version.ts`); eine Versionsnummer von Hand im Splash-HTML ist ein Fehler.
 - Marketing-Flächen mit sichtbarer Version: Footer; Legal-/Support-Kontext darf die Version ebenfalls nutzen.
+- Die Admin-App zeigt Version und Build-Info nur im Admin (Login-Seite und Navigation, `BloomMD <version> (<short-sha>)`) und hat **keinen öffentlichen Endpunkt** dafür.
 - App und Marketing bieten `/api/version` mit nicht-geheimer Build-Info: Produkt, Package, Deployment, Version, Git-SHA, Short-SHA, Git-Tag, Build-Zeitpunkt und Display-Version.
 - Feedback-Issues müssen Version, SHA, Deployment, Route, Browser/OS und Zeitstempel automatisch enthalten.
 - CI/Docker injiziert Build-Metadaten deterministisch über `BLOOMMD_RELEASE_VERSION`, `BLOOMMD_BUILD_SHA`, `BLOOMMD_BUILD_TAG`, `BLOOMMD_BUILD_TIME` und die zugehörigen `NEXT_PUBLIC_BLOOMMD_*` Werte.

@@ -154,6 +154,7 @@ function marketingSplitErrors(env: NodeJS.ProcessEnv, siteOrigin: string | null)
   for (const key of ["DATABASE_URL", "BLOOMMD_AUTH_SECRET", "BLOOMMD_SYNC_SECRET", "NEXT_PUBLIC_SYNC_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"] as const) {
     if (env[key]) errors.push(`${key} must not be set for the marketing app.`);
   }
+  errors.push(...cmsSecretErrors(env));
   if (env.BLOOMMD_BILLING_ENABLED && env.BLOOMMD_BILLING_ENABLED !== "0") {
     errors.push("BLOOMMD_BILLING_ENABLED must be unset or 0 for the marketing app.");
   }
@@ -170,6 +171,30 @@ function marketingSplitErrors(env: NodeJS.ProcessEnv, siteOrigin: string | null)
     errors.push("NEXT_PUBLIC_DESKTOP_MACOS_ARM64_DOWNLOAD_URL must be a valid HTTPS URL.");
   }
 
+  return errors;
+}
+
+/**
+ * The one CMS value marketing may carry (ADR 0001, section 4): the read token `CMS_READ_TOKEN`, which can
+ * only read published blog and news entries over `/svc/v1/content`. It is optional here (marketing reads
+ * Markdown from the repository until the content moves), but when set it must have the shape of a real token:
+ * at least 256 bit of randomness, 43 URL-safe characters, no placeholder. Everything else of the CMS stays
+ * forbidden: the database, the Payload secret and the keys that sign the calls of the app.
+ */
+const CMS_FORBIDDEN_FOR_MARKETING = ["CMS_DATABASE_URL", "PAYLOAD_SECRET", "CMS_SVC_APP_KEY", "CMS_SVC_APP_KEY_NEXT", "CMS_OPERATOR_PASSWORD"] as const;
+
+function cmsSecretErrors(env: NodeJS.ProcessEnv): string[] {
+  const errors: string[] = [];
+  for (const key of CMS_FORBIDDEN_FOR_MARKETING) {
+    if (env[key]) errors.push(`${key} must not be set for the marketing app.`);
+  }
+  const token = env.CMS_READ_TOKEN;
+  if (token !== undefined && token !== "") {
+    const placeholder = /(todo|replace|placeholder|dummy|tbd|changeme|change-me|not-real)/i.test(token);
+    if (placeholder || !/^[A-Za-z0-9_-]{43,128}$/.test(token)) {
+      errors.push("CMS_READ_TOKEN must be a random read token of at least 256 bit (43 URL-safe characters), not a placeholder.");
+    }
+  }
   return errors;
 }
 

@@ -159,7 +159,13 @@ jobs:
           DATABASE_URL: ${{ env.BLOOMMD_TEST_DATABASE_URL }}
         run: bun run --cwd apps/app db:migrate
       - name: Run unit tests
-        run: bun run test
+        # The failing lines go into annotations as well (the job log is only readable when logged in).
+        run: |
+          set -o pipefail
+          bun run test 2>&1 | tee "$RUNNER_TEMP/unit-tests.log" || {
+            grep -nE "\(fail\)|error:|Error:|FAIL|failed" "$RUNNER_TEMP/unit-tests.log" | head -15 | cut -c1-400 | while IFS= read -r line; do echo "::error title=unit tests::${line}"; done
+            exit 1
+          }
       - name: DB tests ran without skips
         # Second run on the already used database (order/isolation check); the counts go into a
         # notice annotation on the run, and a skipped or missing DB test fails the job.

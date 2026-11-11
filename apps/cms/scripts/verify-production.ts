@@ -45,7 +45,8 @@ const env: NodeJS.ProcessEnv = {
   PORT: String(port),
   CMS_BUILD_HEAP_MB: buildHeapMb,
 };
-delete env.DATABASE_URL;
+// The CMS refuses app secrets by design (see runtimeConfigErrors); CI and developer shells carry some of them.
+for (const key of ["DATABASE_URL", "BLOOMMD_AUTH_SECRET", "BLOOMMD_SYNC_SECRET", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"]) delete env[key];
 
 // ------------------------------------------------------------------ memory sampling
 function readNumber(path: string): number | null {

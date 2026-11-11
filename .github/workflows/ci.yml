@@ -146,7 +146,8 @@ jobs:
         run: bun audit --ignore GHSA-gcqx-w48m-w2h4
       - name: Audit Obsidian plugin dependencies
         working-directory: plugins/obsidian
-        run: bun audit
+        # Same ignore as above: the plugin is a workspace member, so its audit sees payload (apps/cms) too.
+        run: bun audit --ignore GHSA-gcqx-w48m-w2h4
       - name: Typecheck all surfaces
         run: bun run typecheck
       - name: Migrate test database

@@ -209,7 +209,11 @@ jobs:
           CMS_BUILD_HEAP_MB: "4096"
         run: |
           set -euo pipefail
-          bun run scripts/verify-production.ts 2>&1 | tee "$RUNNER_TEMP/cms-production.log"
+          bun run scripts/verify-production.ts 2>&1 | tee "$RUNNER_TEMP/cms-production.log" || {
+            # The job log is only readable when logged in; the tail goes into an annotation as well.
+            echo "::error title=CMS production check::$(tail -n 30 "$RUNNER_TEMP/cms-production.log" | cut -c1-300 | sed -e "s/%/%25/g" | tr "\n" "|")"
+            exit 1
+          }
           echo "::notice title=CMS production build and start::$(grep '^SUMMARY' "$RUNNER_TEMP/cms-production.log")"
       - name: Build mobile web assets
         working-directory: packages/mobile

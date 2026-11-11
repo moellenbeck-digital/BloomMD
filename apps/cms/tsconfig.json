@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@payload-config": ["./src/payload.config.ts"]
+    },
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["@types/bun", "node"]
+  },
+  "include": ["src", "scripts", "next-env.d.ts", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

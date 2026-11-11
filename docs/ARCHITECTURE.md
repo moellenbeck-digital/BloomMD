@@ -160,6 +160,15 @@ Content-free security audit events record session creation/revocation, verificat
 
 Mutating cookie-authenticated routes require an exact same-origin request. Request bodies are content-type checked and size bounded, API responses are not cached, and the production gate requires TLS URLs, non-placeholder secrets, Resend, Sentry, legal identity, a usable closed-beta gate, and a single sync writer replica. Stripe credentials are demanded only when billing is enabled. Public operation still needs a database restore drill, provider-level smoke tests, load/reconnect tests, signed native artifacts, and an independent production security review.
 
+## Admin App (`apps/cms`)
+
+`apps/cms` is a third deployable service next to the app and marketing, built on Payload 3.93 (headless) and decided in [ADR 0001](adr/0001-payload-cms.md). It is **not public**: it is reachable only inside the cluster mesh (operators through the wave ingress), has its own database (`CMS_DATABASE_URL`, never the app database) and never receives app secrets. It holds the platform identity (accounts, access, trial period), operators and the blog/news content; the app keeps sessions, workspaces and documents and reads the rights state of an account over `/svc/v1`. Until the cutover the app database stays authoritative; nothing of this is switched on in production (ADR 9, 10).
+
+- **Interface `/svc/v1`:** Next route handlers beside Payload's `/api`, described in `apps/cms/openapi/svc-v1.yaml`. `apps/app` signs every call (`X-Svc-Signature`, HMAC-SHA256 over method, path with query, body hash, timestamp and nonce, ±60 s, nonce in a store shared by all replicas, two keys valid at once); marketing reads published blog/news entries with a read token (≥ 256 bit, only its hash stored, rate limit with a shared counter). Every answer carries a request ID; no answer contains a password hash.
+- **Layers in the service** (ADR 3, layer 4 and 5): GraphQL off and its route files deleted, every collection denies by default and grants through explicit access functions, a guard in front of `/api` answers 404 without an operator session, CORS and CSRF accept only the admin origin, and an inventory test fails for every route or Payload endpoint that is not on the positive list (`apps/cms/src/inventory`).
+- **Runtime:** Node ≥ 22.23.4 (Payload's engine, pinned in `.nvmrc`), dependencies installed with Bun, build and start under Node. The Docker target is `cms`. The version and build information are shown inside the admin UI only; there is no public version endpoint.
+- **Build and start measurements** (CI run on PR #369, GitHub runner, Node v22.23.4, `next build --webpack` with a 4096 MB heap cap, `CMS_BUILD_HEAP_MB`): the production build takes 42 s with a peak of 1983 MB RSS (process tree); `next start` peaks at 181 MB RSS after the probes. The template's 8 GB heap is therefore not needed; 4096 MB leaves about twice the measured peak. The Docker target `cms` builds on the same runner with the same cap (the image check in CI builds it, verifies Node and the refusal to start without configuration); a peak inside the Docker build is not measured separately. `disablePlaygroundInProduction` is moot: GraphQL and the playground route files do not exist (inventory test). `scripts/verify-production.ts` repeats build, migration, start, route probe, signed call and build-info check and prints the numbers as `SUMMARY`.
+
 ## Packages
 
 | Package | Responsibility |
@@ -168,6 +177,7 @@ Mutating cookie-authenticated routes require an exact same-origin request. Reque
 | `packages/ui` | Shared React UI and React Flow interactions |
 | `apps/app` | Next.js app, auth, billing, APIs, Postgres tenant storage, browser workspaces |
 | `apps/marketing` | Public Next.js site: landing page, docs, legal, templates, demo |
+| `apps/cms` | Admin app (Payload headless, not public): platform identity, access, trial period, blog/news content and the internal `/svc/v1` interface ([ADR 0001](adr/0001-payload-cms.md)) |
 | `packages/sync` | WebSocket rooms, ticket enforcement, filesystem/Postgres persistence |
 | `packages/desktop` | Electrobun host, native filesystem and RPC |
 | `packages/mobile` | Capacitor renderer |

@@ -1,0 +1,45 @@
+{
+  "name": "@bloommd/cms",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "description": "BloomMD admin app (Payload headless): platform identity, access, trial period, content, and the internal /svc/v1 interface. Not public.",
+  "engines": {
+    "node": "^22.23.4"
+  },
+  "scripts": {
+    "dev": "NODE_OPTIONS=--no-deprecation next dev --webpack -p 3300",
+    "build": "NODE_OPTIONS=\"--no-deprecation --max-old-space-size=${CMS_BUILD_HEAP_MB:-4096}\" next build --webpack",
+    "start": "NODE_OPTIONS=--no-deprecation next start -p ${PORT:-3300}",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test --path-ignore-patterns \"**/svc.db.test.ts\" src && bun test src/testing/svc.db.test.ts",
+    "payload": "NODE_OPTIONS=--no-deprecation payload",
+    "generate:importmap": "NODE_OPTIONS=--no-deprecation payload generate:importmap",
+    "generate:types": "NODE_OPTIONS=--no-deprecation payload generate:types",
+    "migrate": "NODE_OPTIONS=--no-deprecation payload migrate",
+    "migrate:status": "NODE_OPTIONS=--no-deprecation payload migrate:status",
+    "migrate:create": "NODE_OPTIONS=--no-deprecation payload migrate:create",
+    "read-token": "bun run scripts/read-token.ts"
+  },
+  "dependencies": {
+    "@payloadcms/db-postgres": "3.93.0",
+    "@payloadcms/next": "3.93.0",
+    "@payloadcms/ui": "3.93.0",
+    "graphql": "^16.8.1",
+    "next": "16.4.2",
+    "payload": "3.93.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/node": "^26.2.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "pg": "^8.20.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

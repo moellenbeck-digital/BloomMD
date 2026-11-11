@@ -140,10 +140,14 @@ jobs:
         working-directory: plugins/obsidian
         run: bun install --frozen-lockfile
       - name: Audit workspace dependencies
-        run: bun audit
+        # GHSA-gcqx-w48m-w2h4 (deepmerge <= 4.3.1, low, prototype pollution in mergeObject()) has no fixed
+        # release (4.3.1 is the latest) and comes in through payload (apps/cms), which merges its own
+        # configuration with it. Re-check when deepmerge releases a fix, then drop the ignore.
+        run: bun audit --ignore GHSA-gcqx-w48m-w2h4
       - name: Audit Obsidian plugin dependencies
         working-directory: plugins/obsidian
-        run: bun audit
+        # Same ignore as above: the plugin is a workspace member, so its audit sees payload (apps/cms) too.
+        run: bun audit --ignore GHSA-gcqx-w48m-w2h4
       - name: Typecheck all surfaces
         run: bun run typecheck
       - name: Migrate test database
@@ -155,7 +159,13 @@ jobs:
           DATABASE_URL: ${{ env.BLOOMMD_TEST_DATABASE_URL }}
         run: bun run --cwd apps/app db:migrate
       - name: Run unit tests
-        run: bun run test
+        # The failing lines go into annotations as well (the job log is only readable when logged in).
+        run: |
+          set -o pipefail
+          bun run test 2>&1 | tee "$RUNNER_TEMP/unit-tests.log" || {
+            grep -nE "\(fail\)|error:|Error:|FAIL|failed" "$RUNNER_TEMP/unit-tests.log" | head -15 | cut -c1-400 | while IFS= read -r line; do echo "::error title=unit tests::${line}"; done
+            exit 1
+          }
       - name: DB tests ran without skips
         # Second run on the already used database (order/isolation check); the counts go into a
         # notice annotation on the run, and a skipped or missing DB test fails the job.
@@ -167,6 +177,18 @@ jobs:
           echo "::notice title=DB tests::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
           test "${pass:-0}" -gt 0
           test "${skip:-0}" -eq 0
+      - name: CMS DB tests ran without skips
+        # The CMS tests create a database of their own on the service above (the user may create
+        # databases) and run the real migrations; a skipped or missing DB test fails the job.
+        working-directory: apps/cms
+        run: |
+          set -euo pipefail
+          bun test src/testing/svc.db.test.ts 2>&1 | tee "$RUNNER_TEMP/cms-db-tests.log"
+          count() { { grep -E "^ *[0-9]+ $1\$" "$RUNNER_TEMP/cms-db-tests.log" || true; } | awk '{print $1}' | tail -1; }
+          pass="$(count pass)"; skip="$(count skip)"; fail="$(count fail)"
+          echo "::notice title=CMS DB tests::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
+          test "${pass:-0}" -gt 0
+          test "${skip:-0}" -eq 0
       - name: Validate M1 QA matrix and test plan
         run: bun run test:qa
       - name: Build web
@@ -175,6 +197,24 @@ jobs:
       - name: Build marketing
         working-directory: apps/marketing
         run: bun run build
+      - name: Node version of the job is the pinned one
+        # Payload's engine is ^22.23.4; .nvmrc is the single pin (setup-node reads it, the CMS image copies it).
+        run: test "$(node --version)" = "v$(cat .nvmrc)"
+      - name: Build the CMS for production, start it under Node and probe the routes
+        # Spike rest of #204: production build and `next start` under the pinned Node, peak memory of the
+        # build, the route inventory against the running service, a signed /svc/v1 call and the build info in
+        # the admin UI. The numbers go into the notice below.
+        working-directory: apps/cms
+        env:
+          CMS_BUILD_HEAP_MB: "4096"
+        run: |
+          set -euo pipefail
+          bun run scripts/verify-production.ts 2>&1 | tee "$RUNNER_TEMP/cms-production.log" || {
+            # The job log is only readable when logged in; the tail goes into an annotation as well.
+            echo "::error title=CMS production check::$(tail -n 30 "$RUNNER_TEMP/cms-production.log" | cut -c1-300 | sed -e "s/%/%25/g" | tr "\n" "|")"
+            exit 1
+          }
+          echo "::notice title=CMS production build and start::$(grep '^SUMMARY' "$RUNNER_TEMP/cms-production.log")"
       - name: Build mobile web assets
         working-directory: packages/mobile
         run: bun run build
@@ -207,11 +247,20 @@ jobs:
           expected="$(jq -r .packageManager package.json | cut -d@ -f2)"
           docker build --file deploy/openclaw/Dockerfile --target plugin-build --tag bloommd-openclaw-plugin-build:ci .
           docker build --file Dockerfile --target deps --tag bloommd-app-deps:ci .
-          for image in bloommd-openclaw-plugin-build:ci bloommd-app-deps:ci; do
+          docker build --file Dockerfile --target cms --tag bloommd-cms:ci .
+          for image in bloommd-openclaw-plugin-build:ci bloommd-app-deps:ci bloommd-cms:ci; do
             actual="$(docker run --rm --entrypoint bun "$image" --version)"
             echo "$image: bun --version $actual"
             test "$actual" = "$expected"
           done
+          # The CMS image runs on the pinned Node (not Bun), and without configuration it refuses to start.
+          cms_node="$(docker run --rm --entrypoint node bloommd-cms:ci --version)"
+          echo "bloommd-cms:ci: node --version $cms_node (pinned: v$(cat .nvmrc))"
+          test "$cms_node" = "v$(cat .nvmrc)"
+          if docker run --rm bloommd-cms:ci > "$RUNNER_TEMP/cms-start.log" 2>&1; then
+            echo "The CMS image started without configuration"; exit 1
+          fi
+          grep -Fq "BloomMD CMS configuration is incomplete" "$RUNNER_TEMP/cms-start.log"
           docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep -E '^bloommd-' | sort
           echo "::notice title=bun --version in images::plugin-build=$(docker run --rm --entrypoint bun bloommd-openclaw-plugin-build:ci --version) app-deps=$(docker run --rm --entrypoint bun bloommd-app-deps:ci --version) runner=$(bun --version)"
 

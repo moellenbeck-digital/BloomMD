@@ -5,6 +5,7 @@ COPY package.json bun.lock ./
 COPY patches patches
 COPY apps/app/package.json apps/app/package.json
 COPY apps/marketing/package.json apps/marketing/package.json
+COPY apps/cms/package.json apps/cms/package.json
 COPY packages/core/package.json packages/core/package.json
 COPY packages/agent-runtime/package.json packages/agent-runtime/package.json
 COPY packages/desktop/package.json packages/desktop/package.json
@@ -18,7 +19,7 @@ COPY packages/wiki-cli/package.json packages/wiki-cli/package.json
 COPY plugins/obsidian/package.json plugins/obsidian/package.json
 COPY packages/agent-runtime/src/index.ts packages/agent-runtime/src/index.ts
 COPY plugins/openclaw ./plugins/openclaw
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --filter '!@bloommd/cms'
 RUN bun build ./plugins/openclaw/src/index.ts --target node --outdir /plugin/dist --external openclaw/*
 
 FROM ghcr.io/openclaw/openclaw:2026.9.3-browser

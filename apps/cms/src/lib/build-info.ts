@@ -26,7 +26,7 @@ function realValue(...values: Array<string | undefined>) {
  * The SemVer version is the one of `apps/cms/package.json`; CI and Docker inject the SHA, tag and
  * build time through the `BLOOMMD_*` variables (same names as app and marketing).
  */
-export function getCmsBuildInfo(env: NodeJS.ProcessEnv = process.env): CmsBuildInfo {
+export function getCmsBuildInfo(env: Record<string, string | undefined> = process.env): CmsBuildInfo {
   const version = realValue(env.BLOOMMD_RELEASE_VERSION) ?? packageJson.version;
   const gitSha = realValue(env.BLOOMMD_BUILD_SHA, env.GITHUB_SHA);
   const shortSha = gitSha ? gitSha.slice(0, 7) : null;

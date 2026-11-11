@@ -235,7 +235,7 @@ async function defaultTrialDays(payload: Payload, user: User): Promise<number> {
 
 /**
  * `POST /svc/v1/tokens/redeem`. A token is redeemed once: the claim is an atomic update of `usedAt`
- * (`where usedAt is null`), so two simultaneous redemptions cannot both succeed. The password rule is
+ * (`where used_at is null`, one SQL statement), so two simultaneous redemptions cannot both succeed. The password rule is
  * checked before the claim, so a weak password leaves the token valid. Unknown, used and expired tokens
  * are the same 400. Confirming an address sets the trial end once; when another confirmed account
  * already holds the mailbox (partial unique index), the claim is released and the answer is 409.
@@ -262,13 +262,10 @@ export async function redeemToken(payload: Payload, body: Record<string, unknown
   const user = await findUser(payload, userId);
   if (!user || user.status !== "active") throw new SvcError(400, "invalid_token");
 
-  const claimed = await payload.update({
-    collection: "auth-tokens",
-    where: { and: [{ id: { equals: record.id } }, { usedAt: { exists: false } }] },
-    data: { usedAt: now.toISOString() },
-    overrideAccess: true,
-  });
-  if (claimed.docs.length !== 1) throw new SvcError(400, "invalid_token");
+  // The claim is one SQL statement. Payload's `update` with a `where` reads first and writes by ID afterwards,
+  // so simultaneous redemptions would all succeed; `where used_at is null` in the statement decides the race.
+  const claimed = await poolOf(payload).query("update auth_tokens set used_at = $2 where id = $1 and used_at is null returning id", [record.id, now.toISOString()]);
+  if (claimed.rowCount !== 1) throw new SvcError(400, "invalid_token");
 
   const data: Record<string, unknown> = {};
   if (needsPassword) {

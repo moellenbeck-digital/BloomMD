@@ -39,6 +39,16 @@ export default buildConfig({
   graphQL: { disable: true, disablePlaygroundInProduction: true },
   cors: allowedOrigins,
   csrf: allowedOrigins,
+  // The CMS sends no mail: the app sends confirmation and password mails (O5) and Payload's own flows
+  // are closed. The adapter exists so that nothing is ever sent by accident.
+  email: () => ({
+    name: "disabled",
+    defaultFromAddress: "noreply@invalid",
+    defaultFromName: "BloomMD CMS",
+    sendEmail: async () => {
+      throw new Error("The CMS sends no e-mail.");
+    },
+  }),
   secret: process.env.PAYLOAD_SECRET || "",
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   db: postgresAdapter({

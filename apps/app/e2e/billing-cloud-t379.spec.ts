@@ -3,7 +3,7 @@
  *
  * An der Oberfläche prüfbar (Testmarke @t379):
  * - K1: Ohne `BLOOMMD_BILLING_ENABLED=1` sind `/api/billing/*` unerreichbar (404), auch `POST` mit `tier=cloud&interval=monthly`.
- * - K7: Die Rechtsseiten (`widerruf` auf App und Marketing, `leistungen` auf Marketing) sagen weiterhin „keine kostenpflichtigen Pläne“.
+ * - K7: Die Rechtsseiten `widerruf` (App und Marketing) enthalten die Widerrufsbelehrung zum Tarif Cloud (#381) und sagen nicht mehr „keine kostenpflichtigen Pläne“; `leistungen` (Marketing) sagt bis zu seiner eigenen Anpassung weiterhin „keine kostenpflichtigen Pläne“.
  *
  * Nicht prüfbar an der Oberfläche (abgedeckt durch Bun-Tests, siehe Ticket-Meldung):
  * - K2/K3: Brauchen ein laufendes Billing (`BLOOMMD_BILLING_ENABLED=1`), Datenbank und ein eingeloggtes Konto ohne Price-IDs; das
@@ -35,14 +35,16 @@ test.describe("Billing Cloud (#379)", () => {
     expect(checkout.status(), "POST /api/billing/checkout (tier=cloud, interval=monthly)").toBe(404);
   });
 
-  test("K7: Rechtsseiten sagen weiterhin „keine kostenpflichtigen Pläne“ @t379", async ({ page }) => {
+  test("K7: Widerruf nennt die Widerrufsbelehrung zum Tarif Cloud; Leistungen sagt noch „keine kostenpflichtigen Pläne“ @t379", async ({ page }) => {
     const widerrufApp = await page.goto(`${baseURL}/widerruf`);
     expect(widerrufApp?.status(), "App /widerruf").toBe(200);
-    await expect(page.locator("body")).toContainText("verkauft derzeit keine kostenpflichtigen Pläne");
+    await expect(page.locator("body")).toContainText("Muster-Widerrufsformular");
+    await expect(page.locator("body")).not.toContainText("keine kostenpflichtigen Pläne");
 
     const widerrufMarketing = await page.goto(`${marketingURL}/widerruf`);
     expect(widerrufMarketing?.status(), "Marketing /widerruf").toBe(200);
-    await expect(page.locator("body")).toContainText("verkauft derzeit keine kostenpflichtigen Pläne");
+    await expect(page.locator("body")).toContainText("Muster-Widerrufsformular");
+    await expect(page.locator("body")).not.toContainText("keine kostenpflichtigen Pläne");
 
     const leistungen = await page.goto(`${marketingURL}/leistungen`);
     expect(leistungen?.status(), "Marketing /leistungen").toBe(200);

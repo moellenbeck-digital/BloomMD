@@ -179,10 +179,10 @@ test.describe("Rechtsseiten @t199", () => {
     }
   });
 
-  test("K8: /widerruf ohne „M1“ und „Beta“; nennt Testaccount ohne Zahlungsdaten, Konto löschen und Widerruf der Wartelisten-Einwilligung über den Abmeldelink @t199", async ({ page }) => {
+  test("K8: /widerruf ohne „M1“ und „Beta“; nennt die Widerrufsbelehrung zum Tarif Cloud, den kostenlosen Testaccount, Konto löschen und Widerruf der Wartelisten-Einwilligung über den Abmeldelink @t199", async ({ page }) => {
     const expected = {
-      de: [/kostenlose Testaccount verursacht keine Kosten/, /erhebt keine Zahlungsdaten/, /Konto jederzeit unter .* löschen/, /Einwilligung jederzeit über den Abmeldelink .* widerrufen/],
-      en: [/free trial account costs nothing/, /collects no payment data/, /delete your account at any time/, /withdraw your consent at any time through the unsubscribe link/],
+      de: [/kostenlose Testaccount verursacht keine Kosten/, /binnen vierzehn Tagen ohne Angabe von Gründen/, /Konto jederzeit unter .* löschen/, /Einwilligung jederzeit über den Abmeldelink .* widerrufen/],
+      en: [/free trial account costs nothing/, /within fourteen days without giving any reason/, /delete your account at any time/, /withdraw your consent at any time through the unsubscribe link/],
     } as const;
     for (const host of HOSTS) {
       for (const lang of LANGS) {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildSyncRoomStatusUrl, createThroughSyncServer, deleteThroughSyncServer, fetchSyncRoomStatus, isSyncRoomActive, renameThroughSyncServer, writeThroughSyncServer } from "./sync-room-status";
+import { isQuotaMutationError } from "./account-quota";
+import { buildSyncRoomStatusUrl, createThroughSyncServer, deleteThroughSyncServer, fetchSyncRoomStatus, isSyncRoomActive, renameThroughSyncServer, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
 
 describe("sync room status", () => {
   test("builds an internal HTTP status URL from the public websocket URL", () => {
@@ -120,5 +121,22 @@ describe("sync room status", () => {
       "PATCH:https://sync.bloommd.app/internal/documents/doc-1",
       "DELETE:https://sync.bloommd.app/internal/documents/doc-1",
     ]);
+  });
+
+  test("keeps usage and limit of a quota refusal (413 QUOTA_EXCEEDED) on the error (#380)", async () => {
+    const fetcher = (async () => Response.json(
+      { error: "The account's storage quota is reached.", code: "QUOTA_EXCEEDED", usedBytes: 1234, limitBytes: 5678 },
+      { status: 413 },
+    )) as unknown as typeof fetch;
+    const error = await writeThroughSyncServer("doc-1", { filename: "a.md", markdown: "# A", workspaceId: "w", userId: "u" }, {
+      NEXT_PUBLIC_SYNC_URL: "wss://sync.bloommd.app",
+      BLOOMMD_SYNC_SECRET: "sync-secret-with-enough-variety-123",
+    }, fetcher).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(SyncMutationError);
+    expect(isQuotaMutationError(error)).toBe(true);
+    expect((error as SyncMutationError).status).toBe(413);
+    expect((error as SyncMutationError).details).toEqual({ usedBytes: 1234, limitBytes: 5678 });
+    expect(isQuotaMutationError(new SyncMutationError("VERSION_CONFLICT", 409, "x"))).toBe(false);
+    expect(isQuotaMutationError(new SyncMutationError("QUOTA_EXCEEDED", 413, "no numbers"))).toBe(false);
   });
 });

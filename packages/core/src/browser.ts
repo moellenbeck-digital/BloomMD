@@ -22,6 +22,7 @@ export {
   type ConflictCopyInfo,
   type ConflictCopyLabel,
 } from "./conflict-copy";
+export { QUOTA_EXCEEDED_CLOSE_CODE, QUOTA_EXCEEDED_CODE } from "./account-quota";
 export { NOTE_HISTORY_LIMIT, sortRevisionsNewestFirst, type NoteHistorySource, type NoteRevision } from "./note-history";
 export { collapseUnchanged, diffLines, diffStats, type DiffKind, type DiffLine, type DiffStats } from "./diff";
 export { addNode, deleteNode, moveNode, renameNode } from "./operations";

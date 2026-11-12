@@ -271,3 +271,28 @@ describe("trial switches in the production config (#274)", () => {
     expect(productionConfigWarnings(on).some((warning) => warning.includes("BLOOMMD_TRIAL_READONLY is 1"))).toBe(true);
   });
 });
+
+describe("account quota switch in the production config (#380)", () => {
+  test("is optional and accepts exactly 1 or 0", () => {
+    for (const value of [undefined, "", "0", "1"]) {
+      const env = appEnv();
+      if (value !== undefined) env.BLOOMMD_ACCOUNT_QUOTA = value;
+      expect(productionConfigErrors(env)).toEqual([]);
+    }
+    for (const invalid of ["true", "yes", "2", "on"]) {
+      const env = appEnv();
+      env.BLOOMMD_ACCOUNT_QUOTA = invalid;
+      expect(productionConfigErrors(env)).toContain('BLOOMMD_ACCOUNT_QUOTA must be exactly "1" or "0" when set.');
+    }
+  });
+
+  test("on is reported as a warning, off and unset are not", () => {
+    const off = appEnv();
+    off.BLOOMMD_ACCOUNT_QUOTA = "0";
+    expect(productionConfigWarnings(off).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA"))).toBe(false);
+    expect(productionConfigWarnings(appEnv()).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA"))).toBe(false);
+    const on = appEnv();
+    on.BLOOMMD_ACCOUNT_QUOTA = "1";
+    expect(productionConfigWarnings(on).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA is 1"))).toBe(true);
+  });
+});

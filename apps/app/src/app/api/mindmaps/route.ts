@@ -8,6 +8,7 @@ import { agentProposalResponse, logAgentChange } from "../../../lib/agent-access
 import { agentGate, agentReadOnlyResponse, readAgentMeta } from "../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
+import { isQuotaMutationError, quotaExceededResponse } from "../../../lib/account-quota";
 import { createThroughSyncServer, SyncMutationError, type SyncRoomSaveResult } from "../../../lib/sync-room-status";
 import { workspaceErrorResponse } from "../../../lib/workspace-api";
 
@@ -105,6 +106,7 @@ export async function POST(request: Request) {
           userId: identity.userId,
         });
       } catch (error) {
+        if (isQuotaMutationError(error)) return quotaExceededResponse(request, error.details.usedBytes, error.details.limitBytes);
         const code = error instanceof SyncMutationError ? error.code : "SYNC_MUTATION_UNAVAILABLE";
         const status = error instanceof SyncMutationError && error.code === "DOCUMENT_FILENAME_CONFLICT" ? 409 : 503;
         return NextResponse.json({ error: "Mindmap could not be created through the sync server.", code }, { status });

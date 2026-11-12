@@ -7,6 +7,7 @@ import { agentGate, agentReadOnlyResponse, readAgentMeta } from "./agent-gate";
 import { getApiRequestIdentity } from "./auth";
 import { getMindmapStorage } from "./mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "./request-security";
+import { isQuotaMutationError, quotaExceededResponse } from "./account-quota";
 import { applyKnowledgeNodesThroughSyncServer, SyncMutationError } from "./sync-room-status";
 
 export interface NodeOperationsOptions {
@@ -66,6 +67,7 @@ export async function applyNodeOperations(request: Request, filename: string, re
         }) : undefined;
         return NextResponse.json({ ids: result.ids, created: result.created, updated: result.updated, version: result.version, ...(gate ? { mode: "written", changeId } : {}) });
       } catch (error) {
+        if (isQuotaMutationError(error)) return quotaExceededResponse(request, error.details.usedBytes, error.details.limitBytes);
         if (error instanceof SyncMutationError) {
           if (error.code === "NODE_NOT_FOUND") return unknownNodeResponse(error.message, options);
           const status = error.status === 400 || error.status === 409 ? error.status : 503;

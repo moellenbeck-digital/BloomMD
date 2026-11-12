@@ -21,6 +21,7 @@ import {
   SyncRetryablePersistenceError,
   type DocumentPersistence,
 } from "./persistence";
+import { AccountQuotaExceededError, QUOTA_EXCEEDED_CLOSE_CODE } from "@bloommd/core/account-quota";
 import type { RoomDescriptor, SyncServerConfig, WebSocketData } from "./types";
 
 function createMockWs(roomName: string) {
@@ -1352,5 +1353,52 @@ describe("websocket updates reach storage", () => {
 
     expect(stored.attempts).toBe(1);
     expect(room.lastPersistError).toBe("VERSION_CONFLICT");
+  });
+});
+
+describe("account quota rejection of a room save (#380)", () => {
+  test("tells every client with 4013, drops the room and does not leave it degraded", async () => {
+    const closed: Array<{ code: number; reason: string }> = [];
+    const ws = {
+      sendBinary() {},
+      readyState: 1,
+      data: { roomName: "test.md" },
+      close(code: number, reason: string) { closed.push({ code, reason }); },
+    } as unknown as import("bun").ServerWebSocket<WebSocketData>;
+    const telemetry = createSyncTelemetry({ write: () => undefined });
+    const persistence: DocumentPersistence = {
+      authorize: async () => "write",
+      load: async (descriptor) => parseFile(descriptor.filename, SAMPLE_MD),
+      save: async () => { throw new AccountQuotaExceededError(123, 456); },
+    };
+    const manager = createRoomManager({ ...config, telemetry }, persistence, clock);
+    managers.push(manager);
+    const room = await manager.getOrCreateRoom("test.md");
+    manager.addClient(room, ws);
+    const rootId = room.yDoc.getMap("meta").get("rootId") as string;
+    (room.yDoc.getMap("nodes").get(rootId) as import("yjs").Map<unknown>).set("title", "Grows");
+
+    await expect(manager.persistRoom(room)).rejects.toBeInstanceOf(AccountQuotaExceededError);
+
+    expect(closed).toEqual([{ code: QUOTA_EXCEEDED_CLOSE_CODE, reason: "QUOTA_EXCEEDED" }]);
+    expect(QUOTA_EXCEEDED_CLOSE_CODE).toBe(4013);
+    expect(manager.getRooms().has("test.md")).toBe(false);
+    expect(room.lastPersistError).toBeNull();
+    expect(telemetry.snapshot().counters).toMatchObject({ sync_persistence_quota_rejections_total: 1 });
+    expect(telemetry.snapshot().counters.sync_persistence_errors_total ?? 0).toBe(0);
+  });
+
+  test("a snapshot write refused by the quota is reported and leaves no degraded room behind", async () => {
+    const persistence: DocumentPersistence = {
+      authorize: async () => "write",
+      load: async (descriptor) => parseFile(descriptor.filename, SAMPLE_MD),
+      save: async () => { throw new AccountQuotaExceededError(1, 2); },
+    };
+    const manager = createRoomManager(config, persistence, clock);
+    managers.push(manager);
+    const descriptor: RoomDescriptor = { key: "doc-1", filename: "test.md", workspaceId: "w", documentId: "doc-1", userId: "u", permission: "write" };
+
+    await expect(manager.writeDocumentSnapshot(descriptor, parseFile("test.md", "# Bigger"))).rejects.toBeInstanceOf(AccountQuotaExceededError);
+    expect(manager.getRooms().has("doc-1")).toBe(false);
   });
 });

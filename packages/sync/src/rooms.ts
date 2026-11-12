@@ -18,6 +18,7 @@ import {
   type DocumentPersistence,
   type DocumentRenameResult,
 } from "./persistence";
+import { AccountQuotaExceededError, QUOTA_EXCEEDED_CLOSE_CODE, QUOTA_EXCEEDED_CODE } from "@bloommd/core/account-quota";
 import type { PersistenceOperation, RoomDescriptor, SyncRoom, SyncServerConfig, WebSocketData } from "./types";
 
 const PERSISTENCE_ORIGIN = "bloommd:persistence";
@@ -28,7 +29,8 @@ function isTerminalPersistenceError(error: unknown): boolean {
   return error instanceof SyncDocumentVersionConflictError
     || error instanceof SyncPersistenceAuthorizationError
     || error instanceof SyncPersistenceValidationError
-    || error instanceof SyncPersistenceCorruptionError;
+    || error instanceof SyncPersistenceCorruptionError
+    || error instanceof AccountQuotaExceededError;
 }
 
 export class SyncRoomCapacityError extends Error {
@@ -521,6 +523,16 @@ export function createRoomManager(
         if (wasDegraded) telemetry.increment("sync_persistence_recoveries_total");
         if (room.revision !== revision) schedulePersist(room);
       } catch (err) {
+        if (err instanceof AccountQuotaExceededError) {
+          // The account's quota refused the save (#380): nothing reached storage and nothing will until
+          // the account shrinks, so the room must not stay degraded. Every client is told, then the
+          // room is dropped; its unsaved state lives on in the clients' own documents, and the next
+          // connection starts again from what storage holds.
+          rejectRoomForQuota(room);
+          telemetry.increment("sync_persistence_quota_rejections_total");
+          telemetry.event({ operation: "persistence", outcome: "error", durationMs: clock.now() - startedAt, roomKey: room.key, correlationId: room.correlationId, error: err });
+          throw err;
+        }
         room.lastPersistError = err instanceof Error ? err.message : "Persistence failed";
         telemetry.increment("sync_persistence_errors_total");
         telemetry.event({ operation: "persistence", outcome: "error", durationMs: clock.now() - startedAt, roomKey: room.key, correlationId: room.correlationId, error: err });
@@ -533,6 +545,21 @@ export function createRoomManager(
     })();
     persistencePromises.set(room, task);
     return task;
+  }
+
+  function rejectRoomForQuota(room: SyncRoom): void {
+    const clients = [...room.clients];
+    room.clients.clear();
+    for (const ws of clients) {
+      try {
+        ws.close(QUOTA_EXCEEDED_CLOSE_CODE, QUOTA_EXCEEDED_CODE);
+      } catch {
+        // A socket that is already gone needs no notice.
+      }
+    }
+    room.lastPersistError = null;
+    room.persistenceOperation = null;
+    destroyRoom(room.key);
   }
 
   async function persistWithRetry(

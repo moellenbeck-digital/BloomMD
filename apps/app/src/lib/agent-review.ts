@@ -16,6 +16,7 @@ import {
   type WorkspaceRecord,
 } from "./db";
 import { assertRateLimit, assertSameOriginForIdentity } from "./request-security";
+import { isQuotaMutationError, quotaExceededResponse } from "./account-quota";
 import { createThroughSyncServer, deleteThroughSyncServer, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
 import { workspaceForIdentity } from "./token-workspace";
 
@@ -27,7 +28,8 @@ export class AgentReviewError extends Error {
   }
 }
 
-export function agentReviewErrorResponse(error: unknown): NextResponse | null {
+export function agentReviewErrorResponse(error: unknown, request?: Request): NextResponse | null {
+  if (isQuotaMutationError(error)) return quotaExceededResponse(request, error.details.usedBytes, error.details.limitBytes);
   if (error instanceof AgentReviewError) return NextResponse.json({ error: error.message, code: error.code, ...error.extra }, { status: error.status });
   if (error instanceof SyncMutationError) {
     // A whole-map save is refused while someone has the map open (it would overwrite live edits).

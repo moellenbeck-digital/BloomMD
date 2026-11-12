@@ -19,6 +19,7 @@
     "db:purge-unconfirmed": "bun run scripts/purge-unconfirmed-accounts.ts",
     "db:transfer-waitlist": "bun run scripts/transfer-waitlist-accounts.ts",
     "db:trial-reminders": "bun run scripts/trial-reminders.ts",
+    "db:quota-report": "bun run scripts/quota-report.ts",
     "db:trial-admin": "bun run scripts/trial-admin.ts",
     "start": "next start",
     "test": "bun scripts/test-isolated.ts",

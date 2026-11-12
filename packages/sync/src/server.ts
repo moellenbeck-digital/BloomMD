@@ -7,6 +7,7 @@ import type { ServerWebSocket } from "bun";
 import { createSyncTelemetry, type SyncTelemetry } from "./observability";
 import { SyncNodeConflictError, SyncRoomBusyError, SyncRoomCapacityError, SyncServerDrainingError, type RoomManager, type RoomShutdownResult } from "./rooms";
 import { SyncDocumentNotFoundError, SyncDocumentVersionConflictError } from "./persistence";
+import { AccountQuotaExceededError, QUOTA_EXCEEDED_CODE } from "@bloommd/core/account-quota";
 import type { RoomDescriptor, SyncRoom, SyncServerConfig, WebSocketData } from "./types";
 import { parseFile, sanitizeMarkdownFilename, verifySyncTicket } from "@bloommd/core";
 import { sendSyncStep1, handleSyncMessage, isReadOnlyMessageAllowed, releaseAwarenessClients, sendAwarenessStates } from "./sync-handler";
@@ -141,6 +142,14 @@ function mutationErrorResponse(error: unknown) {
         ? "Document persistence is still pending."
         : "Document is active in another sync session.";
     return { status: 409 as const, body: { error: message, code } };
+  }
+  if (error instanceof AccountQuotaExceededError) {
+    // 413 rather than 403: the account may write (that is what 403 TRIAL_EXPIRED says it may not),
+    // this change is too large for what is left. The web app words the message in the user's language.
+    return {
+      status: 413 as const,
+      body: { error: "The account's storage quota is reached.", code: QUOTA_EXCEEDED_CODE, usedBytes: error.usedBytes, limitBytes: error.limitBytes },
+    };
   }
   if (error instanceof SyncDocumentVersionConflictError) {
     return { status: 409 as const, body: { error: "Document version changed on the server.", code: "VERSION_CONFLICT" } };

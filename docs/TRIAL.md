@@ -1,4 +1,4 @@
-# Testaccount: 30 Tage (Bestand 60 Tage), Hinweis-Mails, Sperre nach Ablauf (#274, #364)
+# Testaccount: 30 Tage (Bestand 60 Tage), Hinweis-Mails, Sperre nach Ablauf (#274, #364, #378)
 
 Der kostenlose Testaccount gilt 30 Tage ab E-Mail-Bestätigung; Bestandskonten bekommen 60 Tage (Ende 14.01.2027, #364). Die Texte dazu stehen in den
 Datenschutzerklärungen (`apps/app` und `apps/marketing`, je `datenschutz/page.tsx`) und in den AGB. Fristen und Konto-Löschung: `docs/LOESCHKONZEPT.md`.
@@ -46,7 +46,11 @@ Ausgabe: eine JSON-Zeile mit Zahlen (`due`, `dueByKind`, `heldBackExisting`, `ma
 - Lesen und der Export (`GET /api/account/export`) bleiben. Es wird nichts gelöscht.
 - Sichtbar: Hinweis in der App (unten eingeblendet) und auf `/account`. Auf `/account` steht außerdem „Testzeitraum bis TT.MM.JJJJ“, solange das Testende in der Zukunft liegt.
 - Ohne Datenbank (Dateimodus, E2E-Bypass) gibt es kein Testende und keine Sperre.
-- Zahlende Konten (Stripe) sind nicht ausgenommen. Billing ist in M1 aus (`BLOOMMD_BILLING_ENABLED=0`); gäbe es dennoch zahlende Konten, müsste ihre Behandlung vor dem Einschalten entschieden werden.
+- **Ausnahme: Konten mit aktivem Tarif (#378).** Sie bleiben nach Testende schreibbar, auch bei `BLOOMMD_TRIAL_READONLY=1`; Konten ohne Tarif bleiben wie oben nur lesbar. Das ist die Voraussetzung für das Billing (Entscheid #276, Tarif Cloud über Stripe).
+  - **Aktiver Tarif** = das Konto hat in `bloom_entitlements` mindestens eine Zeile mit `active = true` und (`expires_at` leer oder in der Zukunft; genau jetzt zählt als abgelaufen). Die Tabelle schreibt `recordStripeSubscription` (`apps/app/src/lib/db.ts`); die Prüfung ist `hasActiveEntitlement(userId, now)`. Ein bestimmter Tarifname wird nicht geprüft: jeder aktive Eintrag genügt, der Tarif „Cloud“ braucht also keine weitere Änderung.
+  - **Kündigung:** ein zum Periodenende gekündigtes Abo bleibt aktiv, bis `expires_at` (Periodenende) erreicht ist; danach ist das Konto wieder nur lesbar. Eine sofortige Kündigung (`canceled`) und **Zahlungsausfall** (`past_due` und andere Status außer `active`, `trialing`, `complete`, `paid`) setzen `active = false`: das Konto ist ab dem nächsten Schreibversuch wieder nur lesbar. Nichts wird gelöscht; zahlt das Konto wieder, ist es sofort wieder schreibbar.
+  - **Eine Regel an einer Stelle:** `isTrialWriteLocked` in `apps/app/src/lib/trial-lock.ts` prüft erst das Testende und fragt den Tarif nur bei abgelaufenen Konten ab. Proxy-Guard, Sync-Ticket (Berechtigung `write` statt `read`) und der Hinweis in der App und auf `/account` nutzen sie gemeinsam; es gibt keine zweite Regel. Konten mit aktivem Tarif sehen den Sperr-Hinweis nicht.
+  - **Fehlerverhalten unverändert:** schlägt die Abfrage fehl (Datenbank), blockiert der Guard nicht; die Route dahinter braucht die Datenbank ebenfalls und scheitert dort.
 
 ## Rollout-Reihenfolge
 
@@ -54,8 +58,16 @@ Ausgabe: eine JSON-Zeile mit Zahlen (`due`, `dueByKind`, `heldBackExisting`, `ma
 2. Migration `015` (`db/015_trial_legacy_60_days.sql`) vor dem Admin-Go anwenden (ebenfalls über `db:migrate`): sie setzt nur Bestandskonten, deren `trial_ends_at` noch 2026-12-15 ist, auf 2027-01-14 00:00 UTC. Von Hand geänderte Werte bleiben unberührt, nichts wird gelöscht, nichts wird versendet. Idempotent.
 3. App ausrollen (beide Schalter aus). Neue Konten bekommen ab da Testende und Sprache.
 4. Admin-Go einholen. Dann plant Ops den Job (zuerst Dry-Run prüfen, `heldBackExisting` und `dueByKind` ansehen), für Bestandskonten zusätzlich `BLOOMMD_TRIAL_REMINDERS_EXISTING=1` setzen. Das globale Mailbudget (60/Stunde, 300/Tag) vorher gegen die Zahl der Bestandskonten rechnen.
-5. `BLOOMMD_TRIAL_READONLY=1` erst nach Admin-Go und Absprache mit Ops, frühestens zum Testende.
+5. `BLOOMMD_TRIAL_READONLY=1` erst nach Admin-Go und Absprache mit Ops, frühestens zum Testende. Zahlende Konten sind ausgenommen (siehe „Sperre nach Ablauf“, #378): vor dem Einschalten sicherstellen, dass das Billing deren `bloom_entitlements`-Zeilen schreibt, sonst gelten sie als Konten ohne Tarif.
 
 ## Für den Oberflächentest
 
 Testsystem mit E2E-Outbox, Schalter nach Bedarf. Neues Konto registrieren und bestätigen, `/account` zeigt „Testzeitraum bis“ = Bestätigungstag + 30 Tage. Den Job mit `--jetzt` auf Bestätigung + 14, 15, 22, 23, 30 Tage laufen lassen (`--apply`): bei +15 und +23 je genau eine Mail im Outbox, bei +14/+22/+30 keine, ein zweiter Lauf zur selben Zeit keine. Bestandskonto (`trial_legacy`, Testende 2027-01-14 00:00 UTC; nur Testsystem, `BLOOMMD_TRIAL_REMINDERS_EXISTING=1`): `/account` zeigt „Testzeitraum bis 14.01.2027“; `--jetzt 2026-12-29T23:59:59Z` keine Mail, `2026-12-30T00:00:00Z` genau eine (Hinweis „noch 15 Tage“), `2027-01-06T23:59:59Z` keine weitere, `2027-01-07T00:00:00Z` genau eine („noch 7 Tage“), ab `2027-01-14T00:00:00Z` keine. Zum Prüfen der Sperre `trial_ends_at` des Testkontos auf die Vergangenheit setzen und `BLOOMMD_TRIAL_READONLY=1` auf dem Dev-System setzen.
+
+Sperre mit und ohne Tarif (#378, Marke `@t378`), `BLOOMMD_TRIAL_READONLY=1`, zwei bestätigte Konten mit `trial_ends_at` in der Vergangenheit:
+
+1. **Ohne Tarif:** Schreiben (z. B. `POST /api/workspaces` oder Speichern in der App) wird mit 403 und `code: "TRIAL_EXPIRED"` abgelehnt; `/account` und die App zeigen den Hinweis „Testzeitraum abgelaufen“; Lesen und `GET /api/account/export` gehen.
+2. **Mit Tarif:** `insert into bloom_entitlements (user_id, feature, source, active, expires_at) values (<id>, 'cloud', 'test', true, null)` (oder `expires_at` in der Zukunft): Schreiben geht (201/200), `/account` und die App zeigen keinen Hinweis.
+3. **Grenzen:** `active = false`, `expires_at` in der Vergangenheit oder genau jetzt → wieder gesperrt; `expires_at` leer → schreibbar.
+
+Automatisiert: `bun run --cwd apps/app test:e2e:trial-readonly` (eigener Server, Postgres; Spec `e2e/trial-readonly-t378.spec.ts`, nicht Teil des CI-Jobs `full-e2e`) und `tests/integration/trial-lock-entitlement-db.integration.test.ts`.

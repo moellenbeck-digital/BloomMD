@@ -1,7 +1,6 @@
 import { Info } from "lucide-react";
 import { getTrialEndsAt, normalizeUuid } from "../lib/db";
-import { isTrialOver } from "../lib/trial";
-import { isTrialReadonlyEnabled } from "../lib/trial-readonly";
+import { isTrialWriteLocked } from "../lib/trial-lock";
 import type { AppLocale } from "../lib/locale";
 
 /** End of the account's trial, or null (no database, no account, address not confirmed yet). */
@@ -12,13 +11,12 @@ export async function trialEndsAtForUser(userId: string | undefined) {
 
 /**
  * Notice of the read-only mode (#274): shown only with BLOOMMD_TRIAL_READONLY=1 and only when the
- * trial of the signed-in account has ended. Floats at the bottom so the app's full-height layout
- * stays as it is.
+ * trial of the signed-in account has ended and it has no active plan (#378; the same rule as the
+ * write guard, `isTrialWriteLocked`). Floats at the bottom so the app's full-height layout stays
+ * as it is.
  */
 export async function TrialReadonlyNotice({ userId, locale, floating = false }: { userId: string | undefined; locale: AppLocale; floating?: boolean }) {
-  if (!isTrialReadonlyEnabled()) return null;
-  const endsAt = await trialEndsAtForUser(userId);
-  if (!endsAt || !isTrialOver(endsAt, new Date())) return null;
+  if (!(await isTrialWriteLocked(userId, new Date()))) return null;
   return (
     <div
       role="status"

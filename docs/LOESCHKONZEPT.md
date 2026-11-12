@@ -29,6 +29,7 @@ prüft, dass Text und Code übereinstimmen.
 
 Ein abgelaufener Testaccount wird **nicht automatisch gelöscht**. Mit `BLOOMMD_TRIAL_READONLY=1` ist er nur
 lesbar, der Export (`GET /api/account/export`) und das Löschen des Kontos bleiben möglich (`docs/TRIAL.md`).
+Konten mit aktivem Tarif sind von der Sperre ausgenommen und bleiben schreibbar (#378).
 Ohne den Schalter (Standard) ist das Konto weiter voll nutzbar. Konto und Inhalte bleiben bestehen, bis die
 Nutzerin oder der Nutzer das Konto löscht. Die Texte beschreiben das so.
 

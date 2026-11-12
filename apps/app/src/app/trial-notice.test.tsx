@@ -4,9 +4,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 const USER = "11111111-1111-4111-8111-111111111111";
 const DAY = 24 * 60 * 60 * 1000;
 let endsAt: string | null = null;
+let hasPlan = false;
+let planLookups = 0;
 
 const realDb = await import("../lib/db");
-mock.module("../lib/db", () => ({ ...realDb, getTrialEndsAt: async () => endsAt }));
+mock.module("../lib/db", () => ({
+  ...realDb,
+  getTrialEndsAt: async () => endsAt,
+  hasActiveEntitlement: async () => {
+    planLookups += 1;
+    return hasPlan;
+  },
+}));
 const { TrialReadonlyNotice } = await import("./trial-notice");
 
 const html = async (userId: string | undefined, locale: "de" | "en") => {
@@ -18,6 +27,8 @@ describe("notice of the read-only mode (#274)", () => {
   afterEach(() => {
     delete process.env.BLOOMMD_TRIAL_READONLY;
     endsAt = null;
+    hasPlan = false;
+    planLookups = 0;
   });
 
   test("hidden without the switch, even for an expired account", async () => {
@@ -36,6 +47,24 @@ describe("notice of the read-only mode (#274)", () => {
     const en = await html(USER, "en");
     expect(en).toContain("Trial period ended");
     expect(en).toContain("read-only");
+  });
+
+  test("hidden for an expired account with an active plan, shown again without one (#378)", async () => {
+    process.env.BLOOMMD_TRIAL_READONLY = "1";
+    endsAt = new Date(Date.now() - DAY).toISOString();
+    hasPlan = true;
+    expect(await html(USER, "de")).toBe("");
+    expect(await html(USER, "en")).toBe("");
+    expect(planLookups).toBe(2);
+    hasPlan = false;
+    expect(await html(USER, "de")).toContain('data-testid="trial-expired-banner"');
+  });
+
+  test("the plan is not looked up while the trial runs (#378)", async () => {
+    process.env.BLOOMMD_TRIAL_READONLY = "1";
+    endsAt = new Date(Date.now() + DAY).toISOString();
+    expect(await html(USER, "de")).toBe("");
+    expect(planLookups).toBe(0);
   });
 
   test("hidden while the trial runs, without a trial end or without an account", async () => {

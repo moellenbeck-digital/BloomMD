@@ -1,4 +1,4 @@
-import { getTrialEndsAt, normalizeUuid } from "./db";
+import { getTrialEndsAt, hasActiveEntitlement, normalizeUuid } from "./db";
 import { isTrialOver } from "./trial";
 import { isTrialReadonlyEnabled } from "./trial-readonly";
 
@@ -10,8 +10,14 @@ export async function isTrialExpired(userId: string, now: Date = new Date()) {
   return endsAt != null && isTrialOver(endsAt, now);
 }
 
-/** With the switch on (BLOOMMD_TRIAL_READONLY=1): whether writes of this account are refused (#274). */
+/**
+ * With the switch on (BLOOMMD_TRIAL_READONLY=1): whether writes of this account are refused (#274).
+ * An account with an active plan stays writable after the trial (#378, `hasActiveEntitlement`).
+ * The plan is looked up only for accounts whose trial has ended.
+ */
 export async function isTrialWriteLocked(userId: string | undefined, now: Date = new Date()) {
   if (!userId || !isTrialReadonlyEnabled()) return false;
-  return isTrialExpired(userId, now);
+  if (!(await isTrialExpired(userId, now))) return false;
+  const normalized = normalizeUuid(userId);
+  return !normalized || !(await hasActiveEntitlement(normalized, now));
 }

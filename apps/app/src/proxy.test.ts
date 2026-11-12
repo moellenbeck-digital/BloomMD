@@ -11,7 +11,10 @@ const USER = "11111111-1111-4111-8111-111111111111";
 const TOKEN_USER = "22222222-2222-4222-8222-222222222222";
 const DAY = 24 * 60 * 60 * 1000;
 const ends: Record<string, string | null> = {};
+const plans = new Set<string>();
 let lookups = 0;
+let planLookups = 0;
+let planFails = false;
 
 const realDb = await import("./lib/db");
 mock.module("./lib/db", () => ({
@@ -19,6 +22,11 @@ mock.module("./lib/db", () => ({
   getTrialEndsAt: async (userId: string) => {
     lookups += 1;
     return ends[userId] ?? null;
+  },
+  hasActiveEntitlement: async (userId: string) => {
+    planLookups += 1;
+    if (planFails) throw new Error("db down");
+    return plans.has(userId);
   },
   resolveAccessToken: async (token: string) => (token === "bloom_pat_good" ? { userId: TOKEN_USER, email: "t@example.test", scope: "write", workspaceIds: null } : null),
 }));
@@ -39,6 +47,9 @@ const passes = (response: Response) => response.headers.get("x-middleware-next")
 describe("proxy: read-only mode of expired trial accounts (#274)", () => {
   beforeEach(() => {
     lookups = 0;
+    planLookups = 0;
+    planFails = false;
+    plans.clear();
     ends[USER] = new Date(Date.now() - DAY).toISOString();
     ends[TOKEN_USER] = new Date(Date.now() - DAY).toISOString();
     process.env.BLOOMMD_TRIAL_READONLY = "1";
@@ -106,6 +117,41 @@ describe("proxy: read-only mode of expired trial accounts (#274)", () => {
       expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
     } finally {
       Object.defineProperty(ends, USER, { value: stored, writable: true, configurable: true, enumerable: true });
+      console.error = original;
+    }
+  });
+
+  test("on: an expired account with an active plan can write, by session and by access token (#378)", async () => {
+    plans.add(USER);
+    plans.add(TOKEN_USER);
+    expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
+    expect(passes(await proxy(request("POST", "/api/account/access-tokens", { authorization: "Bearer bloom_pat_good" })))).toBe(true);
+    expect(planLookups).toBe(2);
+    plans.delete(USER);
+    expect((await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) }))).status).toBe(403);
+  });
+
+  test("on: the plan is only looked up for an expired account (#378)", async () => {
+    ends[USER] = new Date(Date.now() + DAY).toISOString();
+    expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
+    ends[USER] = null;
+    expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
+    expect(planLookups).toBe(0);
+    // Off: neither the trial end nor the plan is asked.
+    delete process.env.BLOOMMD_TRIAL_READONLY;
+    ends[USER] = new Date(Date.now() - DAY).toISOString();
+    expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
+    expect(planLookups).toBe(0);
+  });
+
+  test("on: a failing plan lookup does not block either (#378)", async () => {
+    const original = console.error;
+    console.error = () => {};
+    planFails = true;
+    try {
+      expect(passes(await proxy(request("PUT", "/api/mindmaps/plan.md", { cookie: cookie(USER) })))).toBe(true);
+      expect(planLookups).toBe(1);
+    } finally {
       console.error = original;
     }
   });

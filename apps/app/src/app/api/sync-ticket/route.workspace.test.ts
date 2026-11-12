@@ -6,6 +6,7 @@ const WORKSPACE_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 let tokenWorkspaceIds: string[] | null = [WORKSPACE_A];
 let requested: Array<string | null | undefined> = [];
 let trialEndsAt: string | null = null;
+let hasPlan = false;
 let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 
 mock.module("../../../lib/auth", () => ({
@@ -24,6 +25,7 @@ mock.module("../../../lib/db", () => ({
   readCloudDocument: async (_userId: string, filename: string, workspaceId: string) => ({ id: "doc-1", filename, workspaceId }),
   getAgentTokenRights: async () => rights,
   getTrialEndsAt: async () => trialEndsAt,
+  hasActiveEntitlement: async () => hasPlan,
 }));
 
 process.env.NEXT_PUBLIC_SYNC_URL = "wss://sync.bloommd.test";
@@ -42,6 +44,7 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
     requested = [];
     rights = { access: "write", areas: {} };
     trialEndsAt = null;
+    hasPlan = false;
     delete process.env.BLOOMMD_TRIAL_READONLY;
   });
 
@@ -83,5 +86,19 @@ describe("POST /api/sync-ticket with a workspace-bound token", () => {
     expect(await permission()).toBe("write");
     trialEndsAt = null;
     expect(await permission()).toBe("write");
+  });
+
+  test("an expired account with an active plan keeps a write ticket, without one it is read-only (#378)", async () => {
+    const permission = async () => ((await (await ticket({ filename: "plan.md" })).json()) as { permission: string }).permission;
+    process.env.BLOOMMD_TRIAL_READONLY = "1";
+    trialEndsAt = new Date(Date.now() - 1000).toISOString();
+    hasPlan = true;
+    expect(await permission()).toBe("write");
+    hasPlan = false;
+    expect(await permission()).toBe("read");
+    // The plan does not lift a read-only right the agent token itself has.
+    hasPlan = true;
+    rights = { access: "read", areas: {} };
+    expect(await permission()).toBe("read");
   });
 });

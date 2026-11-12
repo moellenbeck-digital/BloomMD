@@ -4143,6 +4143,28 @@ export async function getTrialEndsAt(userId: string): Promise<string | null> {
   return endsAt ? new Date(endsAt).toISOString() : null;
 }
 
+/**
+ * Whether the account has an active plan (#378): at least one `bloom_entitlements` row with
+ * `active = true` whose `expires_at` is empty or still ahead of `now` (an end exactly at `now`
+ * counts as over). `recordStripeSubscription` writes the rows: `past_due`, `canceled` and the like
+ * set `active = false`, a cancelled subscription runs out at the end of its period. No particular
+ * feature is checked. False without a database or an account.
+ */
+export async function hasActiveEntitlement(userId: string, now: Date = new Date()): Promise<boolean> {
+  if (!isDatabaseConfigured()) return false;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    select 1
+    from bloom_entitlements
+    where user_id = ${userId}
+      and active = true
+      and (expires_at is null or expires_at > ${now.toISOString()})
+    limit 1
+  `;
+  return rows.length > 0;
+}
+
 export interface TrialReminderCandidate {
   userId: string;
   email: string;

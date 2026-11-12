@@ -26,6 +26,7 @@ Ausgeschlossen sind (Projekt `chromium`):
 | `wiki.spec.ts` | braucht einen eigenen Server (`playwright.wiki.config.ts`) |
 | `beta-gate.spec.ts` | braucht eigene Server-Umgebung (`playwright.beta.config.ts`) |
 | `open-signup.spec.ts` | braucht eigene Server-Umgebung (`playwright.open-signup.config.ts`) |
+| `trial-readonly-t378.spec.ts` | braucht eigene Server-Umgebung mit Postgres (`playwright.trial-readonly.config.ts`, `bun run test:e2e:trial-readonly`; `BLOOMMD_TRIAL_READONLY=1`, Testende und Tarif per SQL gesetzt); läuft nicht in der CI, da dem Job `full-e2e` die Datenbank fehlt |
 | `collaboration.spec.ts` | braucht eigene Server-Umgebung (`playwright.collaboration.config.ts`) |
 | `visual-regression.spec.ts` | eigene Config und Snapshots (`playwright.visual.config.ts`) |
 | `plausible-tracking-local.spec.ts` | startet Gegenstelle und App selbst, braucht den Produktions-Build (`playwright.plausible.config.ts`, `bun run test:e2e:plausible`, CI-Schritt „Run Plausible tracking end-to-end tests“) |

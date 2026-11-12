@@ -8,6 +8,7 @@ import { createRoomManager, SyncRoomBusyError, SyncRoomCapacityError } from "./r
 import { TestClock } from "./clock";
 import { SyncDocumentVersionConflictError, type DocumentPersistence } from "./persistence";
 import { parseFile } from "@bloommd/core";
+import { AccountQuotaExceededError } from "@bloommd/core/account-quota";
 import { createSyncTelemetry } from "./observability";
 import type { SyncRoom, WebSocketData } from "./types";
 
@@ -511,5 +512,26 @@ describe("single-writer document mutations", () => {
     expect(rename.status).toBe(200);
     expect(remove.status).toBe(200);
     expect(calls).toEqual(["create", "rename", "delete"]);
+  });
+});
+
+describe("quota refusal of the document mutation API (#380)", () => {
+  test("answers 413 QUOTA_EXCEEDED with usage and limit, not the generic 503", async () => {
+    const secret = "sync-secret-with-enough-variety-123";
+    const roomManager = {
+      writeDocumentSnapshot: async () => { throw new AccountQuotaExceededError(1234, 5678); },
+      createDocument: async () => { throw new AccountQuotaExceededError(1234, 5678); },
+    };
+    const { app } = createSyncServer(roomManager as never, { syncSecret: secret });
+    const headers = { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
+    const base = { filename: "big.md", markdown: "# Big", workspaceId: "workspace-1", userId: "user-1" };
+
+    for (const response of [
+      await app.request("/internal/documents/doc-1/snapshot", { method: "PUT", headers, body: JSON.stringify(base) }),
+      await app.request("/internal/documents", { method: "POST", headers, body: JSON.stringify(base) }),
+    ]) {
+      expect(response.status).toBe(413);
+      expect(await response.json()).toMatchObject({ code: "QUOTA_EXCEEDED", usedBytes: 1234, limitBytes: 5678 });
+    }
   });
 });

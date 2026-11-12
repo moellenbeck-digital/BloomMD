@@ -48,9 +48,8 @@ Der Code erstattet **nichts** automatisch, weder bei Kündigung noch bei Konto-L
 
 ## Vor Prod-Go
 
-1. Die Rechtsseiten `agb`, `widerruf` und `datenschutz` (App und Marketing) beschreiben den Tarif seit #381 (siehe unten). `leistungen` (Marketing) sagt
-   noch „keine kostenpflichtigen Pläne“ und muss vor dem Einschalten ebenfalls angepasst werden (eigenes Ticket). Die Texte gehen zusammen mit dem Admin-Go
-   live, nicht früher: sie nennen den Tarif, kein Startdatum.
+1. Die Rechtsseiten `agb`, `widerruf` und `datenschutz` (App und Marketing) beschreiben den Tarif seit #381 (siehe unten). `leistungen` (Marketing) nennt
+   den Tarif ebenfalls (Nacharbeit #381). Die Texte nennen den Tarif, kein Startdatum; sie gehen zusammen mit dem Admin-Go live, nicht früher.
 2. Erstattungsregel entscheiden (siehe oben).
 3. Admin-Go und die Stripe-Schlüssel (live) kommen über Ops-CoS; danach `BLOOMMD_BILLING_ENABLED=1`.
 4. Testmodus-Durchlauf (Checkout, Webhook, Portal, Kündigung) mit Stripe-Testschlüsseln und Test-Price-IDs ist noch offen.

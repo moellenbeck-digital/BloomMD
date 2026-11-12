@@ -13,7 +13,7 @@ import {
   type AwarenessIdentity,
   type AwarenessUserState,
 } from "./types";
-import { QUOTA_EXCEEDED_CLOSE_CODE } from "@bloommd/core/account-quota";
+import { QUOTA_EXCEEDED_CLOSE_CODE } from "@bloommd/core/browser";
 import { getAwarenessColor } from "./presence";
 
 export interface SyncProviderOptions {

@@ -27,6 +27,7 @@ Ausgeschlossen sind (Projekt `chromium`):
 | `beta-gate.spec.ts` | braucht eigene Server-Umgebung (`playwright.beta.config.ts`) |
 | `open-signup.spec.ts` | braucht eigene Server-Umgebung (`playwright.open-signup.config.ts`) |
 | `trial-readonly-t378.spec.ts` | braucht eigene Server-Umgebung mit Postgres (`playwright.trial-readonly.config.ts`, `bun run test:e2e:trial-readonly`; `BLOOMMD_TRIAL_READONLY=1`, Testende und Tarif per SQL gesetzt); läuft nicht in der CI, da dem Job `full-e2e` die Datenbank fehlt |
+| `account-abuse-protection.spec.ts` (#277) | läuft gegen ein System per `PLAYWRIGHT_BASE_URL` (Testsystem-Config, `--grep @t277`; `PLAYWRIGHT_MAIL_OUTBOX` für K1–K5) oder lokal mit eigenem Server und Postgres: `bun run test:e2e:account-abuse` (`playwright.account-abuse.config.ts`, Mail-Outbox als Datei); ohne `PLAYWRIGHT_BASE_URL` bricht er ab, in der Standard-Config also nicht mitlaufen lassen |
 | `collaboration.spec.ts` | braucht eigene Server-Umgebung (`playwright.collaboration.config.ts`) |
 | `visual-regression.spec.ts` | eigene Config und Snapshots (`playwright.visual.config.ts`) |
 | `plausible-tracking-local.spec.ts` | startet Gegenstelle und App selbst, braucht den Produktions-Build (`playwright.plausible.config.ts`, `bun run test:e2e:plausible`, CI-Schritt „Run Plausible tracking end-to-end tests“) |

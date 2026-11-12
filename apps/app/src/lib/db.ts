@@ -1,6 +1,7 @@
 import { createSqlClient, type SqlClient } from "./sql-client";
 import { canonicalEmail } from "./email-canonical";
 import { TRIAL_DAYS, TRIAL_REMINDER_DAYS, TRIAL_REMINDER_KINDS, type TrialReminderKind } from "./trial";
+import { planTrialEnd, reminderKindsToReset, trialExceptionKey } from "./trial-admin";
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { NOTE_HISTORY_LIMIT } from "@bloommd/core/note-history";
@@ -195,7 +196,8 @@ async function verifyMarketSchema() {
       to_regclass('public.bloom_mail_budget') as mail_budget,
       to_regclass('public.bloom_waitlist_transfers') as waitlist_transfers,
       to_regclass('public.bloom_document_revisions') as document_revisions,
-      to_regclass('public.bloom_trial_reminders') as trial_reminders
+      to_regclass('public.bloom_trial_reminders') as trial_reminders,
+      to_regclass('public.bloom_trial_exceptions') as trial_exceptions
   `;
   const row = rows[0] as Record<string, string | null> | undefined;
   const missing = Object.entries(row ?? {})
@@ -1002,6 +1004,17 @@ async function createMarketSchema() {
 
   // Existing accounts get 60 instead of 30 days; see db/015_trial_legacy_60_days.sql, which explains the statement.
   await sql`update bloom_users set trial_ends_at = '2027-01-14T00:00:00Z' where trial_legacy and trial_ends_at = '2026-12-15T00:00:00Z'`;
+
+  // Exceptions of the mailbox rule, set only by the operator command; see db/016_trial_exceptions.sql, which explains the table.
+  await sql`
+    create table if not exists bloom_trial_exceptions (
+      email_hash text primary key,
+      created_by text not null,
+      created_at timestamptz not null default now(),
+      expires_at timestamptz not null,
+      check (email_hash ~ '^[0-9a-f]{64}$')
+    )
+  `;
 }
 
 export interface WorkspaceRecord {
@@ -3360,25 +3373,50 @@ type AuditEventType =
   | "document.share_link.revoked"
   | "mobile_app.connected"
   | "mobile_app.disconnected"
-  | "mobile_app.code_replayed";
+  | "mobile_app.code_replayed"
+  | "trial.extended"
+  | "trial.guard_released"
+  | "trial.exception_granted";
+
+type AuditTargetType =
+  | "access_token"
+  | "auth_token"
+  | "session"
+  | "workspace"
+  | "workspace_invitation"
+  | "workspace_member"
+  | "document"
+  | "workspace_agent"
+  | "agent_task"
+  | "agent_proposal"
+  | "agent_token_proposal"
+  | "share_link"
+  | "account"
+  | "trial_exception";
+
+interface AuditRow {
+  actorUserId: string | null;
+  actorAgentId: string | null;
+  eventType: AuditEventType;
+  targetType?: AuditTargetType;
+  targetId: string | null;
+  details?: Record<string, string>;
+}
+
+/** The one INSERT into bloom_audit_events; `sql` is the client or a transaction. Throws when it fails. */
+async function insertAuditRow(sql: Sql, row: AuditRow) {
+  // sql.json stores an object; JSON.stringify(...)::jsonb would store a JSON string instead.
+  await sql`
+    insert into bloom_audit_events (actor_user_id, actor_agent_id, event_type, target_type, target_id, details)
+    values (${row.actorUserId}, ${row.actorAgentId}, ${row.eventType}, ${row.targetType ?? null}, ${row.targetId}, ${row.details ? sql.json(row.details) : null})
+  `;
+}
 
 async function recordAuditEvent(input: {
   actorUserId?: string;
   actorAgentId?: string;
   eventType: AuditEventType;
-  targetType?:
-    | "access_token"
-    | "auth_token"
-    | "session"
-    | "workspace"
-    | "workspace_invitation"
-    | "workspace_member"
-    | "document"
-    | "workspace_agent"
-    | "agent_task"
-    | "agent_proposal"
-    | "agent_token_proposal"
-    | "share_link";
+  targetType?: AuditTargetType;
   targetId?: string | null;
   details?: Record<string, string>;
 }) {
@@ -3394,12 +3432,7 @@ async function recordAuditEvent(input: {
 
   try {
     await ensureMarketSchema();
-    const sql = getSql();
-    // sql.json stores an object; JSON.stringify(...)::jsonb would store a JSON string instead.
-    await sql`
-      insert into bloom_audit_events (actor_user_id, actor_agent_id, event_type, target_type, target_id, details)
-      values (${actorUserId}, ${actorAgentId}, ${input.eventType}, ${input.targetType ?? null}, ${targetId}, ${input.details ? sql.json(input.details) : null})
-    `;
+    await insertAuditRow(getSql(), { actorUserId, actorAgentId, eventType: input.eventType, targetType: input.targetType, targetId, details: input.details });
     return true;
   } catch {
     console.error("BloomMD security audit event could not be persisted.");
@@ -3955,6 +3988,7 @@ function isUniqueViolation(error: unknown) {
 /**
  * Is there a confirmed account with the same canonical address but another address (#277)? Only
  * confirmed accounts count: an unconfirmed one must not be able to occupy somebody else's address.
+ * An address with a valid exception of the operator command (`db:trial-admin`) has no twin.
  */
 export async function hasConfirmedMailboxTwin(email: string): Promise<boolean> {
   if (!isDatabaseConfigured()) return false;
@@ -3966,9 +4000,24 @@ export async function hasConfirmedMailboxTwin(email: string): Promise<boolean> {
     where email_canonical = ${canonicalEmail(email)}
       and lower(email) <> ${email.trim().toLowerCase()}
       and email_verified_at is not null
+      and not exists (
+        select 1 from bloom_trial_exceptions x
+        where x.email_hash = ${trialExceptionKey(email)} and x.expires_at > now()
+      )
     limit 1
   `;
   return rows.length > 0;
+}
+
+/**
+ * SQL condition (for the row `u` of bloom_users): a valid exception of the operator command exists
+ * for the address of `u`. The key is the same SHA-256 as `trialExceptionKey` in trial-admin.ts.
+ */
+function trialExceptionExists(sql: Sql) {
+  return sql`exists (
+    select 1 from bloom_trial_exceptions x
+    where x.email_hash = encode(sha256(convert_to(lower(btrim(u.email)), 'UTF8')), 'hex') and x.expires_at > now()
+  )`;
 }
 
 /**
@@ -3990,11 +4039,14 @@ export async function markEmailVerified(userId: string): Promise<"ok" | "duplica
       update bloom_users u
       set email_verified_at = coalesce(u.email_verified_at, now()),
         trial_ends_at = coalesce(u.trial_ends_at, coalesce(u.email_verified_at, now()) + (${TRIAL_DAYS} * interval '1 day')),
+        -- An address with a valid exception leaves the mailbox rule (and so the unique index) for good.
+        trial_guarded = u.trial_guarded and not ${trialExceptionExists(getSql())},
         updated_at = now()
       where u.id = ${dbUserId}
         and (
           u.email_verified_at is not null
           or not u.trial_guarded
+          or ${trialExceptionExists(getSql())}
           or not exists (
             select 1 from bloom_users o
             where o.email_canonical = u.email_canonical and o.id <> u.id and o.email_verified_at is not null
@@ -4018,6 +4070,161 @@ export async function markEmailVerified(userId: string): Promise<"ok" | "duplica
     eventType: "email.verified",
   });
   return "ok";
+}
+
+// ---------------------------------------------------------------- operator command for the trial (#277)
+//
+// Only `scripts/trial-admin.ts` calls these three functions: there is no route, no UI, no token for
+// them, so an account can never change its own trial end or its mailbox rule. Each run that changes
+// something writes one audit event in the same transaction (a change without its log line cannot
+// happen): time (created_at), operator and old and new value in `details`, the account id as target,
+// never an address (an exception is logged with the first 12 characters of its key only).
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface TrialAdminOutcome {
+  event: "trial.extended" | "trial.guard_released" | "trial.exception_granted";
+  /** Null for an exception of an address without an account. */
+  accountId: string | null;
+  field: "trial_ends_at" | "trial_guarded" | "exception_valid_until";
+  oldValue: string;
+  newValue: string;
+  /** False: the value was already as requested; nothing is written, not even a log line. */
+  changed: boolean;
+  /** False: dry run, nothing was written. */
+  applied: boolean;
+  /** Reminder claims (15/23 days) given back (or, in a dry run, that would be) so the reminders follow the new end. */
+  remindersReset: number;
+}
+
+const iso = (value: Date | string | null) => (value ? new Date(value).toISOString() : "none");
+
+/** Extends the trial end of an account (`endsAt` absolute or `extendDays` from the later of the old end and now). Null: no such account. */
+export async function adminSetTrialEnd(input: { operator: string; accountId: string; endsAt?: Date; extendDays?: number; now?: Date; apply: boolean }): Promise<TrialAdminOutcome | null> {
+  if (!isDatabaseConfigured()) return null;
+  const accountId = normalizeUuid(input.accountId);
+  if (!accountId) return null;
+  await ensureMarketSchema();
+  const now = input.now ?? new Date();
+
+  return getSql().begin(async (transaction) => {
+    const tx = transaction as unknown as Sql;
+    const rows = await tx`select trial_ends_at from bloom_users where id = ${accountId} for update`;
+    const row = rows[0] as { trial_ends_at: Date | string | null } | undefined;
+    if (!row) return null;
+    const oldEnd = row.trial_ends_at ? new Date(row.trial_ends_at) : null;
+    const newEnd = planTrialEnd({ oldEnd, now, endsAt: input.endsAt, extendDays: input.extendDays });
+    const kinds = reminderKindsToReset(newEnd, now);
+    const claims = kinds.length
+      ? ((await tx`select count(*)::int as n from bloom_trial_reminders where user_id = ${accountId} and kind in ${tx(kinds)}`)[0] as { n: number }).n
+      : 0;
+    const outcome: TrialAdminOutcome = {
+      event: "trial.extended",
+      accountId,
+      field: "trial_ends_at",
+      oldValue: iso(oldEnd),
+      newValue: newEnd.toISOString(),
+      changed: true,
+      applied: input.apply,
+      remindersReset: claims,
+    };
+    if (!input.apply) return outcome;
+
+    await tx`update bloom_users set trial_ends_at = ${newEnd.toISOString()}::timestamptz, updated_at = now() where id = ${accountId}`;
+    if (kinds.length) await tx`delete from bloom_trial_reminders where user_id = ${accountId} and kind in ${tx(kinds)}`;
+    await insertAuditRow(tx, {
+      actorUserId: null,
+      actorAgentId: null,
+      eventType: "trial.extended",
+      targetType: "account",
+      targetId: accountId,
+      details: { operator: input.operator, field: "trial_ends_at", old: outcome.oldValue, new: outcome.newValue, remindersReset: String(claims) },
+    });
+    return outcome;
+  });
+}
+
+/** Takes an existing account out of the mailbox rule (`trial_guarded = false`). Null: no such account. */
+export async function adminReleaseTrialGuard(input: { operator: string; accountId: string; apply: boolean }): Promise<TrialAdminOutcome | null> {
+  if (!isDatabaseConfigured()) return null;
+  const accountId = normalizeUuid(input.accountId);
+  if (!accountId) return null;
+  await ensureMarketSchema();
+
+  return getSql().begin(async (transaction) => {
+    const tx = transaction as unknown as Sql;
+    const rows = await tx`select trial_guarded from bloom_users where id = ${accountId} for update`;
+    const row = rows[0] as { trial_guarded: boolean } | undefined;
+    if (!row) return null;
+    const outcome: TrialAdminOutcome = {
+      event: "trial.guard_released",
+      accountId,
+      field: "trial_guarded",
+      oldValue: String(row.trial_guarded),
+      newValue: "false",
+      changed: row.trial_guarded,
+      applied: input.apply && row.trial_guarded,
+      remindersReset: 0,
+    };
+    if (!input.apply || !row.trial_guarded) return outcome;
+
+    await tx`update bloom_users set trial_guarded = false, updated_at = now() where id = ${accountId}`;
+    await insertAuditRow(tx, {
+      actorUserId: null,
+      actorAgentId: null,
+      eventType: "trial.guard_released",
+      targetType: "account",
+      targetId: accountId,
+      details: { operator: input.operator, field: "trial_guarded", old: "true", new: "false" },
+    });
+    return outcome;
+  });
+}
+
+/**
+ * Allows one more trial account for an exact address: for `validDays` the address has no
+ * "confirmed twin" at sign-up and leaves the mailbox rule when it is confirmed. Stored as the key of
+ * the address (SHA-256), not the address. The audit event targets the account of that address when
+ * it exists already.
+ */
+export async function adminGrantTrialException(input: { operator: string; address: string; validDays: number; now?: Date; apply: boolean }): Promise<TrialAdminOutcome> {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL ist nicht konfiguriert.");
+  await ensureMarketSchema();
+  const now = input.now ?? new Date();
+  const key = trialExceptionKey(input.address);
+  const validUntil = new Date(now.getTime() + input.validDays * DAY_MS);
+
+  return getSql().begin(async (transaction) => {
+    const tx = transaction as unknown as Sql;
+    const previous = (await tx`select expires_at from bloom_trial_exceptions where email_hash = ${key} for update`)[0] as { expires_at: Date | string } | undefined;
+    const account = (await tx`select id from bloom_users where lower(email) = ${input.address.trim().toLowerCase()} limit 1`)[0] as { id: string } | undefined;
+    const outcome: TrialAdminOutcome = {
+      event: "trial.exception_granted",
+      accountId: account?.id ?? null,
+      field: "exception_valid_until",
+      oldValue: iso(previous?.expires_at ?? null),
+      newValue: validUntil.toISOString(),
+      changed: true,
+      applied: input.apply,
+      remindersReset: 0,
+    };
+    if (!input.apply) return outcome;
+
+    await tx`
+      insert into bloom_trial_exceptions (email_hash, created_by, created_at, expires_at)
+      values (${key}, ${input.operator}, ${now.toISOString()}::timestamptz, ${validUntil.toISOString()}::timestamptz)
+      on conflict (email_hash) do update set created_by = excluded.created_by, created_at = excluded.created_at, expires_at = excluded.expires_at
+    `;
+    await insertAuditRow(tx, {
+      actorUserId: null,
+      actorAgentId: null,
+      eventType: "trial.exception_granted",
+      targetType: account ? "account" : "trial_exception",
+      targetId: account?.id ?? null,
+      details: { operator: input.operator, field: "exception_valid_until", old: outcome.oldValue, new: outcome.newValue, key: key.slice(0, 12) },
+    });
+    return outcome;
+  });
 }
 
 export async function updatePasswordForEmail(input: {

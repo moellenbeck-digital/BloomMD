@@ -20,8 +20,13 @@ export const QUOTA_EXCEEDED_CODE = "QUOTA_EXCEEDED";
 export const QUOTA_EXCEEDED_CLOSE_CODE = 4013;
 
 /** Off unless `BLOOMMD_ACCOUNT_QUOTA=1`, so nothing is refused without the admin's go (like `BLOOMMD_TRIAL_READONLY`). */
-export function isAccountQuotaEnforced(env: Record<string, string | undefined> = process.env): boolean {
+export function isAccountQuotaEnforced(env: Record<string, string | undefined> = processEnv()): boolean {
   return env.BLOOMMD_ACCOUNT_QUOTA === "1";
+}
+
+/** `process.env` where there is one; this file is also bundled for browsers and the mobile app, which have no Node types. */
+function processEnv(): Record<string, string | undefined> {
+  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
 }
 
 const encoder = new TextEncoder();

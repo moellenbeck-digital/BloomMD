@@ -2575,7 +2575,7 @@ export async function listAccountStorageUsage(): Promise<Array<{ accountId: stri
 }
 
 /** The quota check of `writeCloudDocument` (verification-only path; runtime writes are checked in the sync server). */
-async function assertQuotaAllowsWrite(workspaceId: string, filename: string, markdown: string): Promise<void> {
+async function assertQuotaAllowsWrite(workspaceId: string, filename: string, markdown: string, limitBytes: number = ACCOUNT_QUOTA_BYTES): Promise<void> {
   if (!isAccountQuotaEnforced()) return;
   const newBytes = quotaBytes(markdown);
   const current = await getSql()`
@@ -2592,7 +2592,7 @@ async function assertQuotaAllowsWrite(workspaceId: string, filename: string, mar
     where w.owner_user_id = (select owner_user_id from bloom_workspaces where id = ${workspaceId})
   `;
   const usedBytes = Number((usage[0] as { used?: string | number } | undefined)?.used ?? 0);
-  if (!decideQuotaWrite({ usedBytes, oldBytes, newBytes }).allowed) throw new AccountQuotaExceededError(usedBytes, ACCOUNT_QUOTA_BYTES);
+  if (!decideQuotaWrite({ usedBytes, oldBytes, newBytes, limitBytes }).allowed) throw new AccountQuotaExceededError(usedBytes, limitBytes);
 }
 
 /**
@@ -2608,6 +2608,8 @@ export async function writeCloudDocument(input: {
   markdown: string;
   frontmatter: Record<string, unknown>;
   expectedVersion?: number | null;
+  /** Only for tests of the quota (#380): a smaller limit than the 100 MB, used with BLOOMMD_ACCOUNT_QUOTA=1. */
+  quotaLimitBytes?: number;
 }): Promise<CloudDocumentRecord> {
   const dbUserId = normalizeUuid(input.userId);
   if (!dbUserId)
@@ -2615,7 +2617,7 @@ export async function writeCloudDocument(input: {
   const workspace = await getWorkspaceForUser(dbUserId, input.workspaceId);
   if (workspace.role === "viewer")
     throw new Error("This workspace is read-only.");
-  await assertQuotaAllowsWrite(workspace.id, input.filename, input.markdown);
+  await assertQuotaAllowsWrite(workspace.id, input.filename, input.markdown, input.quotaLimitBytes);
 
   let rows;
   if (input.expectedVersion != null) {

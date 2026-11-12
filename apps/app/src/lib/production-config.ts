@@ -113,7 +113,8 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     }
   }
   // Trial switches (#274): off unless exactly "1"; a typo must not silently mean "off" in a release.
-  for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING"] as const) {
+  // The account quota (#380) is the same kind of switch (read by the app and by the sync server).
+  for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING", "BLOOMMD_ACCOUNT_QUOTA"] as const) {
     const value = env[key]?.trim();
     if (value && value !== "0" && value !== "1") errors.push(`${key} must be exactly "1" or "0" when set.`);
   }
@@ -201,6 +202,11 @@ export function productionConfigWarnings(env: NodeJS.ProcessEnv = process.env) {
   if (env.BLOOMMD_TRIAL_READONLY?.trim() === "1") {
     warnings.push(
       "BLOOMMD_TRIAL_READONLY is 1: accounts whose trial has ended are read-only (#274). It belongs on only after the admin's go and in agreement with Ops.",
+    );
+  }
+  if (env.BLOOMMD_ACCOUNT_QUOTA?.trim() === "1") {
+    warnings.push(
+      "BLOOMMD_ACCOUNT_QUOTA is 1: writes that grow an account beyond 100 MB are refused (#380). It belongs on only after the admin's go and in agreement with Ops; the sync server needs the same value.",
     );
   }
   return warnings;

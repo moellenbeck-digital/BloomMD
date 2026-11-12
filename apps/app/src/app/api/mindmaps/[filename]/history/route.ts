@@ -3,7 +3,8 @@ import { getApiRequestIdentity } from "../../../../../lib/auth";
 import { isAgentTokenIdentity } from "../../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody } from "../../../../../lib/request-security";
-import { SyncMutationError, writeThroughSyncServer } from "../../../../../lib/sync-room-status";
+import { quotaExceededResponse } from "../../../../../lib/account-quota";
+import { isQuotaMutationError, SyncMutationError, writeThroughSyncServer } from "../../../../../lib/sync-room-status";
 import { workspaceErrorResponse } from "../../../../../lib/workspace-api";
 
 interface RouteParams {
@@ -83,6 +84,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         if (error instanceof SyncMutationError && error.code === "VERSION_CONFLICT") {
           return NextResponse.json({ error: "Document changed on the server.", code: error.code }, { status: 409 });
         }
+        if (isQuotaMutationError(error)) return quotaExceededResponse(request, error.details.usedBytes, error.details.limitBytes);
         console.warn("[BloomMD] Restoring a cloud version failed:", error instanceof Error ? error.name : "unknown");
         const code = error instanceof SyncMutationError ? error.code : "SYNC_MUTATION_UNAVAILABLE";
         return NextResponse.json({ error: "The version could not be restored through the sync server.", code }, { status: error instanceof SyncMutationError && error.status === 409 ? 409 : 503 });

@@ -88,6 +88,6 @@ export async function POST(request: Request, { params }: RouteParams) {
       throw error;
     }
   } catch (error) {
-    return workspaceErrorResponse(error, "Agent proposal could not be reviewed.");
+    return workspaceErrorResponse(error, "Agent proposal could not be reviewed.", request);
   }
 }

@@ -8,8 +8,10 @@ import { agentProposalResponse, logAgentChange } from "../../../../lib/agent-acc
 import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta, type AgentChangeMeta } from "../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, readTextBody, RequestSecurityError } from "../../../../lib/request-security";
+import { quotaExceededResponse } from "../../../../lib/account-quota";
 import {
   deleteThroughSyncServer,
+  isQuotaMutationError,
   renameThroughSyncServer,
   SyncMutationError,
   writeThroughSyncServer,
@@ -114,6 +116,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
         if (syncMutationError instanceof SyncMutationError && syncMutationError.code === "VERSION_CONFLICT") {
           throw new Error("VERSION_CONFLICT");
         }
+        if (isQuotaMutationError(syncMutationError)) return quotaExceededResponse(request, syncMutationError.details.usedBytes, syncMutationError.details.limitBytes);
         console.warn("[BloomMD] Sync-server document save failed:", syncMutationError instanceof Error ? syncMutationError.name : "unknown");
         const code = syncMutationError instanceof SyncMutationError ? syncMutationError.code : "SYNC_MUTATION_UNAVAILABLE";
         return NextResponse.json({ error: "Document could not be saved through the sync server.", code }, { status: 503 });

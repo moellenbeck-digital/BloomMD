@@ -20,10 +20,18 @@ export interface SyncRoomSaveResult {
 }
 
 export class SyncMutationError extends Error {
-  constructor(readonly code: string, readonly status: number, message: string) {
+  constructor(readonly code: string, readonly status: number, message: string, readonly details: { usedBytes?: number; limitBytes?: number } = {}) {
     super(message);
     this.name = "SyncMutationError";
   }
+}
+
+/** The quota refusal of the sync server (#380): 413 `QUOTA_EXCEEDED` with usage and limit. */
+export function isQuotaMutationError(error: unknown): error is SyncMutationError & { details: { usedBytes: number; limitBytes: number } } {
+  return error instanceof SyncMutationError
+    && error.code === "QUOTA_EXCEEDED"
+    && typeof error.details.usedBytes === "number"
+    && typeof error.details.limitBytes === "number";
 }
 
 type SyncRoomStatusEnv = Record<string, string | undefined>;
@@ -98,11 +106,14 @@ async function requestSyncMutation<T>(
     signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => null) as { code?: string; error?: string } | null;
+    const payload = await response.json().catch(() => null) as { code?: string; error?: string; usedBytes?: number; limitBytes?: number } | null;
     throw new SyncMutationError(
       payload?.code ?? "SYNC_MUTATION_UNAVAILABLE",
       response.status,
       payload?.error ?? `Sync mutation failed with ${response.status}.`,
+      typeof payload?.usedBytes === "number" && typeof payload?.limitBytes === "number"
+        ? { usedBytes: payload.usedBytes, limitBytes: payload.limitBytes }
+        : {},
     );
   }
   return response.json() as Promise<T>;

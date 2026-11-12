@@ -5,6 +5,7 @@ import { planTrialEnd, reminderKindsToReset, trialExceptionKey } from "./trial-a
 import { createHash, randomBytes } from "node:crypto";
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
 import { NOTE_HISTORY_LIMIT } from "@bloommd/core/note-history";
+import { ACCOUNT_QUOTA_BYTES, AccountQuotaExceededError, decideQuotaWrite, isAccountQuotaEnforced, quotaBytes } from "@bloommd/core/account-quota";
 import { AGENT_ACCESS, areaKey, normalizeAreaPath, type AgentAccess, type AgentAccessConfig } from "@bloommd/core/agent-ledger";
 import {
   hashSecret,
@@ -605,6 +606,9 @@ async function createMarketSchema() {
     on bloom_workspaces(owner_user_id)
     where kind = 'personal'
   `;
+
+  // The storage quota (#380) sums the documents of all workspaces an account owns.
+  await sql`create index if not exists bloom_workspaces_owner_idx on bloom_workspaces(owner_user_id)`;
 
   await sql`
     create table if not exists bloom_workspace_members (
@@ -2532,6 +2536,66 @@ export async function readCloudRevisionMarkdown(
 }
 
 /**
+ * Storage usage of an account (#380): the UTF-8 bytes of `markdown` of all documents that are not
+ * deleted, in all workspaces the account owns. One aggregate; the workspaces are found through
+ * `bloom_workspaces_owner_idx`, their documents through `bloom_documents_workspace_updated_idx`.
+ * Revisions and the front matter column do not count. 0 without a database.
+ */
+export async function getAccountStorageUsage(userId: string): Promise<number> {
+  if (!isDatabaseConfigured()) return 0;
+  const dbUserId = normalizeUuid(userId);
+  if (!dbUserId) return 0;
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    select coalesce(sum(octet_length(d.markdown)), 0)::bigint as used
+    from bloom_workspaces w
+    join bloom_documents d on d.workspace_id = w.id and d.deleted_at is null
+    where w.owner_user_id = ${dbUserId}
+  `;
+  return Number((rows[0] as { used?: string | number } | undefined)?.used ?? 0);
+}
+
+/**
+ * Usage of every account, for the ops report (`db:quota-report`): account id and bytes, no address.
+ * Accounts without documents are listed with 0, so the number of accounts is complete.
+ */
+export async function listAccountStorageUsage(): Promise<Array<{ accountId: string; usedBytes: number }>> {
+  if (!isDatabaseConfigured()) return [];
+  await ensureMarketSchema();
+
+  const rows = await getSql()`
+    select u.id, coalesce(sum(octet_length(d.markdown)), 0)::bigint as used
+    from bloom_users u
+    left join bloom_workspaces w on w.owner_user_id = u.id
+    left join bloom_documents d on d.workspace_id = w.id and d.deleted_at is null
+    group by u.id
+  `;
+  return (rows as unknown as Array<{ id: string; used: string | number }>).map((row) => ({ accountId: row.id, usedBytes: Number(row.used) }));
+}
+
+/** The quota check of `writeCloudDocument` (verification-only path; runtime writes are checked in the sync server). */
+async function assertQuotaAllowsWrite(workspaceId: string, filename: string, markdown: string): Promise<void> {
+  if (!isAccountQuotaEnforced()) return;
+  const newBytes = quotaBytes(markdown);
+  const current = await getSql()`
+    select octet_length(markdown)::bigint as bytes
+    from bloom_documents
+    where workspace_id = ${workspaceId} and lower(filename) = lower(${filename}) and deleted_at is null
+  `;
+  const oldBytes = Number((current[0] as { bytes?: string | number } | undefined)?.bytes ?? 0);
+  if (newBytes <= oldBytes) return;
+  const usage = await getSql()`
+    select coalesce(sum(octet_length(d.markdown)), 0)::bigint as used
+    from bloom_workspaces w
+    join bloom_documents d on d.workspace_id = w.id and d.deleted_at is null
+    where w.owner_user_id = (select owner_user_id from bloom_workspaces where id = ${workspaceId})
+  `;
+  const usedBytes = Number((usage[0] as { used?: string | number } | undefined)?.used ?? 0);
+  if (!decideQuotaWrite({ usedBytes, oldBytes, newBytes }).allowed) throw new AccountQuotaExceededError(usedBytes, ACCOUNT_QUOTA_BYTES);
+}
+
+/**
  * Verification-only database primitives used by `scripts/verify-database.ts`.
  * Runtime cloud document mutations must go through the Sync-Server command API;
  * these helpers are intentionally kept for isolated migration/release checks and
@@ -2551,6 +2615,7 @@ export async function writeCloudDocument(input: {
   const workspace = await getWorkspaceForUser(dbUserId, input.workspaceId);
   if (workspace.role === "viewer")
     throw new Error("This workspace is read-only.");
+  await assertQuotaAllowsWrite(workspace.id, input.filename, input.markdown);
 
   let rows;
   if (input.expectedVersion != null) {

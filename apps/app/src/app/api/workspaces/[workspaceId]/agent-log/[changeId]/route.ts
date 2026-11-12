@@ -16,6 +16,6 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (body.action !== "undo") return NextResponse.json({ error: "The action must be undo." }, { status: 400 });
     return NextResponse.json(await undoAgentChange(context.workspace.id, changeId, { kind: "owner", userId: context.userId, name: context.reviewerName }));
   } catch (error) {
-    return agentReviewErrorResponse(error) ?? workspaceErrorResponse(error, "The change could not be undone.");
+    return agentReviewErrorResponse(error, request) ?? workspaceErrorResponse(error, "The change could not be undone.", request);
   }
 }

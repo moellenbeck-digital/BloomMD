@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
+import { quotaExceededResponse } from "./account-quota";
 import { RateLimitError, RequestSecurityError } from "./request-security";
+import { isQuotaMutationError } from "./sync-room-status";
 
-export function workspaceErrorResponse(error: unknown, fallback: string) {
+export function workspaceErrorResponse(error: unknown, fallback: string, request?: Request) {
+  // A change the storage quota stopped (#380): its own code and a message that names usage and limit.
+  if (isQuotaMutationError(error)) return quotaExceededResponse(request, error.details.usedBytes, error.details.limitBytes);
   if (error instanceof RequestSecurityError) return NextResponse.json({ error: error.message }, { status: error.status });
   if (error instanceof RateLimitError) {
     return NextResponse.json({ error: error.message }, { status: 429, headers: { "Retry-After": String(error.retryAfterSeconds) } });

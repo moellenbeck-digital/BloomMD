@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { parseFile, type MindMapDocument } from "@bloommd/core";
+import { ACCOUNT_QUOTA_BYTES, decideQuotaWrite, isAccountQuotaEnforced, quotaBytes } from "@bloommd/core/account-quota";
 
 const originalWarn = console.warn;
 
@@ -13,6 +14,10 @@ let syncMutationResult: {
   storage?: MindMapDocument["storage"];
   version: number | null;
 } | null = null;
+
+// Stand-in for the sync server's quota rule (#380): the account's usage and the stored size of the document.
+let quotaUsedBytes = 0;
+let quotaOldBytes = 0;
 
 let agent = false;
 let storedName = "synced.md";
@@ -75,8 +80,12 @@ mock.module("../../../../lib/sync-room-status", () => ({
       this.status = status;
     }
   },
-  writeThroughSyncServer: async () => {
+  writeThroughSyncServer: async (_documentId: string, input: { markdown?: string }) => {
     if (syncMutationFailure) throw syncMutationFailure;
+    // The sync server refuses a growing save beyond the limit only with BLOOMMD_ACCOUNT_QUOTA=1; same rule, same module.
+    if (isAccountQuotaEnforced() && !decideQuotaWrite({ usedBytes: quotaUsedBytes, oldBytes: quotaOldBytes, newBytes: quotaBytes(input.markdown ?? "") }).allowed) {
+      throw Object.assign(new Error("The account's storage quota is reached."), { code: "QUOTA_EXCEEDED", status: 413, details: { usedBytes: quotaUsedBytes, limitBytes: ACCOUNT_QUOTA_BYTES } });
+    }
     return syncMutationResult;
   },
   renameThroughSyncServer: async () => ({ success: true, newFilePath: "renamed.md", newFilename: "renamed.md", version: 8 }),
@@ -120,6 +129,9 @@ describe("mindmap save route", () => {
     storeDeleteCalls = 0;
     syncMutationFailure = null;
     syncMutationResult = null;
+    quotaUsedBytes = 0;
+    quotaOldBytes = 0;
+    delete process.env.BLOOMMD_ACCOUNT_QUOTA;
     agent = false;
     storedName = "synced.md";
     rights = { access: "write", areas: {} };
@@ -130,6 +142,7 @@ describe("mindmap save route", () => {
 
   afterEach(() => {
     console.warn = originalWarn;
+    delete process.env.BLOOMMD_ACCOUNT_QUOTA;
   });
 
   test("returns the sync-room save result without writing directly to storage", async () => {
@@ -171,6 +184,85 @@ describe("mindmap save route", () => {
     expect(response.status).toBe(503);
     expect(body.code).toBe("SYNC_MUTATION_UNAVAILABLE");
     expect(storeWriteCalls).toBe(0);
+  });
+
+  describe("storage quota (#380)", () => {
+    const putMarkdown = (markdown: string, query = "") => PUT(new Request(`https://bloommd.app/api/mindmaps/synced.md${query}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Origin: "https://bloommd.app" },
+      body: JSON.stringify({ markdown }),
+    }), { params: Promise.resolve({ filename: "synced.md" }) });
+    const okResult = () => {
+      syncMutationResult = {
+        filePath: "synced.md",
+        frontmatter: {},
+        storage: { mode: "database", documentId: "22222222-2222-4222-8222-222222222222", workspaceId: "33333333-3333-4333-8333-333333333333", version: 8 },
+        version: 8,
+      };
+    };
+
+    test("a growing PUT that takes the account over 100 MB is a 413 QUOTA_EXCEEDED with usage, limit and a German message", async () => {
+      process.env.BLOOMMD_ACCOUNT_QUOTA = "1";
+      quotaUsedBytes = ACCOUNT_QUOTA_BYTES;
+      quotaOldBytes = 10;
+      okResult();
+
+      const response = await putMarkdown("# Synced\n\nGrows");
+      const body = await response.json() as { code?: string; error?: string; usedBytes?: number; limitBytes?: number };
+
+      expect(response.status).toBe(413);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(body.code).toBe("QUOTA_EXCEEDED");
+      expect(body.usedBytes).toBe(ACCOUNT_QUOTA_BYTES);
+      expect(body.limitBytes).toBe(ACCOUNT_QUOTA_BYTES);
+      expect(body.error).toContain("100,0 MB von 100 MB");
+      expect(body.error).toContain("Lesen, Export und Löschen");
+      expect(storeWriteCalls).toBe(0);
+    });
+
+    test("the message follows ?lang=en and the Accept-Language header", async () => {
+      process.env.BLOOMMD_ACCOUNT_QUOTA = "1";
+      quotaUsedBytes = ACCOUNT_QUOTA_BYTES;
+      quotaOldBytes = 10;
+      okResult();
+
+      const en = await (await putMarkdown("# Synced\n\nGrows", "?lang=en")).json() as { error?: string; code?: string };
+      expect(en.code).toBe("QUOTA_EXCEEDED");
+      expect(en.error).toContain("100.0 MB of 100 MB");
+      expect(en.error).toContain("read, export and delete");
+
+      const header = await PUT(new Request("https://bloommd.app/api/mindmaps/synced.md", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Origin: "https://bloommd.app", "Accept-Language": "en-GB,en;q=0.8" },
+        body: JSON.stringify({ markdown: "# Synced\n\nGrows" }),
+      }), { params: Promise.resolve({ filename: "synced.md" }) });
+      expect(header.status).toBe(413);
+      expect((await header.json() as { error?: string }).error).toContain("storage quota");
+    });
+
+    test("a shrinking PUT with the quota reached goes through (200)", async () => {
+      process.env.BLOOMMD_ACCOUNT_QUOTA = "1";
+      quotaUsedBytes = ACCOUNT_QUOTA_BYTES + 5_000_000;
+      quotaOldBytes = quotaBytes("# Synced\n\nA long text that is cut down below");
+      okResult();
+
+      const response = await putMarkdown("# Synced\n");
+      const body = await response.json() as { storage?: MindMapDocument["storage"] };
+
+      expect(response.status).toBe(200);
+      expect(body.storage?.version).toBe(8);
+    });
+
+    test("without the switch a growing PUT at the limit is not refused", async () => {
+      quotaUsedBytes = ACCOUNT_QUOTA_BYTES + 5_000_000;
+      quotaOldBytes = 10;
+      okResult();
+
+      const response = await putMarkdown("# Synced\n\nGrows and grows");
+
+      expect(response.status).toBe(200);
+      expect(isAccountQuotaEnforced()).toBe(false);
+    });
   });
 
   test("routes cloud rename and delete through the sync server", async () => {

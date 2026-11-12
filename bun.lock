@@ -30,7 +30,7 @@
     },
     "apps/app": {
       "name": "@bloommd/web-app",
-      "version": "0.6.0-develop.1",
+      "version": "0.6.0-develop.2",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ui": "workspace:*",
@@ -83,7 +83,7 @@
     },
     "apps/marketing": {
       "name": "@bloommd/marketing",
-      "version": "0.6.0-develop.1",
+      "version": "0.6.0-develop.2",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ui": "workspace:*",
@@ -473,7 +473,7 @@
     },
     "packages/sync": {
       "name": "@bloommd/sync",
-      "version": "0.6.0-develop.1",
+      "version": "0.6.0-develop.2",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "hono": "^4.13.12",

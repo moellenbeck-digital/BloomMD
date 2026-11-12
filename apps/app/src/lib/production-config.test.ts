@@ -65,6 +65,48 @@ describe("product app production config", () => {
     expect(errors).toContain("BLOOMMD_REQUIRE_AUTH must be 1.");
   });
 
+  test("billing on needs the Stripe secrets and both Cloud prices (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    const errors = productionConfigErrors(env);
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_CLOUD_MONTHLY", "STRIPE_PRICE_CLOUD_ANNUAL"]) {
+      expect(errors).toContain(`${key} is required when BLOOMMD_BILLING_ENABLED is 1.`);
+    }
+    // The legacy price keys are no longer part of the contract.
+    expect(errors.join(" ")).not.toMatch(/PRO_MONTHLY|PRO_ANNUAL|LIFETIME|SYNC_MONTHLY/);
+  });
+
+  test("billing on checks the live key, the webhook secret and the price prefix (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    env.STRIPE_SECRET_KEY = "sk_test_123";
+    env.STRIPE_WEBHOOK_SECRET = "secret";
+    env.STRIPE_PRICE_CLOUD_MONTHLY = "prod_123";
+    env.STRIPE_PRICE_CLOUD_ANNUAL = "123";
+    expect(productionConfigErrors(env)).toEqual(expect.arrayContaining([
+      "STRIPE_SECRET_KEY must be a live Stripe secret for production.",
+      "STRIPE_WEBHOOK_SECRET must use a Stripe webhook secret.",
+      "STRIPE_PRICE_CLOUD_MONTHLY must use a Stripe price id.",
+      "STRIPE_PRICE_CLOUD_ANNUAL must use a Stripe price id.",
+    ]));
+  });
+
+  test("billing on with a complete Stripe configuration passes, with no sync price rule (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    env.STRIPE_SECRET_KEY = "sk_live_abc";
+    env.STRIPE_WEBHOOK_SECRET = "whsec_abc";
+    env.STRIPE_PRICE_CLOUD_MONTHLY = "price_monthly";
+    env.STRIPE_PRICE_CLOUD_ANNUAL = "price_annual";
+    expect(productionConfigErrors(env)).toEqual([]);
+  });
+
+  test("billing off needs no Stripe values", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "0";
+    expect(productionConfigErrors(env)).toEqual([]);
+  });
+
   test("allows the beta gate to use database-backed invites", () => {
     const env = appEnv();
     delete env.BLOOMMD_BETA_ALLOWED_EMAILS;

@@ -1,61 +1,48 @@
-export type BillingTier = "pro-monthly" | "pro-annual" | "lifetime" | "sync-monthly";
+export type BillingTier = "cloud";
+export type BillingInterval = "monthly" | "annual";
+
+export interface BillingIntervalPlan {
+  interval: BillingInterval;
+  price: string;
+  cadence: string;
+  cta: string;
+  envKey: string;
+}
 
 export interface BillingPlan {
   tier: BillingTier;
   name: string;
-  price: string;
-  cadence: string;
   description: string;
   features: string[];
-  cta: string;
-  mode: "payment" | "subscription";
-  envKey: string;
+  mode: "subscription";
+  intervals: Record<BillingInterval, BillingIntervalPlan>;
 }
 
+export const billingIntervals: readonly BillingInterval[] = ["monthly", "annual"];
+
 export const billingPlans: Record<BillingTier, BillingPlan> = {
-  "pro-monthly": {
-    tier: "pro-monthly",
-    name: "Pro Monthly",
-    price: "9 EUR",
-    cadence: "pro Monat",
-    description: "Für intensive Wissensarbeit ohne lange Bindung.",
-    features: ["Alle lokalen Funktionen", "Große Maps", "Präsentationsmodus", "Keyboard-first Workflow"],
-    cta: "Monatlich starten",
-    mode: "subscription",
-    envKey: "STRIPE_PRICE_PRO_MONTHLY",
-  },
-  "pro-annual": {
-    tier: "pro-annual",
-    name: "Pro Annual",
-    price: "79 EUR",
-    cadence: "pro Jahr",
-    description: "Für regelmäßige Wissensarbeit mit Pro-Workflows und besserem Jahrespreis.",
-    features: ["Alle lokalen Funktionen", "Große Maps", "Präsentationsmodus", "Keyboard-first Workflow"],
-    cta: "Pro kaufen",
-    mode: "subscription",
-    envKey: "STRIPE_PRICE_PRO_ANNUAL",
-  },
-  lifetime: {
-    tier: "lifetime",
-    name: "Lifetime",
-    price: "149 EUR",
-    cadence: "einmalig",
-    description: "Für Local-first-Nutzer, die eine dauerhafte Lizenz für die Hauptversion wollen.",
-    features: ["Dauerlizenz für v1", "Desktop und Mobile", "Priorisierte Updates", "Beta-Zugang"],
-    cta: "Lifetime sichern",
-    mode: "payment",
-    envKey: "STRIPE_PRICE_LIFETIME",
-  },
-  "sync-monthly": {
-    tier: "sync-monthly",
-    name: "Sync Monthly",
-    price: "5 EUR",
-    cadence: "pro Monat",
-    description: "Optionaler Cloud-Sync für mehrere Geräte und spätere Team-Funktionen.",
+  cloud: {
+    tier: "cloud",
+    name: "Cloud",
+    description: "Cloud-Workspaces mit Sync für mehrere Geräte, Realtime-Präsenz und Cloud-Backup.",
     features: ["Mehrgeräte-Sync", "Realtime-Präsenz", "Cloud-Backup", "Jederzeit kündbar"],
-    cta: "Sync aktivieren",
     mode: "subscription",
-    envKey: "STRIPE_PRICE_SYNC_MONTHLY",
+    intervals: {
+      monthly: {
+        interval: "monthly",
+        price: "6 EUR",
+        cadence: "pro Monat",
+        cta: "Monatlich buchen",
+        envKey: "STRIPE_PRICE_CLOUD_MONTHLY",
+      },
+      annual: {
+        interval: "annual",
+        price: "60 EUR",
+        cadence: "pro Jahr",
+        cta: "Jährlich buchen",
+        envKey: "STRIPE_PRICE_CLOUD_ANNUAL",
+      },
+    },
   },
 };
 
@@ -70,15 +57,17 @@ export const landingPlans = [
     cta: "Kostenlos starten",
     href: "/app",
   },
-  billingPlans["pro-monthly"],
-  billingPlans["pro-annual"],
-  billingPlans.lifetime,
-  billingPlans["sync-monthly"],
+  billingPlans.cloud,
 ];
 
+/** Only `cloud` resolves; legacy tier names (`pro-*`, `lifetime`, `sync-monthly`) are unknown here. */
 export function getBillingPlan(tier: string | null): BillingPlan | null {
-  if (!tier) return null;
-  return billingPlans[tier as BillingTier] ?? null;
+  return tier === "cloud" ? billingPlans.cloud : null;
+}
+
+/** `monthly` or `annual`; anything else (missing, empty, other case) is not a billing interval. */
+export function getBillingInterval(interval: string | null): BillingInterval | null {
+  return interval === "monthly" || interval === "annual" ? interval : null;
 }
 
 export function getSiteUrl() {

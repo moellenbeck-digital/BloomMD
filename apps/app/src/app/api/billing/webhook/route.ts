@@ -117,9 +117,13 @@ export async function POST(request: Request) {
         customer?: string;
         status?: string;
         current_period_end?: number;
+        items?: { data?: Array<{ current_period_end?: number }> };
         cancel_at_period_end?: boolean;
         metadata?: { tier?: string; app_user_id?: string };
       };
+      // Newer Stripe API versions carry the period end on the subscription item, not on the
+      // subscription. Without it the entitlement would stay open-ended until the delete event arrives.
+      const periodEnd = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end;
       await recordStripeSubscription({
         userId: subscription.metadata?.app_user_id,
         tier: subscription.metadata?.tier ?? "unknown",
@@ -127,12 +131,12 @@ export async function POST(request: Request) {
         mode: "subscription",
         stripeCustomerId: typeof subscription.customer === "string" ? subscription.customer : null,
         stripeSubscriptionId: subscription.id,
-        currentPeriodEnd: subscription.current_period_end,
+        currentPeriodEnd: periodEnd,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
         raw: {
           subscriptionId: subscription.id,
           status: subscription.status ?? null,
-          currentPeriodEnd: subscription.current_period_end ?? null,
+          currentPeriodEnd: periodEnd ?? null,
           cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
         },
       });

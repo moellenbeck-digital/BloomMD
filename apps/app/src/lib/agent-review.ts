@@ -16,8 +16,8 @@ import {
   type WorkspaceRecord,
 } from "./db";
 import { assertRateLimit, assertSameOriginForIdentity } from "./request-security";
-import { quotaExceededResponse } from "./account-quota";
-import { createThroughSyncServer, deleteThroughSyncServer, isQuotaMutationError, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
+import { isQuotaMutationError, quotaExceededResponse } from "./account-quota";
+import { createThroughSyncServer, deleteThroughSyncServer, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
 import { workspaceForIdentity } from "./token-workspace";
 
 /** A refusal with a status and a code the clients show; anything else is an internal error. */

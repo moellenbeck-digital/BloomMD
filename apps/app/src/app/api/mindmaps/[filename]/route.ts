@@ -8,10 +8,9 @@ import { agentProposalResponse, logAgentChange } from "../../../../lib/agent-acc
 import { agentGate, agentReadOnlyResponse, agentWriteRequiredResponse, readAgentMeta, type AgentChangeMeta } from "../../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, readTextBody, RequestSecurityError } from "../../../../lib/request-security";
-import { quotaExceededResponse } from "../../../../lib/account-quota";
+import { isQuotaMutationError, quotaExceededResponse } from "../../../../lib/account-quota";
 import {
   deleteThroughSyncServer,
-  isQuotaMutationError,
   renameThroughSyncServer,
   SyncMutationError,
   writeThroughSyncServer,

@@ -7,8 +7,8 @@ import { agentGate, agentReadOnlyResponse, readAgentMeta } from "./agent-gate";
 import { getApiRequestIdentity } from "./auth";
 import { getMindmapStorage } from "./mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "./request-security";
-import { quotaExceededResponse } from "./account-quota";
-import { applyKnowledgeNodesThroughSyncServer, isQuotaMutationError, SyncMutationError } from "./sync-room-status";
+import { isQuotaMutationError, quotaExceededResponse } from "./account-quota";
+import { applyKnowledgeNodesThroughSyncServer, SyncMutationError } from "./sync-room-status";
 
 export interface NodeOperationsOptions {
   /** Tool name in the change log and in proposals when the agent names none. */

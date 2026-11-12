@@ -26,13 +26,6 @@ export class SyncMutationError extends Error {
   }
 }
 
-/** The quota refusal of the sync server (#380): 413 `QUOTA_EXCEEDED` with usage and limit. */
-export function isQuotaMutationError(error: unknown): error is SyncMutationError & { details: { usedBytes: number; limitBytes: number } } {
-  return error instanceof SyncMutationError
-    && error.code === "QUOTA_EXCEEDED"
-    && typeof error.details.usedBytes === "number"
-    && typeof error.details.limitBytes === "number";
-}
 
 type SyncRoomStatusEnv = Record<string, string | undefined>;
 

@@ -8,8 +8,8 @@ import { agentProposalResponse, logAgentChange } from "../../../lib/agent-access
 import { agentGate, agentReadOnlyResponse, readAgentMeta } from "../../../lib/agent-gate";
 import { getMindmapStorage } from "../../../lib/mindmap-storage";
 import { assertSameOriginForIdentity, readJsonBody, RequestSecurityError } from "../../../lib/request-security";
-import { quotaExceededResponse } from "../../../lib/account-quota";
-import { createThroughSyncServer, isQuotaMutationError, SyncMutationError, type SyncRoomSaveResult } from "../../../lib/sync-room-status";
+import { isQuotaMutationError, quotaExceededResponse } from "../../../lib/account-quota";
+import { createThroughSyncServer, SyncMutationError, type SyncRoomSaveResult } from "../../../lib/sync-room-status";
 import { workspaceErrorResponse } from "../../../lib/workspace-api";
 
 function serializeNodes(nodes: Map<string, MindMapNode>) {

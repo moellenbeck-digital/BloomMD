@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildSyncRoomStatusUrl, createThroughSyncServer, deleteThroughSyncServer, fetchSyncRoomStatus, isQuotaMutationError, isSyncRoomActive, renameThroughSyncServer, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
+import { isQuotaMutationError } from "./account-quota";
+import { buildSyncRoomStatusUrl, createThroughSyncServer, deleteThroughSyncServer, fetchSyncRoomStatus, isSyncRoomActive, renameThroughSyncServer, SyncMutationError, writeThroughSyncServer } from "./sync-room-status";
 
 describe("sync room status", () => {
   test("builds an internal HTTP status URL from the public websocket URL", () => {

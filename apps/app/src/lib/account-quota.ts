@@ -81,6 +81,17 @@ export function summarizeQuotaUsage(
   };
 }
 
+/**
+ * The quota refusal of the sync server (#380): a `SyncMutationError` with code `QUOTA_EXCEEDED`, status 413 and
+ * usage and limit in `details`. Checked by its shape and not with `instanceof`, so this file needs nothing from
+ * `sync-room-status` (route tests replace that module with partial mocks).
+ */
+export function isQuotaMutationError(error: unknown): error is Error & { code: string; details: { usedBytes: number; limitBytes: number } } {
+  if (!(error instanceof Error)) return false;
+  const { code, details } = error as { code?: unknown; details?: { usedBytes?: unknown; limitBytes?: unknown } };
+  return code === QUOTA_EXCEEDED_CODE && typeof details?.usedBytes === "number" && typeof details?.limitBytes === "number";
+}
+
 /** Language of an API refusal, like `trialRequestLocale`: `?lang=en`, else the browser's preference. */
 export function quotaRequestLocale(request?: { url: string; headers: { get(name: string): string | null } }): AppLocale {
   if (!request) return "de";

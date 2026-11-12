@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { quotaExceededResponse } from "./account-quota";
+import { isQuotaMutationError, quotaExceededResponse } from "./account-quota";
 import { RateLimitError, RequestSecurityError } from "./request-security";
-import { isQuotaMutationError } from "./sync-room-status";
 
 export function workspaceErrorResponse(error: unknown, fallback: string, request?: Request) {
   // A change the storage quota stopped (#380): its own code and a message that names usage and limit.

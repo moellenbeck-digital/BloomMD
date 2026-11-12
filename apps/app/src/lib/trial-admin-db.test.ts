@@ -32,7 +32,7 @@ async function recordingSql(answers: (statement: string) => unknown[] | undefine
     const statement = normalize(parts.join("?"));
     recorded.push({ statement, values, transaction: inTransaction });
     return Promise.resolve(answers(statement) ?? []);
-  }) as unknown as SqlClient & { json: (value: unknown) => unknown; begin: <T>(fn: (tx: SqlClient) => Promise<T>) => Promise<T> };
+  }) as unknown as { json: (value: unknown) => unknown; begin: <T>(fn: (tx: unknown) => Promise<T>) => Promise<T> };
   sql.json = (value) => ({ json: value });
   sql.begin = async (fn) => {
     inTransaction = true;
@@ -42,7 +42,7 @@ async function recordingSql(answers: (statement: string) => unknown[] | undefine
       inTransaction = false;
     }
   };
-  __setMarketSqlForTest(sql);
+  __setMarketSqlForTest(sql as unknown as SqlClient);
   process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test?sslmode=require";
   // The first call migrates; start recording after that.
   await ensureMarketSchema();

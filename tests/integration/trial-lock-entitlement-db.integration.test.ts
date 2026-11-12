@@ -112,6 +112,52 @@ describe.skipIf(!url)("trial lock and active plan (Postgres)", () => {
     expect(await lock.isTrialWriteLocked(lapsed, NOW)).toBe(true);
   });
 
+  test("Cloud subscription (#379): the events Stripe sends give the account the feature cloud and take it away again", async () => {
+    const userId = await account("cloud-lifecycle");
+    const now = new Date();
+    const periodEnd = Math.floor((now.getTime() + 30 * DAY) / 1000);
+    const subscriptionId = `sub_cloud_${run}`;
+    const cloudRows = async () => (await sql`select feature, active from bloom_entitlements where user_id = ${userId}`).map((row) => [row.feature, row.active]);
+    const subscription = (status: string, extra: Partial<Parameters<typeof db.recordStripeSubscription>[0]> = {}) =>
+      db.recordStripeSubscription({
+        userId, tier: "cloud", status, mode: "subscription", stripeSubscriptionId: subscriptionId, stripeCustomerId: `cus_cloud_${run}`,
+        currentPeriodEnd: periodEnd, raw: { id: subscriptionId, status }, ...extra,
+      });
+
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(false);
+
+    // checkout.session.completed (subscription mode, paid): active at once, no period end yet.
+    await db.recordStripeSubscription({
+      userId, tier: "cloud", status: "paid", mode: "subscription", stripeCustomerId: `cus_cloud_${run}`,
+      stripeSubscriptionId: subscriptionId, stripeCheckoutSessionId: `cs_cloud_${run}`, raw: { id: `cs_cloud_${run}` },
+    });
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(true);
+    expect(await cloudRows()).toEqual([["cloud", true]]);
+
+    // customer.subscription.created / updated: the same row, now with the end of the period.
+    await subscription("active");
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(true);
+    expect(await cloudRows()).toEqual([["cloud", true]]);
+
+    // Cancelled to the end of the period: active until then, over from the period end on.
+    await subscription("active", { cancelAtPeriodEnd: true });
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(true);
+    expect(await db.hasActiveEntitlement(userId, new Date(periodEnd * 1000))).toBe(false);
+
+    // Payment failed, then paid again.
+    await subscription("past_due");
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(false);
+    await subscription("active");
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(true);
+
+    // customer.subscription.deleted.
+    await subscription("canceled");
+    expect(await db.hasActiveEntitlement(userId, now)).toBe(false);
+    expect(await cloudRows()).toEqual([["cloud", false]]);
+    const stored = await sql`select tier, status, mode from bloom_subscriptions where stripe_subscription_id = ${subscriptionId}`;
+    expect(stored.map((row) => [row.tier, row.status, row.mode])).toEqual([["cloud", "canceled", "subscription"]]);
+  });
+
   test("isTrialWriteLocked: the switch off or a running trial never lock", async () => {
     const free = await account("lock-off");
     expect(await lock.isTrialWriteLocked(free, NOW)).toBe(false);

@@ -45,7 +45,7 @@ test.describe("product app release contracts", () => {
     }
 
     const checkout = await request.post("/api/billing/checkout", {
-      form: { tier: "pro-monthly" },
+      form: { tier: "cloud", interval: "monthly" },
       headers: { origin: "http://localhost:3211" },
       maxRedirects: 0,
     });

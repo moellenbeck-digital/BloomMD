@@ -1,4 +1,5 @@
 import {
+  formatQuotaUsage,
   ACCOUNT_QUOTA_BYTES,
   ACCOUNT_QUOTA_WARNING_RATIO,
   QUOTA_EXCEEDED_CODE,
@@ -102,4 +103,37 @@ export function quotaExceededResponse(request: { url: string; headers: { get(nam
     { error: quotaExceededMessage(quotaRequestLocale(request), usedBytes, limitBytes), code: QUOTA_EXCEEDED_CODE, usedBytes, limitBytes },
     { status: 413, headers: { "Cache-Control": "no-store" } },
   );
+}
+
+/** What the account page shows for the storage of the account (#380). */
+export interface StorageUsageView {
+  title: string;
+  /** "37,2 MB von 100 MB" */
+  usage: string;
+  /** Share of the limit for the bar, capped at 100. */
+  barPercent: number;
+  level: QuotaLevel;
+  /** Null while everything is fine. */
+  message: string | null;
+}
+
+export function storageUsageView(status: AccountQuotaStatus, locale: AppLocale): StorageUsageView {
+  const percent = status.percent;
+  let message: string | null = null;
+  if (status.level === "reached") {
+    message = locale === "en"
+      ? "Your storage is full. New content is not saved. You can still read, export and delete your data, and shrink notes."
+      : "Dein Speicherplatz ist erreicht. Neue Inhalte werden nicht gespeichert. Lesen, Export und Löschen sowie das Verkleinern von Notizen sind weiterhin möglich.";
+  } else if (status.level === "warning") {
+    message = locale === "en"
+      ? `You have used ${percent} % of your storage. When it is full, new content is not saved any more; reading, export and deleting keep working.`
+      : `Du hast ${percent} % deines Speicherplatzes belegt. Ist er voll, werden neue Inhalte nicht mehr gespeichert; Lesen, Export und Löschen bleiben möglich.`;
+  }
+  return {
+    title: locale === "en" ? "Storage" : "Speicher",
+    usage: formatQuotaUsage(status.usedBytes, status.limitBytes, locale),
+    barPercent: Math.min(100, Math.max(0, percent)),
+    level: status.level,
+    message,
+  };
 }

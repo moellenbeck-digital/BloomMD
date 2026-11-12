@@ -5,6 +5,7 @@ import {
   isAccountQuotaEnforced,
   quotaExceededResponse,
   quotaRequestLocale,
+  storageUsageView,
   summarizeQuotaUsage,
 } from "./account-quota";
 
@@ -80,5 +81,33 @@ describe("ops report (db:quota-report)", () => {
     const report = summarizeQuotaUsage([], { enforced: true });
     expect(report).toMatchObject({ accounts: 0, totalBytes: 0, over80: 0, over100: 0, perAccount: [], enforced: true });
     expect(JSON.stringify(summarizeQuotaUsage(rows))).not.toContain("@");
+  });
+});
+
+describe("storage block of the account page (#380)", () => {
+  test("shows usage like '37,2 MB von 100 MB' and says nothing while all is well", () => {
+    const view = storageUsageView(accountQuotaStatus(Math.round(37.2 * MB), true), "de");
+    expect(view.usage).toBe("37,2 MB von 100 MB");
+    expect(view.title).toBe("Speicher");
+    expect(view.level).toBe("ok");
+    expect(view.barPercent).toBe(37);
+    expect(view.message).toBeNull();
+  });
+
+  test("warns from 80 % and names what still works", () => {
+    const view = storageUsageView(accountQuotaStatus(85 * MB, true), "de");
+    expect(view.level).toBe("warning");
+    expect(view.message).toContain("85 %");
+    expect(view.message).toContain("Lesen, Export und Löschen");
+    expect(storageUsageView(accountQuotaStatus(85 * MB, true), "en").message).toContain("reading, export and deleting");
+  });
+
+  test("says plainly when the storage is full; the bar stops at 100 for an account that was over before", () => {
+    const view = storageUsageView(accountQuotaStatus(130 * MB, true), "en");
+    expect(view.level).toBe("reached");
+    expect(view.barPercent).toBe(100);
+    expect(view.usage).toBe("130.0 MB of 100 MB");
+    expect(view.message).toContain("storage is full");
+    expect(storageUsageView(accountQuotaStatus(100 * MB, true), "de").message).toContain("Speicherplatz ist erreicht");
   });
 });

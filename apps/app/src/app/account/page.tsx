@@ -4,7 +4,8 @@ import { Clock, CreditCard, Download, LogOut, MailCheck, MoveLeft, ShieldCheck, 
 import { getSession } from "../../lib/auth";
 import { getBuildInfo } from "../../lib/build-info";
 import { getBillingPlan } from "../../lib/billing";
-import { getMarketAccountByEmail, isDatabaseConfigured, listAccessTokens, listWorkspacesForUser, normalizeUuid } from "../../lib/db";
+import { getAccountStorageUsage, getMarketAccountByEmail, isDatabaseConfigured, listAccessTokens, listWorkspacesForUser, normalizeUuid } from "../../lib/db";
+import { accountQuotaStatus, isAccountQuotaEnforced, storageUsageView } from "../../lib/account-quota";
 import { AccessTokens } from "./access-tokens";
 import { TrialReadonlyNotice, trialEndsAtForUser } from "../trial-notice";
 import { formatTrialEnd, isTrialOver } from "../../lib/trial";
@@ -48,6 +49,11 @@ export default async function AccountPage({
   const trialRunning = trialEndsAt != null && !isTrialOver(trialEndsAt, new Date());
   const accessTokens = userId ? await listAccessTokens(userId) : [];
   const workspaces = userId && isDatabaseConfigured() ? (await listWorkspacesForUser(userId).catch(() => [])).map(({ id, name, kind }) => ({ id, name, kind })) : [];
+  // Storage quota (#380): shown once the server enforces it (BLOOMMD_ACCOUNT_QUOTA=1), so that no limit is
+  // displayed that nothing applies yet. A failing lookup hides the block, it does not break the page.
+  const storage = userId && isDatabaseConfigured() && isAccountQuotaEnforced()
+    ? await getAccountStorageUsage(userId).then((used) => storageUsageView(accountQuotaStatus(used, true), locale)).catch(() => null)
+    : null;
   const buildInfo = getBuildInfo("app");
   const localizedBillingMessages: Record<string, string> = locale === "de" ? billingMessages : {
     "database-not-configured": "The database is not configured yet.",
@@ -111,6 +117,37 @@ export default async function AccountPage({
             </div>
           )}
           <TrialReadonlyNotice userId={session.userId} locale={locale} />
+
+          {storage && (
+            <div className="mt-3 rounded-md border border-[#E8E4DF] bg-[#FCFBFA] px-4 py-3 text-sm" data-testid="account-storage" data-level={storage.level}>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold">{storage.title}</span>
+                <span data-testid="account-storage-usage">{storage.usage}</span>
+              </div>
+              <div
+                className="mt-2 h-2 overflow-hidden rounded-full bg-[#E8E4DF]"
+                role="progressbar"
+                aria-label={storage.title}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={storage.barPercent}
+              >
+                <div
+                  className={`h-full ${storage.level === "reached" ? "bg-red-600" : storage.level === "warning" ? "bg-amber-500" : "bg-emerald-600"}`}
+                  style={{ width: `${storage.barPercent}%` }}
+                />
+              </div>
+              {storage.message && (
+                <p
+                  className={`mt-2 leading-6 ${storage.level === "reached" ? "text-red-700" : "text-[#8A3518]"}`}
+                  data-testid="account-storage-message"
+                  role={storage.level === "reached" ? "alert" : undefined}
+                >
+                  {storage.message}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <article className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4">

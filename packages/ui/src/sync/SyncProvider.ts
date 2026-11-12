@@ -13,6 +13,7 @@ import {
   type AwarenessIdentity,
   type AwarenessUserState,
 } from "./types";
+import { QUOTA_EXCEEDED_CLOSE_CODE } from "@bloommd/core/account-quota";
 import { getAwarenessColor } from "./presence";
 
 export interface SyncProviderOptions {
@@ -490,6 +491,9 @@ export class SyncProvider {
     }
     if (code === 4004) return { kind: "file-not-found", code, reason: this.closeReasonCategory(code, reason) };
     if (code === 4008) return { kind: "room-capacity", code, reason: this.closeReasonCategory(code, reason) };
+    // The server refused to save because the account's storage quota is reached (#380). Reconnecting
+    // cannot help until the account shrinks, so this is shown, not retried; "reconnect" tries again.
+    if (code === QUOTA_EXCEEDED_CLOSE_CODE) return { kind: "quota-exceeded", code, reason: this.closeReasonCategory(code, reason) };
     return null;
   }
 
@@ -500,6 +504,7 @@ export class SyncProvider {
       4003: "access-revoked",
       4004: "file-not-found",
       4008: "room-capacity",
+      [QUOTA_EXCEEDED_CLOSE_CODE]: "quota-exceeded",
       1006: "abnormal-closure",
     }[code];
     if (knownReason) return knownReason;

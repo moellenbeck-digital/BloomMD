@@ -223,6 +223,27 @@ describe("SyncProvider connection health", () => {
     provider.destroy();
   });
 
+  test("a save refused by the storage quota (close 4013) is a terminal failure of its own, not a silent reconnect (#380)", async () => {
+    const doc = new Y.Doc();
+    const failures: Array<{ kind: string; reason?: string }> = [];
+    const provider = new SyncProvider({
+      url: "ws://test",
+      doc,
+      refreshUrl: async () => "ws://fresh",
+      onFailure: (failure) => failures.push({ kind: failure.kind, reason: failure.reason }),
+      reconnectBaseDelayMs: 1,
+    });
+    provider.connect();
+    latest().open();
+    latest().close(4013, "QUOTA_EXCEEDED");
+
+    expect(provider.getStatus()).toBe("failed");
+    expect(failures).toEqual([{ kind: "quota-exceeded", reason: "quota-exceeded" }]);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    provider.destroy();
+  });
+
   test("fails immediately on unauthorized close when no ticket refresh is available", () => {
     const doc = new Y.Doc();
     let failureKind: string | undefined;

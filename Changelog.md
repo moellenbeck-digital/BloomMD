@@ -314,6 +314,15 @@
 - Die deutsche und englische Lizenzseite erklärt die ELv2-Bedingungen für künftige Obsidian-Versionen und die unveränderte MIT-Lizenz bereits veröffentlichter Plugin-Versionen bis 0.5.12.
 - The German and English license pages explain ELv2 for future Obsidian versions and preserve the MIT terms of plugin releases through 0.5.12.
 
+## [Desktop 0.5.16] - ausstehend
+
+- Der Knoten-Editor bewahrt eingefügten oder getippten Text beim Schließen mit ⌘+Return und übernimmt noch nicht gemeldete Änderungen vor dem Ausblenden. Leere Editor-Zwischenstände überschreiben vorhandene Inhalte nicht mehr unbeabsichtigt (#394).
+- Nach ⌘+Return wartet der Fokus auf den geladenen Editor; beim Schließen kehrt er sofort zum Knoten zurück. Kind- und Schwesterknoten sowie die Pfeilnavigation reagieren dadurch auch direkt nach dem Editorwechsel wieder zuverlässig (#396).
+- The node editor preserves pasted or typed text when closed with Command+Return and captures pending changes before it disappears. Temporary empty editor states no longer overwrite existing content unintentionally (#394).
+- After Command+Return, focus waits for the loaded editor and returns immediately to the node when it closes. Child and sibling creation and arrow navigation respond reliably right after switching out of the editor (#396).
+- Der Release-Stand aktualisiert die gesperrten Abhängigkeiten `hono` und `basic-ftp`, damit die CI-Sicherheitsprüfung wieder besteht.
+- The release updates the pinned `hono` and `basic-ftp` dependencies so the CI security audit passes again.
+
 ## [Desktop 0.5.15] - 2026-10-21
 
 - BloomMD Desktop 0.5.15 wird erstmals unter der Elastic License 2.0 (ELv2) ausgeliefert. App-Bundles und Pacman-Pakete enthalten den Lizenztext und den historischen MIT-Hinweis.

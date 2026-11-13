@@ -5,7 +5,7 @@ export function focusNodeElement(nodeId: string): boolean {
   if (!element) return false;
   if (element.getAttribute("tabindex") === "-1") return false;
   element.focus({ preventScroll: true });
-  return true;
+  return document.activeElement === element;
 }
 
 export interface NodeFocusRequest {
@@ -15,19 +15,14 @@ export interface NodeFocusRequest {
 }
 
 let latestRequestId = 0;
-let pendingFrame: number | null = null;
 let pendingTimer: number | null = null;
 
 /** Cancel focus retries when the active document or workspace changes. */
 export function cancelPendingNodeFocus(): void {
   latestRequestId += 1;
-  if (pendingFrame !== null && typeof window !== "undefined" && typeof window.cancelAnimationFrame === "function") {
-    window.cancelAnimationFrame(pendingFrame);
-  }
   if (pendingTimer !== null && typeof window !== "undefined") {
     window.clearTimeout(pendingTimer);
   }
-  pendingFrame = null;
   pendingTimer = null;
 }
 
@@ -37,8 +32,8 @@ export function isCurrentNodeFocusRequest(requestId: number): boolean {
 }
 
 /**
- * Request focus after a state mutation. React Flow may need several render frames before the
- * target exists and becomes selected. A newer request invalidates the complete previous request.
+ * Request focus after a state mutation. Focus an existing selected node immediately, then retry
+ * if React Flow still needs to render it. A newer request invalidates the previous request.
  */
 export function requestNodeFocus(nodeId: string, reveal = true): void {
   if (typeof window === "undefined") return;
@@ -52,7 +47,6 @@ export function requestNodeFocus(nodeId: string, reveal = true): void {
 
   let attempts = 0;
   const tryFocus = () => {
-    pendingFrame = null;
     pendingTimer = null;
     if (!isCurrentNodeFocusRequest(requestId)) return;
     if (focusNodeElement(nodeId) || attempts >= 4) return;
@@ -60,11 +54,9 @@ export function requestNodeFocus(nodeId: string, reveal = true): void {
     pendingTimer = window.setTimeout(tryFocus, 50);
   };
 
-  if (typeof window.requestAnimationFrame === "function") {
-    pendingFrame = window.requestAnimationFrame(tryFocus);
-  } else {
-    pendingTimer = window.setTimeout(tryFocus, 0);
-  }
+  // The existing selected node can be focused immediately. Waiting for a frame loses the next
+  // Tab/Enter/arrow key when someone types directly after closing the editor.
+  tryFocus();
 }
 
 /** Keep visible nodes stationary; reveal keyboard targets only when outside the usable canvas. */

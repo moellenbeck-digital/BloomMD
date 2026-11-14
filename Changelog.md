@@ -314,7 +314,10 @@
 - Die deutsche und englische Lizenzseite erklärt die ELv2-Bedingungen für künftige Obsidian-Versionen und die unveränderte MIT-Lizenz bereits veröffentlichter Plugin-Versionen bis 0.5.12.
 - The German and English license pages explain ELv2 for future Obsidian versions and preserve the MIT terms of plugin releases through 0.5.12.
 
-## [Desktop 0.5.16] - ausstehend
+## [Desktop 0.5.16] - 2026-11-14
+
+- Zusätzlicher Browser-Regressionstest für Einfügen und Schließen des Editors; separat ausführbare Wiki-Video-Demo für die Entwicklung.
+- Additional browser regression test for pasting and closing the editor; a separately runnable Wiki video demo for development.
 
 - Der Knoten-Editor bewahrt eingefügten oder getippten Text beim Schließen mit ⌘+Return und übernimmt noch nicht gemeldete Änderungen vor dem Ausblenden. Leere Editor-Zwischenstände überschreiben vorhandene Inhalte nicht mehr unbeabsichtigt (#394).
 - Nach ⌘+Return wartet der Fokus auf den geladenen Editor; beim Schließen kehrt er sofort zum Knoten zurück. Kind- und Schwesterknoten sowie die Pfeilnavigation reagieren dadurch auch direkt nach dem Editorwechsel wieder zuverlässig (#396).

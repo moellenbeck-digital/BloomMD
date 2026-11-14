@@ -59,15 +59,16 @@ function flushFrames(): void {
 }
 
 describe("node focus coordination", () => {
-  test("only the latest request may focus and inactive nodes are deferred", () => {
+  test("focuses an active node immediately and defers inactive nodes", () => {
     const first = addNode("first", 0);
     const second = addNode("second", -1);
 
     requestNodeFocus("first");
+    expect(document.activeElement).toBe(first);
     requestNodeFocus("second");
     flushFrames();
 
-    expect(document.activeElement).not.toBe(first);
+    expect(document.activeElement).toBe(first);
     expect(document.activeElement).not.toBe(second);
     expect(isCurrentNodeFocusRequest(1)).toBe(false);
 

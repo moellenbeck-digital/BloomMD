@@ -257,6 +257,52 @@ describe("useKeyboardShortcuts node creation", () => {
     expect(onToggleCommandPalette).not.toHaveBeenCalled();
   });
 
+  test("Cmd+Enter waits for a lazy editor and cancels pending node auto-edit", async () => {
+    const doc = useMindMapStore.getState().document!;
+    const rendered = renderHarness(doc.rootId);
+    root = rendered.root;
+    const node = nodeElement(rendered.container, doc.rootId)!;
+    node.focus();
+    useMindMapStore.getState().setAutoEditNodeId(doc.rootId);
+
+    const event = dispatchKey(node, "Enter", { metaKey: true });
+    expect(event.defaultPrevented).toBe(true);
+    expect(useMindMapStore.getState().editorVisible).toBe(true);
+    expect(useMindMapStore.getState().autoEditNodeId).toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    const wrapper = document.createElement("div");
+    wrapper.className = "mdxeditor";
+    const editor = document.createElement("div");
+    editor.contentEditable = "true";
+    wrapper.appendChild(editor);
+    rendered.container.appendChild(wrapper);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(document.activeElement).toBe(editor);
+  });
+
+  test("closing the editor focuses the node before the next Tab shortcut", () => {
+    const doc = useMindMapStore.getState().document!;
+    const rendered = renderHarness(doc.rootId);
+    root = rendered.root;
+    const node = nodeElement(rendered.container, doc.rootId)!;
+    flushSync(() => useMindMapStore.getState().setEditorVisible(true));
+    const wrapper = document.createElement("div");
+    wrapper.className = "mdxeditor";
+    const editor = document.createElement("div");
+    editor.contentEditable = "true";
+    wrapper.appendChild(editor);
+    rendered.container.appendChild(wrapper);
+    editor.focus();
+
+    dispatchKey(editor, "Enter", { metaKey: true });
+    expect(document.activeElement).toBe(node);
+    expect(useMindMapStore.getState().editorVisible).toBe(false);
+    const before = useMindMapStore.getState().document!.nodes.size;
+    dispatchKey(document.activeElement as HTMLElement, "Tab");
+    expect(useMindMapStore.getState().document!.nodes.size).toBe(before + 1);
+  });
+
   test("dialogs and IME composition do not trigger map editing", () => {
     const doc = useMindMapStore.getState().document!;
     const rendered = renderHarness(doc.rootId);

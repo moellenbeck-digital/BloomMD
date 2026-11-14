@@ -23,7 +23,7 @@ Ausgeschlossen sind (Projekt `chromium`):
 
 | Spec | Grund |
 | --- | --- |
-| `wiki.spec.ts` | braucht einen eigenen Server (`playwright.wiki.config.ts`) |
+| `wiki.spec.ts`, `wiki-timelapse-demo.spec.ts` | braucht einen eigenen Server (`playwright.wiki.config.ts`) |
 | `beta-gate.spec.ts` | braucht eigene Server-Umgebung (`playwright.beta.config.ts`) |
 | `open-signup.spec.ts` | braucht eigene Server-Umgebung (`playwright.open-signup.config.ts`) |
 | `trial-readonly-t378.spec.ts` | braucht eigene Server-Umgebung mit Postgres (`playwright.trial-readonly.config.ts`, `bun run test:e2e:trial-readonly`; `BLOOMMD_TRIAL_READONLY=1`, Testende und Tarif per SQL gesetzt); läuft nicht in der CI, da dem Job `full-e2e` die Datenbank fehlt |
@@ -118,3 +118,17 @@ Diese Specs ersetzen eine API per `page.route` durch eine feste Antwort, weil da
 | Spec | Marke | Was der Mock ersetzt, was offen bleibt |
 | --- | --- | --- |
 | `wiki-sources-t87.spec.ts` | `@t87` | `GET /api/wiki` mit Quellenstatus `ok`/`changed`/`missing`/`unmonitored`; prüft nur die Darstellung (K1–K5). K4 (Englisch) ist `test.fixme`: `/wiki` hat keinen `LocaleProvider`. Das echte Erkennen geänderter oder gelöschter Quelldateien im Pod ist nicht geprüft (`route.test.ts`, `wiki-sources.test.ts`, `watch.test.ts`) |
+
+## Wiki-Demo als Video / Wiki demo video
+
+Die Demo zeigt Suche, Quellen, Problemfilter und Wissenskarte mit den lokalen Wiki-Fixtures.
+Sie läuft separat; Standard- und Testsystem-Suite schließen sie aus.
+
+The demo records search, citations, the problem filter and the knowledge map using local Wiki fixtures.
+It runs separately and is excluded from the default and test-system suites.
+
+```bash
+scripts/team-lauf bun run --cwd apps/app test:e2e --config playwright.wiki.timelapse-demo.config.ts
+```
+
+720p-WebM: `/tmp/bloommd-e2e-timelapse/raw/`.

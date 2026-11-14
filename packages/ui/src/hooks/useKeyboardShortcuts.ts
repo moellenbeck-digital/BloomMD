@@ -3,7 +3,7 @@
 import { useEffect, useCallback } from "react";
 import { useMindMapStore } from "./useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
-import { requestNodeFocus } from "../utils/nodeFocus";
+import { cancelPendingNodeFocus, requestNodeFocus } from "../utils/nodeFocus";
 
 interface ShortcutActions {
   onNew: () => void;
@@ -37,6 +37,22 @@ function focusCanvas() {
       setTimeout(tryFocus, 50);
     }
   });
+}
+
+/** The rich editor is lazy-loaded, so one fixed timeout is not enough in the desktop webview. */
+function focusRichEditorWhenReady(nodeId: string) {
+  let attempts = 0;
+  const tryFocus = () => {
+    const state = useMindMapStore.getState();
+    if (!state.editorVisible || state.selectedNodeId !== nodeId) return;
+    const editor = window.document.querySelector<HTMLElement>(".mdxeditor [contenteditable]");
+    if (editor) {
+      editor.focus();
+      return;
+    }
+    if (++attempts < 30) window.setTimeout(tryFocus, 50);
+  };
+  window.setTimeout(tryFocus, 0);
 }
 
 function isInteractiveControl(target: HTMLElement): boolean {
@@ -198,13 +214,11 @@ export function useKeyboardShortcuts(actions: ShortcutActions) {
           setEditorVisible(false);
           if (selectedNodeId) requestNodeFocus(selectedNodeId);
         } else if (selectedNodeId) {
+          // A pending auto-rename/focus request from node creation must not steal the editor focus.
+          setAutoEditNodeId(null);
+          cancelPendingNodeFocus();
           toggleEditor();
-          setTimeout(() => {
-            const editor = window.document.querySelector(
-              ".mdxeditor [contenteditable]",
-            ) as HTMLElement | null;
-            editor?.focus();
-          }, 100);
+          focusRichEditorWhenReady(selectedNodeId);
         }
         return;
       }

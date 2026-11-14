@@ -1181,6 +1181,36 @@ test.describe("shortcut workflows", () => {
     await expect((await saveResponse).ok()).toBe(true);
     await request.delete(`/api/mindmaps/${encodeURIComponent(filename)}`, { headers: SAME_ORIGIN_HEADERS });
   });
+
+  test("keeps pasted node content when Cmd+Return closes the editor @t394", async ({ page, request }) => {
+    const email = uniqueEmail("paste-close");
+    const filename = `e2e-paste-close-${Date.now()}.md`;
+    const title = `E2E Paste Close ${Date.now()}`;
+    const pasted = "A pasted paragraph that must survive closing the editor.";
+    await createAccount(request, email);
+    await createMindmapFixture(request, filename, title);
+    await suppressOnboarding(page);
+    await login(page, email);
+
+    await page.keyboard.press("Control+K");
+    await page.getByTestId("command-palette-input").fill(title);
+    await page.getByTestId("command-palette-item-mindmap").first().click();
+    await page.locator('[data-node-label="Evidence"]').first().click();
+    await page.keyboard.press("Meta+Enter");
+    const editor = page.locator(".mdxeditor [contenteditable]").first();
+    await expect(editor).toBeVisible();
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.evaluate((text) => navigator.clipboard.writeText(text), pasted);
+    await editor.click();
+    await page.keyboard.press(process.platform === "darwin" ? "Meta+V" : "Control+V");
+    await expect(editor).toContainText(pasted);
+
+    await page.keyboard.press("Meta+Enter");
+    await expect(page.getByTestId("node-editor")).toHaveCount(0);
+    await page.keyboard.press("Meta+Enter");
+    await expect(page.locator(".mdxeditor [contenteditable]").first()).toContainText(pasted);
+    await request.delete(`/api/mindmaps/${encodeURIComponent(filename)}`, { headers: SAME_ORIGIN_HEADERS });
+  });
 });
 
 test.describe("beta onboarding", () => {

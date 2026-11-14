@@ -3,6 +3,14 @@
 Mindmap-App, deren natives Datenformat **Markdown-Dateien** sind.
 Vollständige Architektur, Datenmodell und Projektplan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
+## Leitprinzip: Einfachheit
+
+**Geht es noch einfacher, ohne Funktionalität zu vermissen?**
+
+Einfachste Lösung zuerst. Keine zusätzlichen Abstraktionen oder Optionen auf Vorrat. Die Funktionalität bleibt vollständig; vereinfacht wird nur der Weg dorthin.
+
+Rollen: architect stellt die Frage in der Analyse und beantwortet sie im Ticket in einem Satz. coder und tester prüfen sie im PR bzw. Review. release-manager wendet sie auf den Release-Ablauf an.
+
 ## Tech Stack
 
 - **Sprache:** TypeScript (strict), kein `any`

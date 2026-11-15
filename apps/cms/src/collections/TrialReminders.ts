@@ -1,10 +1,10 @@
 import type { CollectionConfig } from "payload";
-import { adminOrSupport, deny } from "../access";
+import { adminOrSupport, deny, hiddenUnless } from "../access";
 
 /** Reminder mails of the trial period (#274): at most one per account and kind, claimed before sending. */
 export const TrialReminders: CollectionConfig = {
   slug: "trial-reminders",
-  admin: { useAsTitle: "kind", defaultColumns: ["user", "kind", "claimedAt", "sentAt"], group: "Plattform" },
+  admin: { useAsTitle: "kind", defaultColumns: ["user", "kind", "claimedAt", "sentAt"], group: "Plattform", hidden: hiddenUnless("admin", "support") },
   access: { create: deny, read: adminOrSupport, update: deny, delete: deny, readVersions: deny },
   indexes: [{ fields: ["user", "kind"], unique: true }],
   fields: [

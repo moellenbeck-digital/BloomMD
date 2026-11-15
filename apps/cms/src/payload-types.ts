@@ -69,6 +69,7 @@ export interface Config {
   blocks: {};
   collections: {
     operators: Operator;
+    'operator-audit': OperatorAudit;
     users: User;
     entitlements: Entitlement;
     'auth-tokens': AuthToken;
@@ -82,9 +83,14 @@ export interface Config {
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
   };
-  collectionsJoins: {};
+  collectionsJoins: {
+    users: {
+      entitlementList: 'entitlements';
+    };
+  };
   collectionsSelect: {
     operators: OperatorsSelect<false> | OperatorsSelect<true>;
+    'operator-audit': OperatorAuditSelect<false> | OperatorAuditSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     entitlements: EntitlementsSelect<false> | EntitlementsSelect<true>;
     'auth-tokens': AuthTokensSelect<false> | AuthTokensSelect<true>;
@@ -155,13 +161,39 @@ export interface UserAuthOperations {
   };
 }
 /**
+ * Betreiberkonten der Admin-Oberfläche. Anlegen, Rolle ändern, zweiten Faktor zurücksetzen, sperren und löschen dürfen nur Admins.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "operators".
  */
 export interface Operator {
   id: number;
   name?: string | null;
+  /**
+   * Admin: alles. Support: liest Benutzer, Zugänge, Testende und Inhalte, ändert nichts. Editor: nur Blog, News und Medien.
+   */
   role: 'admin' | 'support' | 'editor';
+  /**
+   * Ein gesperrter Betreiber kann sich nicht anmelden und hat keinen Zugriff mehr. Beim Ausscheiden: sperren, danach löschen (docs/LOESCHKONZEPT.md).
+   */
+  blocked?: boolean | null;
+  blockedAt?: string | null;
+  /**
+   * Leer: der Betreiber sieht nach der Anmeldung nur die Einrichtung.
+   */
+  totpEnabledAt?: string | null;
+  totpSecret?: string | null;
+  totpPending?: string | null;
+  totpLastStep?: number | null;
+  recoveryHashes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -183,6 +215,58 @@ export interface Operator {
   collection: 'operators';
 }
 /**
+ * Betreiberaktionen: wer, wann, was, alt → neu. Nur anfügbar, nicht änderbar; Aufbewahrung 365 Tage.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "operator-audit".
+ */
+export interface OperatorAudit {
+  id: number;
+  actorEmail?: string | null;
+  actorId?: string | null;
+  actorRole?: string | null;
+  action:
+    | 'account.trial_end'
+    | 'account.trial_days_override'
+    | 'account.trial_legacy'
+    | 'account.cloud_access'
+    | 'account.beta'
+    | 'entitlement.create'
+    | 'entitlement.update'
+    | 'entitlement.delete'
+    | 'settings.default_trial_days'
+    | 'operator.create'
+    | 'operator.role'
+    | 'operator.profile'
+    | 'operator.block'
+    | 'operator.unblock'
+    | 'operator.delete'
+    | 'operator.password'
+    | 'operator.mfa_enabled'
+    | 'operator.mfa_reset'
+    | 'operator.mfa_recovery_used';
+  targetType?: string | null;
+  targetId?: string | null;
+  /**
+   * Wird geleert, wenn das Konto gelöscht wird.
+   */
+  targetUser?: (string | null) | User;
+  targetLabel?: string | null;
+  changes?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Konten der Produkt-App. Support liest, nur Admins ändern. Suche nach E-Mail; Filter über „Filter“ (z. B. Status, Herkunft).
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
@@ -190,26 +274,37 @@ export interface User {
   id: string;
   name?: string | null;
   locale: 'de' | 'en';
-  emailCanonical?: string | null;
   emailVerifiedAt?: string | null;
   status: 'active' | 'deletion_requested';
   deletionRequestedAt?: string | null;
-  deletionKey?: string | null;
   origin: 'registration' | 'waitlist' | 'migration';
-  platformRole: 'user' | 'beta';
-  cloudAccess?: boolean | null;
-  waitlistMailSentAt?: string | null;
-  passwordSetAt?: string | null;
+  /**
+   * Wird einmal bei der E-Mail-Bestätigung gesetzt (Bestätigungstag plus Standarddauer). Hier ändern verlängert oder verkürzt genau dieses Konto.
+   */
   trialEndsAt?: string | null;
+  /**
+   * Überschreibt für dieses Konto die Standarddauer aus den Plattform-Einstellungen, sobald das Testende gesetzt wird. Ein schon gesetztes Testende ändert sich dadurch nicht.
+   */
+  trialDaysOverride?: number | null;
+  /**
+   * Konto aus der Zeit vor dem CMS; sein Testende kommt aus der Migration.
+   */
   trialLegacy?: boolean | null;
   /**
    * Nur geschützte Konten fallen unter den Index „ein bestätigtes Konto je Postfach“ (#169).
    */
   trialGuarded?: boolean | null;
-  /**
-   * Überschreibt die Standarddauer aus den Plattform-Einstellungen für dieses Konto.
-   */
-  trialDaysOverride?: number | null;
+  cloudAccess?: boolean | null;
+  platformRole: 'user' | 'beta';
+  entitlementList?: {
+    docs?: (number | Entitlement)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  emailCanonical?: string | null;
+  deletionKey?: string | null;
+  waitlistMailSentAt?: string | null;
+  passwordSetAt?: string | null;
   /**
    * Sitzungen der App, die vor diesem Zeitpunkt begonnen haben, sind ungültig.
    */
@@ -228,6 +323,8 @@ export interface User {
   collection: 'users';
 }
 /**
+ * Einzelne Zugänge eines Kontos (z. B. Cloud-Funktionen). Nur Admins ändern.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "entitlements".
  */
@@ -286,6 +383,8 @@ export interface ReadToken {
   createdAt: string;
 }
 /**
+ * Entwurf speichern, prüfen und erst dann veröffentlichen. Nur Veröffentlichtes erreicht /svc/v1/content; Entwürfe nie. Die Vorschau zeigt den aktuellen Entwurf.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "blog".
  */
@@ -314,11 +413,16 @@ export interface Blog {
   _status?: ('draft' | 'published') | null;
 }
 /**
+ * Bilder für Blog und News. Der Alternativtext ist Pflicht.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media".
  */
 export interface Media {
   id: number;
+  /**
+   * Beschreibt das Bild für Screenreader und wenn es nicht lädt.
+   */
   alt: string;
   updatedAt: string;
   createdAt: string;
@@ -333,6 +437,8 @@ export interface Media {
   focalY?: number | null;
 }
 /**
+ * Entwurf speichern, prüfen und erst dann veröffentlichen. Nur Veröffentlichtes erreicht /svc/v1/content; Entwürfe nie. Die Vorschau zeigt den aktuellen Entwurf.
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "news".
  */
@@ -387,6 +493,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'operators';
         value: number | Operator;
+      } | null)
+    | ({
+        relationTo: 'operator-audit';
+        value: number | OperatorAudit;
       } | null)
     | ({
         relationTo: 'users';
@@ -479,6 +589,13 @@ export interface PayloadMigration {
 export interface OperatorsSelect<T extends boolean = true> {
   name?: T;
   role?: T;
+  blocked?: T;
+  blockedAt?: T;
+  totpEnabledAt?: T;
+  totpSecret?: T;
+  totpPending?: T;
+  totpLastStep?: T;
+  recoveryHashes?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -499,26 +616,44 @@ export interface OperatorsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "operator-audit_select".
+ */
+export interface OperatorAuditSelect<T extends boolean = true> {
+  actorEmail?: T;
+  actorId?: T;
+  actorRole?: T;
+  action?: T;
+  targetType?: T;
+  targetId?: T;
+  targetUser?: T;
+  targetLabel?: T;
+  changes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
   id?: T;
   name?: T;
   locale?: T;
-  emailCanonical?: T;
   emailVerifiedAt?: T;
   status?: T;
   deletionRequestedAt?: T;
-  deletionKey?: T;
   origin?: T;
-  platformRole?: T;
-  cloudAccess?: T;
-  waitlistMailSentAt?: T;
-  passwordSetAt?: T;
   trialEndsAt?: T;
+  trialDaysOverride?: T;
   trialLegacy?: T;
   trialGuarded?: T;
-  trialDaysOverride?: T;
+  cloudAccess?: T;
+  platformRole?: T;
+  entitlementList?: T;
+  emailCanonical?: T;
+  deletionKey?: T;
+  waitlistMailSentAt?: T;
+  passwordSetAt?: T;
   sessionsValidAfter?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -682,6 +817,9 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
  */
 export interface PlatformSetting {
   id: number;
+  /**
+   * Gilt für neue Konten: Das Testende wird einmal bei der E-Mail-Bestätigung gesetzt (Bestätigungstag plus diese Tage). Konten mit Testende, Bestandskonten und die Beta-Teilnehmer mit 60 Tagen (#364) ändern sich dadurch nicht; für ein einzelnes Konto gibt es die Dauer-Überschreibung. Jede Änderung wird im Audit festgehalten.
+   */
   defaultTrialDays: number;
   updatedAt?: string | null;
   createdAt?: string | null;

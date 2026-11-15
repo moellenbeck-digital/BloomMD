@@ -9,11 +9,12 @@ import { contentReaders, contentRoles, deny } from "../access";
  */
 export const Media: CollectionConfig = {
   slug: "media",
-  admin: { useAsTitle: "alt", group: "Inhalte" },
+  admin: { useAsTitle: "alt", group: "Inhalte", description: "Bilder für Blog und News. Der Alternativtext ist Pflicht." },
+  labels: { singular: "Medium", plural: "Medien" },
   access: { create: contentRoles, read: contentReaders, update: contentRoles, delete: contentRoles, readVersions: deny },
   upload: {
     staticDir: process.env.CMS_MEDIA_DIR?.trim() || path.resolve(process.cwd(), "media"),
     mimeTypes: ["image/png", "image/jpeg", "image/webp", "image/avif", "image/gif"],
   },
-  fields: [{ name: "alt", type: "text", required: true, label: "Alternativtext" }],
+  fields: [{ name: "alt", type: "text", required: true, label: "Alternativtext", admin: { description: "Beschreibt das Bild für Screenreader und wenn es nicht lädt." } }],
 };

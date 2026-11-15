@@ -40,6 +40,9 @@ export const RATE_LIMITS = {
   passwordResetPerAccount: { limit: 3, windowSeconds: 60 * 60 },
   redeemPerToken: { limit: 10, windowSeconds: 15 * 60 },
   contentPerToken: { limit: 600, windowSeconds: 60 },
+  /** Wrong codes of the second factor (and recovery codes) of one operator; the password login has its own lockout. */
+  mfaCodePerOperator: { limit: 5, windowSeconds: 15 * 60 },
+  mfaBeginPerOperator: { limit: 20, windowSeconds: 15 * 60 },
 } as const;
 
 export function runtimeConfigErrors(env: EnvLike = process.env): string[] {

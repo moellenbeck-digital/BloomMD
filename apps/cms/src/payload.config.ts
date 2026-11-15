@@ -1,11 +1,13 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { postgresAdapter } from "@payloadcms/db-postgres";
+import { de } from "@payloadcms/translations/languages/de";
 import { buildConfig } from "payload";
 import { AuthTokens } from "./collections/AuthTokens";
 import { Blog, News } from "./collections/content";
 import { Entitlements } from "./collections/Entitlements";
 import { Media } from "./collections/Media";
+import { OperatorAudit } from "./collections/OperatorAudit";
 import { Operators } from "./collections/Operators";
 import { ReadTokens } from "./collections/ReadTokens";
 import { TrialReminders } from "./collections/TrialReminders";
@@ -31,10 +33,14 @@ export default buildConfig({
     components: {
       beforeLogin: ["@/components/BuildInfo#BuildInfoLogin"],
       afterNavLinks: ["@/components/BuildInfo#BuildInfoNav"],
+      // Second factor after the password (ticket #206); `proxy.ts` sends operators without it here.
+      views: { mfa: { Component: "@/components/MfaView#MfaView", path: "/mfa" } },
     },
     meta: { titleSuffix: " · BloomMD CMS", robots: "noindex, nofollow" },
   },
-  collections: [Operators, Users, Entitlements, AuthTokens, TrialReminders, ReadTokens, Blog, News, Media],
+  // The operators work in German; the texts of Payload follow.
+  i18n: { supportedLanguages: { de }, fallbackLanguage: "de" },
+  collections: [Operators, OperatorAudit, Users, Entitlements, AuthTokens, TrialReminders, ReadTokens, Blog, News, Media],
   globals: [PlatformSettings],
   graphQL: { disable: true, disablePlaygroundInProduction: true },
   cors: allowedOrigins,

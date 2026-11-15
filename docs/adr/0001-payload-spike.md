@@ -368,6 +368,81 @@ Bestätigt ohne Abweichung: Next 16.4.2 und React 19.2.8 passen, Payload 3.93.0,
 
 Alle anderen Pakete der Tabelle in Abschnitt 5 sind von #204 nicht berührt und bleiben, wie sie sind. Die Schätzung ist nach #206 (Oberfläche, zweiter Faktor) und #205 (Betrieb) erneut zu prüfen.
 
+## Ergebnis #206
+
+Ticket #206 liefert die Admin-Oberfläche und die Betreiberkonten (Zweiter Faktor, Rollen, Audit, Benutzerliste, Betreiberverwaltung, Redaktion). Was gemessen und was nur gelesen ist, steht unten; die Oberfläche im Browser hat der coder nicht durchlaufen (Oberflächentests gehören dem tester, `AGENTS.md`).
+
+### Entscheidung O9: Eigenbau statt `payload-totp`
+
+**Entscheidung: Eigenbau.** Grundlage ist die Prüfung des Quelltextes von `payload-totp` 3.0.7 (`dist/`, Stand 15.11.2026), nicht ein Lauf im Browser: Der Ablauf des Plugins in der Oberfläche wurde **nicht** durchlaufen, weil die Befunde unten unabhängig davon gegen die Anforderung des Tickets sprechen und ein Lauf von `next dev` im Pod ein schwerer Lauf ist. Hält der tester das Plugin trotzdem für eine bessere Wahl, ist die Entscheidung mit diesen Punkten zu widerlegen.
+
+| Anforderung (Ticket #206, Todo 1) | `payload-totp` 3.0.7 | Eigenbau (`lib/mfa.ts`, `lib/mfa-session.ts`, `lib/operator-mfa.ts`) |
+|---|---|---|
+| Einrichtung mit QR-Code und erstem Code | ja (Ansicht `Setup`) | ja (`/admin/mfa`, `POST /api/operators/mfa/begin` und `/confirm`) |
+| Wiederherstellungscodes | **nein**: kein Code, kein Feld, keine Ansicht (Suche nach „recover“ und „backup“ in `dist/`: einziger Treffer ist ein Kommentar zur Strategie, keine Funktion für Codes) | ja: 10 Codes zu je 10 Zeichen (ca. 50 Bit), einmal angezeigt, nur als HMAC-SHA-256 gespeichert, jeder gilt einmal (atomare SQL-Anweisung) |
+| Secret nicht im Klartext | **nein**: `setSecret` schreibt das Base32-Secret unverändert in das Feld `totpSecret` | AES-256-GCM, Schlüssel per HKDF aus `PAYLOAD_SECRET` abgeleitet (kein weiteres Geheimnis); Feld für niemanden über die API les- oder schreibbar |
+| Pflicht für jeden Betreiber | ja mit `forceSetup` | ja: ohne bestätigten Faktor hat die Sitzung keine Rolle, `/admin/mfa` ist der einzige Weg |
+| Admin setzt den Faktor eines Betreibers zurück | **nein**: `remove-totp` verlangt den eigenen Code und ist mit `forceSetup` gesperrt; nur Handarbeit an der Datenbank | ja: Knopf am Betreiber, `POST /api/operators/:id/mfa-reset` (nur Admin, beendet die Sitzungen, mit Audit); letzter Admin: `bun run operator reset-mfa <email>` |
+| Wirkung auf die Zugriffsfunktionen | überschreibt `access` **aller** Collections und Globals (und die Payload-eigenen); als letztes Plugin einzutragen; braucht `proxy.ts` mit `x-pathname` | keine Umhüllung: eine Funktion (`operatorRole`) in `src/access`, die Rollenmatrix bleibt an einer Stelle |
+| Schutz gegen Wiederholung eines Codes | nicht erkennbar (im Quelltext kein Speicher des letzten Schritts; die Sperre zählt nur falsche Codes) | letzter Schritt wird atomar beansprucht, derselbe Code gilt nur einmal |
+| Sperre nach falschen Codes | ja (`totp-attempts`, eigene Collection) | 5 Versuche je 15 Minuten und Betreiber (gemeinsamer Zähler in der CMS-Datenbank, wie die übrigen Rate-Limits) |
+| Pflege | ein Maintainer (laut Spike) | gut 500 Zeilen eigener Code (Bibliothek, Endpunkte, zwei Ansichten), durch Tests belegt |
+
+**Wie der Faktor wirkt.** Das Passwort-Login erzeugt wie bisher eine Payload-Sitzung. Sie zählt erst, wenn der Betreiber den zweiten Faktor bestanden hat: Der Endpunkt setzt dann das Cookie `payload-mfa` (HttpOnly, SameSite=Strict, 8 Stunden), signiert mit einem aus `PAYLOAD_SECRET` abgeleiteten Schlüssel und gebunden an Betreiber und `sid` der Sitzung; es gilt für keine andere Sitzung und endet mit ihr. Ohne das Cookie (oder bei gesperrtem Betreiber) ist `operatorRole` leer und **jede** Zugriffsfunktion verweigert, in der Oberfläche und über REST gleichermaßen. Das gilt auch für den REST-Login: `POST /api/operators/login` gibt eine Sitzung, mit der nichts lesbar oder schreibbar ist (geprüft für Benutzer, Inhalte, Medien, Einstellungen, Audit, Betreiber). Möglich bleiben `me`, `logout` und die drei Endpunkte des Faktors; der eigene Datensatz ist lesbar (Payloads `me` braucht das), die Felder des Faktors nie. Der Wächter in `lib/rest-guard.ts` ist unverändert und bleibt wirksam: ohne Sitzung 404 für die neuen Endpunkte, und die Probeliste (`inventory/routes.ts`) prüft das. `src/proxy.ts` lenkt Betreiber ohne Faktor von jeder `/admin`-Seite auf `/admin/mfa`; das ist Komfort, die Sperre liegt in den Zugriffsfunktionen.
+
+**Grenzen und Folgen (bewusst so).**
+
+- **Erste Einrichtung nur mit dem Passwort:** Wer das Startpasswort eines neuen Betreibers kennt, bevor dieser sich anmeldet, kann den Faktor einrichten. Startpasswörter über einen sicheren Kanal geben; der Ingress-Schutz aus O9 (VPN oder vorgeschaltete Anmeldung) bleibt zusätzlich nötig und ist Sache von Ops.
+- **`PAYLOAD_SECRET` ist an die Faktoren gekoppelt:** Wird es rotiert, sind alle Secrets nicht mehr lesbar und alle Betreiber müssen neu einrichten (Admin setzt zurück, der letzte Admin per Skript). Das gehört in den Betriebsablauf von #205.
+- **Keine neuen Wiederherstellungscodes im Selbstdienst:** Sind die Codes verbraucht, setzt ein Admin zurück.
+- **`sid` aus dem Token ohne Signaturprüfung:** Die Claims des Sitzungstokens werden nur mit dem signierten Cookie verglichen; ob das Token gilt, entscheidet Payload. Ein Angreifer ohne Faktor kann kein Cookie erzeugen.
+- **Nicht belegt:** Der Ablauf in einem echten Browser mit einer Authenticator-App (QR-Code, Eingabe, Wiederherstellungscodes, Weiterleitung) und das Verhalten von Payloads Oberfläche für Betreiber ohne Faktor (Menü, `/admin/mfa`, Weiterleitung, Abmelden) sind **nicht** gelaufen; die Teile dahinter (Endpunkte, Zugriff, Cookie, Audit) sind durch Tests belegt (unten).
+
+### Rollenmatrix (ADR Abschnitt 2, 3, O2)
+
+| | `admin` | `support` | `editor` |
+|---|---|---|---|
+| Benutzer, Testende, Dauer-Überschreibung, Cloud-Zugang, Beta | lesen und ändern | **nur lesen** | nicht erreichbar (Menü weg, URL 403) |
+| Entitlements (am Konto und als Liste) | lesen und ändern | nur lesen | nicht erreichbar |
+| Plattform-Einstellungen (Standarddauer) | lesen und ändern | nur lesen | nicht erreichbar |
+| Blog, News, Medien | alles | nur lesen (auch Entwürfe und Vorschau) | alles |
+| Betreiber | anlegen, Rolle ändern, Faktor zurücksetzen, sperren, löschen | nur der eigene Datensatz | nur der eigene Datensatz |
+| Audit | lesen | nicht erreichbar | nicht erreichbar |
+
+Die Matrix steht in `src/access/index.ts` (eine Stelle); jede Collection listet jede Operation ausdrücklich, der Inventar-Test fällt bei einer fehlenden um. Ein Betreiber hebt seine Rolle nie an (Feldzugriff nur für `admin`); der letzte aktive Admin kann weder herabgestuft noch gesperrt noch gelöscht werden. `hidden` blendet nur das Menü aus, die Sperre per URL sind die Zugriffsfunktionen.
+
+### Audit (`operator-audit`)
+
+Eine Zeile je geänderten Wert: **wer** (E-Mail, ID, Rolle), **wann** (`createdAt`), **was** (`action`), **Objekt** (bei Konten und Zugängen die Relation zum Konto, bei Betreibern die E-Mail), **alt → neu** (`changes`). Aufgenommen werden nur Felder aus einer festen Liste (`lib/audit.ts`): Testende, Dauer-Überschreibung, Legacy, Cloud-Zugang, Beta, Entitlement (Funktion, Quelle, aktiv, Ablauf), Standarddauer, Betreiber (Anlage, Rolle, E-Mail/Name, Sperre, Löschung, „Passwort geändert“ ohne Wert), Faktor (eingerichtet, zurückgesetzt, Wiederherstellungscode benutzt, nur mit der Restzahl). Passwörter, Secrets und Codes gelangen nicht hinein (Test: die gesamte Tabelle enthält keines der verwendeten). Nur Admins lesen; über UI und API gibt es kein Anlegen, Ändern und Löschen. In der Datenbank erzwingt ein Trigger dasselbe: keine Änderung einer Zeile (außer dass `ON DELETE SET NULL` die Relation zum Konto löscht, wenn das Konto gelöscht wird, damit der Audit keinen Bezug zu gelöschten Konten behält) und kein Löschen vor 365 Tagen. **Frist 365 Tage** wie `docs/LOESCHKONZEPT.md`; jeder Audit-Schreibvorgang räumt Abgelaufenes mit auf (dieselbe Gewohnheit wie bei der Nonce-Tabelle), zusätzlich `bun run operator purge-audit` für einen Job. Die E-Mail eines gelöschten Betreibers bleibt bis zu 365 Tage im Audit (Bezeichnung des Objekts und des Handelnden); das ist im Löschkonzept festgehalten.
+
+Änderungen, die die App über `/svc/v1` macht (z. B. Testende bei der Bestätigung), sind keine Betreiberaktionen und stehen nicht im Audit.
+
+### Betreiberverwaltung und Löschfrist
+
+Admins legen Betreiber mit Rolle an, ändern die Rolle, setzen den Faktor zurück, sperren (kein Login, bestehende Sitzungen enden sofort) und löschen. `scripts/operator.ts`: `create`, `reset-mfa`, `purge-audit` (Handelnder `cli` im Audit). **Löschfrist (Vorschlag, Entscheidung der Admins in O10):** beim Ausscheiden sofort sperren, binnen 30 Tagen löschen; Audit-Einträge bleiben 365 Tage. Automatisch löscht nichts (ein Fehlgriff würde den Zugang entziehen).
+
+### Redaktion
+
+Blog und News haben Entwurf, Veröffentlichen und eine Vorschau (`/preview/{blog|news}/{id}`, nur für Betreiber mit Faktor, HTML maskiert, `noindex`, keine Zwischenspeicherung); Medien verlangen den Alternativtext. **Entwürfe erscheinen nie über `/svc/v1/content`:** DB-Test mit einem nur als Entwurf gespeicherten Eintrag und einem veröffentlichten Eintrag mit neuerem Entwurf (geliefert wird die veröffentlichte Fassung); erst nach dem Veröffentlichen erscheint die neue. Der Beleg im Browser ist Sache des testers. Medien bleiben lokal (O11, S3: #205); Import und Marketing-Lesepfad sind #366.
+
+### Beleg (Tests im Pod, Wegwerf-Postgres)
+
+- 44 bestehende DB-Tests (`svc.db.test.ts`) grün, dazu **26 neue** (`operators.db.test.ts`): Faktor (Einrichtung, falscher Code, Wiederholung, Wiederherstellungscode, Zähler, Reset, Bindung an die Sitzung), Rollen über REST mit dem echten Wächter, Zugriff per URL, Audit je Wert, Inhalte ohne Geheimnisse, Trigger, Frist, gesperrte Betreiber, letzter Admin, Entwürfe, Vorschau, Alternativtext.
+- Unit: 15 Tests der Hilfen (TOTP, Verschlüsselung, Codes, Cookie), 5 der Restlaufzeit, Inventar- und Probeliste (jetzt mit den Endpunkten des Faktors und der Vorschau; 203 Zeilen in `payload-endpoints.txt`).
+- **Nicht gelaufen im Pod (zu schwer, laut `AGENTS.md`):** der Produktions-Build und `verify-production.ts` (CI), die gesamte Suite des Repos, jede Oberfläche im Browser.
+
+### Neue Funde
+
+| # | Stelle | Befund in #206 | Folge |
+|---|---|---|---|
+| 21 | Deutsche Oberfläche und Dienstlogik | Payload übersetzt auch Fehlermeldungen, die der Dienst auswertet: Die Erkennung einer verletzten Eindeutigkeit (`isUniqueViolation`) suchte englische Texte; mit `fallbackLanguage: "de"` wurde aus 409 ein 500 (fünf DB-Tests rot) | Erkennung auch auf Deutsch, Test dazu. Neue Auswertung von Meldungstexten in Diensten vermeiden |
+| 22 | Eigene `id` in Reitern | Liegt das Textfeld `id` der Benutzer in einem Reiter, erkennt Payload es nicht mehr als `id` der Collection (Typen werden `number`) | Das Feld `id` bleibt auf oberster Ebene, nur die übrigen Felder sind in Reitern (keine Spaltenänderung, die Migration enthält nichts für `users`) |
+| 23 | Cookie ohne `Origin` | Payload nimmt das Sitzungs-Cookie ohne `Origin` nur mit `Sec-Fetch-Site: same-origin, same-site, none` an; die Vorschau (GET) gilt deshalb nur für Aufrufe aus der Oberfläche oder eine direkte Eingabe der Adresse | Test dazu; ein Aufruf von anderer Herkunft (`cross-site`) bekommt 404 |
+
+### O17 nach #206
+
+**Annahme, kein Beleg.** Keine Zeiterfassung. Der Eigenbau des zweiten Faktors liegt im oberen Teil der im Spike genannten 3 bis 5 Personentage; die Zeile „Admin-Oberfläche“ bleibt bei **8 bis 12**. Nach #205 (Betrieb) und dem Lauf des testers in der Oberfläche erneut prüfen.
+
 ## Wiederholung ohne den Pod des coders
 
 Alle Dateien des Prototyps, die die Tabellen oben belegen, stehen unten als Codeblöcke (Prüfskripte und das nötige Gerüst, kein Produktivcode, ca. 400 Zeilen; Zusatzprüfungen zu API-Schlüssel, Job-Queue, TOTP-Plugin, Migrationen und `id` sind nicht enthalten und aus den Befehlen im Text einzeln nachzustellen). Es gibt keine Zugangsdaten: Das Postgres ist ein Wegwerf-Container oder ein npm-Postgres, alle Werte in `.env` sind Dummywerte.

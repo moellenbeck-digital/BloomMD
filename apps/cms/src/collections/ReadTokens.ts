@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "payload";
-import { adminOnly, deny } from "../access";
+import { adminOnly, deny, hiddenUnless } from "../access";
 
 /**
  * Read tokens for `GET /svc/v1/content/{blog|news}` (option T, ADR 3): at least 256 bits, only the hash
@@ -9,7 +9,7 @@ import { adminOnly, deny } from "../access";
  */
 export const ReadTokens: CollectionConfig = {
   slug: "read-tokens",
-  admin: { useAsTitle: "label", defaultColumns: ["label", "uses", "lastUsedAt", "expiresAt"], group: "Betreiber" },
+  admin: { useAsTitle: "label", defaultColumns: ["label", "uses", "lastUsedAt", "expiresAt"], group: "Betreiber", hidden: hiddenUnless("admin") },
   access: { create: deny, read: adminOnly, update: deny, delete: adminOnly, readVersions: deny },
   fields: [
     { name: "label", type: "text", required: true },

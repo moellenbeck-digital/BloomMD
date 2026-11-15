@@ -11,6 +11,7 @@ export const ALLOWED_ROUTE_FILES = [
   "(payload)/admin/[[...segments]]/page.tsx",
   "(payload)/api/[...slug]/route.ts",
   "(payload)/layout.tsx",
+  "preview/[kind]/[id]/route.ts",
   "svc/v1/auth/login/route.ts",
   "svc/v1/content/[kind]/route.ts",
   "svc/v1/health/ready/route.ts",
@@ -39,6 +40,13 @@ export const PROBES: Probe[] = [
   { method: "GET", path: "/admin/login", expect: [200] },
   { method: "GET", path: "/api/operators/me", expect: [200] },
   { method: "POST", path: "/api/operators/login", expect: [400, 401] },
+  // Preview of drafts for operators: without a session it is a 404 like every unknown path.
+  { method: "GET", path: "/preview/blog/1", expect: [404] },
+  { method: "GET", path: "/preview/news/1", expect: [404] },
+  // The second-factor endpoints and the reset need an operator session.
+  { method: "POST", path: "/api/operators/mfa/verify", expect: [404] },
+  { method: "POST", path: "/api/operators/mfa/begin", expect: [404] },
+  { method: "POST", path: "/api/operators/1/mfa-reset", expect: [404] },
   // /svc/v1 without signature or token: 401; health is open and carries no data.
   { method: "GET", path: "/svc/v1/health/ready", expect: [200] },
   { method: "POST", path: "/svc/v1/auth/login", expect: [401] },

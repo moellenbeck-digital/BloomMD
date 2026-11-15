@@ -138,11 +138,13 @@ export const verifyCode: PayloadHandler = async (req) => {
   return json(200, { ok: true, ...(recoveryLeft === undefined ? {} : { recoveryCodesLeft: recoveryLeft }) }, { "set-cookie": cookie });
 };
 
-export const resetFactor: PayloadHandler = async (req) => {
-  if (operatorRole(req) !== "admin") return json(403, { error: "forbidden" });
-  const id = (req.routeParams as { id?: string } | undefined)?.id;
-  const row = id ? await load(req, id) : null;
-  if (!id || !row) return json(404, { error: "not_found" });
+/**
+ * Removes the second factor of an operator and ends their sessions; they sign in again and set it up anew. Used by the
+ * endpoint (an admin) and by `scripts/operator.ts reset-mfa` (the way back for the last admin). Audited.
+ */
+export async function clearFactor(req: PayloadRequest, id: string | number): Promise<boolean> {
+  const row = await load(req, id);
+  if (!row) return false;
   await req.payload.update({
     collection: "operators",
     id,
@@ -150,8 +152,14 @@ export const resetFactor: PayloadHandler = async (req) => {
     overrideAccess: true,
     depth: 0,
   });
-  // The operator signs in again and sets the factor up anew: every open session ends.
   await poolOf(req.payload).query("delete from operators_sessions where _parent_id = $1", [id]);
   await recordAudit(req, { action: "operator.mfa_reset", targetType: "operators", targetId: id, targetLabel: row.email, changes: [{ field: "totpEnabledAt", from: row.totpEnabledAt ?? null, to: null }] });
+  return true;
+}
+
+export const resetFactor: PayloadHandler = async (req) => {
+  if (operatorRole(req) !== "admin") return json(403, { error: "forbidden" });
+  const id = (req.routeParams as { id?: string } | undefined)?.id;
+  if (!id || !(await clearFactor(req, id))) return json(404, { error: "not_found" });
   return json(200, { ok: true });
 };

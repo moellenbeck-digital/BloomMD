@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { canonicalEmail } from "./email-canonical";
 import { passwordRuleError } from "./password-rule";
-import { isEmail, isUuid, parseRegister } from "./identity";
+import { isEmail, isUniqueViolation, isUuid, parseRegister } from "./identity";
 import { SvcError } from "./svc-error";
 import { MIN_READ_TOKEN_LENGTH, generateToken, hashToken } from "./token";
 
@@ -73,5 +73,16 @@ describe("registration input", () => {
   test("a waitlist account has no password", () => {
     expect(parseRegister({ id, email: "w@example.de", origin: "waitlist" })).toMatchObject({ origin: "waitlist", password: undefined });
     expect(() => parseRegister({ id, email: "w@example.de", origin: "waitlist", password: "Sup3rGeheim123" })).toThrow();
+  });
+});
+
+describe("a violated unique index is recognized in both languages of the admin UI", () => {
+  test("English and German texts of Payload (valueMustBeUnique, userEmailAlreadyRegistered)", () => {
+    expect(isUniqueViolation(new Error("Value must be unique"))).toBe(true);
+    expect(isUniqueViolation(new Error("Wert muss einzigartig sein"))).toBe(true);
+    expect(isUniqueViolation(new Error("A user with the given email is already registered."))).toBe(true);
+    expect(isUniqueViolation(new Error("Ein Benutzer mit der angegebenen E-Mail ist bereits registriert."))).toBe(true);
+    expect(isUniqueViolation(new Error("connection terminated"))).toBe(false);
+    expect(isUniqueViolation("Wert muss einzigartig sein")).toBe(false);
   });
 });

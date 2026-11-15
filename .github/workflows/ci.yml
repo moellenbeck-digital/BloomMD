@@ -183,12 +183,16 @@ jobs:
         working-directory: apps/cms
         run: |
           set -euo pipefail
-          bun test src/testing/svc.db.test.ts 2>&1 | tee "$RUNNER_TEMP/cms-db-tests.log"
-          count() { { grep -E "^ *[0-9]+ $1\$" "$RUNNER_TEMP/cms-db-tests.log" || true; } | awk '{print $1}' | tail -1; }
-          pass="$(count pass)"; skip="$(count skip)"; fail="$(count fail)"
-          echo "::notice title=CMS DB tests::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
-          test "${pass:-0}" -gt 0
-          test "${skip:-0}" -eq 0
+          # One process per file: each sets the environment first and then imports the configuration.
+          for name in svc operators; do
+            log="$RUNNER_TEMP/cms-db-tests-$name.log"
+            bun test "src/testing/$name.db.test.ts" 2>&1 | tee "$log"
+            count() { { grep -E "^ *[0-9]+ $1\$" "$log" || true; } | awk '{print $1}' | tail -1; }
+            pass="$(count pass)"; skip="$(count skip)"; fail="$(count fail)"
+            echo "::notice title=CMS DB tests ($name)::pass=${pass:-0} skip=${skip:-0} fail=${fail:-0}"
+            test "${pass:-0}" -gt 0
+            test "${skip:-0}" -eq 0
+          done
       - name: Validate M1 QA matrix and test plan
         run: bun run test:qa
       - name: Build web

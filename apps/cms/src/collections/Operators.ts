@@ -1,6 +1,6 @@
 import { AuthenticationError, ValidationError } from "payload";
 import type { CollectionBeforeDeleteHook, CollectionConfig } from "payload";
-import { adminOnly, adminOnlyField, allowRoles, anyOperator, denyField, hiddenUnless, operatorRole } from "../access";
+import { adminOnly, adminOnlyField, allowRoles, anyOperator, denyField, hiddenUnless, operatorRole, signedInOperator } from "../access";
 import { diffFields, recordAudit, recordFieldAudits } from "../lib/audit";
 import { beginSetup, confirmSetup, resetFactor, verifyCode } from "../lib/operator-mfa";
 import { passwordHooks } from "../lib/password-hooks";
@@ -50,12 +50,13 @@ export const Operators: CollectionConfig = {
     // the second factor (or a blocked account) has no role and therefore no access to the UI either.
     admin: ({ req }) => operatorRole(req) !== null,
     create: adminOnly,
-    // Everybody sees themselves; the list of all operators is for admins.
+    // Everybody who is signed in sees themselves, also before the second factor (Payload's `me` needs it, and the
+    // secret fields are closed for everybody anyway); the list of all operators is for admins.
     read: ({ req }) => {
-      const role = operatorRole(req);
-      if (role === "admin") return true;
-      if (role && req.user) return { id: { equals: req.user.id } };
-      return false;
+      const operator = signedInOperator(req);
+      if (!operator || operator.blocked) return false;
+      if (operatorRole(req) === "admin") return true;
+      return { id: { equals: operator.id } };
     },
     update: ({ req }) => {
       const role = operatorRole(req);
@@ -131,6 +132,8 @@ export const Operators: CollectionConfig = {
     beforeChange: [
       async ({ data, originalDoc, operation, req }) => {
         const next = data as Record<string, unknown>;
+        // afterChange does not see the password; the audit only learns that it was set (never the value).
+        if (typeof next.password === "string") (req.context as Record<string, unknown>).passwordChanged = true;
         if (operation === "update" && originalDoc) {
           const before = originalDoc as { id: string | number; role?: string; blocked?: boolean };
           const losesAdmin = before.role === "admin" && !before.blocked && ((next.role !== undefined && next.role !== "admin") || next.blocked === true);
@@ -149,7 +152,7 @@ export const Operators: CollectionConfig = {
       },
     ],
     afterChange: [
-      async ({ doc, previousDoc, operation, data, req }) => {
+      async ({ doc, previousDoc, operation, req }) => {
         const base = { targetType: "operators" as const, targetId: doc.id, targetLabel: doc.email };
         if (operation === "create") {
           await recordAudit(req, { ...base, action: "operator.create", changes: [{ field: "role", from: null, to: doc.role }] });
@@ -159,7 +162,7 @@ export const Operators: CollectionConfig = {
         await recordFieldAudits(req, base, changes, { role: "operator.role", email: "operator.profile", name: "operator.profile" });
         const blocked = changes.find((change) => change.field === "blocked");
         if (blocked) await recordAudit(req, { ...base, action: doc.blocked ? "operator.block" : "operator.unblock", changes: [blocked] });
-        if (typeof (data as { password?: unknown } | undefined)?.password === "string") {
+        if ((req.context as { passwordChanged?: boolean }).passwordChanged) {
           await recordAudit(req, { ...base, action: "operator.password", changes: [{ field: "password", from: null, to: "geändert" }] });
         }
         return doc;

@@ -6,6 +6,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const date = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" });
 
 const days = (count: number) => `${count} ${count === 1 ? "Tag" : "Tage"}`;
+/** After "vor": dative. */
+const daysAgo = (count: number) => `${count} ${count === 1 ? "Tag" : "Tagen"}`;
 
 export type TrialState = "none" | "running" | "ends_today" | "ended";
 
@@ -17,7 +19,7 @@ export function trialSummary(endsAt: string | Date | null | undefined, now: Date
   const diff = end.getTime() - now.getTime();
   if (diff <= 0) {
     const ago = Math.floor(-diff / DAY_MS);
-    return { text: ago === 0 ? `${label} (heute abgelaufen)` : `${label} (abgelaufen vor ${days(ago)})`, state: "ended" };
+    return { text: ago === 0 ? `${label} (heute abgelaufen)` : `${label} (abgelaufen vor ${daysAgo(ago)})`, state: "ended" };
   }
   if (diff < DAY_MS) return { text: `${label} (endet in weniger als einem Tag)`, state: "ends_today" };
   return { text: `${label} (noch ${days(Math.ceil(diff / DAY_MS))})`, state: "running" };

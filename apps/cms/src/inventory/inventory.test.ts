@@ -3,7 +3,10 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import config from "@payload-config";
 import { allowRoles, anyOperator } from "../access";
+import { operatorReq } from "../testing/operator-req";
 import { ALLOWED_ROUTE_FILES, IGNORED_APP_FILES, PROBES } from "./routes";
+
+process.env.PAYLOAD_SECRET ||= "inventory-test-secret-inventory-test-secret";
 
 /**
  * Inventory test (ADR 3, layer 5). Three parts, each fails for every unknown entry:
@@ -66,7 +69,7 @@ describe("2. endpoints of the resolved Payload configuration", () => {
 describe("3. every collection and global denies by default", () => {
   const anonymous = { req: { user: null } } as never;
   const outsider = { req: { user: { collection: "users", id: "u", role: "admin" } } } as never;
-  const operator = (role: string) => ({ req: { user: { collection: "operators", id: "o", role } } }) as never;
+  const operator = (role: string) => operatorReq(role);
   const OPERATIONS = ["create", "read", "update", "delete", "readVersions"] as const;
 
   test("each collection lists the operations explicitly and denies anonymous callers and end users", async () => {
@@ -132,7 +135,43 @@ describe("3. every collection and global denies by default", () => {
   });
 
   test("the role helpers ignore unknown roles", async () => {
-    expect(await allowRoles("admin")({ req: { user: { collection: "operators", role: "root" } } } as never)).toBe(false);
-    expect(await anyOperator({ req: { user: { collection: "operators", role: "editor" } } } as never)).toBe(true);
+    expect(await allowRoles("admin")(operatorReq("root"))).toBe(false);
+    expect(await anyOperator(operatorReq("editor"))).toBe(true);
+  });
+});
+
+describe("4. a session without the second factor, and a blocked operator, have no role", () => {
+  test("every operation of every collection and global denies, in the admin UI and over REST alike", async () => {
+    const resolved = await config;
+    const cases = [operatorReq("admin", { mfa: false }), operatorReq("admin", { blocked: true })];
+    for (const args of cases) {
+      for (const collection of resolved.collections.filter((c) => !c.slug.startsWith("payload-"))) {
+        for (const operation of ["create", "read", "update", "delete", "readVersions", "unlock", "admin"] as const) {
+          if ((operation === "unlock" || operation === "admin") && !collection.auth) continue;
+          const access = (collection.access as Record<string, unknown>)[operation] as ((a: never) => unknown) | undefined;
+          if (typeof access !== "function") continue;
+          const result = await access(args);
+          // The only exception: a signed-in operator reads their own record without the second factor (Payload's "me").
+          const ownRecordOnly = collection.slug === "operators" && operation === "read" && args === cases[0];
+          if (ownRecordOnly) expect(result, "operators.read is the own record only").toEqual({ id: { equals: "o" } });
+          else expect(result, `${collection.slug}.${operation}`).toBe(false);
+        }
+      }
+      for (const global of resolved.globals) {
+        for (const operation of ["read", "update"] as const) {
+          const access = (global.access as Record<string, (a: never) => unknown>)[operation]!;
+          expect(await access(args), `${global.slug}.${operation}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  test("the cookie of another operator or another session does not count", async () => {
+    const resolved = await config;
+    const read = (resolved.collections.find((c) => c.slug === "users")!.access as Record<string, (a: never) => unknown>).read!;
+    expect(await read(operatorReq("admin", { id: "a" }))).toBe(true);
+    const foreign = operatorReq("admin", { id: "b" }) as unknown as { req: { headers: Headers } };
+    const mixed = { req: { user: { collection: "operators", id: "a", role: "admin" }, headers: foreign.req.headers } };
+    expect(await read(mixed as never)).toBe(false);
   });
 });

@@ -13,14 +13,15 @@
     "build": "NODE_OPTIONS=\"--no-deprecation --max-old-space-size=${CMS_BUILD_HEAP_MB:-4096}\" next build --webpack",
     "start": "NODE_OPTIONS=--no-deprecation next start -p ${PORT:-3300}",
     "typecheck": "tsc --noEmit",
-    "test": "bun test --path-ignore-patterns \"**/svc.db.test.ts\" src && bun test src/testing/svc.db.test.ts",
+    "test": "bun test --path-ignore-patterns \"**/*.db.test.ts\" src && bun test src/testing/svc.db.test.ts && bun test src/testing/operators.db.test.ts",
     "payload": "NODE_OPTIONS=--no-deprecation payload",
     "generate:importmap": "NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "generate:types": "NODE_OPTIONS=--no-deprecation payload generate:types",
     "migrate": "NODE_OPTIONS=--no-deprecation payload migrate",
     "migrate:status": "NODE_OPTIONS=--no-deprecation payload migrate:status",
     "migrate:create": "NODE_OPTIONS=--no-deprecation payload migrate:create",
-    "read-token": "bun run scripts/read-token.ts"
+    "read-token": "bun run scripts/read-token.ts",
+    "operator": "bun run scripts/operator.ts"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.93.0",

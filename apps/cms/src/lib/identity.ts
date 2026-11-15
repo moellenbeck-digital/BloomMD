@@ -154,9 +154,13 @@ export function parseRegister(body: Record<string, unknown>): RegisterInput {
   };
 }
 
-function isUniqueViolation(error: unknown): boolean {
+/**
+ * Payload turns a violated unique index into a ValidationError whose only trace is the translated text (`valueMustBeUnique`,
+ * `userEmailAlreadyRegistered`). The admin UI is German since #206, so both languages are recognized.
+ */
+export function isUniqueViolation(error: unknown): boolean {
   const text = error instanceof Error ? `${error.name} ${error.message} ${JSON.stringify((error as { data?: unknown }).data ?? "")}` : "";
-  return /unique|duplicate|already registered|value must be unique/i.test(text);
+  return /unique|duplicate|already registered|einzigartig|bereits registriert/i.test(text);
 }
 
 /** `POST /svc/v1/users`: creates the account and returns the one-time token to confirm it. */

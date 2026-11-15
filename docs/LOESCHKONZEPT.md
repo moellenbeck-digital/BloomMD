@@ -18,7 +18,7 @@ entscheiden muss, steht in Abschnitt 6.
 | Zähler der Anfrage-Begrenzung (nur Hash) | 7 Tage nach letzter Änderung | `maintenance.ts` | `db:maintenance` |
 | Gelöschte Dokumente (samt Revisionen, Share-Links) | 30 Tage nach dem Löschen, `BLOOMMD_DELETED_DOCUMENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance` |
 | Audit-Ereignisse | 365 Tage, `BLOOMMD_AUDIT_EVENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance` |
-| Stripe-Ereignisse | 180 Tage, `BLOOMMD_STRIPE_EVENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance` (Billing ist aus, im öffentlichen Text nicht genannt) |
+| Stripe-Ereignisse | 180 Tage, `BLOOMMD_STRIPE_EVENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance`; im öffentlichen Text genannt („Speicherdauer und Löschung“: 180 Tage nach der Verarbeitung), der Test `legal-pages-consistency` prüft den Wert (#381) |
 | Wartelisten-Einträge | 90 Tage nach der letzten Einladungs-E-Mail | `apps/marketing/src/lib/waitlist-retention.ts` | **manuell:** `bun run --cwd apps/marketing waitlist purge --apply` (verweigert vor Ablauf der Frist) |
 | Feedback (Datenbank, Ticket, Anhänge im Objektspeicher) | **keine Löschung im Repo.** Anhänge bekommen `retention_expires_at` (Standard 90 Tage, `BLOOMMD_FEEDBACK_ATTACHMENT_RETENTION_DAYS`), es löscht sie aber nichts | `apps/app/src/app/api/feedback/feedback-handler.ts` | nichts |
 
@@ -36,7 +36,7 @@ Nutzerin oder der Nutzer das Konto löscht. Die Texte beschreiben das so.
 ## 3. Konto-Löschung durch die Nutzer (`deleteAccountData`)
 
 Auslöser: `/account` (E-Mail-Adresse und Passwort zur Bestätigung), Route `POST /api/account/delete`. Laufende
-Stripe-Abonnements werden vorher gekündigt. Die Löschung wirkt sofort in einer Transaktion
+Stripe-Abonnements werden vorher bei Stripe beendet; schlägt das fehl, wird das Konto nicht gelöscht. Die Löschung wirkt sofort in einer Transaktion
 (`apps/app/src/lib/db.ts`).
 
 **Wird gelöscht** (Fremdschlüssel `on delete cascade` auf `bloom_users`): das Konto, Sitzungen, Auth-Tokens,
@@ -54,7 +54,8 @@ Inhalt, `created_by`, `updated_by` und `saved_by` werden leer (`on delete set nu
 | Daten | Was passiert | Frist |
 | --- | --- | --- |
 | Audit-Ereignisse | Bezug zum Konto entfällt (`actor_user_id` leer), Eintrag bleibt | 365 Tage nach dem Ereignis |
-| Zahlungsdatensätze (`bloom_subscriptions`) | `raw` wird geschwärzt, Stripe-Kundennummer entfernt, Bezug zum Konto entfällt | keine Frist im Code (Billing ist aus, es gibt keine) |
+| Abo-Datensatz (`bloom_subscriptions`) | `raw` wird geschwärzt, `stripe_customer_id` entfernt, Bezug zum Konto entfällt (`user_id` leer); Tarif, Status, Stripe-Abo- und Checkout-Kennung, Periodenende und Zeitstempel bleiben. Öffentlich beschrieben unter „Zahlung und Abo“ und „Speicherdauer und Löschung“ (#381) | **keine Frist im Code** (`maintenance.ts` löscht `bloom_subscriptions` nicht); der Text sagt „derzeit nicht vorgesehen“ |
+| Rechnungs- und Zahlungsdaten (Buchführung, Stripe) | nicht im Code; Konto-Löschung berührt sie nicht, den Stripe-Kunden löscht sie nicht | gesetzliche Aufbewahrung; Text nennt keine Dauer (offen, siehe `docs/BILLING.md`) |
 | Feedback (`bloom_feedback`) | Bezug zum Konto entfällt, `user_email` und Text bleiben; GitHub-Ticket und Anhänge bleiben | **keine Frist** |
 | Wartelisten-Eintrag (Marketing-Datenbank, eigene Datenbank) | wird von der Konto-Löschung nicht berührt | 90 Tage nach der letzten Einladungs-E-Mail, manuell |
 
@@ -106,3 +107,4 @@ Diese Punkte stehen bewusst **nicht** als Platzhalter im öffentlichen Text.
     eigener Abschnitt mit Zweck und Rechtsgrundlage. Rechtsgrundlagen sind weiter nur allgemein genannt.
 12. **Store-Formulare:** Google Play „Data safety“ und Apple App Privacy erst nach den Entscheidungen zu 5 bis 9 ausfüllen
     (`packages/mobile/store/PRIVACY-ANSWERS.md`).
+13. **Zahlung und Abo (#381):** Die zehn offenen Rechtsfragen zum Cloud-Tarif (Aufbewahrungsdauer der Rechnungsdaten, Löschfrist des Abo-Datensatzes, Stripe-Kunde bei Konto-Löschung, Stripes Rolle, Widerruf, Erstattung und weitere) stehen in `docs/BILLING.md`, Abschnitt „Offen — Rechtsprüfung vor Admin-Go“. Sie werden hier nicht wiederholt.

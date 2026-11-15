@@ -40,6 +40,10 @@
       "import": "./src/learning.ts",
       "types": "./src/learning.ts"
     },
+    "./account-quota": {
+      "import": "./src/account-quota.ts",
+      "types": "./src/account-quota.ts"
+    },
     "./agent-ledger": {
       "import": "./src/agent-ledger.ts",
       "types": "./src/agent-ledger.ts"

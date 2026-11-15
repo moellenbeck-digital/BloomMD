@@ -113,7 +113,8 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     }
   }
   // Trial switches (#274): off unless exactly "1"; a typo must not silently mean "off" in a release.
-  for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING"] as const) {
+  // The account quota (#380) is the same kind of switch (read by the app and by the sync server).
+  for (const key of ["BLOOMMD_TRIAL_READONLY", "BLOOMMD_TRIAL_REMINDERS_EXISTING", "BLOOMMD_ACCOUNT_QUOTA"] as const) {
     const value = env[key]?.trim();
     if (value && value !== "0" && value !== "1") errors.push(`${key} must be exactly "1" or "0" when set.`);
   }
@@ -130,12 +131,12 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
   // be able to pass this gate without live payment credentials, and enabling billing must not be
   // possible with half a configuration.
   if (env.BLOOMMD_BILLING_ENABLED === "1") {
-    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_ANNUAL", "STRIPE_PRICE_LIFETIME"] as const) {
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_CLOUD_MONTHLY", "STRIPE_PRICE_CLOUD_ANNUAL"] as const) {
       if (!env[key]?.trim()) errors.push(`${key} is required when BLOOMMD_BILLING_ENABLED is 1.`);
     }
     if (!env.STRIPE_SECRET_KEY?.startsWith("sk_live_")) errors.push("STRIPE_SECRET_KEY must be a live Stripe secret for production.");
     if (!env.STRIPE_WEBHOOK_SECRET?.startsWith("whsec_")) errors.push("STRIPE_WEBHOOK_SECRET must use a Stripe webhook secret.");
-    for (const key of ["STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_ANNUAL", "STRIPE_PRICE_LIFETIME"] as const) {
+    for (const key of ["STRIPE_PRICE_CLOUD_MONTHLY", "STRIPE_PRICE_CLOUD_ANNUAL"] as const) {
       if (!env[key]?.startsWith("price_")) errors.push(`${key} must use a Stripe price id.`);
     }
   } else if (env.BLOOMMD_BILLING_ENABLED && env.BLOOMMD_BILLING_ENABLED !== "0") {
@@ -178,9 +179,6 @@ export function productionConfigErrors(env: NodeJS.ProcessEnv = process.env) {
     }
     if (env.SYNC_REPLICA_COUNT !== "1") errors.push("SYNC_REPLICA_COUNT must be 1 until distributed room coordination is implemented.");
   }
-  if (env.BLOOMMD_BILLING_ENABLED === "1" && env.STRIPE_PRICE_SYNC_MONTHLY && !env.NEXT_PUBLIC_SYNC_URL) {
-    errors.push("STRIPE_PRICE_SYNC_MONTHLY must not be offered before sync is configured.");
-  }
   if (env.NEXT_PUBLIC_POSTHOG_KEY && !env.NEXT_PUBLIC_POSTHOG_HOST) {
     errors.push("NEXT_PUBLIC_POSTHOG_HOST is required when PostHog is enabled.");
   }
@@ -204,6 +202,11 @@ export function productionConfigWarnings(env: NodeJS.ProcessEnv = process.env) {
   if (env.BLOOMMD_TRIAL_READONLY?.trim() === "1") {
     warnings.push(
       "BLOOMMD_TRIAL_READONLY is 1: accounts whose trial has ended are read-only (#274). It belongs on only after the admin's go and in agreement with Ops.",
+    );
+  }
+  if (env.BLOOMMD_ACCOUNT_QUOTA?.trim() === "1") {
+    warnings.push(
+      "BLOOMMD_ACCOUNT_QUOTA is 1: writes that grow an account beyond 100 MB are refused (#380). It belongs on only after the admin's go and in agreement with Ops; the sync server needs the same value.",
     );
   }
   return warnings;

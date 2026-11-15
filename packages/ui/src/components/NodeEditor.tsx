@@ -57,7 +57,7 @@ import { RemotePreviewImage, remoteHost } from "./RemotePreviewImage";
 import { requestNodeFocus } from "../utils/nodeFocus";
 import { revealFocusedField } from "../utils/visual-viewport";
 import { InkAttachmentsContext } from "../ink/attachments";
-import { restoreWikiLinks } from "../utils/wiki-links-escape";
+import { useEditorContentGuard } from "../hooks/useEditorContentGuard";
 import type { Translations } from "../i18n/translations";
 import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown, resolveMapLinkInDocument, type MapLinkResource, type MapLinkResolution, type PdfLink } from "../utils/links";
 import {
@@ -151,7 +151,6 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setSelectedNodeId = useMindMapStore((s) => s.setSelectedNodeId);
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
-  const updateNodeContent = useMindMapStore((s) => s.updateNodeContent);
   const updateNodeMetadata = useMindMapStore((s) => s.updateNodeMetadata);
   const deleteNodeAction = useMindMapStore((s) => s.deleteNodeAction);
   const editorRef = useRef<MDXEditorMethods>(null);
@@ -205,15 +204,8 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
     }
   }, [selectedNodeId, selectedNode]);
 
-  const onChange = useCallback(
-    (markdown: string) => {
-      if (selectedNodeId) {
-        // Keep Obsidian links and handwriting embeds intact; the editor escapes `[[`.
-        updateNodeContent(selectedNodeId, restoreWikiLinks(markdown));
-      }
-    },
-    [selectedNodeId, updateNodeContent],
-  );
+  // #394: an empty editor report that is not from the user must not empty a node; unreported text is kept when the editor goes away.
+  const { handleEditorChange: onChange, attachEditorRegion } = useEditorContentGuard(editorRef, selectedNodeId);
 
   const copyUrl = useCallback((url: string) => {
     navigator.clipboard?.writeText(url).catch(() => {});
@@ -1009,7 +1001,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
       {showPrimaryMarkdownEditor ? (
         <details open className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="node-content-panel">
           <summary className="cursor-pointer list-none border-b border-[var(--color-border)] px-5 py-3 pointer-coarse:py-[14px] text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">{t.content}</summary>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div ref={attachEditorRegion} className="min-h-0 flex-1 overflow-y-auto">
             <VisualsContext.Provider value={visualsContext}>
             <MDXEditor
               ref={editorRef}

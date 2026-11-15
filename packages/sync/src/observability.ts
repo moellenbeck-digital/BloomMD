@@ -9,6 +9,7 @@ export type SyncMetricName =
   | "sync_messages_total"
   | "sync_messages_dropped_total"
   | "sync_persistence_errors_total"
+  | "sync_persistence_quota_rejections_total"
   | "sync_persistence_retries_total"
   | "sync_persistence_recoveries_total"
   | "sync_room_flush_errors_total";
@@ -62,6 +63,7 @@ const metricHelp: Record<SyncMetricName, string> = {
   sync_messages_total: "Processed WebSocket sync messages.",
   sync_messages_dropped_total: "Dropped or rejected WebSocket sync messages.",
   sync_persistence_errors_total: "Persistence operations that ended in an error.",
+  sync_persistence_quota_rejections_total: "Saves refused because the account's storage quota is reached.",
   sync_persistence_retries_total: "Safe persistence retries attempted.",
   sync_persistence_recoveries_total: "Persistence operations recovered after a prior error.",
   sync_room_flush_errors_total: "Final room flushes that failed or timed out.",

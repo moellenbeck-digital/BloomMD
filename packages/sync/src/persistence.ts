@@ -6,6 +6,7 @@ import {
   serializeToMarkdown,
   type MindMapDocument,
 } from "@bloommd/core";
+import { ACCOUNT_QUOTA_BYTES, AccountQuotaExceededError, decideQuotaWrite, quotaBytes } from "@bloommd/core/account-quota";
 import { AGENT_ACCESS, accessFor, cloudAreaOf, type AgentAccess, type AgentAccessConfig } from "@bloommd/core/agent-ledger";
 import type { PersistenceOperation, RoomDescriptor, SyncServerConfig } from "./types";
 
@@ -111,8 +112,51 @@ export function createFilePersistence(config: SyncServerConfig): DocumentPersist
 }
 
 /** Cloud persistence against any TLS-reachable Postgres, including CloudNativePG. */
-export function createDatabasePersistence(databaseUrl: string): DocumentPersistence {
+export interface DatabasePersistenceOptions {
+  /**
+   * Refuse a save or create that raises the owning account's storage usage beyond the limit (#380).
+   * Off by default (`BLOOMMD_ACCOUNT_QUOTA=1` turns it on in `index.ts`); with it off no extra query runs.
+   */
+  quotaEnforced?: boolean;
+  /** Defaults to the 100 MB of `@bloommd/core/account-quota`. */
+  quotaLimitBytes?: number;
+}
+
+export function createDatabasePersistence(databaseUrl: string, options: DatabasePersistenceOptions = {}): DocumentPersistence {
   const sql: SqlClient = createSqlClient(databaseUrl);
+  const quotaEnforced = options.quotaEnforced === true;
+  const quotaLimitBytes = options.quotaLimitBytes ?? ACCOUNT_QUOTA_BYTES;
+
+  /**
+   * Quota of the account that owns the workspace (#380). A write that does not grow the document
+   * costs one cheap lookup and passes; only a growing write runs the aggregate over the owner's
+   * documents (index `bloom_documents_workspace_updated_idx` per workspace, `bloom_workspaces_owner_idx`
+   * for the owner's workspaces). Concurrent saves of different documents can overshoot the limit by
+   * the size of one save; the next growing write is refused.
+   */
+  async function assertQuotaAllows(workspaceId: string, documentId: string | null, markdown: string): Promise<void> {
+    if (!quotaEnforced) return;
+    const newBytes = quotaBytes(markdown);
+    let oldBytes = 0;
+    if (documentId) {
+      const current = await sql`
+        select octet_length(markdown)::bigint as bytes
+        from bloom_documents
+        where id = ${documentId} and workspace_id = ${workspaceId} and deleted_at is null
+      `;
+      oldBytes = Number((current[0] as { bytes?: string | number } | undefined)?.bytes ?? 0);
+    }
+    if (newBytes <= oldBytes) return;
+    const usage = await sql`
+      select coalesce(sum(octet_length(d.markdown)), 0)::bigint as used
+      from bloom_workspaces w
+      join bloom_documents d on d.workspace_id = w.id and d.deleted_at is null
+      where w.owner_user_id = (select owner_user_id from bloom_workspaces where id = ${workspaceId})
+    `;
+    const usedBytes = Number((usage[0] as { used?: string | number } | undefined)?.used ?? 0);
+    const decision = decideQuotaWrite({ usedBytes, oldBytes, newBytes, limitBytes: quotaLimitBytes });
+    if (!decision.allowed) throw new AccountQuotaExceededError(usedBytes, quotaLimitBytes);
+  }
   // sql.json stores an object; JSON.stringify(...)::jsonb would store a JSON string instead.
   const jsonb = (value: unknown) => sql.json(value as Parameters<SqlClient["json"]>[0]);
 
@@ -200,6 +244,7 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
       const expectedVersion = document.storage?.version;
       if (expectedVersion == null) throw new Error("Cloud document version is missing.");
       const markdown = serializeToMarkdown(document);
+      await assertQuotaAllows(descriptor.workspaceId, descriptor.documentId, markdown);
       // One statement, so the version this save replaces is stored exactly when the save succeeds:
       // `prev` locks the row the save may replace (a concurrent save makes it empty, and with it the
       // revision and the pruning), `revision` keeps its old state and `pruned` drops every older
@@ -306,6 +351,7 @@ export function createDatabasePersistence(databaseUrl: string): DocumentPersiste
         throw new Error("Cloud sync requires workspace and user ids.");
       }
       const markdown = serializeToMarkdown(document);
+      await assertQuotaAllows(descriptor.workspaceId, null, markdown);
       const rows = await sql`
         insert into bloom_documents (workspace_id, filename, markdown, frontmatter, created_by, updated_by)
         select ${descriptor.workspaceId}, ${descriptor.filename}, ${markdown},

@@ -65,6 +65,48 @@ describe("product app production config", () => {
     expect(errors).toContain("BLOOMMD_REQUIRE_AUTH must be 1.");
   });
 
+  test("billing on needs the Stripe secrets and both Cloud prices (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    const errors = productionConfigErrors(env);
+    for (const key of ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_CLOUD_MONTHLY", "STRIPE_PRICE_CLOUD_ANNUAL"]) {
+      expect(errors).toContain(`${key} is required when BLOOMMD_BILLING_ENABLED is 1.`);
+    }
+    // The legacy price keys are no longer part of the contract.
+    expect(errors.join(" ")).not.toMatch(/PRO_MONTHLY|PRO_ANNUAL|LIFETIME|SYNC_MONTHLY/);
+  });
+
+  test("billing on checks the live key, the webhook secret and the price prefix (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    env.STRIPE_SECRET_KEY = "sk_test_123";
+    env.STRIPE_WEBHOOK_SECRET = "secret";
+    env.STRIPE_PRICE_CLOUD_MONTHLY = "prod_123";
+    env.STRIPE_PRICE_CLOUD_ANNUAL = "123";
+    expect(productionConfigErrors(env)).toEqual(expect.arrayContaining([
+      "STRIPE_SECRET_KEY must be a live Stripe secret for production.",
+      "STRIPE_WEBHOOK_SECRET must use a Stripe webhook secret.",
+      "STRIPE_PRICE_CLOUD_MONTHLY must use a Stripe price id.",
+      "STRIPE_PRICE_CLOUD_ANNUAL must use a Stripe price id.",
+    ]));
+  });
+
+  test("billing on with a complete Stripe configuration passes, with no sync price rule (#379)", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "1";
+    env.STRIPE_SECRET_KEY = "sk_live_abc";
+    env.STRIPE_WEBHOOK_SECRET = "whsec_abc";
+    env.STRIPE_PRICE_CLOUD_MONTHLY = "price_monthly";
+    env.STRIPE_PRICE_CLOUD_ANNUAL = "price_annual";
+    expect(productionConfigErrors(env)).toEqual([]);
+  });
+
+  test("billing off needs no Stripe values", () => {
+    const env = appEnv();
+    env.BLOOMMD_BILLING_ENABLED = "0";
+    expect(productionConfigErrors(env)).toEqual([]);
+  });
+
   test("allows the beta gate to use database-backed invites", () => {
     const env = appEnv();
     delete env.BLOOMMD_BETA_ALLOWED_EMAILS;
@@ -227,5 +269,30 @@ describe("trial switches in the production config (#274)", () => {
     const on = appEnv();
     on.BLOOMMD_TRIAL_READONLY = "1";
     expect(productionConfigWarnings(on).some((warning) => warning.includes("BLOOMMD_TRIAL_READONLY is 1"))).toBe(true);
+  });
+});
+
+describe("account quota switch in the production config (#380)", () => {
+  test("is optional and accepts exactly 1 or 0", () => {
+    for (const value of [undefined, "", "0", "1"]) {
+      const env = appEnv();
+      if (value !== undefined) env.BLOOMMD_ACCOUNT_QUOTA = value;
+      expect(productionConfigErrors(env)).toEqual([]);
+    }
+    for (const invalid of ["true", "yes", "2", "on"]) {
+      const env = appEnv();
+      env.BLOOMMD_ACCOUNT_QUOTA = invalid;
+      expect(productionConfigErrors(env)).toContain('BLOOMMD_ACCOUNT_QUOTA must be exactly "1" or "0" when set.');
+    }
+  });
+
+  test("on is reported as a warning, off and unset are not", () => {
+    const off = appEnv();
+    off.BLOOMMD_ACCOUNT_QUOTA = "0";
+    expect(productionConfigWarnings(off).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA"))).toBe(false);
+    expect(productionConfigWarnings(appEnv()).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA"))).toBe(false);
+    const on = appEnv();
+    on.BLOOMMD_ACCOUNT_QUOTA = "1";
+    expect(productionConfigWarnings(on).some((warning) => warning.includes("BLOOMMD_ACCOUNT_QUOTA is 1"))).toBe(true);
   });
 });

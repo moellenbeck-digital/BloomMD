@@ -52,6 +52,27 @@ Ausgabe: eine JSON-Zeile mit Zahlen (`due`, `dueByKind`, `heldBackExisting`, `ma
   - **Eine Regel an einer Stelle:** `isTrialWriteLocked` in `apps/app/src/lib/trial-lock.ts` prüft erst das Testende und fragt den Tarif nur bei abgelaufenen Konten ab. Proxy-Guard, Sync-Ticket (Berechtigung `write` statt `read`) und der Hinweis in der App und auf `/account` nutzen sie gemeinsam; es gibt keine zweite Regel. Konten mit aktivem Tarif sehen den Sperr-Hinweis nicht.
   - **Fehlerverhalten unverändert:** schlägt die Abfrage fehl (Datenbank), blockiert der Guard nicht; die Route dahinter braucht die Datenbank ebenfalls und scheitert dort.
 
+## Admin: Verlängerung und Freischaltung (#277)
+
+Maßgeblich ist die Datenbank der Produkt-App (`bloom_users`). **Die Anbindung der Admin-App (`apps/cms`, #204) steht noch aus:** `apps/cms` hat eigene Felder (`trialEndsAt`, `trialGuarded`, `trialDaysOverride`) in einer eigenen Datenbank, die App liest sie nicht (sie ruft `/svc/v1` noch nicht auf). Eine Änderung dort wirkt heute nicht auf die App; ein Audit im CMS gibt es noch nicht (Folge von #204/#206). Bis zur Anbindung geht eine Verlängerung oder Freischaltung nur über das Operator-Kommando der App.
+
+```bash
+cd apps/app   # DATABASE_URL der Ziel-Datenbank gesetzt
+bun run db:trial-admin --operator <kürzel> --konto <uuid> --um 30              # Testende: 30 Tage ab dem späteren von altem Ende und jetzt
+bun run db:trial-admin --operator <kürzel> --konto <uuid> --bis 2027-02-01T00:00:00Z
+bun run db:trial-admin --operator <kürzel> --konto <uuid> --entsperren         # bestehendes Konto verlässt die Postfach-Regel (trial_guarded = false)
+bun run db:trial-admin --operator <kürzel> --adresse <e-mail> --freischalten [--tage 14]   # ein weiteres Testkonto für genau diese Adresse
+# ohne --apply ist es ein Probelauf (zeigt die Änderung, schreibt nichts); mit --apply schreibt es
+```
+
+- **Kein Weg für Nutzer:** keine HTTP-Route, keine Oberfläche, kein Token. Nur wer die Datenbank erreicht, kann das Kommando ausführen. Ein Konto kann sein Testende und die Postfach-Regel nicht ändern; `src/lib/trial-self-service.test.ts` hält fest, dass keine Route die Felder schreibt und niemand außer dem Skript die Operator-Funktionen aufruft.
+- **Verlängerung** (`--um`, `--bis`): nur später als das heutige Ende, in der Zukunft und höchstens 366 Tage voraus (`--um` höchstens 366 Tage). Die Hinweis-Mails folgen dem neuen Ende (15 und 23 Tage nach Start, also 15 und 7 Tage vor dem Ende): bereits versendete oder beanspruchte Hinweise, die zum neuen Ende noch nicht fällig sind, werden freigegeben und gehen zu ihrem neuen Termin einmal erneut raus; was beim neuen Ende schon fällig wäre, bleibt beansprucht, die Verlängerung löst also von sich aus keine Mail aus. Bestandskonten bekommen ihre Hinweise weiterhin nur mit `BLOOMMD_TRIAL_REMINDERS_EXISTING=1`.
+- **Migration 015** und ein späteres `db:migrate` ändern nur Bestandskonten, deren Testende noch genau der Wert aus Migration 013 (15.12.2026) ist; ein vom Operator gesetztes Ende bleibt. Die Bestätigung setzt das Ende nur, wenn keines gesetzt ist (`coalesce`).
+- **Weiteres Testkonto** (`--adresse … --freischalten`): hebt die Regel „ein bestätigtes Konto je Postfach“ (#289, `docs/ACCOUNT-ABUSE-PROTECTION.md`) für genau diese Adresse für `--tage` Tage auf (Standard 14, höchstens 90). Die Anmeldung findet dann keinen „bestätigten Zwilling“, und die Bestätigung nimmt das Konto aus der Regel (`trial_guarded = false`, also auch aus dem Unique-Index). Jede andere Schreibweise desselben Postfachs bleibt gesperrt. Gespeichert wird nur der SHA-256-Schlüssel der Adresse (Tabelle `bloom_trial_exceptions`, Migration `016`, kein Klartext). Die Ausnahme gilt nicht für den Wartelisten-Weg; ein dort angelegtes Konto gibt man mit `--entsperren` frei. Bis die Frist abläuft, kann die Adresse auch nach Löschen und erneutem Registrieren einen weiteren Testzeitraum starten.
+- **Protokoll:** Jeder Lauf mit `--apply`, der etwas ändert, schreibt in derselben Transaktion ein Ereignis in `bloom_audit_events` (der vorhandene Audit der App): `trial.extended`, `trial.guard_released` oder `trial.exception_granted`. Zeitpunkt = `created_at`, `target_id` = Konto-ID, `details` = `operator`, `field`, `old`, `new` (bei Verlängerung zusätzlich `remindersReset`, bei der Ausnahme die ersten 12 Zeichen des Schlüssels). Ohne Konto handelt niemand: `actor_user_id` und `actor_agent_id` sind leer, der Operator steht in `details`. Keine Adresse im Protokoll und in der Ausgabe. Ein Lauf ohne Änderung (z. B. Konto schon entsperrt) schreibt nichts. Auslesen: `select created_at, event_type, target_id, details from bloom_audit_events where event_type like 'trial.%' order by created_at desc;`
+- **Ausgabe:** eine JSON-Zeile (`mode`, `operator`, `event`, `accountId`, `field`, `oldValue`, `newValue`, `changed`, `applied`, `remindersReset`). Exit 1: Konto unbekannt; Exit 2: falsche Argumente.
+- **Rollout:** `bun run --cwd apps/app db:migrate` legt die Tabelle an (Migration `016`); ohne sie scheitert der Schema-Check der Produktions-App.
+
 ## Rollout-Reihenfolge
 
 1. Migration `013` anwenden: `bun run --cwd apps/app db:migrate` (ohne sie scheitert die Prod-App am Schema-Check). Sie ist idempotent und löscht nichts. Der Befehl wendet auch `015` an (siehe Schritt 2).

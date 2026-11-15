@@ -220,6 +220,7 @@ export interface Translations {
   syncFailed: string;
   syncFailureFileNotFound: string;
   syncFailureRoomCapacity: string;
+  syncFailureQuotaExceeded: string;
   syncFailureAccessRevoked: string;
   syncFailureUnauthorized: string;
   syncFailureTicketRefresh: string;
@@ -783,6 +784,7 @@ export const translations: Record<Locale, Translations> = {
     syncFailed: "Verbindung fehlgeschlagen",
   syncFailureFileNotFound: "Workspace-Datei nicht gefunden",
   syncFailureRoomCapacity: "Workspace ist voll",
+  syncFailureQuotaExceeded: "Speicherplatz erreicht – Änderung nicht gespeichert",
   syncFailureAccessRevoked: "Zugriff auf diesen Workspace wurde entzogen",
   syncFailureUnauthorized: "Zugriff nicht autorisiert",
     syncFailureTicketRefresh: "Sync-Ticket konnte nicht erneuert werden",
@@ -1340,6 +1342,7 @@ export const translations: Record<Locale, Translations> = {
     syncFailed: "Connection failed",
   syncFailureFileNotFound: "Workspace file not found",
   syncFailureRoomCapacity: "Workspace is full",
+  syncFailureQuotaExceeded: "Storage quota reached – change not saved",
   syncFailureAccessRevoked: "Access to this workspace was revoked",
   syncFailureUnauthorized: "Access not authorized",
     syncFailureTicketRefresh: "Could not renew sync ticket",

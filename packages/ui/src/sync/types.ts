@@ -4,6 +4,7 @@ export type SyncFailureKind =
   | "access-revoked"
   | "file-not-found"
   | "room-capacity"
+  | "quota-exceeded"
   | "unauthorized"
   | "ticket-refresh-failed"
   | "reconnect-exhausted";

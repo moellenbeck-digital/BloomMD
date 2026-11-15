@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBillingPlan, getSiteUrl, isBillingEnabled } from "../../../../lib/billing";
+import { getBillingInterval, getBillingPlan, getSiteUrl, isBillingEnabled } from "../../../../lib/billing";
 import { getSession } from "../../../../lib/auth";
 import { isDatabaseConfigured, upsertMarketUser } from "../../../../lib/db";
 import { assertSameOrigin, readUrlEncodedForm, RequestSecurityError } from "../../../../lib/request-security";
@@ -25,9 +25,10 @@ export async function POST(request: Request) {
     throw error;
   }
   const plan = getBillingPlan(String(form.get("tier") || ""));
+  const interval = getBillingInterval(String(form.get("interval") || ""));
   const siteUrl = getSiteUrl();
 
-  if (!plan) {
+  if (!plan || !interval) {
     return NextResponse.redirect(new URL("/?billing=unknown-plan#pricing", siteUrl), 303);
   }
 
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  const priceId = process.env[plan.envKey];
+  const priceId = process.env[plan.intervals[interval].envKey];
 
   if (!stripeSecretKey || !priceId) {
     return NextResponse.redirect(new URL(`/?billing=not-configured&tier=${plan.tier}#pricing`, siteUrl), 303);
@@ -62,29 +63,32 @@ export async function POST(request: Request) {
   const appUserId = marketUser.id;
   const body = new URLSearchParams({
     mode: plan.mode,
-    success_url: `${siteUrl}/app?checkout=success&tier=${encodeURIComponent(plan.tier)}`,
+    success_url: `${siteUrl}/app?checkout=success&tier=${encodeURIComponent(plan.tier)}&interval=${interval}`,
     cancel_url: `${siteUrl}/?checkout=cancelled#pricing`,
     "line_items[0][price]": priceId,
     "line_items[0][quantity]": "1",
-    allow_promotion_codes: "true",
+    // Billing address and VAT id are collected at checkout; Stripe Tax computes the VAT from them.
+    // No promotion codes: there is no student discount.
+    allow_promotion_codes: "false",
+    billing_address_collection: "required",
+    "tax_id_collection[enabled]": "true",
     "automatic_tax[enabled]": "true",
     client_reference_id: appUserId,
     "metadata[tier]": plan.tier,
+    "metadata[interval]": interval,
     "metadata[app_user_id]": appUserId,
+    "subscription_data[metadata][tier]": plan.tier,
+    "subscription_data[metadata][interval]": interval,
+    "subscription_data[metadata][app_user_id]": appUserId,
   });
 
   if (marketUser.stripeCustomerId) {
     body.set("customer", marketUser.stripeCustomerId);
+    // Stripe requires this to save the name, address and tax id entered at checkout on the customer.
+    body.set("customer_update[name]", "auto");
+    body.set("customer_update[address]", "auto");
   } else {
     body.set("customer_email", session.email);
-  }
-
-  if (plan.mode === "subscription") {
-    body.set("subscription_data[metadata][tier]", plan.tier);
-    body.set("subscription_data[metadata][app_user_id]", appUserId);
-  } else {
-    body.set("payment_intent_data[metadata][tier]", plan.tier);
-    body.set("payment_intent_data[metadata][app_user_id]", appUserId);
   }
 
   const stripeResponse = await fetch("https://api.stripe.com/v1/checkout/sessions", {

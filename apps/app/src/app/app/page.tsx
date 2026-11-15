@@ -131,6 +131,8 @@ const appCopy = {
       "Dieses Dokument ist gerade in einer Sync-Sitzung aktiv. Änderungen werden über die Verbindung gespeichert.",
     syncFailed:
       "Dieses Dokument konnte nicht über die aktive Sync-Sitzung gespeichert werden. Bitte Verbindung prüfen und erneut versuchen.",
+    quotaReached:
+      "Dein Speicherplatz ist erreicht: Die letzte Änderung wurde nicht gespeichert. Lesen, Export und Löschen sowie das Verkleinern von Notizen sind weiterhin möglich. Den Verbrauch siehst du unter Konto → Speicher.",
     noUrl: "Keine URL hinterlegt.",
     previewUnavailable: "Für diese Ressource ist keine Vorschau verfügbar.",
     openWorkspaceFirst:
@@ -195,6 +197,8 @@ const appCopy = {
       "This document is active in a sync session. Changes are saved through the connection.",
     syncFailed:
       "This document could not be saved through the active sync session. Check the connection and try again.",
+    quotaReached:
+      "Your storage quota is reached: the last change was not saved. You can still read, export and delete your data, and shrink notes. See Account → Storage for your usage.",
     noUrl: "No URL is configured.",
     previewUnavailable: "No preview is available for this resource.",
     openWorkspaceFirst: "Open a local workspace first to preview this file.",
@@ -708,6 +712,13 @@ function HomeContent({ workspaceIdRef }: { workspaceIdRef: { current: string | n
     });
   }, []);
 
+  // The sync server refused to save because the storage quota is reached (#380, close code 4013):
+  // the edit is still on screen, so say plainly that it is not stored and what still works.
+  const syncFailureKind = useMindMapStore((s) => s.syncFailure?.kind);
+  useEffect(() => {
+    if (syncFailureKind === "quota-exceeded") showNotice(copy.quotaReached);
+  }, [copy.quotaReached, showNotice, syncFailureKind]);
+
   /** A read-only link to the open cloud map, copied for sending to colleagues. */
   const [shareLinksTarget, setShareLinksTarget] = useState<{ filename: string; workspaceId: string | null } | null>(null);
   const shareReadOnlyLink = useCallback(() => {
@@ -769,6 +780,12 @@ function HomeContent({ workspaceIdRef }: { workspaceIdRef: { current: string | n
           }),
         },
       );
+      if (response.status === 413) {
+        // The account's storage quota (#380): the server words the refusal (usage, limit, what still works).
+        const payload = (await response.json().catch(() => ({}))) as { code?: string; error?: string };
+        showNotice(payload.code === "QUOTA_EXCEEDED" && payload.error ? payload.error : copy.quotaReached, doc.rootId);
+        return "blocked";
+      }
       if (response.status === 409 || response.status === 503) {
         // Someone else saved first. Hand the user the other version instead of an error string —
         // "reload before saving again" throws away their work without showing what they would lose.
@@ -809,7 +826,7 @@ function HomeContent({ workspaceIdRef }: { workspaceIdRef: { current: string | n
         useMindMapStore.getState().setStorageMetadata(result.storage);
       return saved();
     },
-    [browserWorkspaceFiles, copy.derived, copy.syncActive, copy.syncFailed, showNotice],
+    [browserWorkspaceFiles, copy.derived, copy.quotaReached, copy.syncActive, copy.syncFailed, showNotice],
   );
 
   /** Toolbar and shortcut save: the outcome is shown by the toolbar and the conflict dialog. */

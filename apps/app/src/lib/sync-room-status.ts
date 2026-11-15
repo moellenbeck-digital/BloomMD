@@ -20,11 +20,12 @@ export interface SyncRoomSaveResult {
 }
 
 export class SyncMutationError extends Error {
-  constructor(readonly code: string, readonly status: number, message: string) {
+  constructor(readonly code: string, readonly status: number, message: string, readonly details: { usedBytes?: number; limitBytes?: number } = {}) {
     super(message);
     this.name = "SyncMutationError";
   }
 }
+
 
 type SyncRoomStatusEnv = Record<string, string | undefined>;
 
@@ -98,11 +99,14 @@ async function requestSyncMutation<T>(
     signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => null) as { code?: string; error?: string } | null;
+    const payload = await response.json().catch(() => null) as { code?: string; error?: string; usedBytes?: number; limitBytes?: number } | null;
     throw new SyncMutationError(
       payload?.code ?? "SYNC_MUTATION_UNAVAILABLE",
       response.status,
       payload?.error ?? `Sync mutation failed with ${response.status}.`,
+      typeof payload?.usedBytes === "number" && typeof payload?.limitBytes === "number"
+        ? { usedBytes: payload.usedBytes, limitBytes: payload.limitBytes }
+        : {},
     );
   }
   return response.json() as Promise<T>;

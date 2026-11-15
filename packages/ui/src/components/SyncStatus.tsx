@@ -27,6 +27,7 @@ export function SyncStatus() {
     "access-revoked": t.syncFailureAccessRevoked,
     "file-not-found": t.syncFailureFileNotFound,
     "room-capacity": t.syncFailureRoomCapacity,
+    "quota-exceeded": t.syncFailureQuotaExceeded,
     unauthorized: t.syncFailureUnauthorized,
     "ticket-refresh-failed": t.syncFailureTicketRefresh,
     "reconnect-exhausted": t.syncFailureExhausted,

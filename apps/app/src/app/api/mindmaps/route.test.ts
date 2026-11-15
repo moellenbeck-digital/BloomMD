@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 const originalError = console.error;
 let storageError: Error | null = null;
+let syncCreateError: Error | null = null;
 let syncCreateCalls = 0;
 let agent = false;
 let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
@@ -57,6 +58,7 @@ mock.module("../../../lib/sync-room-status", () => ({
   },
   createThroughSyncServer: async () => {
     syncCreateCalls += 1;
+    if (syncCreateError) throw syncCreateError;
     return { filePath: "new.md", frontmatter: { title: "New" }, storage: { mode: "database", documentId: "33333333-3333-4333-8333-333333333333", workspaceId: "22222222-2222-4222-8222-222222222222", version: 1 } };
   },
   writeThroughSyncServer: async () => null,
@@ -75,6 +77,7 @@ describe("mindmap listing route", () => {
   beforeEach(() => {
     storageError = null;
     syncCreateCalls = 0;
+    syncCreateError = null;
     agent = false;
     rights = { access: "write", areas: {} };
     proposals = [];
@@ -114,6 +117,23 @@ describe("mindmap listing route", () => {
 
     expect(response.status).toBe(201);
     expect(syncCreateCalls).toBe(1);
+  });
+
+  test("a create the storage quota stopped is a 413 QUOTA_EXCEEDED with usage and limit, not the generic 503 (#380)", async () => {
+    syncCreateError = Object.assign(new Error("quota"), { code: "QUOTA_EXCEEDED", status: 413, details: { usedBytes: 104_857_600, limitBytes: 104_857_600 } });
+
+    const response = await POST(new Request("https://bloommd.app/api/mindmaps?lang=en", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://bloommd.app" },
+      body: JSON.stringify({ filename: "new.md", markdown: "# New" }),
+    }));
+    const body = await response.json() as { code?: string; error?: string; usedBytes?: number; limitBytes?: number };
+
+    expect(response.status).toBe(413);
+    expect(body.code).toBe("QUOTA_EXCEEDED");
+    expect(body.usedBytes).toBe(104_857_600);
+    expect(body.limitBytes).toBe(104_857_600);
+    expect(body.error).toContain("100.0 MB of 100 MB");
   });
 
   const create = (filename: string, agentMeta?: unknown) => POST(new Request("https://bloommd.app/api/mindmaps", {

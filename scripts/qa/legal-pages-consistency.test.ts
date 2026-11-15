@@ -26,6 +26,23 @@ describe("legal pages are maintained twice (apps/app and apps/marketing)", () =>
     for (const [title, block] of marketing) expect(app.get(title)).toBe(block);
   });
 
+  test("terms, withdrawal and privacy policy describe the Cloud plan and no longer say there are no payments (#381)", () => {
+    for (const app of ["app", "marketing"] as const) {
+      const agb = page(app, "agb");
+      for (const text of ["6 EUR pro Monat", "60 EUR pro Jahr", "6 EUR per month", "60 EUR per year", "100 MB", "Stripe", "Rechnungen und Abo verwalten"]) expect(agb).toContain(text);
+      expect(agb).not.toMatch(/keine kostenpflichtigen Pläne|no paid plans/);
+      const widerruf = page(app, "widerruf");
+      for (const text of ["binnen vierzehn Tagen ohne Angabe von Gründen", "Muster-Widerrufsformular", "within fourteen days without giving any reason", "Model withdrawal form"]) expect(widerruf).toContain(text);
+      expect(widerruf).not.toMatch(/keine kostenpflichtigen Pläne|keine Zahlungsrückabwicklung|no paid plans|no payment reversal/);
+      const datenschutz = page(app, "datenschutz");
+      expect(datenschutz).toContain('en ? "Payment and subscription" : "Zahlung und Abo"');
+      expect(datenschutz).toContain("Stripe Payments Europe, Ltd.");
+      expect(datenschutz).not.toMatch(/Keine Zahlungen|No payments|Zahlungsdienstleister werden erst relevant|Payment service providers become relevant/);
+      // Neither lifetime nor student discount are mentioned (decision #276, option A).
+      for (const name of ["agb", "widerruf", "datenschutz"] as const) expect(page(app, name)).not.toMatch(/[Ll]ifetime|Studierende|Studienrabatt|[Ss]tudent/);
+    }
+  });
+
   test("the license page has the same sections and text in both apps", () => {
     const marketing = sections(page("marketing", "lizenz"));
     const app = sections(page("app", "lizenz"));
@@ -104,6 +121,13 @@ describe("retention periods named in the privacy policy match the code", () => {
     expect(read("apps/app/src/lib/unconfirmed-accounts.ts")).toContain("UNCONFIRMED_ACCOUNT_RETENTION_DAYS = 7;");
     expect(retention).toContain("7 Tage nach der Registrierung");
     expect(page("app", "agb")).toContain("nach 7 Tagen gelöscht");
+  });
+
+  test("Stripe events: 180 days after processing, as in the code (#381)", () => {
+    expect(maintenance).toContain('positiveDays("BLOOMMD_STRIPE_EVENT_RETENTION_DAYS", 180)');
+    expect(maintenance).toMatch(/delete from bloom_stripe_events where processed_at < now\(\) - \(\$\{stripeEventDays\} \* interval '1 day'\)/);
+    expect(retention).toContain("180 Tage nach der Verarbeitung");
+    expect(retention).toContain("180 days after they were processed");
   });
 
   test("the privacy policy no longer speaks of M1", () => {

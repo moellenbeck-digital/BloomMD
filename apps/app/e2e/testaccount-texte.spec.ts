@@ -49,21 +49,20 @@ test.describe("Testaccount-Texte @t271", () => {
     });
   });
 
-  test("Kriterium 1: /leistungen DE nennt Testaccount, 30 Tage, Preisvorbehalt, keinen Preis @t271", async ({ page }) => {
+  test("Kriterium 1: /leistungen DE nennt Testaccount, 30 Tage und den Tarif Cloud (#381) @t271", async ({ page }) => {
     const text = await pageText(page, marketing("/leistungen"));
     expect(text).toContain("kostenloser Testaccount");
     expect(text).toContain("30 Tage ab E-Mail-Bestätigung");
-    expect(text).toContain("Preise und Leistungsumfang werden vor Einführung");
+    expect(text).toContain("6 EUR pro Monat");
     expect(text).not.toMatch(CLOSED_BETA);
-    expect(text).not.toMatch(PRICE);
   });
 
-  test("Kriterium 1: /leistungen EN nennt free trial account, 30 days, keinen Preis @t271", async ({ page }) => {
+  test("Kriterium 1: /leistungen EN nennt free trial account, 30 days und den Tarif Cloud (#381) @t271", async ({ page }) => {
     const text = await pageText(page, marketing("/leistungen?lang=en"));
     expect(text).toContain("free trial account");
     expect(text).toContain("30 days from email confirmation");
+    expect(text).toContain("6 EUR per month");
     expect(text).not.toMatch(CLOSED_BETA);
-    expect(text).not.toMatch(PRICE);
   });
 
   test("Kriterium 2: Landing DE (#beta, FAQ, Nav, Footer) @t271", async ({ page }) => {

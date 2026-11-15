@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { createRoomManager } from "./rooms";
 import { createSyncServer } from "./server";
 import { createDatabasePersistence } from "./persistence";
+import { isAccountQuotaEnforced } from "@bloommd/core/account-quota";
 import { createSyncTelemetry } from "./observability";
 import type { SyncServerConfig } from "./types";
 
@@ -54,7 +55,7 @@ for (const [name, value] of [
   if (!Number.isSafeInteger(value) || value! < 1) throw new Error(`${name} must be a positive integer.`);
 }
 
-const persistence = config.databaseUrl ? createDatabasePersistence(config.databaseUrl) : undefined;
+const persistence = config.databaseUrl ? createDatabasePersistence(config.databaseUrl, { quotaEnforced: isAccountQuotaEnforced() }) : undefined;
 const roomManager = createRoomManager(config, persistence);
 const { app, websocket, drain } = createSyncServer(roomManager, config);
 

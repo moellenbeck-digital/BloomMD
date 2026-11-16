@@ -13,10 +13,16 @@ import type { Payload } from "payload";
 import { claimNonce, hitRateLimit, poolOf, type SqlPool } from "../lib/shared-store";
 import { signCall } from "../lib/signature";
 import { generateToken, hashToken } from "../lib/token";
+import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { createTestDatabase, testDatabaseUrl, type TestDatabase } from "./db";
 import { loadSpec, operations, responseSchema, templateOf, validate } from "./openapi";
+import { createTestBucket, testS3Settings, type TestBucket } from "./s3";
 
 const adminUrl = testDatabaseUrl();
+/** S3-compatible service (MinIO in CI): when set, the whole run uses the S3 storage of the media collection. */
+const s3Test = testS3Settings();
+// 1x1 PNG.
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 
 type Handler = (request: Request, context?: never) => Promise<Response>;
 interface Reply {
@@ -35,6 +41,7 @@ const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
   let database: TestDatabase;
+  let bucket: TestBucket | undefined;
   let payload: Payload;
   let pool: SqlPool;
   const extraPools: Pool[] = [];
@@ -98,6 +105,17 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
     process.env.CMS_SVC_APP_KEY_NEXT = KEY_B;
     process.env.CMS_ADMIN_ORIGIN = "http://localhost:3300";
     process.env.CMS_MEDIA_DIR = `/tmp/cms-test-media-${run}`;
+    if (s3Test) {
+      // The configuration is read once on import, so the storage variables must be set before it.
+      bucket = await createTestBucket(s3Test);
+      Object.assign(process.env, {
+        CMS_S3_BUCKET: bucket.name,
+        CMS_S3_ENDPOINT: s3Test.endpoint,
+        CMS_S3_REGION: s3Test.region,
+        CMS_S3_ACCESS_KEY: s3Test.accessKey,
+        CMS_S3_SECRET_KEY: s3Test.secretKey,
+      });
+    }
     const [{ default: config }, { getPayload }] = await Promise.all([import("@payload-config"), import("payload")]);
     payload = await getPayload({ config });
     await payload.db.migrate();
@@ -114,6 +132,7 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
   }, 120_000);
 
   afterAll(async () => {
+    await bucket?.drop().catch(() => undefined);
     for (const extra of extraPools) await extra.end();
     // Payload's destroy() only resets the adapter state and keeps the pool open. Dropping the database
     // (WITH FORCE) terminates the pool's idle connections, which would surface as an unhandled "terminating
@@ -670,6 +689,38 @@ describe.skipIf(!adminUrl)("/svc/v1 and the CMS data model (Postgres)", () => {
       const reply = await call(route.health.GET, "GET", "/svc/v1/health/ready", undefined, { unsigned: true });
       expect(reply.status).toBe(200);
       expect(stripRequestId(reply.json)).toEqual({ ready: true });
+    });
+  });
+
+  describe.skipIf(!s3Test)("media in S3 (MinIO)", () => {
+    const name = `t407-${run}.png`;
+
+    test("an upload through Payload lands in the bucket, reads back identical and is gone after the delete", async () => {
+      const created = await payload.create({ collection: "media", data: { alt: "t407" }, file: { data: PNG, mimetype: "image/png", name, size: PNG.length } });
+      expect(created.filename).toBe(name);
+      // The URL leads through the CMS (access functions, rest-guard), not to the bucket.
+      expect(created.url).toBe(`/api/media/file/${name}`);
+      const object = await bucket!.client.send(new GetObjectCommand({ Bucket: bucket!.name, Key: name }));
+      expect(Buffer.from(await object.Body!.transformToByteArray()).equals(PNG)).toBe(true);
+      // Nothing was written to the local directory.
+      expect(await Bun.file(`${process.env.CMS_MEDIA_DIR}/${name}`).exists()).toBe(false);
+
+      await payload.delete({ collection: "media", id: created.id });
+      await expect(bucket!.client.send(new HeadObjectCommand({ Bucket: bucket!.name, Key: name }))).rejects.toMatchObject({ name: "NotFound" });
+    });
+
+    test("ready fails without details when the bucket is not reachable", async () => {
+      const real = process.env.CMS_S3_BUCKET;
+      process.env.CMS_S3_BUCKET = `${bucket!.name}-missing`;
+      try {
+        const reply = await call(route.health.GET, "GET", "/svc/v1/health/ready", undefined, { unsigned: true });
+        expect(reply.status).toBe(503);
+        expect(stripRequestId(reply.json)).toEqual({ ready: false });
+        expect(reply.raw).not.toContain(process.env.CMS_S3_BUCKET);
+        expect(reply.raw).not.toContain(s3Test!.secretKey);
+      } finally {
+        process.env.CMS_S3_BUCKET = real;
+      }
     });
   });
 

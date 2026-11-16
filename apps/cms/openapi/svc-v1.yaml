@@ -38,7 +38,7 @@ paths:
   /svc/v1/health/ready:
     get:
       operationId: healthReady
-      summary: Readiness for Kubernetes (database and media directory)
+      summary: Readiness for Kubernetes (database and media storage, S3 bucket or local directory)
       security: []
       responses:
         "200":

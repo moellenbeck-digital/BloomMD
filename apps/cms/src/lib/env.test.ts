@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { adminOrigin, appSigningKeys, runtimeConfigErrors } from "./env";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { adminOrigin, appSigningKeys, mediaStorage, runtimeConfigErrors, S3_VARS, s3ClientConfig } from "./env";
 import { getCmsBuildInfo } from "./build-info";
 
 const good = {
@@ -57,5 +59,72 @@ describe("build info of the admin app", () => {
     const info = getCmsBuildInfo({});
     expect(info.version).toMatch(/^\d+\.\d+\.\d+/);
     expect(info.displayVersion).toBe(`BloomMD ${info.version}`);
+  });
+});
+
+describe("media storage: S3 or local directory (#407)", () => {
+  const s3 = {
+    CMS_S3_BUCKET: "cms-media",
+    CMS_S3_ENDPOINT: "https://s3.example.test",
+    CMS_S3_REGION: "eu-central",
+    CMS_S3_ACCESS_KEY: "AKIA-test-access-1234",
+    CMS_S3_SECRET_KEY: "s3-test-secret-value-5678",
+  };
+
+  test("none of the CMS_S3_* variables set: local directory, no error", () => {
+    expect(mediaStorage({}).mode).toBe("local");
+    expect(mediaStorage({ CMS_S3_BUCKET: "  " }).mode).toBe("local");
+    expect(runtimeConfigErrors(good)).toEqual([]);
+  });
+
+  test("all five set: S3, path style, endpoint from the variable", () => {
+    const storage = mediaStorage(s3);
+    expect(storage.mode).toBe("s3");
+    if (storage.mode !== "s3") return;
+    expect(s3ClientConfig(storage.s3)).toEqual({
+      endpoint: "https://s3.example.test",
+      region: "eu-central",
+      forcePathStyle: true,
+      credentials: { accessKeyId: s3.CMS_S3_ACCESS_KEY, secretAccessKey: s3.CMS_S3_SECRET_KEY },
+    });
+    expect(runtimeConfigErrors({ ...good, ...s3 })).toEqual([]);
+  });
+
+  test("some but not all set: startup error that names the missing variables and never a value", () => {
+    for (const name of S3_VARS) {
+      const partial: Record<string, string> = { ...s3 };
+      delete partial[name];
+      const errors = runtimeConfigErrors({ ...good, ...partial });
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain(name);
+      for (const value of Object.values(s3)) expect(errors.join()).not.toContain(value);
+      expect(mediaStorage(partial)).toEqual({ mode: "partial", missing: [name] });
+    }
+    const onlyKeys = runtimeConfigErrors({ ...good, CMS_S3_ACCESS_KEY: s3.CMS_S3_ACCESS_KEY, CMS_S3_SECRET_KEY: s3.CMS_S3_SECRET_KEY }).join();
+    for (const name of ["CMS_S3_BUCKET", "CMS_S3_ENDPOINT", "CMS_S3_REGION"]) expect(onlyKeys).toContain(name);
+    expect(onlyKeys).not.toContain("CMS_S3_ACCESS_KEY");
+  });
+
+  test("an invalid endpoint or placeholder credentials are errors without values", () => {
+    const badEndpoint = runtimeConfigErrors({ ...good, ...s3, CMS_S3_ENDPOINT: "not a url" }).join();
+    expect(badEndpoint).toContain("CMS_S3_ENDPOINT");
+    expect(badEndpoint).not.toContain("not a url");
+    const placeholder = runtimeConfigErrors({ ...good, ...s3, CMS_S3_SECRET_KEY: "replace-with-the-secret-key" }).join();
+    expect(placeholder).toContain("CMS_S3_SECRET_KEY");
+    expect(placeholder).not.toContain("replace-with-the-secret-key");
+  });
+
+  test(".env.example offers only placeholders that the start check rejects", () => {
+    const example = readFileSync(join(import.meta.dir, "..", "..", ".env.example"), "utf8");
+    const uncommented = Object.fromEntries(
+      example.split("\n").flatMap((line) => {
+        const match = /^#\s*(CMS_S3_[A-Z_]+)=(.*)$/.exec(line);
+        return match ? [[match[1], match[2]]] : [];
+      }),
+    );
+    expect(Object.keys(uncommented).sort()).toEqual([...S3_VARS].sort());
+    const errors = runtimeConfigErrors({ ...good, ...uncommented }).join();
+    expect(errors).toContain("placeholders");
+    for (const value of Object.values(uncommented)) expect(errors).not.toContain(value);
   });
 });

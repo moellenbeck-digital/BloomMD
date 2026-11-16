@@ -12,6 +12,7 @@ import { TrialReminders } from "./collections/TrialReminders";
 import { Users } from "./collections/Users";
 import { PlatformSettings } from "./globals/PlatformSettings";
 import { adminOrigin } from "./lib/env";
+import { mediaStoragePlugins } from "./lib/media-storage";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const origin = adminOrigin();
@@ -36,6 +37,8 @@ export default buildConfig({
   },
   collections: [Operators, Users, Entitlements, AuthTokens, TrialReminders, ReadTokens, Blog, News, Media],
   globals: [PlatformSettings],
+  // Media in the private S3 bucket when all CMS_S3_* variables are set, otherwise the local directory.
+  plugins: mediaStoragePlugins(),
   graphQL: { disable: true, disablePlaygroundInProduction: true },
   cors: allowedOrigins,
   csrf: allowedOrigins,

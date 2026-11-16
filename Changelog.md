@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- CMS-Medien im privaten S3-Speicher (Ticket 407): `apps/cms` legt die Bilder für Blog und News in einem privaten S3-Bucket ab, sobald `CMS_S3_BUCKET`, `CMS_S3_ENDPOINT`, `CMS_S3_REGION`, `CMS_S3_ACCESS_KEY` und `CMS_S3_SECRET_KEY` gesetzt sind; sie überstehen damit einen Pod-Neustart. Ohne die Variablen bleibt der lokale Ordner (nur Entwicklung), eine Teilkonfiguration stoppt den Start. Der Zugriff läuft weiter nur über das CMS, `/svc/v1/health/ready` prüft den Bucket. Details in `docs/CMS-MEDIEN-S3.md`.
+- CMS media in private S3 storage (ticket 407): `apps/cms` stores the images for blog and news in a private S3 bucket as soon as `CMS_S3_BUCKET`, `CMS_S3_ENDPOINT`, `CMS_S3_REGION`, `CMS_S3_ACCESS_KEY` and `CMS_S3_SECRET_KEY` are set, so they survive a pod restart. Without the variables the local directory stays (development only), a partial configuration stops the start. Access still goes through the CMS only, `/svc/v1/health/ready` probes the bucket. Details in `docs/CMS-MEDIEN-S3.md`.
+
 ## [Web-App 0.6.0-develop.2, Marketing 0.6.0-develop.2, Sync 0.6.0-develop.2] - 2026-11-15
 
 - Node-Editor: Text geht beim Ausblenden nicht mehr verloren (Ticket 394): Wird der Editor mit ⌘/Strg/Alt+Return oder Escape ausgeblendet, schreibt er einen noch nicht gemeldeten Tipp-Stand zuerst in den Node, und ein leerer Editor-Stand, der nicht von einer Eingabe stammt (Öffnen, Neuaufbau, Ausblenden), leert vorhandenen Inhalt nie. Bewusstes Löschen per Eingabe bleibt möglich und ist rückgängig zu machen. Die Ursache des gemeldeten Verlusts in der macOS-App ließ sich nicht reproduzieren; das ist ein Schutz, keine bestätigte Behebung. Neu: Unit- und Komponententests (Marke `@t394`).

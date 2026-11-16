@@ -34,6 +34,61 @@ export function adminOrigin(env: EnvLike = process.env): string {
   return env.NODE_ENV === "production" ? "" : "http://localhost:3300";
 }
 
+/** The five variables of the S3 media storage; all set = S3, none set = local directory, anything else = error. */
+export const S3_VARS = ["CMS_S3_BUCKET", "CMS_S3_ENDPOINT", "CMS_S3_REGION", "CMS_S3_ACCESS_KEY", "CMS_S3_SECRET_KEY"] as const;
+
+export interface S3Settings {
+  bucket: string;
+  endpoint: string;
+  region: string;
+  accessKey: string;
+  secretKey: string;
+}
+
+export type MediaStorage =
+  | { mode: "local" }
+  | { mode: "s3"; s3: S3Settings }
+  /** Some but not all variables are set; `missing` holds variable names only, never values. */
+  | { mode: "partial"; missing: string[] };
+
+/** Where the media collection keeps its files, decided only by which of the `CMS_S3_*` variables are set. */
+export function mediaStorage(env: EnvLike = process.env): MediaStorage {
+  const values = S3_VARS.map((name) => env[name]?.trim() ?? "");
+  const missing = S3_VARS.filter((_, index) => !values[index]);
+  if (missing.length === S3_VARS.length) return { mode: "local" };
+  if (missing.length > 0) return { mode: "partial", missing };
+  const [bucket = "", endpoint = "", region = "", accessKey = "", secretKey = ""] = values;
+  return { mode: "s3", s3: { bucket, endpoint, region, accessKey, secretKey } };
+}
+
+/**
+ * Client settings for the S3 API of Hetzner (and MinIO): the endpoint comes from the variable and the
+ * bucket is addressed by path (`forcePathStyle`). Shared by the storage plugin, the readiness probe and the tests.
+ */
+export function s3ClientConfig(s3: S3Settings) {
+  return {
+    endpoint: s3.endpoint,
+    region: s3.region,
+    forcePathStyle: true,
+    credentials: { accessKeyId: s3.accessKey, secretAccessKey: s3.secretKey },
+  };
+}
+
+/** Errors of the media storage configuration; messages carry variable names only, never values. */
+function mediaStorageErrors(env: EnvLike): string[] {
+  const storage = mediaStorage(env);
+  if (storage.mode === "partial") return [`CMS_S3_* is incomplete: ${storage.missing.join(", ")} missing (set all five variables for S3 or none for the local directory).`];
+  if (storage.mode !== "s3") return [];
+  const errors: string[] = [];
+  try {
+    new URL(storage.s3.endpoint);
+  } catch {
+    errors.push("CMS_S3_ENDPOINT must be a valid URL.");
+  }
+  if (PLACEHOLDER.test(storage.s3.accessKey) || PLACEHOLDER.test(storage.s3.secretKey)) errors.push("CMS_S3_ACCESS_KEY and CMS_S3_SECRET_KEY must be real credentials, not placeholders.");
+  return errors;
+}
+
 /** Window and limits of the handler-level rate limits (shared counter in the CMS database). */
 export const RATE_LIMITS = {
   loginPerAccount: { limit: 10, windowSeconds: 15 * 60 },
@@ -56,6 +111,7 @@ export function runtimeConfigErrors(env: EnvLike = process.env): string[] {
   if (keys.length === 0) errors.push("CMS_SVC_APP_KEY is required (HMAC key of apps/app for /svc/v1).");
   for (const key of keys) if (!realSecret(key)) errors.push(`CMS_SVC_APP_KEY(_NEXT) must be a real secret of at least ${MIN_SECRET_LENGTH} characters.`);
   if (keys.length === 2 && keys[0]?.trim() === keys[1]?.trim()) errors.push("CMS_SVC_APP_KEY and CMS_SVC_APP_KEY_NEXT must differ.");
+  errors.push(...mediaStorageErrors(env));
   if (production) {
     const origin = adminOrigin(env);
     if (!origin || !origin.startsWith("https://")) errors.push("CMS_ADMIN_ORIGIN must be a valid HTTPS origin in production.");

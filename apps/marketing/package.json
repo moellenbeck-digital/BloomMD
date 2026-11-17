@@ -29,7 +29,7 @@
     "@sentry/nextjs": "^10.76.2",
     "fumadocs-core": "^16.14.2",
     "import-in-the-middle": "^3.3.3",
-    "next": "16.4.2",
+    "next": "16.4.5",
     "postgres": "^3.4.9",
     "posthog-js": "^1.414.0",
     "react": "^19.2.8",

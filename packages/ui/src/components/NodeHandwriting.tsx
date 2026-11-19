@@ -42,14 +42,14 @@ export function NodeHandwriting({ nodeId, content, notePath, readOnly }: { nodeI
     return () => { cancelled = true; };
   }, [attachments, names, notePath]);
 
-  const save = useCallback(async () => {
+  const save = useCallback(async (latest: InkDocument) => {
     if (!attachments || !editing) return;
     if (editing.readOnly) {
       setEditing(null);
       return;
     }
     try {
-      const name = await attachments.write(editing.name, serializeInkSvg(editing.document), notePath);
+      const name = await attachments.write(editing.name, serializeInkSvg(latest), notePath);
       // A new drawing, or a copy because the drawing changed elsewhere meanwhile: embed it too.
       if (name !== editing.name) {
         const current = useMindMapStore.getState().document?.nodes.get(nodeId)?.content ?? content;
@@ -57,7 +57,7 @@ export function NodeHandwriting({ nodeId, content, notePath, readOnly }: { nodeI
       }
       setDrawings((list) => {
         const rest = list.filter((entry) => entry.name !== name);
-        return [...rest, { name, document: editing.document, readOnly: false }];
+        return [...rest, { name, document: latest, readOnly: false }];
       });
       setNotice(editing.name && name !== editing.name ? `${t.drawingSavedAsCopy} ${name}` : null);
       setEditing(null);
@@ -106,7 +106,7 @@ export function NodeHandwriting({ nodeId, content, notePath, readOnly }: { nodeI
             document={editing.document}
             readOnly={readOnly || editing.readOnly}
             onChange={(next) => setEditing((current) => (current ? { ...current, document: next } : current))}
-            onDone={() => void save()}
+            onDone={(latest) => void save(latest)}
             onPickNote={attachments.pickNote ?? (async () => null)}
             onHoverLink={() => undefined}
             onOpenLink={(target) => attachments.openNote?.(target)}

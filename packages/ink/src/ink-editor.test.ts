@@ -26,6 +26,7 @@ afterEach(() => {
 
 function renderEditor(document: InkDocument) {
   const changes: InkDocument[] = [];
+  const done: InkDocument[] = [];
   container = window.document.createElement("div");
   window.document.body.appendChild(container);
   root = createRoot(container);
@@ -33,7 +34,7 @@ function renderEditor(document: InkDocument) {
     document,
     readOnly: false,
     onChange: (next: InkDocument) => changes.push(next),
-    onDone: () => undefined,
+    onDone: (latest: InkDocument) => done.push(latest),
     onPickNote: async () => null,
     onHoverLink: () => undefined,
     onOpenLink: () => undefined,
@@ -47,13 +48,26 @@ function renderEditor(document: InkDocument) {
   const click = (label: string) => {
     act(() => (container!.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).click());
   };
-  return { changes, surface, pointer, click, container };
+  const pressDone = () => act(() => (container!.querySelector(".bloommd-ink-done") as HTMLButtonElement).click());
+  return { changes, done, surface, pointer, click, pressDone, container };
 }
 
 describe("InkEditor", () => {
   test("does not save a drawing that was only opened", () => {
     const editor = renderEditor(createInkDocument());
     expect(editor.changes).toHaveLength(0);
+  });
+
+  test("Done hands over the drawing as shown, including a stroke the pen just lifted from", () => {
+    const editor = renderEditor(createInkDocument());
+    editor.pointer("pointerdown", 1, "pen", 10, 10);
+    editor.pointer("pointermove", 1, "pen", 40, 30);
+    editor.pointer("pointerup", 1, "pen", 40, 30);
+    editor.pressDone();
+
+    // The parent saves this document; it must not depend on onChange having arrived first.
+    expect(editor.done).toHaveLength(1);
+    expect(editor.done[0]!.strokes).toHaveLength(1);
   });
 
   test("saves an undo back to the opened state", () => {

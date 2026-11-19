@@ -45,7 +45,12 @@ export interface InkEditorProps extends InkLinkHandlers {
   document: InkDocument;
   readOnly: boolean;
   onChange: (document: InkDocument) => void;
-  onDone: () => void;
+  /**
+   * Done was pressed. Receives the drawing exactly as shown: `onChange` is reported from an effect
+   * after the render, so a parent that only keeps what it got there can still hold the drawing
+   * from before the last stroke when Done is pressed right after the pen lifts.
+   */
+  onDone: (document: InkDocument) => void;
   /** Lets the user pick an Obsidian note; resolves to link text or null when cancelled. */
   onPickNote: () => Promise<string | null>;
   /** Creates a child node holding the given drawing; resolves to whether it worked. */
@@ -577,7 +582,7 @@ export function InkEditor({ document, readOnly, onChange, onDone, onPickNote, on
           </button>
         </div>
         <span className="bloommd-ink-spacer" />
-        <button type="button" className="bloommd-ink-done" onClick={onDone}><Check size={16} /><span>Done</span></button>
+        <button type="button" className="bloommd-ink-done" onClick={() => onDone(state.document)}><Check size={16} /><span>Done</span></button>
       </div>
       {state.readOnly && <p className="bloommd-ink-notice" role="status">This drawing was created by a newer BloomMD version and opens read-only.</p>}
       <div

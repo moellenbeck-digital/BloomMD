@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- iPad: Handschrift geht beim schnellen Tippen auf „Done“ nicht mehr verloren (Ticket 140): Der Zeichen-Editor übergibt beim Fertig-Tippen den Stand, der auf dem Bildschirm zu sehen ist, statt des zuletzt gemeldeten. Ein Strich, nach dessen Absetzen sofort „Done“ getippt wurde, konnte sonst fehlen und eine leere Zeichnung gespeichert werden; derselbe Fehler machte den iOS-Selbsttest unregelmäßig rot.
+- iPad: handwriting is no longer lost when "Done" is tapped quickly (ticket 140): when finishing, the drawing editor hands over the state that is on screen instead of the last reported one. A stroke followed immediately by "Done" could be missing and an empty drawing saved; the same bug made the iOS self-test fail intermittently.
+
 ## [Web-App 0.6.0-develop.2, Marketing 0.6.0-develop.2, Sync 0.6.0-develop.2] - 2026-11-15
 
 - Node-Editor: Text geht beim Ausblenden nicht mehr verloren (Ticket 394): Wird der Editor mit ⌘/Strg/Alt+Return oder Escape ausgeblendet, schreibt er einen noch nicht gemeldeten Tipp-Stand zuerst in den Node, und ein leerer Editor-Stand, der nicht von einer Eingabe stammt (Öffnen, Neuaufbau, Ausblenden), leert vorhandenen Inhalt nie. Bewusstes Löschen per Eingabe bleibt möglich und ist rückgängig zu machen. Die Ursache des gemeldeten Verlusts in der macOS-App ließ sich nicht reproduzieren; das ist ein Schutz, keine bestätigte Behebung. Neu: Unit- und Komponententests (Marke `@t394`).

@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+## [Web-App 0.6.0-develop.3, Marketing 0.6.0-develop.3, Sync 0.6.0-develop.3] - 2026-11-19
+
 - iPad: Handschrift geht beim schnellen Tippen auf „Done“ nicht mehr verloren (Ticket 140): Der Zeichen-Editor übergibt beim Fertig-Tippen den Stand, der auf dem Bildschirm zu sehen ist, statt des zuletzt gemeldeten. Ein Strich, nach dessen Absetzen sofort „Done“ getippt wurde, konnte sonst fehlen und eine leere Zeichnung gespeichert werden; derselbe Fehler machte den iOS-Selbsttest unregelmäßig rot.
 - iPad: handwriting is no longer lost when "Done" is tapped quickly (ticket 140): when finishing, the drawing editor hands over the state that is on screen instead of the last reported one. A stroke followed immediately by "Done" could be missing and an empty drawing saved; the same bug made the iOS self-test fail intermittently.
 - Learning-Modell W0: minimales Schema bestätigt (Ticket 259): `docs/LEARNINGS.md` hat einen Abschnitt „Minimales Schema (W0)“, der Quelle/Beleg, Verantwortlichkeit, Gültigkeit und Review auf die bestehenden Felder und Knoten abbildet (kein neues Feld, keine neue Entität), mit Schema-Version `okf: "0.2"` und dem erwarteten Verhalten je Status in Suche (`agent search`, `--status bestätigt`) und Lint. Neu: Beispielbündel `docs/learnings-beispiel-w0/` (gültig, korrigiert, unbelegt, normale Vergleichsseite) und Lint-Tests dazu (Marke `@t259`); keine Code-Änderung.

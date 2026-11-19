@@ -196,6 +196,49 @@ und Undo.
 - **Keine Rohlogs:** nur ein kurzer Auszug (die aussagekräftigen Zeilen) und der Link auf Ticket, PR oder
   CI-Lauf.
 
+## Minimales Schema (W0)
+
+Das Format oben reicht für die Pflichtangaben eines Learnings; es gibt **kein neues Feld und keine neue Entität**.
+Die Angaben liegen auf bestehenden Feldern und Knoten:
+
+- **Quelle/Beleg:** `source` und der Knoten „Beleg“ (Link auf Ticket, PR, Commit oder CI-Lauf). Fehlt der Beleg,
+  nennt „Beleg“, was fehlt.
+- **Verantwortlichkeit:** `scope` (Rolle, Komponente), `verified` (`by`, `at`) und bei einer Entscheidung
+  (`agent decide`) der Knoten „Entscheidung“.
+- **Gültigkeit:** `status` und `stale_after`; `replaced_by` nur bei `ersetzt`.
+- **Review:** der Lebenszyklus `neu` → `bestätigt` oder `verworfen` durch den Chief of Staff (`agent decide`) und
+  die Wochenübersicht (`agent review`), siehe „Bestätigen und Verwerfen“.
+- **Schema-Version:** `okf: "0.2"` in der `index.md` des Bündels.
+
+Erwartetes Verhalten je Status (Suche über `bloommd-wiki agent search`, Lint über `bloommd-wiki lint`):
+
+| Status | Standardsuche | `--status bestätigt` | Lint |
+|---|---|---|---|
+| `bestätigt` | liefert den Treffer, Status im Treffer | liefert ihn | gültig (`stable`) |
+| `neu` | liefert den Treffer, Status im Treffer | liefert ihn nicht | gültig (`draft`) |
+| `unbestätigt` | liefert den Treffer, Status `unbestätigt` im Treffer (nicht als bestätigt) | liefert ihn nicht | gültig (`draft`) |
+| `veraltet`, `ersetzt`, `verworfen` | liefert ihn nicht; mit `--include-stale` oder `--status <s>` erscheint er (bei `ersetzt` mit `replaced_by`) | liefert ihn nicht | gültig (`deprecated`) |
+| Seite ohne `type: learning` (z. B. `stable`) | wie jede Wiki-Seite, keine Learning-Regeln | liefert sie nicht | unverändert |
+
+Ist `stale_after` überschritten, meldet der Lint zusätzlich `expired-page` und die Standardsuche blendet die Map
+aus (`--include-stale` holt sie zurück).
+
+Das Beispielbündel [learnings-beispiel-w0/index.md](learnings-beispiel-w0/index.md) zeigt je einen Fall
+(`gueltig`, `korrigiert`, `unbelegt`) und eine normale Wiki-Seite (`vergleich`). `agent search` liest einen Vault, in
+dem die Learnings im Ordner `Learnings/` liegen; das Bündel dafür in einen Vault kopieren:
+
+```bash
+bloommd-wiki lint docs/learnings-beispiel-w0
+V=$(mktemp -d) && mkdir -p "$V/Learnings" && cp docs/learnings-beispiel-w0/*.md "$V/Learnings/"
+bloommd-wiki agent search Bun --vault "$V"                       # gueltig.md; korrigiert.md nicht
+bloommd-wiki agent search "" --status bestätigt --vault "$V"     # nur gueltig.md
+bloommd-wiki agent search Platzhalter --vault "$V"               # unbelegt.md mit Status unbestätigt
+bloommd-wiki agent search Bun --include-stale --vault "$V"       # zusätzlich korrigiert.md (ersetzt)
+bloommd-wiki agent read Learnings/korrigiert.md --vault "$V"     # frontmatter.replaced_by: gueltig.md
+```
+
+Die Trefferliste nennt auch `index.md` des Bündels, wenn der Suchtext darin vorkommt.
+
 ## Beispielbündel
 
 > Die drei Beispiele hat der Brand-Chief am 28.10.2026 gegen die Belege im Repo `bloommd-cluster` (Forgejo)
@@ -204,3 +247,5 @@ und Undo.
 [learnings-beispiel/index.md](learnings-beispiel/index.md) enthält drei Learnings aus den Vorfällen vom
 26.10.2026 (kubectl/NetworkPolicy, GHCR-Platzhalter, Bun-Lockfile) als lint-fähiges Wiki-Bundle
 (`bloommd-wiki lint docs/learnings-beispiel`).
+
+Ein zweites Bündel für das minimale Schema (W0) steht in [learnings-beispiel-w0/index.md](learnings-beispiel-w0/index.md).

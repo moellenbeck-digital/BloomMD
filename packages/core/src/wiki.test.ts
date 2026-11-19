@@ -242,6 +242,23 @@ Body.
     expect(bundle.pages.map((page) => page.type)).toEqual(["learning", "learning", "learning"]);
   });
 
+  test("the W0 learnings example bundle lints clean and maps each file to its lifecycle", async () => {
+    const root = join(import.meta.dir, "../../../docs/learnings-beispiel-w0");
+    expect(await lintWikiBundle(root)).toEqual([]);
+    const bundle = await readWikiBundle(root);
+    const byFile = Object.fromEntries(bundle.pages.map((page) => [page.path, { type: page.type, status: String(page.status) }]));
+    expect(byFile["gueltig.md"]).toEqual({ type: "learning", status: "stable" });
+    expect(byFile["korrigiert.md"]).toEqual({ type: "learning", status: "deprecated" });
+    expect(byFile["unbelegt.md"]).toEqual({ type: "learning", status: "draft" });
+    // The comparison page is a plain wiki page: no learning rules, status stable.
+    expect(byFile["vergleich.md"]).toEqual({ type: "Concept", status: "stable" });
+  });
+
+  test("the existing learnings example bundle still lints clean next to the W0 bundle", async () => {
+    const issues = await lintWikiBundle(join(import.meta.dir, "../../../docs/learnings-beispiel"));
+    expect(issues.filter((issue) => issue.code !== "expired-page")).toEqual([]);
+  });
+
   test("keeps reading a v0.1 bundle whose sources only carry id and contentHash", async () => {
     const root = await bundleWith(`---
 type: Concept

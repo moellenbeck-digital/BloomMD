@@ -618,7 +618,7 @@ be used — the product claim is that Markdown stays intact, so the demo has to 
 
 BloomMD's long-term direction is an open, locally usable knowledge and action layer built on portable Markdown. The [vision draft](docs/WISSENSPLATTFORM-VISION.md) describes this direction without making release commitments.
 
-The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) gives the complete German and English scope, dependencies, and open decisions for all ten themes. Each theme now has a [planning issue](https://github.com/moellenbeck-digital/BloomMD/issues/256) in the BloomMD project and a planning milestone. These milestones commit to testable scope decisions, not to shipping every proposed capability or to a date.
+The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) gives the complete German and English scope, dependencies, and open decisions for all ten themes. Each theme has a [planning issue](https://github.com/moellenbeck-digital/BloomMD/issues/256) in the BloomMD project. The single active [W0/W1 focus milestone](https://github.com/moellenbeck-digital/BloomMD/milestone/8) and [delivery contract #415](https://github.com/moellenbeck-digital/BloomMD/issues/415) define the bounded current work; the other themes remain backlog.
 
 | Theme | What we need to prove before implementation | Planning issue |
 | --- | --- | --- |
@@ -633,7 +633,9 @@ The [knowledge platform planning inventory](docs/WISSENSPLATTFORM-ROADMAP.md) gi
 | Transparency and trust | People can inspect sources, permissions, uncertainty, and external model use without leaking sensitive audit data. | [#267](https://github.com/moellenbeck-digital/BloomMD/issues/267) |
 | Operations and administration | A chosen pilot has measurable health, cost, limits, backup, and restore criteria. | [#268](https://github.com/moellenbeck-digital/BloomMD/issues/268) |
 
-The order follows dependencies: [W0: knowledge foundation and learnings pilot](https://github.com/moellenbeck-digital/BloomMD/milestone/4) first; [W1: sources and sync](https://github.com/moellenbeck-digital/BloomMD/milestone/5) next; [W2: identity, rights, and cited search](https://github.com/moellenbeck-digital/BloomMD/milestone/6) before cross-scope access; then [W3: lifecycle, workflows, governance, and operations](https://github.com/moellenbeck-digital/BloomMD/milestone/7). Work on the M1 macOS closed beta remains the priority. The [internal learnings pilot #116](https://github.com/moellenbeck-digital/BloomMD/issues/116) is the first backend use case; it does not make cloud access a prerequisite for BloomMD's local editor.
+**Aktueller Fokus / Current focus:** [W0/W1](https://github.com/moellenbeck-digital/BloomMD/milestone/8) bündelt den vorhandenen Learnings-Pilot, einen Offline-Konfliktfall mit zwei Clients und einer Markdown-Datei sowie eine lesende Nextcloud-Quelle im Desktop. Interner Zielzeitraum: 20.11.–03.12.2026; Aufgaben, Abnahme und täglicher Nachweis in [#415](https://github.com/moellenbeck-digital/BloomMD/issues/415). W2/W3 bleiben Backlog. Die öffentliche Auslieferung braucht eine gesonderte Freigabe des konkreten Release-Kandidaten.
+
+The focus combines acceptance of the existing learnings pilot, one offline conflict scenario with two clients and one Markdown file, and a read-only Nextcloud source in Desktop. The internal target period is 20 November–3 December 2026; #415 owns acceptance and daily evidence. W2 identity/rights/search and W3 lifecycle/workflows/governance remain backlog. Public delivery requires separate approval of the concrete release candidate. Cloud access remains optional for BloomMD's local editor.
 
 The [public roadmap](https://bloommd.io/roadmap) summarizes work that is ready to share. Browse and report concrete requests in [GitHub Issues](https://github.com/moellenbeck-digital/BloomMD/issues); maintainers plan them in the internal project board.
 

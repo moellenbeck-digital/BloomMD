@@ -37,7 +37,7 @@ Der Pilot verwendet die Bausteine für [Trust-Felder und Suche #110](https://git
 | 7. Agenten-Workflows | Vorschläge und Folgeaktionen bleiben begrenzt, nachvollziehbar und rücknehmbar. | Schritte 4 und 6. |
 | 8. Enterprise-Funktionen | Größere Organisationsfunktionen werden einzeln nach Bedarf geprüft. | Nachweis aus den vorigen Schritten. |
 
-SSO/SCIM, Ende-zu-Ende-Verschlüsselung, DLP und breit föderierte Suche sind mögliche spätere Themen. Ihre Aufnahme in diese Vision ist keine Entscheidung über Architektur, Termin oder Release. Die M1-Closed-Beta für macOS hat Vorrang; diese Vision schafft weder einen Meilenstein noch eine Kapazitätszusage. Für größere Ausbaustufen entstehen erst nach Scope- und Kapazitätsentscheidung konkrete Issues und Meilensteine.
+SSO/SCIM, Ende-zu-Ende-Verschlüsselung, DLP und breit föderierte Suche sind mögliche spätere Themen. Ihre Aufnahme in diese Vision ist keine Entscheidung über Architektur, Termin oder Release. Der aktive [Fokusmeilenstein W0/W1](https://github.com/moellenbeck-digital/BloomMD/milestone/8) und [Lieferauftrag #415](https://github.com/moellenbeck-digital/BloomMD/issues/415) begrenzen die nächste Lieferung auf den Learnings-Nachweis, einen Offline-Konfliktfall und eine lesende Nextcloud-Quelle im Desktop. Diese Vision erweitert den dort beschlossenen Umfang nicht. Größere Ausbaustufen bleiben Backlog bis zu einer eigenen Scope- und Kapazitätsentscheidung.
 
 ## English
 
@@ -72,4 +72,4 @@ The pilot builds on work for [trust fields and search #110](https://github.com/m
 7. Keep agent proposals and follow-up actions scoped, traceable, and reversible.
 8. Consider broader organizational functions when earlier stages establish a need.
 
-SSO/SCIM, end-to-end encryption, DLP, and broad federated search remain possible later directions, not architecture or release commitments. The M1 macOS closed beta takes priority; this vision creates neither a milestone nor a capacity commitment. Larger stages receive concrete issues and milestones only after scope and capacity decisions.
+SSO/SCIM, end-to-end encryption, DLP, and broad federated search remain possible later directions, not architecture or release commitments. The active [W0/W1 focus milestone](https://github.com/moellenbeck-digital/BloomMD/milestone/8) and [delivery contract #415](https://github.com/moellenbeck-digital/BloomMD/issues/415) limit the next delivery to learning evidence, one offline conflict scenario, and a read-only Nextcloud source in Desktop. This vision does not expand that approved scope. Larger stages remain in the backlog until a separate scope and capacity decision.

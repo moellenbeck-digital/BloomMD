@@ -75,34 +75,18 @@ jobs:
       - name: Run the self-test on an iPad simulator
         id: selftest
         run: |
-          set -euo pipefail
-          # Newest iOS runtime, and the newest iPad Pro that runtime supports (old models are not).
-          runtime_json="$(xcrun simctl list runtimes -j | jq '[.runtimes[] | select(.isAvailable and .platform == "iOS")] | last')"
-          runtime="$(jq -r '.identifier' <<< "$runtime_json")"
-          device_type="$(jq -r '[.supportedDeviceTypes[] | select(.name | startswith("iPad Pro"))] | last | .identifier' <<< "$runtime_json")"
-          echo "runtime=$runtime device=$device_type"
-          sim="$(xcrun simctl create bloommd-ci "$device_type" "$runtime")"
-          xcrun simctl boot "$sim"
-          xcrun simctl bootstatus "$sim" -b
-          xcrun simctl install "$sim" "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app"
-          data="$(xcrun simctl get_app_container "$sim" app.bloommd.mobile data)"
-          mkdir -p "$data/Documents"
-          touch "$data/Documents/run-selftest"
-          xcrun simctl launch "$sim" app.bloommd.mobile
-          for _ in $(seq 1 90); do
-            [ -f "$data/Documents/selftest-result.json" ] && break
-            sleep 2
-          done
-          xcrun simctl io "$sim" screenshot "$RUNNER_TEMP/ipad-selftest.png" || true
-          cat "$data/Documents/selftest-result.json"
-          jq -e '.passed == true' "$data/Documents/selftest-result.json"
-      - name: Keep the simulator screenshot
+          packages/mobile/scripts/ios-selftest.sh \
+            "$RUNNER_TEMP/dd/Build/Products/Debug-iphonesimulator/App.app" \
+            "$RUNNER_TEMP/ipad-selftest.png" "$RUNNER_TEMP/ipad-selftest-diagnostics"
+      - name: Keep the simulator screenshot and diagnostics
         id: screenshot
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ipad-selftest
-          path: ${{ runner.temp }}/ipad-selftest.png
+          path: |
+            ${{ runner.temp }}/ipad-selftest.png
+            ${{ runner.temp }}/ipad-selftest-diagnostics
           if-no-files-found: ignore
       # The self-test build of the app (VITE_BLOOMMD_SELFTEST=1), ad-hoc signed, for the simulator. If the build
       # failed there is no App.app and no artifact; the job summary says so.

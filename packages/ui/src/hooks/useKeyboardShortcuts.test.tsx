@@ -174,6 +174,7 @@ describe("useKeyboardShortcuts node creation", () => {
   beforeEach(() => {
     installDom();
     useMindMapStore.getState().setDocument(createDocument());
+    useMindMapStore.getState().setEditorVisible(false);
   });
 
   afterEach(async () => {

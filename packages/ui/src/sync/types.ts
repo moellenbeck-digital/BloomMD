@@ -21,6 +21,10 @@ export const SYNC_ORIGIN = "sync-remote" as const;
 
 export const MSG_SYNC = 0;
 export const MSG_AWARENESS = 1;
+/** Client announces its device label; must match packages/sync `MSG_DEVICE`. */
+export const MSG_DEVICE = 2;
+/** Client hands over its queued offline edits; must match packages/sync `MSG_RECONCILE`. */
+export const MSG_RECONCILE = 3;
 
 export interface AwarenessUserState {
   name: string;

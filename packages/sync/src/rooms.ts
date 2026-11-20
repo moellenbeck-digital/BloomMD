@@ -4,6 +4,8 @@ import { documentToYDoc, yAddNode, yDocToDocument, yUpdateContentDiff, type Mind
 import { applyKnowledgeNodesToYDoc } from "@bloommd/core/knowledge-yjs";
 import type { KnowledgeNodeInput } from "@bloommd/core/knowledge";
 import { broadcastUpdate } from "./sync-handler";
+import { trackNodeAuthors } from "./offline-merge";
+import { createFileSnapshotStore } from "./snapshots";
 import { systemClock, type SyncClock } from "./clock";
 import { createSyncTelemetry, type SyncTelemetry } from "./observability";
 import {
@@ -106,6 +108,7 @@ export function createRoomManager(
   clock: SyncClock = systemClock,
 ): RoomManager {
   const rooms = new Map<string, SyncRoom>();
+  const snapshotStore = config.snapshotDir ? createFileSnapshotStore(config.snapshotDir) : null;
   // The executable injects the production logger. A library consumer that does not opt in still
   // gets the metric semantics without unexpectedly writing room lifecycle events to its stdout.
   const telemetry = config.telemetry ?? createSyncTelemetry({ write: () => undefined });
@@ -187,6 +190,7 @@ export function createRoomManager(
       clients: new Set(),
       awareness,
       awarenessClients: new Map(),
+      offline: { devices: new Map(), authors: new Map(), snapshots: snapshotStore, now: () => clock.now() },
       persistTimer: null,
       persistenceTimeoutTimer: null,
       destroyTimer: null,
@@ -220,6 +224,8 @@ export function createRoomManager(
       for (const id of removed) owned.delete(id);
       room.awarenessClients.set(ws, owned);
     });
+
+    trackNodeAuthors(room, yDoc);
 
     rooms.set(descriptor.key, room);
     refreshGauges();

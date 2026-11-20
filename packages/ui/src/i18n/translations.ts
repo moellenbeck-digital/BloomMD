@@ -216,6 +216,12 @@ export interface Translations {
   syncOffline: string;
   syncConnecting: string;
   syncReconnecting: string;
+  syncOfflinePending: string;
+  syncOfflinePendingTitle: string;
+  syncConflictsLabel: string;
+  syncConflictItem: string;
+  syncConflictAdopt: string;
+  syncConflictDiscard: string;
   syncConnected: string;
   syncFailed: string;
   syncFailureFileNotFound: string;
@@ -780,6 +786,12 @@ export const translations: Record<Locale, Translations> = {
     syncOffline: "Offline",
     syncConnecting: "Verbinde...",
     syncReconnecting: "Verbinde erneut...",
+    syncOfflinePending: "Lokal gespeichert",
+    syncOfflinePendingTitle: "Änderungen aus dem Offline-Betrieb sind lokal gespeichert und werden bei der nächsten Verbindung übertragen.",
+    syncConflictsLabel: "Konflikte (%count%)",
+    syncConflictItem: "„%node%“ wurde auf zwei Geräten geändert. Kopie: „%copy%“ (%device%, %time%)",
+    syncConflictAdopt: "Fassung übernehmen",
+    syncConflictDiscard: "Kopie löschen",
     syncConnected: "Synchronisiert",
     syncFailed: "Verbindung fehlgeschlagen",
   syncFailureFileNotFound: "Workspace-Datei nicht gefunden",
@@ -1338,6 +1350,12 @@ export const translations: Record<Locale, Translations> = {
     syncOffline: "Offline",
     syncConnecting: "Connecting...",
     syncReconnecting: "Reconnecting...",
+    syncOfflinePending: "Saved locally",
+    syncOfflinePendingTitle: "Changes made offline are saved on this device and will be sent on the next connection.",
+    syncConflictsLabel: "Conflicts (%count%)",
+    syncConflictItem: "\"%node%\" was changed on two devices. Copy: \"%copy%\" (%device%, %time%)",
+    syncConflictAdopt: "Use this version",
+    syncConflictDiscard: "Delete copy",
     syncConnected: "Synced",
     syncFailed: "Connection failed",
   syncFailureFileNotFound: "Workspace file not found",

@@ -6,6 +6,7 @@ import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import type { SyncRoom, WebSocketData } from "./types";
 import type { SyncTelemetry } from "./observability";
+import { handleDeviceMessage, handleReconcileMessage, MSG_DEVICE, MSG_RECONCILE, releaseDevice } from "./offline-merge";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
@@ -52,6 +53,14 @@ export function handleSyncMessage(
     if (encoding.length(encoder) > 1) {
       ws.sendBinary(encoding.toUint8Array(encoder));
     }
+  } else if (messageType === MSG_DEVICE && room) {
+    try {
+      handleDeviceMessage(room, ws, decoder);
+    } catch {
+      telemetry?.increment("sync_messages_dropped_total");
+    }
+  } else if (messageType === MSG_RECONCILE && room) {
+    handleReconcileMessage(room, ws, decoder, telemetry, correlationId);
   } else if (messageType === MSG_AWARENESS && room) {
     const update = decoding.readVarUint8Array(decoder);
     // Mirror into the room state first so a later joiner sees this client without waiting for its
@@ -115,6 +124,7 @@ export function sendAwarenessStates(room: SyncRoom, ws: ServerWebSocket<WebSocke
 
 /** Drops the presence entries a disconnecting client owned and tells the remaining clients. */
 export function releaseAwarenessClients(room: SyncRoom, ws: ServerWebSocket<WebSocketData>): void {
+  releaseDevice(room, ws);
   const owned = room.awarenessClients.get(ws);
   room.awarenessClients.delete(ws);
   if (!owned || owned.size === 0) return;

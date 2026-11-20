@@ -211,3 +211,20 @@ export {
   type NoteTemplate,
   type NoteTemplateLocale,
 } from "./note-templates";
+export {
+  CONFLICT_RELATION_LABEL,
+  CONFLICT_TITLE_PREFIX,
+  UNKNOWN_DEVICE,
+  conflictCopyTitle,
+  formatConflictTime,
+  listConflictCopies,
+  parseConflictCopyTitle,
+  planOfflineMerge,
+  yCreateConflictCopy,
+  yResolveConflict,
+  type ConflictAuthor,
+  type NodeConflict,
+  type OfflineMergeInput,
+  type OfflineMergePlan,
+  type ConflictCopyInfo as OfflineConflictCopy,
+} from "./offline-conflict";

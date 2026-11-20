@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createRoomManager } from "./rooms";
 import { createSyncServer } from "./server";
 import { createDatabasePersistence } from "./persistence";
@@ -10,6 +10,8 @@ const telemetry = createSyncTelemetry();
 
 const config: SyncServerConfig = {
   baseDir: resolve(process.cwd(), process.env.BLOOMMD_DIR || "./data"),
+  // Pre-merge snapshots of offline merges (#261). Dot directories are not listed as documents.
+  snapshotDir: resolve(process.cwd(), process.env.SYNC_SNAPSHOT_DIR || join(process.env.BLOOMMD_DIR || "./data", ".snapshots")),
   port: parseInt(process.env.SYNC_PORT || "4100", 10),
   persistDebounceMs: parseInt(process.env.SYNC_PERSIST_DEBOUNCE || "2500", 10),
   destroyDelayMs: parseInt(process.env.SYNC_DESTROY_DELAY || "30000", 10),

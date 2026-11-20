@@ -2,9 +2,21 @@ import type * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import type { ServerWebSocket } from "bun";
 import type { SyncTelemetry } from "./observability";
+import type { ConflictAuthor } from "@bloommd/core";
+import type { SnapshotStore } from "./snapshots";
 
 export interface WebSocketData {
   roomName: string;
+}
+
+/** State for merging a client's offline changes (#261); created on first use when a room lacks it. */
+export interface OfflineRoomState {
+  /** Device label each connection announced. */
+  devices: Map<ServerWebSocket<WebSocketData>, string>;
+  /** Who last changed which node (memory only: a restarted server names the device "unbekannt"). */
+  authors: Map<string, ConflictAuthor>;
+  snapshots: SnapshotStore | null;
+  now: () => number;
 }
 
 export interface SyncRoom {
@@ -25,6 +37,7 @@ export interface SyncRoom {
   awareness: Awareness;
   /** Which awareness client ids each connection owns, so they can be cleared on disconnect. */
   awarenessClients: Map<ServerWebSocket<WebSocketData>, Set<number>>;
+  offline?: OfflineRoomState;
   persistTimer: unknown | null;
   /** Timer for an in-flight persistence request; cleared if a bounded shutdown gives up. */
   persistenceTimeoutTimer: unknown | null;
@@ -44,6 +57,8 @@ export interface PersistenceOperation {
 
 export interface SyncServerConfig {
   baseDir: string;
+  /** Where pre-merge snapshots of offline merges go; none are taken when unset. */
+  snapshotDir?: string;
   port: number;
   persistDebounceMs: number;
   destroyDelayMs: number;

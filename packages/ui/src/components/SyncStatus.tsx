@@ -1,11 +1,70 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { listConflictCopies } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import type { SyncFailureKind, SyncStatus as SyncStatusType } from "../sync/types";
 import { getPresenceInitials, getPresenceLabel, shouldShowPresence } from "../sync/presence";
 import { useLocale } from "../i18n/LocaleContext";
 
+/**
+ * Conflict copies from offline merges (#261): shows that there are some and lets the user adopt the
+ * copied version or delete the copy. The copy itself is an ordinary "Konflikt: …" node on the map.
+ */
+function SyncConflicts() {
+  const document = useMindMapStore((s) => s.document);
+  const resolveConflict = useMindMapStore((s) => s.resolveConflict);
+  const readOnly = useMindMapStore((s) => s.readOnly);
+  const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  const copies = useMemo(() => (document ? listConflictCopies(document) : []), [document]);
+  if (copies.length === 0) return null;
+
+  return (
+    <span className="relative" data-testid="sync-conflicts">
+      <button
+        type="button"
+        data-testid="sync-conflicts-toggle"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="rounded border border-[#B45309] px-1 text-[10px] font-semibold text-[#B45309]"
+      >
+        {t.syncConflictsLabel.replace("%count%", String(copies.length))}
+      </button>
+      {open && (
+        <ul
+          className="absolute right-0 top-5 z-50 flex w-80 flex-col gap-2 rounded border border-[var(--color-border,#ddd)] bg-[var(--color-surface,#fff)] p-2 text-[11px] text-[var(--color-ink)] shadow-lg"
+          data-testid="sync-conflict-list"
+        >
+          {copies.map((copy) => (
+            <li key={copy.id} data-testid="sync-conflict" data-conflict-copy-id={copy.id} className="flex flex-col gap-1">
+              <span>
+                {t.syncConflictItem
+                  .replace("%node%", document?.nodes.get(copy.originalId)?.title ?? "")
+                  .replace("%copy%", copy.title)
+                  .replace("%device%", copy.device)
+                  .replace("%time%", copy.time)}
+              </span>
+              {!readOnly && (
+                <span className="flex gap-2">
+                  <button type="button" data-testid="sync-conflict-adopt" className="underline" onClick={() => resolveConflict(copy.id, "adopt")}>
+                    {t.syncConflictAdopt}
+                  </button>
+                  <button type="button" data-testid="sync-conflict-discard" className="underline" onClick={() => resolveConflict(copy.id, "discard")}>
+                    {t.syncConflictDiscard}
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
+  );
+}
+
 export function SyncStatus() {
+  const offlinePending = useMindMapStore((s) => s.offlinePending);
   const syncStatus = useMindMapStore((s) => s.syncStatus);
   const syncProvider = useMindMapStore((s) => s.syncProvider);
   const syncFailure = useMindMapStore((s) => s.syncFailure);
@@ -50,6 +109,16 @@ export function SyncStatus() {
         style={{ backgroundColor: color }}
       />
       <span className="font-[var(--font-mono,monospace)]">{label}</span>
+      {offlinePending && (
+        <span
+          data-testid="sync-offline-pending"
+          className="font-[var(--font-mono,monospace)] text-[10px] opacity-80"
+          title={t.syncOfflinePendingTitle}
+        >
+          {t.syncOfflinePending}
+        </span>
+      )}
+      <SyncConflicts />
       {showPresence && userCount > 1 && (
         <>
           <span className="font-[var(--font-mono,monospace)] text-[10px] opacity-70">({userCount})</span>

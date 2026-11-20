@@ -169,6 +169,12 @@ export interface SyncWebSocketState {
   permission: "read" | "write";
   userId?: string;
   correlationId?: string;
+  /**
+   * Messages of one connection are processed one after the other. The authorization check before
+   * each message is asynchronous; without the queue the ordinary sync step of a reconnecting client
+   * could overtake its offline state and merge it silently (#261).
+   */
+  queue?: Promise<unknown>;
 }
 
 export interface SyncServerDrainResult {
@@ -640,7 +646,8 @@ export function createSyncServer(roomManager: RoomManager, config: Pick<SyncServ
                 : data instanceof Uint8Array
                 ? data
                 : new Uint8Array(0);
-            await processSyncClientMessage(
+            const previous = clientState.queue ?? Promise.resolve();
+            const current = previous.catch(() => undefined).then(() => processSyncClientMessage(
               roomManager,
               clientState,
               room,
@@ -650,7 +657,9 @@ export function createSyncServer(roomManager: RoomManager, config: Pick<SyncServ
               () => draining,
               telemetry,
               clientState.correlationId,
-            );
+            ));
+            clientState.queue = current;
+            await current;
           })().catch((error: unknown) => {
             telemetry.increment("sync_messages_dropped_total");
             telemetry.event({ operation: "websocket.message", outcome: "error", error });

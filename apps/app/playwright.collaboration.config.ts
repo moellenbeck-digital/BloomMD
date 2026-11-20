@@ -10,7 +10,7 @@ const prepareWorkspace = `mkdir -p ${workspaceDir} && cp e2e/fixtures/collaborat
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /collaboration\.spec\.ts/,
+  testMatch: /(?<!offline-)collaboration\.spec\.ts/,
   timeout: 45_000,
   expect: { timeout: 12_000 },
   fullyParallel: false,

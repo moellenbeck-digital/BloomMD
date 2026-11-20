@@ -242,7 +242,13 @@ export function setOfflineStorageForTests(storage: OfflineStorage | null | undef
 
 function emitSyncE2EEvent(name: string, detail: Record<string, unknown>) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(`bloommd:sync:${name}`, { detail }));
+  try {
+    // Use the window's own CustomEvent: a DOM shim (tests) rejects events of another realm.
+    const EventCtor = (window as unknown as { CustomEvent?: typeof CustomEvent }).CustomEvent ?? CustomEvent;
+    window.dispatchEvent(new EventCtor(`bloommd:sync:${name}`, { detail }));
+  } catch {
+    // The event is only an observation point for tests; it must never break syncing.
+  }
 }
 
 /**

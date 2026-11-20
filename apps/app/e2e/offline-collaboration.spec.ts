@@ -30,7 +30,8 @@ interface Client {
 }
 
 async function openClient(browser: Browser, label: "A" | "B"): Promise<Client> {
-  const context = await browser.newContext();
+  // The sync status is only shown from the 2xl breakpoint (1536px).
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   const page = await context.newPage();
   const state = { blocked: false, route: null as WebSocketRoute | null };
   await page.routeWebSocket(/\/ws\//, (route) => {
@@ -292,8 +293,13 @@ test("@t261 a conflict copy can be deleted instead: the node keeps its version",
       await expect(client.page.locator('[data-node-label^="Konflikt:"]')).toHaveCount(0);
       await expect(node(client.page, "Beta-A")).toHaveCount(0);
     }
-    await expect.poll(async () => readFile(alphaFile, "utf8"), { timeout: 10_000 }).toContain("## Beta-B");
-    expect(await readFile(alphaFile, "utf8")).not.toContain("Konflikt");
+    // The export follows the shown state once the debounced persistence has run.
+    await expect
+      .poll(async () => {
+        const text = await readFile(alphaFile, "utf8");
+        return text.includes("## Beta-B") && !text.includes("Konflikt");
+      }, { timeout: 15_000 })
+      .toBe(true);
   } finally {
     await a.close();
     await b.close();

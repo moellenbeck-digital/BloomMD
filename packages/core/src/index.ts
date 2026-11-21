@@ -27,7 +27,7 @@ export { collapseUnchanged, diffLines, diffStats, type DiffKind, type DiffLine, 
 export { addNode, deleteNode, moveNode, renameNode } from "./operations";
 export { FileStore } from "./fileStore";
 export { filenameForTitle, filenameForTitleInPath, normalizeMarkdownFilename, normalizeMarkdownPath, normalizeFolderPath, sanitizeMarkdownFilename, resolveMarkdownPath, resolveFolderPath } from "./paths";
-export { documentToYDoc, yDocToDocument } from "./yjs-bridge";
+export { documentToYDoc, yDocToDocument, yReplaceNodeEntry } from "./yjs-bridge";
 export {
   yAddNode,
   yDeleteNode,

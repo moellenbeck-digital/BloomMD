@@ -231,3 +231,23 @@ describe("offline conflict rule A", () => {
     expect(formatConflictTime(AT_A)).toBe("2026-11-20 17:25");
   });
 });
+
+describe("a client's edit is never hidden by the merge (#261)", () => {
+  test("room and client built the node entries independently: the room shows the client's text", () => {
+    // The outcome of the plain CRDT merge depends on random client ids; repeat it.
+    for (let run = 0; run < 40; run++) {
+      const clientSeed = documentToYDoc(parseFile("offline.md", MARKDOWN.replace("updated: 2026-11-20", "updated: 2026-11-21")));
+      const base = Y.encodeStateAsUpdate(clientSeed);
+      const client = replica(clientSeed);
+      yRenameNode(client, "beta", "Beta-A");
+      yUpdateContentDiff(client, "beta", "", "Text von A");
+      const server = documentToYDoc(parseFile("offline.md", MARKDOWN));
+      const plan = planOfflineMerge(server, { base, local: Y.encodeStateAsUpdate(client), device: "Gerät A", at: AT_A });
+      plan.commit();
+      const beta = yDocToDocument(server).nodes.get("beta")!;
+      expect(beta.title).toBe("Beta-A");
+      expect(beta.content).toBe("Text von A");
+      expect(listConflictCopies(yDocToDocument(server))).toHaveLength(0);
+    }
+  });
+});

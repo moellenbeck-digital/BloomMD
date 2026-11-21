@@ -95,6 +95,36 @@ export function documentToYDoc(
 }
 
 /**
+ * Writes one node (and its content) as a fresh entry. The entry replaces whatever the Y.Doc holds
+ * under this id, including entries it has not seen win, because it is created after them. Used to
+ * put a node back to a known state (#261). Pass `null` as the node to remove the entry.
+ */
+export function yReplaceNodeEntry(yDoc: Y.Doc, id: string, node: MindMapNode | null, origin?: unknown): void {
+  yDoc.transact(() => {
+    const yNodes = yDoc.getMap<Y.Map<unknown>>("nodes");
+    const yNodeContents = yDoc.getMap<Y.Text>("nodeContents");
+    if (!node) {
+      yNodes.delete(id);
+      yNodeContents.delete(id);
+      return;
+    }
+    const yNode = new Y.Map<unknown>();
+    yNode.set("id", node.id);
+    yNode.set("parentId", node.parentId);
+    yNode.set("level", node.level);
+    yNode.set("title", node.title);
+    yNode.set("metadata", node.metadata ? structuredClone(node.metadata) : null);
+    const yChildren = new Y.Array<string>();
+    yChildren.push(node.children);
+    yNode.set("children", yChildren);
+    yNodes.set(id, yNode);
+    const yContent = new Y.Text();
+    if (node.content) yContent.insert(0, node.content);
+    yNodeContents.set(id, yContent);
+  }, origin);
+}
+
+/**
  * Reconstruct a MindMapDocument from a Y.Doc.
  */
 export function yDocToDocument(yDoc: Y.Doc): MindMapDocument {

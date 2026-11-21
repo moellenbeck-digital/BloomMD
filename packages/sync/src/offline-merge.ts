@@ -92,6 +92,8 @@ export function handleReconcileMessage(
   correlationId?: string,
 ): void {
   const state = offlineState(room);
+  // Even a reconcile that fails below hands over to the ordinary sync that follows it.
+  (state.reconciled ??= new WeakSet()).add(ws);
   try {
     const device = sanitizeDeviceLabel(decoding.readVarString(decoder));
     state.devices.set(ws, device);

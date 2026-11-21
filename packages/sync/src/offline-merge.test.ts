@@ -186,8 +186,9 @@ describe("offline merge on the server", () => {
   });
 
   test("a seed that arrives late from an older connection does not hide the first client's merge (#261)", () => {
-    // Every client seeds its own Y.Doc from the file. B's handshake answer (SyncStep2) travels
-    // slowly and reaches the server after A's merge but before B's own reconcile.
+    // Every client seeds its own Y.Doc from the file, and the seeds differ (the frontmatter dates
+    // are set per load). B's handshake answer (SyncStep2) travels slowly and reaches the server
+    // after A's merge but before B's own reconcile.
     const step2 = (from: Y.Doc, stateVector: Uint8Array) => {
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, 0);
@@ -203,8 +204,9 @@ describe("offline merge on the server", () => {
       const wsA = mockWs();
       const wsB = mockWs();
       const wsOld = mockWs();
-      const a = documentToYDoc(parseFile("offline.md", MARKDOWN));
-      const b = documentToYDoc(parseFile("offline.md", MARKDOWN));
+      room.offline!.devices.set(wsOld, "Gerät B");
+      const a = documentToYDoc(parseFile("offline.md", MARKDOWN.replace("updated: 2026-11-20", "updated: 2026-11-21")));
+      const b = documentToYDoc(parseFile("offline.md", MARKDOWN.replace("updated: 2026-11-20", "updated: 2026-11-22")));
       Y.applyUpdate(a, Y.encodeStateAsUpdate(server));
       Y.applyUpdate(server, Y.encodeStateAsUpdate(a), wsA);
       const serverBeforeB = Y.encodeStateVector(server);
@@ -223,6 +225,27 @@ describe("offline merge on the server", () => {
       expect(doc.nodes.get("beta")!.title).toBe("Beta-B");
       expect(listConflictCopies(doc).map((copy) => `${copy.title}/${copy.device}`)).toEqual(["Beta-A/Gerät A"]);
     }
+  });
+
+  test("a handshake answer without reconcile cannot change a node, one after a reconcile is applied as sent", () => {
+    const { server, room, wsA, wsB, a, b } = scenario();
+    const handshake = (from: Y.Doc) => {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, 0);
+      encoding.writeVarUint(encoder, 1);
+      encoding.writeVarUint8Array(encoder, Y.encodeStateAsUpdate(from, Y.encodeStateVector(server)));
+      return encoding.toUint8Array(encoder);
+    };
+    // A's reconcile failed (broken payload): the ordinary sync that follows it must still merge.
+    const broken = encoding.createEncoder();
+    encoding.writeVarUint(broken, MSG_RECONCILE);
+    encoding.writeVarUint(broken, 99);
+    handleSyncMessage(server, encoding.toUint8Array(broken), wsA, room);
+    handleSyncMessage(server, handshake(a), wsA, room);
+    expect(yDocToDocument(server).nodes.get("alpha")!.title).toBe("Alpha-A");
+    // B announced no reconcile: its edit does not arrive this way, and A's stays.
+    handleSyncMessage(server, handshake(b), wsB, room);
+    expect(yDocToDocument(server).nodes.get("alpha")!.title).toBe("Alpha-A");
   });
 
   test("a live edit by a named device is the author of the copy later", () => {

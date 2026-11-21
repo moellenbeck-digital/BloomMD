@@ -17,6 +17,8 @@ export interface OfflineRoomState {
   authors: Map<string, ConflictAuthor>;
   snapshots: SnapshotStore | null;
   now: () => number;
+  /** Connections that sent an offline reconcile (also a failed one); their ordinary sync is not held back. */
+  reconciled?: WeakSet<object>;
 }
 
 export interface SyncRoom {

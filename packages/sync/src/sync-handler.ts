@@ -6,6 +6,7 @@ import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import type { SyncRoom, WebSocketData } from "./types";
 import type { SyncTelemetry } from "./observability";
+import { repairHandshake, snapshotNodes } from "./handshake-guard";
 import { handleDeviceMessage, handleReconcileMessage, MSG_DEVICE, MSG_RECONCILE, releaseDevice } from "./offline-merge";
 
 const MSG_SYNC = 0;
@@ -46,9 +47,21 @@ export function handleSyncMessage(
   const messageType = decoding.readVarUint(decoder);
 
   if (messageType === MSG_SYNC) {
+    // A handshake answer of a connection that sent no offline reconcile may not change a node.
+    const guardsHandshake =
+      Boolean(room) &&
+      decoding.peekVarUint(decoder) === syncProtocol.messageYjsSyncStep2 &&
+      !room!.offline?.reconciled?.has(ws);
+    const nodesBefore = guardsHandshake ? snapshotNodes(yDoc) : null;
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MSG_SYNC);
     syncProtocol.readSyncMessage(decoder, encoder, yDoc, ws);
+    if (nodesBefore) {
+      const repaired = repairHandshake(yDoc, nodesBefore);
+      if (repaired.length > 0) {
+        telemetry?.event({ operation: "sync.handshake.repair", outcome: "success", roomKey: room!.key, correlationId });
+      }
+    }
 
     if (encoding.length(encoder) > 1) {
       ws.sendBinary(encoding.toUint8Array(encoder));

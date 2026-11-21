@@ -192,6 +192,8 @@ export function planOfflineMerge(server: Y.Doc, input: OfflineMergeInput): Offli
   const baseDocument = baseY ? yDocToDocument(baseY) : null;
 
   const localChanged = new Set<string>();
+  /** Existing nodes whose text the client changed; after the merge the room must show that text. */
+  const localEdits = new Map<string, { title: string; content: string }>();
   const conflicts: NodeConflict[] = [];
   if (baseDocument) {
     for (const id of localDocument.nodes.keys()) if (!baseDocument.nodes.has(id)) localChanged.add(id);
@@ -199,6 +201,7 @@ export function planOfflineMerge(server: Y.Doc, input: OfflineMergeInput): Offli
       const local = localDocument.nodes.get(id);
       if (!local || (local.title === base.title && local.content === base.content)) continue;
       localChanged.add(id);
+      localEdits.set(id, { title: local.title, content: local.content });
       const current = serverDocument.nodes.get(id);
       if (!current || (current.title === base.title && current.content === base.content)) continue;
       if (current.title === local.title && current.content === local.content) continue;
@@ -232,6 +235,20 @@ export function planOfflineMerge(server: Y.Doc, input: OfflineMergeInput): Offli
           conflictCopyIds.push(
             yCreateConflictCopy(server, conflict, previousAuthors.get(conflict.nodeId)!),
           );
+        }, origin);
+      }
+      // The CRDT merge alone can leave an edit hidden when the room and the client built the node
+      // entry independently. A node the client changed and the room did not is not a conflict, so
+      // the room has to show the client's text; write it if the merge did not.
+      const conflictIds = new Set(conflicts.map((conflict) => conflict.nodeId));
+      const mergedNodes = localEdits.size > 0 ? yDocToDocument(server).nodes : null;
+      for (const [id, edit] of localEdits) {
+        if (conflictIds.has(id)) continue;
+        const current = mergedNodes?.get(id);
+        if (!current) continue;
+        server.transact(() => {
+          if (current.title !== edit.title) yRenameNode(server, id, edit.title);
+          yUpdateContentDiff(server, id, current.content, edit.content);
         }, origin);
       }
       for (const id of localChanged) input.authors?.set(id, { device: input.device, at: input.at });

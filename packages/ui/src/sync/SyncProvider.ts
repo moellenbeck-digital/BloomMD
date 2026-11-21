@@ -115,7 +115,10 @@ export class SyncProvider {
     this.reconnectBaseDelayMs = opts.reconnectBaseDelayMs ?? 1000;
     this.maxReconnectAttempts = opts.maxReconnectAttempts ?? 6;
     this.offline = opts.offline ?? null;
-    this.base = opts.offline?.base ?? null;
+    // Without a stored base the state the provider starts with is the base. An edit made before
+    // the first sync is then queued and announced like any offline edit; the server accepts
+    // nothing else from a connection that did not announce one (#261).
+    this.base = opts.offline ? (opts.offline.base ?? Y.encodeStateAsUpdate(this.doc)) : null;
 
     if (this.offline) {
       this.persistHandler = () => this.scheduleSave();

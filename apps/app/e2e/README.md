@@ -48,6 +48,49 @@ PLAYWRIGHT_BASE_URL=http://app.bloommd-test.svc.cluster.local:3000 bunx playwrig
 
 Die CI führt davon bisher nur `mobile-smoke.spec.ts` aus (`.github/workflows/ci.yml`).
 
+## Testkonto: Testzeitraum und Hinweis-Mails (#274)
+
+`trial-reminders-t274.spec.ts` (`@t274`) belegt die sichtbaren Kriterien des Testkontos (30 Tage ab Bestätigung, Hinweis-Mails nach 15 und 23 Tagen): echte Registrierung, echte Mails, der echte Job `db:trial-reminders`. Tag 15 und Tag 23 werden nicht abgewartet: Die Spec startet den Job als Kindprozess mit `--jetzt <Bestätigung + n Tage>` und `--konto <id>`; so wird nur das Konto der Spec angesehen, beansprucht und angeschrieben, nie ein anderes Konto einer geteilten Datenbank. Der Job bekommt eine eigene, kleine Umgebung (kein `.env`, `BLOOMMD_TRIAL_REMINDERS_EXISTING` aus, lokal kein Mailanbieter).
+
+| K | Fall | Wie geprüft |
+| --- | --- | --- |
+| K1 | Bestätigungsmail kommt an; nach dem Bestätigen „Testzeitraum bis <Bestätigung + 30 Tage>“ | Mail lesen, Link folgen; `/account` (`account-trial-end`, DE und EN) und `trial_ends_at` |
+| K2 | unbestätigt: kein Testende, nach dem Job keine Mail | Job mit `--jetzt` +16 und +40 Tage |
+| K3 | Tag 15: genau eine Mail „noch 15 Tage“ mit Link auf `https://bloommd.app`; Tag 14 keine | Job mit `--jetzt` +14 Tage, dann +15 Tage (+1 s, siehe unten) |
+| K4 | Tag 23: genau eine zweite Mail „noch 7 Tage“; Tag 22 keine | Job +22, dann +23 Tage |
+| K5 | Job erneut: keine weitere Mail | Job dreimal wiederholt, Zahl der Mails und Zeilen in `bloom_trial_reminders` unverändert |
+| K6 | EN-Konto: englische Mail; DE-Konto: deutsche | Registrierung mit `lang=en`, Betreff und Text der Mail |
+| K7 | Bestandskonto (Schalter aus) und gelöschtes Konto: keine Mail | `trial_legacy` per SQL, Job am 30.12.2026 (`heldBackExisting: 1`); danach Löschung über `POST /api/account/delete`, Job findet nichts |
+
+Die Spec lässt den Job eine Sekunde nach dem Hinweis-Zeitpunkt laufen: Die Datenbank speichert Mikrosekunden, ein `Date` nur Millisekunden, und die Vorauswahl in SQL vergleicht genau.
+
+### Lokal (Postgres, Datei-Outbox)
+
+```bash
+cd apps/app
+PLAYWRIGHT_TRIAL_REMINDERS_DATABASE_URL=postgres://… bun run test:e2e:trial-reminders   # oder DATABASE_URL
+```
+
+Eigener Server wie bei `open-signup` und `trial-readonly` (`playwright.trial-reminders.config.ts`, Port 3513, `PLAYWRIGHT_TRIAL_REMINDERS_PORT`; ohne Bypass, Mails in `MAIL_OUTBOX_PATH`). Die Datenbank muss migriert sein (`bun run db:migrate`) und ist eine Wegwerf-Datenbank: Die Spec löscht die Konten ihres Testpostfachs. Nicht Teil der CI (`full-e2e` hat keine Datenbank).
+
+### Gegen das Testsystem (Resend-Abruf)
+
+```bash
+cd apps/app
+PLAYWRIGHT_BASE_URL=http://app.bloommd-test.svc.cluster.local:3000 PLAYWRIGHT_RESEND_API_KEY=… PLAYWRIGHT_T274_DATABASE_URL=postgres://…   bunx playwright test -c playwright.testsystem.config.ts --grep @t274
+```
+
+- `PLAYWRIGHT_RESEND_API_KEY` — Key der Resend-Umgebung mit **Vollzugriff** (ein reiner Sende-Key kann nicht lesen). Er kommt aus der Umgebung des Testlaufs, steht nie im Code und wird nie ausgegeben. Die Spec liest damit `GET /emails` und `GET /emails/{id}` (Betreff und Text der Mails an ihr Testpostfach, höchstens 2 Anfragen je Sekunde) und gibt ihn dem Job zum Senden der Hinweis-Mails mit.
+- `PLAYWRIGHT_T274_DATABASE_URL` — Datenbank **dieses** Testsystems. Gebraucht für den Bestätigungszeitpunkt, den Job (`--konto`), die Bestandskonto-Prüfung und das Aufräumen.
+- `PLAYWRIGHT_T274_RESEND_FROM_EMAIL` — optional, Absender für den Job (Standard `BloomMD Accounts <account@bloommd.app>`, wie der Standard der App); muss für den Key freigegeben sein.
+- `PLAYWRIGHT_T274_MAIL_BASE` — optional, Testpostfach (Standard `delivered@resend.dev`; erlaubt sind nur `…@resend.dev` und `…@bloommd.local`). Jedes Konto bekommt `delivered+<kurzel>-<lauf>@resend.dev`: Resend nimmt die Mails an, stellt sie aber niemandem zu.
+- Das Testsystem muss **ohne** `BLOOMMD_E2E_AUTH_BYPASS=1` laufen und seine Mails über Resend senden (nicht in eine Outbox-Datei schreiben): Mit Bypass legt die Anmeldung kein Konto an und sendet nichts; die Spec überspringt dann alle Tests mit diesem Grund.
+- Ohne `PLAYWRIGHT_T274_DATABASE_URL` oder ohne Key wird jeder Test mit klarem Grund übersprungen (Teil von `--grep @t274`, kein Fehler).
+
+Das Testkonto: Alle Konten eines Laufs teilen ein Postfach (`+label` zählt nicht zur kanonischen Adresse, #277), deshalb entstehen sie nacheinander: DE-Konto (K2–K5), dann gelöscht über die App, dann EN-Konto (K6, K7), am Ende ebenfalls gelöscht. Reste eines abgebrochenen Laufs entfernt der nächste Lauf am Anfang (`delete from bloom_users where email_canonical = …`, nur für das Testpostfach). Pro Lauf gehen 5 Mails raus (2 Bestätigungen, 3 Hinweise) und 2 Registrierungen zählen gegen das Limit je Postfach (6 je Stunde): höchstens drei Läufe pro Stunde. Das globale Mailbudget (60/Stunde) bleibt unangetastet; ist es aufgebraucht, meldet der Job `deferred` und die Spec schlägt mit dieser Zahl fehl.
+
+Kein Versand und kein POST gegen Produktion; `--apply` mit erfundener Uhrzeit nie gegen die Produktionsdatenbank.
+
 ## Tests einem Ticket zuordnen
 
 Neue Specs für ein Ticket tragen `@t<nr>` im Testtitel, z. B. `test("Einladung bleibt sichtbar @t147", …)`.

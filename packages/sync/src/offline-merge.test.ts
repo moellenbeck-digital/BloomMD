@@ -204,6 +204,7 @@ describe("offline merge on the server", () => {
       const wsA = mockWs();
       const wsB = mockWs();
       const wsOld = mockWs();
+      room.offline!.devices.set(wsOld, "Gerät B");
       const a = documentToYDoc(parseFile("offline.md", MARKDOWN.replace("updated: 2026-11-20", "updated: 2026-11-21")));
       const b = documentToYDoc(parseFile("offline.md", MARKDOWN.replace("updated: 2026-11-20", "updated: 2026-11-22")));
       Y.applyUpdate(a, Y.encodeStateAsUpdate(server));

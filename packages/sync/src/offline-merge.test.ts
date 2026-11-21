@@ -172,6 +172,59 @@ describe("offline merge on the server", () => {
     expect(listConflictCopies(yDocToDocument(server))).toHaveLength(1);
   });
 
+  test("a connection that only delivers known structures does not take over the authorship (#261)", () => {
+    // A client built on another Yjs history replaces the node entries without changing any text.
+    // Which side wins depends on random client ids, so repeat it.
+    for (let run = 0; run < 20; run++) {
+      const { server, base, room, wsA, wsB, a } = scenario();
+      handleSyncMessage(server, reconcileMessage("Gerät A", base, Y.encodeStateAsUpdate(a)), wsA, room);
+      room.offline!.devices.set(wsB, "Gerät B");
+      Y.applyUpdate(server, Y.encodeStateAsUpdate(documentToYDoc(yDocToDocument(server))), wsB);
+      expect(room.offline!.authors.get("alpha")?.device).toBe("Gerät A");
+      expect(room.offline!.authors.get("gamma")?.device).not.toBe("Gerät B");
+    }
+  });
+
+  test("a seed that arrives late from an older connection does not hide the first client's merge (#261)", () => {
+    // Every client seeds its own Y.Doc from the file. B's handshake answer (SyncStep2) travels
+    // slowly and reaches the server after A's merge but before B's own reconcile.
+    const step2 = (from: Y.Doc, stateVector: Uint8Array) => {
+      const encoder = encoding.createEncoder();
+      encoding.writeVarUint(encoder, 0);
+      encoding.writeVarUint(encoder, 1);
+      encoding.writeVarUint8Array(encoder, Y.encodeStateAsUpdate(from, stateVector));
+      return encoding.toUint8Array(encoder);
+    };
+    // The outcome used to depend on random client ids; repeat it.
+    for (let run = 0; run < 40; run++) {
+      const server = documentToYDoc(parseFile("offline.md", MARKDOWN));
+      const room = makeRoom(server, null, { t: Date.UTC(2026, 10, 20, 16, 25) });
+      trackNodeAuthors(room, server);
+      const wsA = mockWs();
+      const wsB = mockWs();
+      const wsOld = mockWs();
+      const a = documentToYDoc(parseFile("offline.md", MARKDOWN));
+      const b = documentToYDoc(parseFile("offline.md", MARKDOWN));
+      Y.applyUpdate(a, Y.encodeStateAsUpdate(server));
+      Y.applyUpdate(server, Y.encodeStateAsUpdate(a), wsA);
+      const serverBeforeB = Y.encodeStateVector(server);
+      Y.applyUpdate(b, Y.encodeStateAsUpdate(server));
+      const lateStep2 = step2(b, serverBeforeB);
+      const baseA = Y.encodeStateAsUpdate(a);
+      const baseB = Y.encodeStateAsUpdate(b);
+      yRenameNode(a, "beta", "Beta-A");
+      yRenameNode(b, "beta", "Beta-B");
+
+      handleSyncMessage(server, reconcileMessage("Gerät A", baseA, Y.encodeStateAsUpdate(a)), wsA, room);
+      handleSyncMessage(server, lateStep2, wsOld, room);
+      handleSyncMessage(server, reconcileMessage("Gerät B", baseB, Y.encodeStateAsUpdate(b)), wsB, room);
+
+      const doc = yDocToDocument(server);
+      expect(doc.nodes.get("beta")!.title).toBe("Beta-B");
+      expect(listConflictCopies(doc).map((copy) => `${copy.title}/${copy.device}`)).toEqual(["Beta-A/Gerät A"]);
+    }
+  });
+
   test("a live edit by a named device is the author of the copy later", () => {
     const { server, base, room, wsA, wsB, b } = scenario();
     const live = replica(server);

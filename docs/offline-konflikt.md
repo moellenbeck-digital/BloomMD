@@ -6,8 +6,18 @@ sich auflösen.
 
 ## Fall (Ausgangslage)
 
-- `offline-alpha.md`: Wurzel mit den Knoten „Alpha“, „Beta“, „Gamma“.
-- `offline-vergleich.md`: unveränderte Vergleichsdatei (muss nach dem Lauf byte-gleich bleiben).
+Der Test legt beide Dateien selbst an (über die App-API, Namen mit Kennung je Lauf, z. B.
+`offline-alpha-<kennung>.md`):
+
+- Ausgangsdatei: Wurzel „Offline Alpha <kennung>“ mit den Knoten „Alpha“, „Beta“, „Gamma“.
+- Vergleichsdatei „Offline Vergleich <kennung>“: bleibt während des Laufs unverändert (Inhalt und Version
+  werden vorher und nachher über die App-API verglichen).
+
+Beide Clients (Browser-Kontexte A und B) melden sich mit demselben Konto an, haben aber getrennten
+Browser-Speicher (eigene Offline-Warteschlange).
+
+Ablauf:
+
 - A benennt offline „Alpha“ in „Alpha-A“ um und legt „Delta“ an. B benennt offline „Alpha“ in
   „Alpha-B“ um. Danach gehen beide online.
 
@@ -52,16 +62,38 @@ bun test packages/core/src/offline-conflict.test.ts
 bun test packages/sync/src/offline-merge.test.ts
 bun test packages/ui/src/sync/offline-queue.test.ts packages/ui/src/hooks/useMindMapStore.offline.test.ts
 
-# E2E @t261 (zwei Browser-Kontexte, Offline über Playwright)
+# E2E @t261, lokal (eigener Sync-Server und Arbeitsordner, zwei Browser-Kontexte, Offline über Playwright)
 bun run --cwd apps/app test:e2e:offline
+
+# E2E @t261 gegen ein laufendes System (Testsystem/Dev); startet nichts, nutzt nur UI und App-API
+cd apps/app
+PLAYWRIGHT_BASE_URL=<URL des Systems> bunx playwright test -c playwright.testsystem.config.ts --grep @t261
+bunx playwright test -c playwright.testsystem.config.ts --grep @t261 --list   # muss > 0 Tests melden
 ```
+
+Dieselbe Spec läuft in beiden Modi. Unterschiede: Lokal werden die Snapshots des Sync-Servers aus dem
+Arbeitsordner gelesen. Am Testsystem sind Platte und Snapshots des Sync-Servers nicht erreichbar; dort
+zeigen Inhalt, Vergleichsdatei, Markdown-Export (UI) und Wiederherstellung über die App-API
+(`GET`/`POST /api/mindmaps/<datei>/history`, Versionsverlauf): Der Test stellt nach dem Lauf alle gespeicherten
+Versionen nacheinander wieder her und erwartet darunter den Stand des Servers vor Bs Änderungen (A-Fassung
+ohne Kopie) und den Stand mit Bs Fassung im Knoten und A als „Konflikt: …“-Kopie.
 
 ## Reset-Verfahren (#346)
 
-Der Lauf setzt sich selbst zurück (`apps/app/playwright-offline-setup.ts`). Manuell:
+Der Test räumt seine Testdaten selbst ab, in beiden Modi.
+
+**Am Testsystem/Dev:** Der Test legt ein Konto `offline-<kennung>@bloommd.local` und beide Dateien an. Am Ende
+löscht er die Dateien (`DELETE /api/mindmaps/<datei>`) und das Konto (`POST /api/account/delete`). Läuft das System
+im Testmodus mit Sitzungs-Bypass, kann das Konto dort nicht gelöscht werden; der Lauf vermerkt dann die Kennung als
+Hinweis „cleanup“ im Bericht. Ein Rest wird wie folgt entfernt: Konto per UI (Konto → „Konto löschen“, E-Mail und
+Passwort `Testpass12345`) löschen oder, falls die Dateien stehen blieben, über die Dateiliste löschen. Das Probe-Konto
+des Testers wird dabei nicht angefasst. Ein Neustart des Sync-Servers ist nicht nötig; Snapshots bleiben dort liegen
+(Platte des Sync-Servers, `SYNC_SNAPSHOT_DIR`).
+
+**Lokal (`test:e2e:offline`):** Der Lauf setzt sich selbst zurück (`apps/app/playwright-offline-setup.ts` löscht den
+Arbeitsordner samt `.snapshots`; die Ausgangsdateien legt der Test per API neu an). Manuell:
 
 1. Testraum und Snapshots löschen: `rm -rf .qa/playwright-offline-workspace` (enthält `.snapshots`).
-2. Ausgangsdateien neu anlegen: `apps/app/e2e/fixtures/offline-workspace/*.md` nach
-   `.qa/playwright-offline-workspace/` kopieren.
+2. Nichts kopieren: Ausgangs- und Vergleichsdatei erzeugt der Test.
 3. Browser-Speicher der Clients leeren (IndexedDB-Warteschlange), sonst werden alte Offline-Änderungen
-   erneut zugestellt.
+   erneut zugestellt. Die Testkontexte starten leer; nur bei manueller Prüfung im eigenen Browser nötig.

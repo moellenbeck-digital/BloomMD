@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from "bun";
+import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import { documentToYDoc, yAddNode, yDocToDocument, yUpdateContentDiff, type MindMapDocument, type MindMapNodeMetadata } from "@bloommd/core";
 import { applyKnowledgeNodesToYDoc } from "@bloommd/core/knowledge-yjs";
@@ -25,6 +26,28 @@ import type { PersistenceOperation, RoomDescriptor, SyncRoom, SyncServerConfig, 
 
 const PERSISTENCE_ORIGIN = "bloommd:persistence";
 const MAX_RECOVERY_DELAY_MS = 60_000;
+/** How many idle rooms keep their Yjs history for a reconnecting client (#261). */
+const MAX_REMEMBERED_LINEAGES = 100;
+
+/**
+ * The Yjs history of a room that was closed after its last client left. A client that was offline
+ * brings a state built on that history; the CRDT merge only keeps its edits when the reopened room
+ * continues the same history. A room rebuilt from Markdown alone starts a new one, and the merge
+ * then lets one side's edit of a node silently disappear.
+ */
+interface RememberedLineage {
+  state: Uint8Array;
+  /** Fingerprint of the nodes; the frontmatter (`updated`) changes with every save and is left out. */
+  content: string;
+  version: number | undefined;
+}
+
+function documentContent(document: MindMapDocument): string {
+  const nodes = [...document.nodes.values()]
+    .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))
+    .map((node) => [node.id, node.parentId, node.level, node.title, node.content, node.children, node.metadata ?? null]);
+  return JSON.stringify([document.rootId, nodes]);
+}
 
 /** Errors a later attempt cannot fix: they need a person or a reconciliation, not another save. */
 function isTerminalPersistenceError(error: unknown): boolean {
@@ -115,6 +138,7 @@ export function createRoomManager(
   const persistencePromises = new WeakMap<SyncRoom, Promise<void>>();
   const recoveryAttempts = new WeakMap<SyncRoom, number>();
   const keyLocks = new Map<string, Promise<void>>();
+  const lineages = new Map<string, RememberedLineage>();
   const mutatingKeys = new Set<string>();
   let draining = false;
 
@@ -134,6 +158,32 @@ export function createRoomManager(
     telemetry.setGauge("sync_degraded_rooms", degraded);
     telemetry.setGauge("sync_room_operations_in_flight", inFlight);
     telemetry.setGauge("sync_pending_persistence_rooms", pendingPersistence);
+  }
+
+  function rememberLineage(room: SyncRoom): void {
+    lineages.delete(room.key);
+    lineages.set(room.key, {
+      state: Y.encodeStateAsUpdate(room.yDoc),
+      content: documentContent(yDocToDocument(room.yDoc)),
+      version: room.version,
+    });
+    while (lineages.size > MAX_REMEMBERED_LINEAGES) {
+      const oldest = lineages.keys().next().value;
+      if (oldest === undefined) break;
+      lineages.delete(oldest);
+    }
+  }
+
+  /** The remembered history, but only if storage still holds exactly what the room last had. */
+  function restoreLineage(key: string, document: MindMapDocument): Y.Doc | null {
+    const remembered = lineages.get(key);
+    if (!remembered) return null;
+    lineages.delete(key);
+    if (remembered.version !== document.storage?.version) return null;
+    if (remembered.content !== documentContent(document)) return null;
+    const yDoc = new Y.Doc();
+    Y.applyUpdate(yDoc, remembered.state);
+    return yDoc;
   }
 
   function assertAcceptingWork(): void {
@@ -174,7 +224,7 @@ export function createRoomManager(
 
     // Load .md from disk → MindMapDocument → Y.Doc
     const doc = await persistence.load(descriptor);
-    const yDoc = documentToYDoc(doc);
+    const yDoc = restoreLineage(descriptor.key, doc) ?? documentToYDoc(doc);
     // The server mirrors presence but never participates, so it holds no local state of its own.
     const awareness = new Awareness(yDoc);
     awareness.setLocalState(null);
@@ -442,7 +492,10 @@ export function createRoomManager(
     if (draining) return;
     if (room.destroyTimer) clock.clearTimeout(room.destroyTimer);
     room.destroyTimer = clock.setTimeout(() => {
-      if (room.clients.size === 0 && !room.lastPersistError) destroyRoom(room.key);
+      if (room.clients.size === 0 && !room.lastPersistError) {
+        rememberLineage(room);
+        destroyRoom(room.key);
+      }
     }, config.destroyDelayMs);
   }
 

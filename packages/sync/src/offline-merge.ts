@@ -34,23 +34,49 @@ export function releaseDevice(room: SyncRoom, ws: ServerWebSocket<WebSocketData>
 /**
  * Records who last changed a node's title or content. Called for transactions that a client sent;
  * the result names the device of a conflict copy.
+ *
+ * Only a real change counts. A client that connects (or reconnects) delivers its Yjs structures
+ * again, which replaces a node's entry without changing its text; if that counted, the next
+ * connection would take over the credit for everything and a conflict copy would name the wrong
+ * device (#261).
  */
 export function trackNodeAuthors(room: SyncRoom, yDoc: Y.Doc): void {
+  const yNodes = yDoc.getMap<Y.Map<unknown>>("nodes");
+  const yContents = yDoc.getMap<Y.Text>("nodeContents");
+  const known = new Map<string, string>();
+  const textOf = (id: string): string | null => {
+    const node = yNodes.get(id);
+    if (!node) return null;
+    return JSON.stringify([node.get("title") ?? "", yContents.get(id)?.toString() ?? ""]);
+  };
+  for (const id of yNodes.keys()) known.set(id, textOf(id)!);
+
   const record = (events: Array<Y.YEvent<any>>, origin: unknown) => {
+    const ids = new Set<string>();
+    for (const event of events) {
+      if (event.path[1] === "children") continue;
+      const touched = event.path.length > 0 ? [event.path[0]] : [...((event as { keysChanged?: Set<string> }).keysChanged ?? [])];
+      for (const id of touched) if (typeof id === "string") ids.add(id);
+    }
+    const changed: string[] = [];
+    for (const id of ids) {
+      const text = textOf(id);
+      if (text === null) {
+        known.delete(id);
+        continue;
+      }
+      if (known.get(id) === text) continue;
+      known.set(id, text);
+      changed.push(id);
+    }
     if (!origin || typeof origin !== "object" || !("readyState" in origin)) return;
     const state = offlineState(room);
     const device = state.devices.get(origin as ServerWebSocket<WebSocketData>);
     if (!device) return;
-    for (const event of events) {
-      if (event.path[1] === "children") continue;
-      const ids = event.path.length > 0 ? [event.path[0]] : [...((event as { keysChanged?: Set<string> }).keysChanged ?? [])];
-      for (const id of ids) {
-        if (typeof id === "string") state.authors.set(id, { device, at: state.now() });
-      }
-    }
+    for (const id of changed) state.authors.set(id, { device, at: state.now() });
   };
-  yDoc.getMap("nodes").observeDeep((events, transaction) => record(events, transaction.origin));
-  yDoc.getMap("nodeContents").observeDeep((events, transaction) => record(events, transaction.origin));
+  yNodes.observeDeep((events, transaction) => record(events, transaction.origin));
+  yContents.observeDeep((events, transaction) => record(events, transaction.origin));
 }
 
 /**

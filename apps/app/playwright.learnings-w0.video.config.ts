@@ -8,7 +8,7 @@ import learningsConfig from "./playwright.learnings-w0.config";
  *
  * Lauf: `bun run --cwd apps/app test:e2e:learnings-w0:video`
  */
-process.env.LEARNINGS_W0_PAUSE_MS ??= "1200";
+process.env.LEARNINGS_W0_PAUSE_MS ??= "2000";
 
 export default defineConfig({
   ...learningsConfig,

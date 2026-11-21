@@ -238,3 +238,50 @@ updated: "2026-04-06T10:00:00Z"
     expect(observedOrigin).toBe(origin);
   });
 });
+
+const SEEDED_MD = `---
+title: Seed
+id: seed-1
+created: 2026-11-20
+updated: 2026-11-20
+---
+
+# Wurzel <!-- bloommd:id=root -->
+
+## Architektur <!-- bloommd:id=arch -->
+
+Details zur Architektur.
+`;
+
+describe("seeding a Y.Doc from a document (#261)", () => {
+  test("the same content gives the same structures, so two seeds never compete", () => {
+    const a = documentToYDoc(parseFile("a.md", SEEDED_MD));
+    const b = documentToYDoc(parseFile("a.md", SEEDED_MD));
+    expect(a.clientID).not.toBe(b.clientID);
+    expect(Y.encodeStateAsUpdate(a)).toEqual(Y.encodeStateAsUpdate(b));
+    const before = Y.encodeStateAsUpdate(b);
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+    expect(Y.encodeStateAsUpdate(b)).toEqual(before);
+  });
+
+  test("an edit after seeding uses its own client id and merges with a late seed of the same content", () => {
+    const a = documentToYDoc(parseFile("a.md", SEEDED_MD));
+    const b = documentToYDoc(parseFile("a.md", SEEDED_MD));
+    const id = "arch";
+    a.getMap<Y.Map<unknown>>("nodes").get(id)!.set("title", "Architektur-A");
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+    expect(yDocToDocument(b).nodes.get(id)!.title).toBe("Architektur-A");
+    // The late seed of the other peer changes nothing.
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(documentToYDoc(parseFile("a.md", SEEDED_MD))));
+    expect(yDocToDocument(a).nodes.get(id)!.title).toBe("Architektur-A");
+  });
+
+  test("different content never shares a seed id", () => {
+    const a = documentToYDoc(parseFile("a.md", SEEDED_MD));
+    const b = documentToYDoc(parseFile("a.md", SEEDED_MD.replace("Details zur Architektur", "Andere Details")));
+    const seedOf = (doc: Y.Doc) => [...Y.decodeStateVector(Y.encodeStateVector(doc)).keys()].filter((id) => id !== doc.clientID);
+    expect(seedOf(a)).toHaveLength(1);
+    expect(seedOf(b)).toHaveLength(1);
+    expect(seedOf(a)[0]).not.toBe(seedOf(b)[0]);
+  });
+});

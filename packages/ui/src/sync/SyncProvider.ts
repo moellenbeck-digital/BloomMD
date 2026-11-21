@@ -1,4 +1,4 @@
-import type * as Y from "yjs";
+import * as Y from "yjs";
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate, removeAwarenessStates } from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as encoding from "lib0/encoding";
@@ -7,6 +7,8 @@ import {
   SYNC_ORIGIN,
   MSG_SYNC,
   MSG_AWARENESS,
+  MSG_DEVICE,
+  MSG_RECONCILE,
   AWARENESS_COLORS,
   type SyncStatus,
   type SyncFailure,
@@ -15,6 +17,22 @@ import {
 } from "./types";
 import { QUOTA_EXCEEDED_CLOSE_CODE } from "@bloommd/core/browser";
 import { getAwarenessColor } from "./presence";
+import { hasPendingChanges, type OfflineStorage } from "./offline-queue";
+
+/** Local queue for offline edits (#261). Without it the provider behaves as before. */
+export interface OfflineQueueOptions {
+  /** Record key of this document in the storage. */
+  key: string;
+  storage: OfflineStorage;
+  /** Label of this device, shown in conflict copies. */
+  device: string;
+  /** Base restored from the storage together with queued edits; null for a document without any. */
+  base?: Uint8Array | null;
+  /** Delay before a change is written locally. */
+  saveDebounceMs?: number;
+  /** Called whenever the number of queued (not yet delivered) state changes between none and some. */
+  onQueueChange?: (pending: boolean) => void;
+}
 
 export interface SyncProviderOptions {
   url: string;
@@ -34,6 +52,7 @@ export interface SyncProviderOptions {
   reconnectBaseDelayMs?: number;
   /** Maximum automatic attempts before requiring an explicit retry. */
   maxReconnectAttempts?: number;
+  offline?: OfflineQueueOptions;
 }
 
 const DEFAULT_RESYNC_INTERVAL_MS = 20_000;
@@ -71,6 +90,17 @@ export class SyncProvider {
   private readonly reconnectBaseDelayMs: number;
   private readonly maxReconnectAttempts: number;
   private reconcilingColor = false;
+  private readonly offline: OfflineQueueOptions | null;
+  /** State both sides last agreed on; stays put while offline. */
+  private base: Uint8Array | null;
+  /** True while connected and something was exchanged since `base` was taken. */
+  private baseDirty = false;
+  /** The server has answered the handshake of the current connection. */
+  private acked = false;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private pending = false;
+  private persistHandler: (() => void) | null = null;
+  private pageHideHandler: (() => void) | null = null;
 
   constructor(opts: SyncProviderOptions) {
     this.doc = opts.doc;
@@ -84,6 +114,23 @@ export class SyncProvider {
     this.connectionTimeoutMs = opts.connectionTimeoutMs ?? DEFAULT_CONNECTION_TIMEOUT_MS;
     this.reconnectBaseDelayMs = opts.reconnectBaseDelayMs ?? 1000;
     this.maxReconnectAttempts = opts.maxReconnectAttempts ?? 6;
+    this.offline = opts.offline ?? null;
+    // Without a stored base the state the provider starts with is the base. An edit made before
+    // the first sync is then queued and announced like any offline edit; the server accepts
+    // nothing else from a connection that did not announce one (#261).
+    this.base = opts.offline ? (opts.offline.base ?? Y.encodeStateAsUpdate(this.doc)) : null;
+
+    if (this.offline) {
+      this.persistHandler = () => this.scheduleSave();
+      this.doc.on("update", this.persistHandler);
+      // A reload right after an edit must not lose it: write what is pending when the page goes away.
+      if (typeof window !== "undefined") {
+        this.pageHideHandler = () => void this.saveNow();
+        window.addEventListener("pagehide", this.pageHideHandler);
+      }
+      this.pending = this.base ? hasPendingChanges(Y.encodeStateAsUpdate(this.doc), this.base) : false;
+      this.notifyQueue();
+    }
 
     // Create awareness tied to Y.Doc
     this.awareness = new Awareness(this.doc);
@@ -143,6 +190,11 @@ export class SyncProvider {
     this.ws = ws;
 
     ws.onopen = () => {
+      // The device and the queued offline edits go first. The server handles one connection's
+      // messages in order, so the ordinary handshake below cannot merge them silently before the
+      // server has compared them with the base (conflict rule A).
+      this.announceOfflineState(ws);
+
       // Send SyncStep1 for Y.Doc sync
       const encoder = encoding.createEncoder();
       encoding.writeVarUint(encoder, MSG_SYNC);
@@ -157,6 +209,7 @@ export class SyncProvider {
         encoding.writeVarUint(enc, MSG_SYNC);
         syncProtocol.writeUpdate(enc, update);
         this.ws.send(encoding.toUint8Array(enc));
+        if (this.acked) this.baseDirty = true;
       };
       this.doc.on("update", this.updateHandler);
 
@@ -220,6 +273,17 @@ export class SyncProvider {
       const messageType = decoding.readVarUint(decoder);
 
       if (messageType === MSG_SYNC) {
+        // The server answers our SyncStep1 with SyncStep2 only after it handled the queued offline
+        // state sent before it (one connection's messages are processed in order). From then on
+        // the local state counts as agreed; before that a dropped connection must not make the
+        // queued edits look delivered.
+        if (decoding.peekVarUint(decoder) === syncProtocol.messageYjsSyncStep2 && !this.acked) {
+          this.acked = true;
+          // Even a handshake that changes nothing establishes the base, which a reload may need.
+          this.baseDirty = true;
+          this.scheduleSave();
+        }
+        if (this.acked) this.baseDirty = true;
         const enc = encoding.createEncoder();
         encoding.writeVarUint(enc, MSG_SYNC);
         syncProtocol.readSyncMessage(decoder, enc, this.doc, SYNC_ORIGIN);
@@ -309,6 +373,15 @@ export class SyncProvider {
 
   destroy(): void {
     this.disconnect();
+    if (this.offline) {
+      void this.saveNow();
+      if (this.persistHandler) this.doc.off("update", this.persistHandler);
+      this.persistHandler = null;
+      if (this.pageHideHandler && typeof window !== "undefined") window.removeEventListener("pagehide", this.pageHideHandler);
+      this.pageHideHandler = null;
+      if (this.saveTimer) clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
     this.awareness.destroy();
     this.onStatusChange = null;
     this.onFailure = null;
@@ -328,6 +401,13 @@ export class SyncProvider {
 
   private cleanup(): void {
     this.stopResyncTimer();
+    // The state at the moment the connection ends is what both sides agreed on; everything after
+    // it is queued. Taken before the handlers are removed.
+    if (this.offline && this.ws) {
+      this.refreshBase();
+      this.acked = false;
+      void this.saveNow();
+    }
     if (this.updateHandler) {
       this.doc.off("update", this.updateHandler);
       this.updateHandler = null;
@@ -387,6 +467,67 @@ export class SyncProvider {
       clearInterval(this.resyncTimer);
       this.resyncTimer = null;
     }
+  }
+
+  private announceOfflineState(ws: WebSocket): void {
+    if (!this.offline) return;
+    const device = encoding.createEncoder();
+    encoding.writeVarUint(device, MSG_DEVICE);
+    encoding.writeVarString(device, this.offline.device);
+    ws.send(encoding.toUint8Array(device));
+
+    const state = Y.encodeStateAsUpdate(this.doc);
+    if (!this.base || !hasPendingChanges(state, this.base)) return;
+    const reconcile = encoding.createEncoder();
+    encoding.writeVarUint(reconcile, MSG_RECONCILE);
+    encoding.writeVarString(reconcile, this.offline.device);
+    encoding.writeVarUint8Array(reconcile, this.base);
+    encoding.writeVarUint8Array(reconcile, state);
+    ws.send(encoding.toUint8Array(reconcile));
+  }
+
+  /** While connected the whole local state counts as agreed; once offline it is frozen. */
+  private refreshBase(): void {
+    if (!this.baseDirty) return;
+    this.base = Y.encodeStateAsUpdate(this.doc);
+    this.baseDirty = false;
+  }
+
+  private scheduleSave(): void {
+    if (!this.offline || this.saveTimer) return;
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      void this.saveNow();
+    }, this.offline.saveDebounceMs ?? 40);
+  }
+
+  /** Writes the local state and the base. Failures are logged, never thrown: sync keeps working. */
+  private async saveNow(): Promise<void> {
+    const offline = this.offline;
+    if (!offline) return;
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
+    if (this.status === "connected") this.refreshBase();
+    const state = Y.encodeStateAsUpdate(this.doc);
+    const base = this.base;
+    try {
+      await offline.storage.save(offline.key, { state, base, savedAt: Date.now() });
+    } catch (error) {
+      console.warn("[bloommd] Offline queue could not be saved:", { error: error instanceof Error ? error.name : "unknown" });
+      return;
+    }
+    this.pending = base ? hasPendingChanges(state, base) : false;
+    this.notifyQueue();
+  }
+
+  private lastNotifiedPending: boolean | null = null;
+
+  private notifyQueue(): void {
+    if (this.lastNotifiedPending === this.pending) return;
+    this.lastNotifiedPending = this.pending;
+    this.offline?.onQueueChange?.(this.pending);
   }
 
   private setStatus(status: SyncStatus): void {

@@ -14,12 +14,21 @@ import {
   yDeleteNode,
   yUpdateFrontmatter,
   yUpdateNodeMetadata,
+  yResolveConflict,
 } from "@bloommd/core/browser";
 import type { Node, Edge } from "@xyflow/react";
 import { type EdgeMode, type MindMapNodeData } from "./useMindMapLayout";
 import { initialWorkspaceCollapse } from "./workspace-view";
 import { computeVisibleLayout } from "./visible-layout";
-import { SyncProvider } from "../sync/SyncProvider";
+import { SyncProvider, type OfflineQueueOptions } from "../sync/SyncProvider";
+import {
+  createIndexedDbOfflineStorage,
+  docFromRecord,
+  hasQueuedEdits,
+  offlineKey,
+  resolveDeviceLabel,
+  type OfflineStorage,
+} from "../sync/offline-queue";
 import { SYNC_ORIGIN, type AwarenessIdentity, type SyncFailure, type SyncStatus } from "../sync/types";
 import { cancelPendingNodeFocus, requestNodeFocus } from "../utils/nodeFocus";
 
@@ -66,6 +75,8 @@ interface MindMapState {
   syncProvider: SyncProvider | null;
   syncStatus: SyncStatus;
   syncFailure: SyncFailure | null;
+  /** Edits made while disconnected that the server has not merged yet (kept locally across reloads). */
+  offlinePending: boolean;
   remoteUsers: RemoteUser[];
   edgeMode: EdgeMode;
   canvasMode: CanvasMode;
@@ -85,7 +96,10 @@ interface MindMapState {
   setStatusMessage: (message: string | null) => void;
   /** Records that everything up to `revision` is persisted (saved, or held by a connected sync room). */
   markSaved: (revision: number) => void;
-  setDocument: (doc: MindMapDocument | null) => void;
+  /** `yDocOverride` installs an existing Y.Doc (restored offline state) instead of building one from `doc`. */
+  setDocument: (doc: MindMapDocument | null, yDocOverride?: Y.Doc) => void;
+  /** Resolves an offline conflict copy: adopt its version into the node, or just delete the copy. */
+  resolveConflict: (copyId: string, resolution: "adopt" | "discard") => void;
   setDocumentFilePath: (filePath: string) => void;
   setStorageMetadata: (storage: MindMapDocument["storage"]) => void;
   loadFromSync: (filePath: string, syncUrl: string, awarenessIdentity?: AwarenessIdentity) => void;
@@ -213,9 +227,28 @@ function buildSyncWebSocketUrl(syncUrl: string, filename: string): string {
   return `${url}?token=${encodeURIComponent(token)}`;
 }
 
+/** Bumped by every connect and disconnect; a connect that waits for the local queue checks it. */
+let connectEpoch = 0;
+let offlineStorage: OfflineStorage | null | undefined;
+function getOfflineStorage(): OfflineStorage | null {
+  if (offlineStorage === undefined) offlineStorage = createIndexedDbOfflineStorage();
+  return offlineStorage;
+}
+
+/** Test seam: replaces the browser's IndexedDB queue (undefined restores the default lookup). */
+export function setOfflineStorageForTests(storage: OfflineStorage | null | undefined): void {
+  offlineStorage = storage;
+}
+
 function emitSyncE2EEvent(name: string, detail: Record<string, unknown>) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(`bloommd:sync:${name}`, { detail }));
+  try {
+    // Use the window's own CustomEvent: a DOM shim (tests) rejects events of another realm.
+    const EventCtor = (window as unknown as { CustomEvent?: typeof CustomEvent }).CustomEvent ?? CustomEvent;
+    window.dispatchEvent(new EventCtor(`bloommd:sync:${name}`, { detail }));
+  } catch {
+    // The event is only an observation point for tests; it must never break syncing.
+  }
 }
 
 /**
@@ -275,6 +308,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   undoManager: null,
   syncProvider: null,
   syncStatus: "disconnected" as SyncStatus,
+  offlinePending: false,
   syncFailure: null,
   remoteUsers: [],
   edgeMode: "hierarchy",
@@ -289,11 +323,16 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   setStatusMessage: (statusMessage) => set({ statusMessage }),
   markSaved: (revision) => set((state) => (revision > state.savedRevision ? { savedRevision: Math.min(revision, state.editRevision) } : {})),
 
-  setDocument: (doc) => {
+  resolveConflict: (copyId, resolution) => {
+    const { yDoc } = get();
+    if (yDoc) yResolveConflict(yDoc, copyId, resolution);
+  },
+
+  setDocument: (doc, yDocOverride) => {
     cancelPendingNodeFocus();
     cancelLayout();
     // A status message belongs to the document it was raised for; never carry it across navigation.
-    set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0 });
+    set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0, offlinePending: false });
     // Cleanup previous sync provider FIRST (before destroying Y.Doc)
     const prevProvider = get().syncProvider;
     if (prevProvider) prevProvider.destroy();
@@ -309,7 +348,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     }
 
     // Create Y.Doc from MindMapDocument
-    const yDoc = documentToYDoc(doc);
+    const yDoc = yDocOverride ?? documentToYDoc(doc);
 
     // UndoManager tracks structural changes AND content edits
     const undoManager = new Y.UndoManager(
@@ -514,11 +553,14 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     if (!yDoc || !doc) return;
 
     if (existing) existing.destroy();
+    const epoch = ++connectEpoch;
+    const launch = (yDoc: Y.Doc, offline?: OfflineQueueOptions) => {
     const provider = new SyncProvider({
       url: websocketUrl,
       doc: yDoc,
       awarenessIdentity,
       refreshUrl,
+      offline,
       onStatusChange: (status) => {
         emitSyncE2EEvent("status", { status });
         set({ syncStatus: status, ...(status !== "failed" ? { syncFailure: null } : {}) });
@@ -563,6 +605,45 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     if (sel) {
       provider.setLocalAwarenessField("selectedNodeId", sel);
     }
+    };
+
+    const storage = getOfflineStorage();
+    if (!storage) {
+      launch(yDoc);
+      return;
+    }
+    // Offline edits queued by an earlier session replace the freshly loaded document before the
+    // connection starts, so the server can merge them (conflict rule A) instead of losing them.
+    const filename = doc.filePath.split("/").pop() ?? doc.filePath;
+    const key = offlineKey({
+      workspaceId: doc.storage?.workspaceId,
+      documentId: doc.storage?.documentId ?? doc.frontmatter.id,
+      filename,
+    });
+    set({ syncStatus: "connecting" });
+    void storage.load(key).catch(() => null).then((record) => {
+      if (epoch !== connectEpoch || get().yDoc !== yDoc) return;
+      const offline: OfflineQueueOptions = {
+        key,
+        storage,
+        device: resolveDeviceLabel(),
+        base: null,
+        onQueueChange: (pending) => set({ offlinePending: pending }),
+      };
+      if (!hasQueuedEdits(record)) {
+        launch(yDoc, offline);
+        return;
+      }
+      const restored = docFromRecord(record);
+      const currentStorage = get().document?.storage ?? null;
+      const meta = restored.getMap("meta");
+      if (JSON.stringify(meta.get("storage") ?? null) !== JSON.stringify(currentStorage)) {
+        meta.set("storage", currentStorage ? structuredClone(currentStorage) : null);
+      }
+      get().setDocument(yDocToDocument(restored), restored);
+      set({ offlinePending: true });
+      launch(restored, { ...offline, base: record.base });
+    });
   },
 
   retrySync: () => {
@@ -570,6 +651,7 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   },
 
   disconnectSync: async () => {
+    connectEpoch += 1;
     const { syncProvider } = get();
     if (syncProvider) await syncProvider.disconnectAndWait();
     set({ syncProvider: null, syncStatus: "disconnected", syncFailure: null, remoteUsers: [] });

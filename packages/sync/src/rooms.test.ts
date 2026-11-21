@@ -11,7 +11,8 @@ import { createSyncTelemetry } from "./observability";
 import * as syncProtocol from "y-protocols/sync";
 import * as encoding from "lib0/encoding";
 import { handleSyncMessage, releaseAwarenessClients } from "./sync-handler";
-import { parseFile, yDocToDocument, yUpdateContentDiff } from "@bloommd/core";
+import { MSG_RECONCILE } from "./offline-merge";
+import { listConflictCopies, parseFile, yDocToDocument, yRenameNode, yUpdateContentDiff } from "@bloommd/core";
 import { KnowledgeNodeNotFoundError, parseKnowledgeNodePatch } from "@bloommd/core/knowledge";
 import {
   SyncDocumentVersionConflictError,
@@ -1400,5 +1401,67 @@ describe("account quota rejection of a room save (#380)", () => {
 
     await expect(manager.writeDocumentSnapshot(descriptor, parseFile("test.md", "# Bigger"))).rejects.toBeInstanceOf(AccountQuotaExceededError);
     expect(manager.getRooms().has("doc-1")).toBe(false);
+  });
+});
+
+describe("reopened room keeps its Yjs history (#261)", () => {
+  function reconcile(device: string, base: Uint8Array, local: Uint8Array): Uint8Array {
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, MSG_RECONCILE);
+    encoding.writeVarString(encoder, device);
+    encoding.writeVarUint8Array(encoder, base);
+    encoding.writeVarUint8Array(encoder, local);
+    return encoding.toUint8Array(encoder);
+  }
+
+  async function closeRoom(manager: RoomManager, ws: ServerWebSocket<WebSocketData>, room: Awaited<ReturnType<RoomManager["getOrCreateRoom"]>>) {
+    manager.removeClient(room, ws);
+    await manager.persistRoom(room);
+    await Promise.resolve();
+    await clock.advanceBy(config.destroyDelayMs);
+    expect(manager.getRooms().has("test.md")).toBe(false);
+  }
+
+  test("two offline clients reconnect one after the other: the node keeps the last state, the other one is the copy", async () => {
+    // Run it often: without the remembered history the outcome depended on random client ids.
+    for (let run = 0; run < 25; run++) {
+      await writeFile(join(tempDir, "test.md"), SAMPLE_MD, "utf-8");
+      const manager = newManager();
+      const first = await manager.getOrCreateRoom("test.md");
+      const wsOpen = createMockWs("test.md");
+      manager.addClient(first, wsOpen);
+      const base = Y.encodeStateAsUpdate(first.yDoc);
+      const a = new Y.Doc();
+      const b = new Y.Doc();
+      Y.applyUpdate(a, base);
+      Y.applyUpdate(b, base);
+      await closeRoom(manager, wsOpen, first);
+      yRenameNode(a, [...yDocToDocument(a).nodes.values()].find((node) => node.title === "Child A")!.id, "Child A-A");
+      yRenameNode(b, [...yDocToDocument(b).nodes.values()].find((node) => node.title === "Child A")!.id, "Child A-B");
+
+      const room = await manager.getOrCreateRoom("test.md");
+      handleSyncMessage(room.yDoc, reconcile("Gerät A", base, Y.encodeStateAsUpdate(a)), createMockWs("test.md"), room);
+      handleSyncMessage(room.yDoc, reconcile("Gerät B", base, Y.encodeStateAsUpdate(b)), createMockWs("test.md"), room);
+
+      const document = yDocToDocument(room.yDoc);
+      expect([...document.nodes.values()].some((node) => node.title === "Child A-B")).toBe(true);
+      expect(listConflictCopies(document).map((copy) => copy.title)).toEqual(["Child A-A"]);
+      await manager.shutdown();
+    }
+  });
+
+  test("a file changed in the meantime starts a new history", async () => {
+    const manager = newManager();
+    const first = await manager.getOrCreateRoom("test.md");
+    const ws = createMockWs("test.md");
+    manager.addClient(first, ws);
+    const before = Y.encodeStateVector(first.yDoc);
+    await closeRoom(manager, ws, first);
+
+    await writeFile(join(tempDir, "test.md"), SAMPLE_MD.replace("Content A.", "Changed outside."), "utf-8");
+    const reopened = await manager.getOrCreateRoom("test.md");
+    expect(yDocToDocument(reopened.yDoc).nodes.size).toBeGreaterThan(0);
+    expect([...yDocToDocument(reopened.yDoc).nodes.values()].some((node) => node.content.includes("Changed outside."))).toBe(true);
+    expect(Y.encodeStateVector(reopened.yDoc)).not.toEqual(before);
   });
 });

@@ -2,6 +2,35 @@ import * as Y from "yjs";
 import type { MindMapDocument, MindMapFrontmatter, MindMapNode } from "./types";
 
 /**
+ * Client id under which a document is seeded: a hash of everything the seed writes (FNV-1a).
+ *
+ * Every client and the server room build their own Y.Doc from the same file. With random ids those
+ * seeds compete for each node entry; the entry with the highest id wins on every peer once all
+ * seeds have arrived, and an edit that was made inside a losing entry disappears. A seed that is
+ * delivered late (an old connection, a slow network) is enough for that (#261). Seeding the same
+ * content under the same id produces identical structures, so there is nothing to compete about.
+ * Different content gets a different id, so two different seeds never share an id.
+ */
+function seedClientId(doc: MindMapDocument): number {
+  const text = JSON.stringify([
+    doc.filePath,
+    doc.rootId,
+    doc.preamble ?? "",
+    doc.storage ?? null,
+    doc.derived ?? null,
+    doc.references ?? [],
+    doc.frontmatter,
+    [...doc.nodes].map(([id, node]) => [id, node.parentId, node.level, node.title, node.content, node.children, node.metadata ?? null]),
+  ]);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash === 0 ? 1 : hash;
+}
+
+/**
  * Convert a MindMapDocument into a Y.Doc.
  *
  * Schema:
@@ -15,6 +44,9 @@ export function documentToYDoc(
   origin?: unknown,
 ): Y.Doc {
   const yDoc = existingDoc ?? new Y.Doc();
+  // A new document is seeded under a content-derived id; edits afterwards use the random one.
+  const editorClientId = yDoc.clientID;
+  if (!existingDoc) yDoc.clientID = seedClientId(doc);
 
   const yMeta = yDoc.getMap("meta");
   const yNodes = yDoc.getMap<Y.Map<unknown>>("nodes");
@@ -58,7 +90,38 @@ export function documentToYDoc(
     }
   }, origin);
 
+  if (!existingDoc) yDoc.clientID = editorClientId;
   return yDoc;
+}
+
+/**
+ * Writes one node (and its content) as a fresh entry. The entry replaces whatever the Y.Doc holds
+ * under this id, including entries it has not seen win, because it is created after them. Used to
+ * put a node back to a known state (#261). Pass `null` as the node to remove the entry.
+ */
+export function yReplaceNodeEntry(yDoc: Y.Doc, id: string, node: MindMapNode | null, origin?: unknown): void {
+  yDoc.transact(() => {
+    const yNodes = yDoc.getMap<Y.Map<unknown>>("nodes");
+    const yNodeContents = yDoc.getMap<Y.Text>("nodeContents");
+    if (!node) {
+      yNodes.delete(id);
+      yNodeContents.delete(id);
+      return;
+    }
+    const yNode = new Y.Map<unknown>();
+    yNode.set("id", node.id);
+    yNode.set("parentId", node.parentId);
+    yNode.set("level", node.level);
+    yNode.set("title", node.title);
+    yNode.set("metadata", node.metadata ? structuredClone(node.metadata) : null);
+    const yChildren = new Y.Array<string>();
+    yChildren.push(node.children);
+    yNode.set("children", yChildren);
+    yNodes.set(id, yNode);
+    const yContent = new Y.Text();
+    if (node.content) yContent.insert(0, node.content);
+    yNodeContents.set(id, yContent);
+  }, origin);
 }
 
 /**

@@ -29,10 +29,13 @@
     "test:e2e:account-abuse": "playwright test --config playwright.account-abuse.config.ts",
     "test:e2e:trial-readonly": "playwright test --config playwright.trial-readonly.config.ts",
     "test:e2e:collaboration": "playwright test --config playwright.collaboration.config.ts",
+    "test:e2e:offline": "playwright test --config playwright.offline.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "typecheck": "tsc --noEmit",
     "test:e2e:wiki": "playwright test --config playwright.wiki.config.ts",
+    "test:e2e:learnings-w0": "playwright test --config playwright.learnings-w0.config.ts",
+    "test:e2e:learnings-w0:video": "playwright test --config playwright.learnings-w0.video.config.ts",
     "test:e2e:testsystem": "playwright test --config playwright.testsystem.config.ts",
     "test:e2e:plausible": "playwright test --config playwright.plausible.config.ts"
   },

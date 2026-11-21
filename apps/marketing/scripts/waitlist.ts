@@ -14,6 +14,7 @@
  *   bun run --cwd apps/marketing waitlist invite [--apply]
  *   bun run --cwd apps/marketing waitlist mark-transferred [--apply]
  *   bun run --cwd apps/marketing waitlist purge [--apply]
+ *   bun run --cwd apps/marketing waitlist purge-due [--apply]
  *   bun run --cwd apps/marketing waitlist list
  *   bun run --cwd apps/marketing waitlist allowlist [anzahl]
  *   bun run --cwd apps/marketing waitlist cleanup [--apply]
@@ -23,6 +24,7 @@ import { writeFileSync } from "node:fs";
 import { isEmailConfigured } from "../src/lib/email";
 import { formatWaitlistExportSummary, summarizeWaitlistExport, waitlistEntriesToExportCsv } from "../src/lib/waitlist-export";
 import { runWaitlistInvitation } from "../src/lib/waitlist-invite";
+import { runWaitlistPurgeDue } from "../src/lib/waitlist-purge-due";
 import {
   WAITLIST_PURGE_RETENTION_DAYS,
   WaitlistPurgeRefusedError,
@@ -58,6 +60,13 @@ const USAGE = `waitlist — Warteliste abwickeln (Registrierung ersetzt sie)
                                 --apply wird verweigert, solange jemand noch nicht eingeladen
                                 wurde oder die Frist von ${WAITLIST_PURGE_RETENTION_DAYS} Tagen nach der
                                 letzten Einladungsmail läuft.
+  purge-due [--apply]           Löschschritt für einen täglichen Job. Wie purge, aber ein
+                                Löschverbot (Frist läuft, Einladung offen, noch keine gesendet)
+                                oder eine leere Liste ist ein normales Ergebnis: nichts wird
+                                gelöscht, Exit 0. Ausgabe: genau eine JSON-Zeile mit Zählern
+                                (mode, total, notInvited, allowed, reason, allowedFrom, deleted),
+                                keine Adressen. Löscht nur mit --apply und nur, wenn erlaubt.
+                                Exit != 0 nur bei echten Fehlern (Datenbank, Variable, Option).
   list                          Bestätigte Adressen mit Datum und Quelle
   allowlist [anzahl]            Die ersten N bestätigten Adressen im Format von
                                 BLOOMMD_BETA_ALLOWED_EMAILS (Standard: alle)
@@ -260,6 +269,16 @@ async function runPurge(values: string[]) {
   }
 }
 
+async function runPurgeDueCommand(values: string[]) {
+  const apply = parseApplyOnly(values, "Purge-due");
+  try {
+    console.log(JSON.stringify(await runWaitlistPurgeDue({ apply })));
+  } catch (error) {
+    console.error(`purge-due fehlgeschlagen: ${error instanceof Error ? error.message : "unbekannter Fehler"}`);
+    process.exit(1);
+  }
+}
+
 switch (command) {
   case "count": {
     const counts = await countWaitlistAdmin();
@@ -284,6 +303,10 @@ switch (command) {
 
   case "purge":
     await runPurge(args);
+    break;
+
+  case "purge-due":
+    await runPurgeDueCommand(args);
     break;
 
   case "list": {

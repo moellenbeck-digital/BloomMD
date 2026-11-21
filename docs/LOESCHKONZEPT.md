@@ -19,7 +19,7 @@ entscheiden muss, steht in Abschnitt 6.
 | Gelöschte Dokumente (samt Revisionen, Share-Links) | 30 Tage nach dem Löschen, `BLOOMMD_DELETED_DOCUMENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance` |
 | Audit-Ereignisse | 365 Tage, `BLOOMMD_AUDIT_EVENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance` |
 | Stripe-Ereignisse | 180 Tage, `BLOOMMD_STRIPE_EVENT_RETENTION_DAYS` | `maintenance.ts` | `db:maintenance`; im öffentlichen Text genannt („Speicherdauer und Löschung“: 180 Tage nach der Verarbeitung), der Test `legal-pages-consistency` prüft den Wert (#381) |
-| Wartelisten-Einträge | 90 Tage nach der letzten Einladungs-E-Mail | `apps/marketing/src/lib/waitlist-retention.ts` | **manuell:** `bun run --cwd apps/marketing waitlist purge --apply` (verweigert vor Ablauf der Frist) |
+| Wartelisten-Einträge | 90 Tage nach der letzten Einladungs-E-Mail | `apps/marketing/src/lib/waitlist-retention.ts` | `waitlist purge-due --apply` (täglich planen; löscht erst nach Ablauf der Frist, davor Exit 0 ohne Löschen; Runbook: `docs/WAITLIST-PURGE.md`) |
 | Feedback (Datenbank, Ticket, Anhänge im Objektspeicher) | **keine Löschung im Repo.** Anhänge bekommen `retention_expires_at` (Standard 90 Tage, `BLOOMMD_FEEDBACK_ATTACHMENT_RETENTION_DAYS`), es löscht sie aber nichts | `apps/app/src/app/api/feedback/feedback-handler.ts` | nichts |
 
 Die Zahlen im öffentlichen Text sind die Standardwerte. `scripts/qa/legal-pages-consistency.test.ts`
@@ -57,13 +57,13 @@ Inhalt, `created_by`, `updated_by` und `saved_by` werden leer (`on delete set nu
 | Abo-Datensatz (`bloom_subscriptions`) | `raw` wird geschwärzt, `stripe_customer_id` entfernt, Bezug zum Konto entfällt (`user_id` leer); Tarif, Status, Stripe-Abo- und Checkout-Kennung, Periodenende und Zeitstempel bleiben. Öffentlich beschrieben unter „Zahlung und Abo“ und „Speicherdauer und Löschung“ (#381) | **keine Frist im Code** (`maintenance.ts` löscht `bloom_subscriptions` nicht); der Text sagt „derzeit nicht vorgesehen“ |
 | Rechnungs- und Zahlungsdaten (Buchführung, Stripe) | nicht im Code; Konto-Löschung berührt sie nicht, den Stripe-Kunden löscht sie nicht | gesetzliche Aufbewahrung; Text nennt keine Dauer (offen, siehe `docs/BILLING.md`) |
 | Feedback (`bloom_feedback`) | Bezug zum Konto entfällt, `user_email` und Text bleiben; GitHub-Ticket und Anhänge bleiben | **keine Frist** |
-| Wartelisten-Eintrag (Marketing-Datenbank, eigene Datenbank) | wird von der Konto-Löschung nicht berührt | 90 Tage nach der letzten Einladungs-E-Mail, manuell |
+| Wartelisten-Eintrag (Marketing-Datenbank, eigene Datenbank) | wird von der Konto-Löschung nicht berührt | 90 Tage nach der letzten Einladungs-E-Mail, `waitlist purge-due --apply` (täglich planen) |
 
 ## 4. Was Ops vor dem Go einrichten muss
 
 - `bun run --cwd apps/app db:maintenance` täglich planen (z. B. Kubernetes-CronJob mit dem App-Image und der
   Datenbank-Verbindung der App). Im Repo gibt es dafür keinen Zeitplan. Ohne ihn gelten die Fristen im Text nicht.
-- `waitlist purge` (Marketing) nach Ablauf der 90 Tage von Hand ausführen oder planen.
+- `bun run --cwd apps/marketing waitlist purge-due --apply` täglich planen (z. B. Kubernetes-CronJob mit dem Marketing-Image und `BLOOMMD_WAITLIST_DATABASE_URL`). Der Job löscht erst nach Ablauf der 90 Tage und ist davor grün (Exit 0, eine JSON-Zeile ohne Adressen). Erst Dry-Run, Prüfung und Aufräumen: `docs/WAITLIST-PURGE.md`.
 - `BLOOMMD_TRIAL_READONLY=1` und `BLOOMMD_TRIAL_REMINDERS_EXISTING=1` nur nach Admin-Go (`docs/TRIAL.md`).
 
 ## 5. Pflege

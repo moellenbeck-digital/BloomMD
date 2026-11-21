@@ -32,6 +32,7 @@ bun run --cwd apps/app db:trial-reminders                       # Dry-Run (Stand
 bun run --cwd apps/app db:trial-reminders --apply               # beansprucht und sendet
 bun run --cwd apps/app db:trial-reminders --apply --limit 30    # höchstens 30 Mails (Budget für Anmeldungen frei lassen)
 bun run --cwd apps/app db:trial-reminders --jetzt 2026-12-05T10:00:00Z   # Uhr dieses Laufs überschreiben (Tests)
+bun run --cwd apps/app db:trial-reminders --apply --konto <uuid> --jetzt …   # nur dieses Konto ansehen, beanspruchen und anschreiben (Tests auf geteilter Datenbank)
 ```
 
 Ausgabe: eine JSON-Zeile mit Zahlen (`due`, `dueByKind`, `heldBackExisting`, `mailSent`, `mailFailed`, `deferred`, `notClaimed`), keine Adressen. Exit 1 bei Fehlversand oder Abbruch durch das Budget. Er läuft nicht in `db:maintenance`; Ops plant ihn nach dem Admin-Go (täglich genügt).
@@ -83,7 +84,7 @@ bun run db:trial-admin --operator <kürzel> --adresse <e-mail> --freischalten [-
 
 ## Für den Oberflächentest
 
-Testsystem mit E2E-Outbox, Schalter nach Bedarf. Neues Konto registrieren und bestätigen, `/account` zeigt „Testzeitraum bis“ = Bestätigungstag + 30 Tage. Den Job mit `--jetzt` auf Bestätigung + 14, 15, 22, 23, 30 Tage laufen lassen (`--apply`): bei +15 und +23 je genau eine Mail im Outbox, bei +14/+22/+30 keine, ein zweiter Lauf zur selben Zeit keine. Bestandskonto (`trial_legacy`, Testende 2027-01-14 00:00 UTC; nur Testsystem, `BLOOMMD_TRIAL_REMINDERS_EXISTING=1`): `/account` zeigt „Testzeitraum bis 14.01.2027“; `--jetzt 2026-12-29T23:59:59Z` keine Mail, `2026-12-30T00:00:00Z` genau eine (Hinweis „noch 15 Tage“), `2027-01-06T23:59:59Z` keine weitere, `2027-01-07T00:00:00Z` genau eine („noch 7 Tage“), ab `2027-01-14T00:00:00Z` keine. Zum Prüfen der Sperre `trial_ends_at` des Testkontos auf die Vergangenheit setzen und `BLOOMMD_TRIAL_READONLY=1` auf dem Dev-System setzen.
+Automatisiert (Marke `@t274`, `apps/app/e2e/trial-reminders-t274.spec.ts`; Aufruf, Umgebung und Testkonto: `apps/app/e2e/README.md`, Abschnitt „Testkonto: Testzeitraum und Hinweis-Mails (#274)“): `bun run --cwd apps/app test:e2e:trial-reminders` (lokal, Datei-Outbox) oder gegen das Testsystem mit Resend-Abruf. Von Hand: Testsystem mit E2E-Outbox, Schalter nach Bedarf. Neues Konto registrieren und bestätigen, `/account` zeigt „Testzeitraum bis“ = Bestätigungstag + 30 Tage. Den Job mit `--jetzt` auf Bestätigung + 14, 15, 22, 23, 30 Tage laufen lassen (`--apply`): bei +15 und +23 je genau eine Mail im Outbox, bei +14/+22/+30 keine, ein zweiter Lauf zur selben Zeit keine. Bestandskonto (`trial_legacy`, Testende 2027-01-14 00:00 UTC; nur Testsystem, `BLOOMMD_TRIAL_REMINDERS_EXISTING=1`): `/account` zeigt „Testzeitraum bis 14.01.2027“; `--jetzt 2026-12-29T23:59:59Z` keine Mail, `2026-12-30T00:00:00Z` genau eine (Hinweis „noch 15 Tage“), `2027-01-06T23:59:59Z` keine weitere, `2027-01-07T00:00:00Z` genau eine („noch 7 Tage“), ab `2027-01-14T00:00:00Z` keine. Zum Prüfen der Sperre `trial_ends_at` des Testkontos auf die Vergangenheit setzen und `BLOOMMD_TRIAL_READONLY=1` auf dem Dev-System setzen.
 
 Sperre mit und ohne Tarif (#378, Marke `@t378`), `BLOOMMD_TRIAL_READONLY=1`, zwei bestätigte Konten mit `trial_ends_at` in der Vergangenheit:
 

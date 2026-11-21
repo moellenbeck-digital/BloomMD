@@ -33,7 +33,7 @@ export interface TrialReminderResult {
 }
 
 export interface TrialReminderDeps {
-  list: (now: Date) => Promise<TrialReminderCandidate[]>;
+  list: (now: Date, options?: { userId?: string }) => Promise<TrialReminderCandidate[]>;
   budget: () => Promise<void>;
   claim: (userId: string, kind: TrialReminderKind, now: Date) => Promise<boolean>;
   markSent: (userId: string, kind: TrialReminderKind) => Promise<void>;
@@ -56,10 +56,11 @@ const defaultDeps: TrialReminderDeps = {
  * anybody twice. A failed send gives the claim back, which makes exactly this reminder repeatable.
  * A run that comes late sends only the latest due reminder and nothing once the trial is over
  * (`dueTrialReminder`). The global mail budget applies as for sign-up; when it is used up the run
- * stops sending and reports the rest as deferred.
+ * stops sending and reports the rest as deferred. `userId` restricts the run to one account: nothing
+ * else is looked at, claimed or mailed (E2E proof on a shared test database).
  */
 export async function runTrialReminders(
-  options: { apply?: boolean; includeExisting?: boolean; limit?: number; now?: Date } = {},
+  options: { apply?: boolean; includeExisting?: boolean; limit?: number; now?: Date; userId?: string } = {},
   deps: TrialReminderDeps = defaultDeps,
 ): Promise<TrialReminderResult> {
   const apply = options.apply ?? false;
@@ -80,7 +81,7 @@ export async function runTrialReminders(
   let stopped = false;
   let attempted = 0;
 
-  for (const candidate of await deps.list(now)) {
+  for (const candidate of await deps.list(now, { userId: options.userId })) {
     const kind = dueTrialReminder(candidate.trialEndsAt, now, candidate.claimed);
     if (!kind) continue;
     result.due += 1;

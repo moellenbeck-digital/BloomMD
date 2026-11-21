@@ -1,5 +1,6 @@
 import { isMailDeliveryAvailable } from "../src/lib/email";
 import { runTrialReminders } from "../src/lib/trial-reminders";
+import { parseAccountId, TrialAdminError } from "../src/lib/trial-admin";
 
 /**
  * Sends the trial reminders (#274): 15 and 23 days after the email confirmation, each at most once.
@@ -8,6 +9,8 @@ import { runTrialReminders } from "../src/lib/trial-reminders";
  *   bun run db:trial-reminders --apply          claims and sends the due reminders
  *   ... --limit 30                              at most 30 mails in this run (leaves mail budget for sign-ups)
  *   ... --jetzt 2026-12-05T10:00:00Z            runs as if it were this instant (tests: day 15, day 23)
+ *   ... --konto <uuid>                          looks at this one account only (tests on a shared database: with a
+ *                                               made-up --jetzt, no other account is claimed or mailed)
  *
  * Run it regularly (daily is enough). A late run sends only the latest due reminder and nothing
  * after the trial ended; a failed send is repeated by the next run.
@@ -30,11 +33,12 @@ function fail(message: string): never {
 
 if (!process.env.DATABASE_URL) fail("DATABASE_URL is required.");
 
-const USAGE = "Usage: trial-reminders.ts [--apply] [--limit <n>] [--jetzt <ISO time>]";
+const USAGE = "Usage: trial-reminders.ts [--apply] [--limit <n>] [--jetzt <ISO time>] [--konto <uuid>]";
 const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 let limit: number | undefined;
 let now: Date | undefined;
+let userId: string | undefined;
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index]!;
   if (arg === "--apply") continue;
@@ -56,10 +60,20 @@ for (let index = 0; index < args.length; index += 1) {
     index += 1;
     continue;
   }
+  if (arg === "--konto") {
+    try {
+      userId = parseAccountId(args[index + 1]);
+    } catch (error) {
+      if (error instanceof TrialAdminError) fail(`${error.message}\n${USAGE}`);
+      throw error;
+    }
+    index += 1;
+    continue;
+  }
   fail(`Unknown argument: ${arg}\n${USAGE}`);
 }
 if (apply && !isMailDeliveryAvailable()) fail("RESEND_API_KEY and RESEND_FROM_EMAIL (or the E2E outbox of a test system) are missing: nothing is sent and nothing is claimed.");
 
-const result = await runTrialReminders({ apply, limit, now, includeExisting: process.env.BLOOMMD_TRIAL_REMINDERS_EXISTING === "1" });
+const result = await runTrialReminders({ apply, limit, now, userId, includeExisting: process.env.BLOOMMD_TRIAL_REMINDERS_EXISTING === "1" });
 console.log(JSON.stringify(result));
 process.exit(result.mailFailed > 0 || result.deferred > 0 ? 1 : 0);

@@ -4453,10 +4453,14 @@ export interface TrialReminderCandidate {
 /**
  * Confirmed accounts whose trial is still running and whose first reminder is due (#274). This is
  * only the coarse selection; `dueTrialReminder` in trial.ts decides which reminder, if any, goes out.
+ * `userId` narrows it to one account (the E2E proof of #274 runs the job against a shared test database).
  */
-export async function listTrialReminderCandidates(now: Date): Promise<TrialReminderCandidate[]> {
+export async function listTrialReminderCandidates(now: Date, options: { userId?: string } = {}): Promise<TrialReminderCandidate[]> {
   if (!isDatabaseConfigured()) return [];
   await ensureMarketSchema();
+
+  const onlyUserId = options.userId ? normalizeUuid(options.userId) : null;
+  if (options.userId && !onlyUserId) return [];
 
   const firstReminderDays = TRIAL_REMINDER_DAYS[TRIAL_REMINDER_KINDS[0]!];
   const rows = await getSql()`
@@ -4472,6 +4476,7 @@ export async function listTrialReminderCandidates(now: Date): Promise<TrialRemin
       and u.trial_ends_at is not null
       and u.trial_ends_at > ${now.toISOString()}::timestamptz
       and u.trial_ends_at - (${TRIAL_DAYS - firstReminderDays} * interval '1 day') <= ${now.toISOString()}::timestamptz
+      ${onlyUserId ? getSql()`and u.id = ${onlyUserId}` : getSql()``}
     order by u.trial_ends_at, u.id
   `;
   return (rows as unknown as Array<{ id: string; email: string; locale: string; trial_ends_at: Date | string; trial_legacy: boolean; claimed: string[] | null }>).map((row) => ({

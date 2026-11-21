@@ -145,6 +145,11 @@ describe.skipIf(!url)("trial period (Postgres)", () => {
     expect(entry).toMatchObject({ locale: "en", existingAccount: false, claimed: [] });
     expect(listed.some((candidate) => candidate.userId === unconfirmed.id)).toBe(false);
 
+    // Narrowed to one account (job option --konto): only that account, none for an unknown or malformed id.
+    expect((await db.listTrialReminderCandidates(now, { userId: user.id })).map((candidate) => candidate.userId)).toEqual([user.id]);
+    expect(await db.listTrialReminderCandidates(now, { userId: unconfirmed.id })).toEqual([]);
+    expect(await db.listTrialReminderCandidates(now, { userId: "not-a-uuid" })).toEqual([]);
+
     expect(await db.claimTrialReminder(user.id, "15", now)).toBe(true);
     expect(await db.claimTrialReminder(user.id, "15", now)).toBe(false);
     expect((await db.listTrialReminderCandidates(now)).find((candidate) => candidate.userId === user.id)?.claimed).toEqual(["15"]);

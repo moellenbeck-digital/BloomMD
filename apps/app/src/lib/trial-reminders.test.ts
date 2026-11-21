@@ -45,6 +45,19 @@ function fakes(candidates: TrialReminderCandidate[], options: { sendFails?: stri
 }
 
 describe("trial reminder run (#274)", () => {
+  test("a run for one account asks the list for that account only (--konto)", async () => {
+    const { deps } = fakes([candidate("a")]);
+    const asked: Array<string | undefined> = [];
+    const list = deps.list;
+    deps.list = async (now, options) => {
+      asked.push(options?.userId);
+      return list(now, options);
+    };
+    await runTrialReminders({ now: at(15), userId: "00000000-0000-4000-8000-000000000001" }, deps);
+    await runTrialReminders({ now: at(15) }, deps);
+    expect(asked).toEqual(["00000000-0000-4000-8000-000000000001", undefined]);
+  });
+
   test("a dry run counts what is due and writes and sends nothing", async () => {
     const { deps, claims, mails } = fakes([candidate("a"), candidate("b")]);
     const result = await runTrialReminders({ now: at(15) }, deps);

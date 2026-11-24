@@ -1,7 +1,7 @@
 name: CI
 
-# Public fork pull requests run tests with a read-only token. Private GHCR image
-# publishing is handled by a maintainer workflow in the private archive.
+# Public fork pull requests run tests with a read-only token. Marketing images are
+# published separately by marketing-release.yml after an explicit maintainer dispatch.
 
 on:
   push:

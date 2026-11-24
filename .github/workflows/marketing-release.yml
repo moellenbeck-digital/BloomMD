@@ -1,0 +1,116 @@
+name: Publish marketing image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Full BloomMD main commit SHA to publish"
+        required: true
+        type: string
+      ci_run_id:
+        description: "Successful main CI run for that exact SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketing-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'moellenbeck-digital/BloomMD' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      CI_RUN_ID: ${{ inputs.ci_run_id }}
+      IMAGE: ghcr.io/moellenbeck-digital/bloommd-marketing
+    steps:
+      - name: Verify successful main CI for the requested source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CI_RUN_ID" =~ ^[0-9]+$ ]]
+          evidence="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID")"
+          jq -e --arg sha "$SOURCE_SHA" '
+            .head_sha == $sha and .event == "push" and .head_branch == "main" and
+            .conclusion == "success" and .path == ".github/workflows/ci.yml"
+          ' <<< "$evidence" >/dev/null
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Verify checkout and prepare build metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          git merge-base --is-ancestor "$SOURCE_SHA" refs/remotes/origin/main
+          [[ -z "$(git status --porcelain)" ]]
+          {
+            echo "BLOOMMD_RELEASE_VERSION=$(node -p 'require("./apps/marketing/package.json").version')"
+            echo "BLOOMMD_BUILD_TIME=$(git show -s --format=%cI HEAD)"
+          } >> "$GITHUB_ENV"
+
+      - name: Log in to the existing GHCR package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and publish marketing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --target marketing \
+            --build-arg BLOOMMD_BUILD_SHA="$SOURCE_SHA" \
+            --build-arg BLOOMMD_BUILD_TAG= \
+            --build-arg BLOOMMD_BUILD_TIME="$BLOOMMD_BUILD_TIME" \
+            --build-arg BLOOMMD_RELEASE_VERSION="$BLOOMMD_RELEASE_VERSION" \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_DOMAIN=bloommd.io \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_SRC=/_plausible/js/script.js \
+            --build-arg NEXT_PUBLIC_PLAUSIBLE_API_HOST=/_plausible \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$SOURCE_SHA" \
+            --label org.opencontainers.image.version="$BLOOMMD_RELEASE_VERSION" \
+            --tag "$IMAGE:sha-$SOURCE_SHA" \
+            --cache-from type=gha,scope=bloommd-marketing \
+            --cache-to type=gha,mode=max,scope=bloommd-marketing \
+            --metadata-file "$RUNNER_TEMP/marketing-image.json" \
+            --push .
+
+      - name: Record the immutable GitOps pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(jq -er '."containerimage.digest"' "$RUNNER_TEMP/marketing-image.json")"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          {
+            echo "## Marketing $BLOOMMD_RELEASE_VERSION"
+            echo ""
+            echo "Source: $SOURCE_SHA"
+            echo "CI: https://github.com/$GITHUB_REPOSITORY/actions/runs/$CI_RUN_ID"
+            echo ""
+            echo "GitOps image: $IMAGE:sha-$SOURCE_SHA@$digest"
+            echo ""
+            echo "This workflow publishes the image. Production rollout uses the reviewed bloommd-cluster GitOps change."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$IMAGE:sha-$SOURCE_SHA@$digest"

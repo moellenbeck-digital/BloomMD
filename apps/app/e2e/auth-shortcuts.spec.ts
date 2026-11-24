@@ -782,11 +782,8 @@ test.describe("discoverable workflows", () => {
     await expect(page.getByTestId("workspace-open-file")).toHaveCount(0);
     await expect(page.locator('[data-testid="mindmap-node"][data-node-label="Local Intro"]').first()).toBeVisible();
     await expect(page.getByTestId("workspace-readonly")).toBeVisible();
+    // The web host returns to its workspace graph; desktop restores its folder tree.
     await page.getByTestId("workspace-navigation-back").click();
-    await expect(folderNode).toBeVisible();
-    await expect(fileNode.getByTestId("workspace-open-file")).toBeVisible();
-
-    await page.getByTestId("map-view-workspace").click();
     await expect(page.getByTestId("map-view-workspace")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("workspace-map")).toBeVisible();
     await expect(page.getByTestId("workspace-node-folder").first()).toBeVisible();

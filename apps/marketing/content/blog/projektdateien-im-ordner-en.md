@@ -22,4 +22,4 @@ Inside a file, nodes are its Markdown headings. **Tab** adds a child node; its t
 
 **Back to folder overview** saves changes and returns to the files. This lets you move between project plans, ideas and decisions while keeping folders distinct from content nodes.
 
-The screenshots show the native macOS test build with sample data. These changes belong to [Desktop 0.6.0](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0); they are not a new Mobile or Obsidian release. See the [desktop guide](/en/docs/desktop) for more steps.
+The screenshots show the native macOS test build with sample data. These changes belong to [Desktop 0.6.0](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0); they are not a new Mobile or Obsidian release. See the [desktop guide](/docs/desktop?lang=en) for more steps.

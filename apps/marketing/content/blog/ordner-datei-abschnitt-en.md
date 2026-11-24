@@ -20,4 +20,4 @@ Choose **Open** on a file to edit its whole map. To work on a particular piece o
 
 The return path is explicit too: **Back to folder overview** saves changes and restores the previous selection and view. If saving fails, the file stays open and the error is shown. Work continues in the actual Markdown file without creating a second copy of its content.
 
-This workflow belongs to [Desktop 0.6.0](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0). The screenshot comes from the native macOS test build with neutral sample data. See the [desktop guide](/en/docs/desktop) for details.
+This workflow belongs to [Desktop 0.6.0](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0). The screenshot comes from the native macOS test build with neutral sample data. See the [desktop guide](/docs/desktop?lang=en) for details.

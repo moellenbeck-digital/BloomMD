@@ -22,4 +22,4 @@ The folder overview now makes each object recognizable: dashed folders, blue-out
 
 The screenshots show real native macOS interactions with neutral sample files. The owner checked the macOS test build before release preparation. This desktop release does not publish a new Mobile app or Obsidian plugin.
 
-See the [desktop guide](/en/docs/desktop). The [release page](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0) contains packages and build evidence.
+See the [desktop guide](/docs/desktop?lang=en). The [release page](https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.0) contains packages and build evidence.

@@ -56,7 +56,7 @@ command palette. On Linux, use the corresponding **Ctrl** shortcuts.
 
 ## Editing and saving files from 0.5.13
 
-The folder overview is read-only. Select a file node and **Open resource**, or open the file
+The folder overview is read-only. Select a file node and **Open**, or open the file
 in the file browser. Creating a mind map opens its editable file view directly. Add your nodes
 and save with **Cmd+S** (macOS) or **Ctrl+S** (Linux).
 

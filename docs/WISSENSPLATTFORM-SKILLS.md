@@ -79,11 +79,12 @@ Lernvorschläge nutzen zwei Stufen der [Vision](WISSENSPLATTFORM-VISION.md): **S
 | --- | --- |
 | OpenClaw | führt aus |
 | BloomMD | weiß und pflegt |
-| ProcessCube | steuert Pflichten (BPMN) |
+| MD_Process | steuert Pflichtabläufe (BPMN in OpenClaw: KI-Agenten und menschliche Aufgaben, modelliert im ProcessCube-Studio-Modeller) |
 
+- **Standard ist ein Skill.** MD_Process nur, wenn die Reihenfolge Pflicht ist, mehrere Menschen freigeben müssen oder ein Prüfer den Ablauf als Nachweis sehen will. Die volle ProcessCube-Engine erst, wenn ein Kunde parallele Zweige, Multiinstanz oder Hochverfügbarkeit braucht.
 - BloomMD wird **keine Agenten-Laufzeit**.
 - BloomMD ist kein Katalog und kein Marktplatz für Skills. Es ist der Ort, an dem ein Team seine eigenen Skills sichtbar prüft und freigibt.
-- **Nie in Skills:** Rechte, Pflichten, Secrets und Personendaten. Rechte setzt das Rechtemodell durch (siehe Vision, Schritt 4). Pflichten steuert der Prozess. Secrets gehören in den Secret Store. Personendaten gehören nicht in Wissensdateien.
+- **Nie in Skills:** Rechte, Pflichten, Secrets und Personendaten. Rechte setzt das Rechtemodell durch (siehe Vision, Schritt 4). Pflichten steuert der Prozess (MD_Process). Secrets gehören in den Secret Store. Personendaten gehören nicht in Wissensdateien.
 - Kundenkontext verlässt seinen Bereich nicht. Skills tragen keine Kundenwerte.
 
 ### Zeitpunkt
@@ -176,11 +177,12 @@ Learning proposals use two stages of the [vision](WISSENSPLATTFORM-VISION.md): *
 | --- | --- |
 | OpenClaw | executes |
 | BloomMD | knows and maintains |
-| ProcessCube | controls obligations (BPMN) |
+| MD_Process | controls mandatory processes (BPMN in OpenClaw: AI agents and human tasks, modelled with the ProcessCube Studio modeller) |
 
+- **A skill is the default.** Use MD_Process only when the order is mandatory, several people must approve, or an auditor wants to see the flow as evidence. The full ProcessCube engine comes only when a customer needs parallel branches, multi-instance, or high availability.
 - BloomMD does **not** become an agent runtime.
 - BloomMD is not a catalog or marketplace for skills. It is where a team reviews and approves its own skills in the open.
-- **Never in skills:** permissions, obligations, secrets, and personal data. The permission model enforces rights (see vision, step 4). The process controls obligations. Secrets belong in a secret store. Personal data does not belong in knowledge files.
+- **Never in skills:** permissions, obligations, secrets, and personal data. The permission model enforces rights (see vision, step 4). The process (MD_Process) controls obligations. Secrets belong in a secret store. Personal data does not belong in knowledge files.
 - Customer context does not leave its scope. Skills carry no customer values.
 
 ### Timing

@@ -1,6 +1,6 @@
 # BloomMD Architecture
 
-Verified against: 2026-10-28 · BloomMD 0.5.1 · c4f794f
+Verified against: 2026-11-24 · BloomMD 0.6.0 · 255c646e
 
 ## Principles
 

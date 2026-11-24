@@ -32,6 +32,16 @@ download link does not work, contact `feedback@bloommd.io`.
 If something does not work as described, see [Troubleshooting](/docs/fehlerbehebung?lang=en). Everything stays on your computer. What stays local, and what only goes to the cloud after an
 explicit choice, is explained in [Local or cloud](/docs/lokal-oder-cloud?lang=en).
 
+## Folders, files and content in 0.6.0
+
+- **Folders** have a dashed outline. Select a folder and **New file** to create a Markdown file there; the dialog preselects the destination folder.
+- **Markdown files** have a subtle blue border and display their relative path. **Open** opens the editable file.
+- **Content previews** are headings inside a file. Select a preview and **Edit section** to open that exact section in the editor.
+
+![Native macOS app showing the selected Ziele section and its text in the editor for Team/Projektplan.md](/releases/desktop-0.6.0-editor.png)
+
+The folder overview is for navigation. Edit nodes and content in the source file. **Back to folder overview** saves changes and restores selection, expanded branches and the view. If saving fails, the file stays open and shows the error. If external changes made a preview stale, BloomMD opens the file and reports the changed section instead of editing a different one.
+
 ## Working with nodes from 0.5.14
 
 Clicking a node selects it without recentering the visible map. Arrow keys move between parents,
@@ -40,7 +50,7 @@ children and siblings; an offscreen target is brought into view. In an open Mark
 confirms and **Escape** cancels the edit. **Tab** creates a child and shows its title field.
 
 Use **Open resource** to open linked files. In the read-only workspace overview,
-**Open source file** on a file node or heading takes you to the editable file. In the node editor,
+**Open** / **Edit section** on a file node or heading takes you to the editable file. In the node editor,
 **Cmd+I** and **Cmd+K** apply italics and open the link editor; on the map **Cmd+K** opens the
 command palette. On Linux, use the corresponding **Ctrl** shortcuts.
 

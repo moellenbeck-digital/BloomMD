@@ -33,6 +33,16 @@ Falls ein Download-Link nicht funktioniert, schreibe an `feedback@bloommd.io`.
 Läuft etwas nicht wie beschrieben, hilft die [Fehlerbehebung](/docs/fehlerbehebung). Alles bleibt dabei auf deinem Rechner. Was lokal bleibt und was erst durch eine bewusste Freigabe
 in die Cloud geht, steht unter [Lokal oder Cloud](/docs/lokal-oder-cloud).
 
+## Ordner, Dateien und Inhalte ab 0.6.0
+
+- **Ordner** haben einen gestrichelten Rahmen. Wähle einen Ordner und **Neue Datei**, um dort eine Markdown-Datei anzulegen; der Dialog übernimmt den Zielordner.
+- **Markdown-Dateien** haben einen dezenten blauen Rand und zeigen ihren relativen Pfad. **Öffnen** führt zur bearbeitbaren Datei.
+- **Inhaltsvorschauen** sind Überschriften innerhalb einer Datei. Wähle eine Vorschau und **Abschnitt bearbeiten**, um genau diesen Abschnitt im Editor zu öffnen.
+
+![Native macOS-App: ausgewählter Abschnitt Ziele und sein Text im Editor der Datei Team/Projektplan.md](/releases/desktop-0.6.0-editor.png)
+
+Die Ordnerübersicht dient zur Navigation. Knoten und Inhalte bearbeitest du in der Quelldatei. **Zur Ordnerübersicht** speichert Änderungen und stellt Auswahl, aufgeklappte Zweige und Ansicht wieder her. Kann nicht gespeichert werden, bleibt die Datei geöffnet und zeigt den Fehler. Wurde eine Vorschau durch externe Änderungen veraltet, öffnet BloomMD die Datei und meldet den geänderten Abschnitt, statt einen anderen Inhalt zu bearbeiten.
+
 ## Knoten bedienen ab 0.5.14
 
 Ein Klick wählt einen Knoten aus, ohne die sichtbare Map neu zu zentrieren. Mit den Pfeiltasten
@@ -42,13 +52,13 @@ Markdown-Datei das Umbenennen, auch bei Ressourcenknoten. **Enter** übernimmt, 
 die Eingabe. **Tab** legt einen Kindknoten an und zeigt dessen Titelfeld an.
 
 Ressourcen öffnest du über **Ressource öffnen**. In der schreibgeschützten Workspace-Übersicht
-führt **Quelldatei öffnen** von einem Dateiknoten oder einer Überschrift zur bearbeitbaren Datei.
+führen **Öffnen** an einer Datei und **Abschnitt bearbeiten** an einer Inhaltsvorschau zur bearbeitbaren Datei.
 Im Knoten-Editor sind **Cmd+I** und **Cmd+K** für Kursivschrift und Links verfügbar; auf der Map
 öffnet **Cmd+K** die Befehlspalette. Unter Linux gelten die entsprechenden **Ctrl**-Kürzel.
 
 ## Dateien bearbeiten und speichern ab 0.5.13
 
-Die Ordnerübersicht ist schreibgeschützt. Wähle einen Dateiknoten und **Ressource öffnen**
+Die Ordnerübersicht ist schreibgeschützt. Wähle einen Dateiknoten und **Öffnen**
 oder öffne die Datei im Datei-Browser. Neue Mindmaps wechseln direkt in die bearbeitbare
 Dateiansicht. Ergänze deine Knoten und speichere mit **Cmd+S** (macOS) bzw. **Ctrl+S** (Linux).
 

@@ -1,12 +1,18 @@
 import { FileChangeQueue } from "./file-change-queue";
 import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
-import { lazy, Suspense, useEffect, useState, useCallback, useRef, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useState, useCallback, useRef, useMemo, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, CloudUpload, FolderUp, Link2Off, Menu, FolderOpen, Globe, MessageSquare, Send, Pencil, Plus, Server, Trash2, X } from "lucide-react";
 import { FolderPublicationDialog, folderPublicationLabel, type FolderPublicationApi } from "./FolderPublicationDialog";
 import { FolderSharesDialog, folderSharesLabel, type FolderSharesApi } from "./FolderSharesDialog";
 import {
   MindMapCanvas,
+  PlatformProvider,
+  usePlatform,
+  workspaceCreationFolder,
+  resolveWorkspaceSourceNode,
+  type WorkspaceSourceTarget,
+  type LocalViewState,
   ResizableEditor,
   Toolbar,
   HelpModal,
@@ -19,6 +25,7 @@ import {
   SyncStatus,
   useMindMapStore,
   useKeyboardShortcuts,
+  focusRichEditorWhenReady,
   useLocale,
   type RootRenameEvent,
   type ToolbarHandle,
@@ -178,6 +185,8 @@ function revealExternalNode(nodeId: string | null | undefined): string | null {
 }
 
 export function App() {
+  const basePlatform = usePlatform();
+  const overviewState = useRef<{ filePath: string; selection: string | null; view: LocalViewState } | null>(null);
   const { t, locale } = useLocale();
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setDocumentFilePath = useMindMapStore((s) => s.setDocumentFilePath);
@@ -419,17 +428,24 @@ export function App() {
     };
   }, [feedbackDraft]);
 
+  const rememberOverview = useCallback(() => {
+      const previous = useMindMapStore.getState();
+      if (isWorkspaceMindMap(previous.document) && previous.document) {
+        overviewState.current = { filePath: previous.document.filePath, selection: previous.selectedNodeId, view: { collapsedIds: [...previous.collapsedIds], focusNodeId: previous.focusNodeId, edgeMode: previous.edgeMode } };
+      }
+  }, []);
+
   const loadFile = useCallback(
     async (filename: string, remoteOverride = false, preserveForwardNavigation = false, fromWatcher = false) => {
       const isCurrent = documentRequests.current.begin();
       if (!preserveForwardNavigation) clearForwardNavigation();
+      const data = await openMindmap(filename);
+      if (!isCurrent()) return;
+      rememberOverview();
       const previousFilename = currentFileRef.current;
       currentFileRef.current = filename;
       setActiveLocalFilename(filename);
       if (previousFilename !== filename) useMindMapStore.getState().disconnectSync();
-
-      const data = await openMindmap(filename);
-      if (!isCurrent()) return;
       const doc: MindMapDocument = {
         ...data,
         nodes: new Map(Object.entries(data.nodes)),
@@ -457,6 +473,7 @@ export function App() {
       }
       persistedFileRef.current = { filePath: doc.filePath, content: incomingContent };
       setDocument(doc);
+      useMindMapStore.getState().setEditorVisible(false);
       let localSharedDocument: DesktopSharedDocumentInfo | null = null;
       if (!remoteOverride) {
         try {
@@ -485,7 +502,7 @@ export function App() {
         await connectSharedFileSync(filename);
       }
     },
-    [clearForwardNavigation, setDocument, connectionMode, syncUrl, reportE2EState, connectRemoteFileSync, connectSharedFileSync, t.documentConflict],
+    [clearForwardNavigation, rememberOverview, setDocument, connectionMode, syncUrl, reportE2EState, connectRemoteFileSync, connectSharedFileSync, t.documentConflict],
   );
 
   const handleSharedDocumentChanged = useCallback(async () => {
@@ -630,8 +647,19 @@ export function App() {
         derived: data.derived,
         rawMarkdown: "",
       };
-      clearForwardNavigation();
+      const previous = useMindMapStore.getState();
+      const sameOverview = isWorkspaceMindMap(previous.document) && previous.document?.filePath === doc.filePath;
+      const saved = sameOverview
+        ? { filePath: doc.filePath, selection: previous.selectedNodeId, view: { collapsedIds: [...previous.collapsedIds], focusNodeId: previous.focusNodeId, edgeMode: previous.edgeMode } }
+        : overviewState.current;
+      if (!sameOverview) clearForwardNavigation();
       setDocument(doc);
+      if (saved?.filePath === doc.filePath) {
+        const store = useMindMapStore.getState();
+        store.applyViewState(saved.view);
+        store.setSelectedNodeId(saved.selection && doc.nodes.has(saved.selection) ? saved.selection : doc.rootId);
+      }
+      useMindMapStore.getState().setEditorVisible(false);
       setSharedDocument(null);
       reportE2EState({
         source,
@@ -647,38 +675,11 @@ export function App() {
   );
 
   const focusCanvasAfterNavigation = useCallback(() => {
-    const focusCanvas = () => {
-      const canvas = window.document.getElementById("mindmap-canvas");
-      if (!canvas) return false;
-      canvas.focus();
-      return true;
-    };
-
-    requestAnimationFrame(() => {
-      if (!focusCanvas()) setTimeout(focusCanvas, 50);
-    });
+    const state = useMindMapStore.getState();
+    if (state.editorVisible || state.autoEditNodeId) return;
+    if (state.selectedNodeId) requestNodeFocus(state.selectedNodeId, false);
+    else window.document.getElementById("mindmap-canvas")?.focus({ preventScroll: true });
   }, []);
-
-  const handleReturnToWorkspace = useCallback(async () => {
-    const current = useMindMapStore.getState().document;
-    if (!current || isWorkspaceMindMap(current) || workspaceNavigationPending) return;
-    const currentFilename = currentFileRef.current;
-    if (!currentFilename) return;
-
-    setWorkspaceNavigationPending(true);
-    try {
-      await loadWorkspace("returnToWorkspace");
-      forwardFileRef.current = currentFilename;
-      setForwardNavigationAvailable(true);
-      setDrawerOpen(false);
-      focusCanvasAfterNavigation();
-    } catch (error) {
-      console.error("[BloomMD] Returning to workspace overview failed:", error);
-      useMindMapStore.getState().setStatusMessage(t.filesLoadFailed);
-    } finally {
-      setWorkspaceNavigationPending(false);
-    }
-  }, [focusCanvasAfterNavigation, loadWorkspace, t.filesLoadFailed, workspaceNavigationPending]);
 
   const handleForwardToFile = useCallback(async () => {
     const filename = forwardFileRef.current;
@@ -856,6 +857,7 @@ export function App() {
   }, [connectionMode, drawerOpen, refreshFileList, refreshRemoteWorkspaces, locale]);
 
   const [createKind, setCreateKind] = useState<CreateEntryKind | null>(null);
+  const [createParent, setCreateParent] = useState("");
   const [knownFolders, setKnownFolders] = useState<string[]>([]);
 
   const assertRemoteWriteAccess = useCallback(() => {
@@ -878,6 +880,7 @@ export function App() {
     try {
       const result = await createMindmap(filename, markdown);
       if (!isCurrent()) return null;
+      rememberOverview();
       const doc: MindMapDocument = {
         ...result,
         nodes: new Map(Object.entries(result.nodes)),
@@ -896,7 +899,7 @@ export function App() {
     } finally {
       if (creatingFileRef.current === isCurrent) creatingFileRef.current = null;
     }
-  }, [clearForwardNavigation, setDocument]);
+  }, [clearForwardNavigation, rememberOverview, setDocument]);
 
   /**
    * Creates a folder or a Markdown file in the local workspace.
@@ -909,6 +912,7 @@ export function App() {
     if (kind === "folder") {
       await createFolder(path);
       setKnownFolders((await listFolders()).folders);
+      if (isWorkspaceMindMap(useMindMapStore.getState().document)) await loadWorkspace("createFolder");
       return;
     }
     const name = path.split("/").pop()?.replace(/\.md$/i, "") ?? "Neu";
@@ -921,10 +925,54 @@ export function App() {
     const result = await createAndOpenFile(path, markdown);
     if (!result) return;
     await refreshFileList();
-    setTimeout(() => {
-      if (currentFileRef.current === path) useMindMapStore.getState().setAutoEditNodeId(result.rootId);
-    }, 200);
-  }, [assertRemoteWriteAccess, createAndOpenFile, refreshFileList]);
+    const state = useMindMapStore.getState();
+    if (currentFileRef.current === path && state.selectedNodeId === result.rootId && !state.editorVisible) {
+      state.requestAutoEditNode(result.rootId);
+    }
+  }, [assertRemoteWriteAccess, createAndOpenFile, refreshFileList, loadWorkspace]);
+
+  const openCreateEntry = useCallback((kind: CreateEntryKind, parent: string) => {
+    if (connectionMode !== "local") return;
+    setCreateParent(parent);
+    setCreateKind(kind);
+    void listFolders().then((result) => setKnownFolders(result.folders)).catch((error: unknown) => {
+      console.error("[BloomMD] Folder list failed:", error);
+      useMindMapStore.getState().setStatusMessage(t.filesLoadFailed);
+    });
+  }, [connectionMode, t.filesLoadFailed]);
+
+  const openOverviewSource = useCallback(async (target: WorkspaceSourceTarget) => {
+    if (workspaceNavigationPending) return;
+    setWorkspaceNavigationPending(true);
+    try {
+      await loadFile(target.file, connectionMode === "remote");
+      const current = useMindMapStore.getState().document;
+      if (!current || isWorkspaceMindMap(current) || currentFileRef.current !== target.file) return;
+      setDrawerOpen(false);
+      const nodeId = resolveWorkspaceSourceNode(current, target);
+      if (target.heading) {
+        if (nodeId) {
+          const store = useMindMapStore.getState();
+          for (const ancestor of collapsedAncestors(current, store.collapsedIds, nodeId)) store.toggleCollapse(ancestor);
+          store.setFocusNodeId(null);
+          store.setSelectedNodeId(nodeId);
+          store.setEditorVisible(true);
+          focusRichEditorWhenReady(nodeId);
+        } else useMindMapStore.getState().setStatusMessage(t.sourceHeadingChanged);
+      } else focusCanvasAfterNavigation();
+    } finally {
+      setWorkspaceNavigationPending(false);
+    }
+  }, [connectionMode, focusCanvasAfterNavigation, loadFile, t.sourceHeadingChanged, workspaceNavigationPending]);
+
+  const platform = useMemo(() => ({
+    ...basePlatform,
+    workspace: {
+      openSource: openOverviewSource,
+      canEdit: connectionMode === "local" || Boolean(activeRemoteWorkspace && activeRemoteWorkspace.role !== "viewer"),
+      ...(connectionMode === "local" ? { createEntry: openCreateEntry } : {}),
+    },
+  }), [basePlatform, openOverviewSource, connectionMode, activeRemoteWorkspace, openCreateEntry]);
 
   // Own templates are the .md files in the workspace folder `Vorlagen`; a remote workspace has none.
   const loadCustomTemplates = useCallback(async () => (await listTemplates()).templates, []);
@@ -1087,7 +1135,7 @@ export function App() {
   }, [renameFileForTitle]);
 
   // Save
-  const handleSaveFile = useCallback(async (doc: MindMapDocument) => {
+  const handleSaveFile = useCallback(async (doc: MindMapDocument, renameForTitle = true) => {
     if (isWorkspaceMindMap(doc)) {
       useMindMapStore.getState().setStatusMessage(t.derivedWorkspaceSave);
       return;
@@ -1123,10 +1171,36 @@ export function App() {
     if (useMindMapStore.getState().document?.filePath !== doc.filePath) return;
     persistedFileRef.current = { filePath: doc.filePath, content: persistedContent };
     const oldFilename = currentFileRef.current;
-    if (oldFilename && doc.frontmatter.title) {
+    if (renameForTitle && oldFilename && doc.frontmatter.title) {
       await renameFileForTitle(oldFilename, doc.frontmatter.title);
     }
   }, [assertRemoteWriteAccess, connectionMode, renameFileForTitle, t]);
+
+  const handleReturnToWorkspace = useCallback(async () => {
+    const current = useMindMapStore.getState().document;
+    if (!current || isWorkspaceMindMap(current) || workspaceNavigationPending) return;
+    const currentFilename = currentFileRef.current;
+    if (!currentFilename) return;
+
+    setWorkspaceNavigationPending(true);
+    try {
+      if (!useMindMapStore.getState().readOnly && persistedFileRef.current?.content !== documentContentKey(current)) {
+        // Returning to the overview saves edits without renaming an existing source file.
+        await handleSaveFile(current, false);
+      }
+      const returnFilename = currentFileRef.current ?? currentFilename;
+      await loadWorkspace("returnToWorkspace");
+      forwardFileRef.current = returnFilename;
+      setForwardNavigationAvailable(true);
+      setDrawerOpen(false);
+      focusCanvasAfterNavigation();
+    } catch (error) {
+      console.error("[BloomMD] Returning to workspace overview failed:", error);
+      useMindMapStore.getState().setStatusMessage(error instanceof Error ? error.message : t.filesLoadFailed);
+    } finally {
+      setWorkspaceNavigationPending(false);
+    }
+  }, [handleSaveFile, focusCanvasAfterNavigation, loadWorkspace, t.filesLoadFailed, workspaceNavigationPending]);
 
   // Import
   const handleImportFile = useCallback(async () => {
@@ -1785,6 +1859,7 @@ export function App() {
   );
 
   return (
+    <PlatformProvider adapter={platform}>
     <div className="h-screen flex flex-col bg-[var(--color-surface)]" data-testid="app-shell">
       {connectionMode === "local" && (localLoadError || unreadablePaths.length > 0) && (
         <div role="alert" data-testid="local-workspace-load-error" className="shrink-0 max-h-36 overflow-auto border-b border-orange-500 p-3 text-sm">
@@ -1851,9 +1926,10 @@ export function App() {
               </div>
             )}
             <div className="w-px h-5 bg-[var(--color-border)]" />
-            <span className="text-sm text-[var(--color-ink-faint)] font-[var(--font-display,Outfit,sans-serif)]" data-testid="document-title">
-              {document.frontmatter.title}
-            </span>
+            <div className="min-w-0 text-sm text-[var(--color-ink-muted)]">
+              {canReturnToWorkspace && <button type="button" disabled={workspaceNavigationPending} onClick={() => void handleReturnToWorkspace()} className="mr-2 underline underline-offset-4" data-testid="workspace-breadcrumb">{t.backToWorkspace}</button>}
+              <span className="font-[var(--font-display,Outfit,sans-serif)]" data-testid="document-title">{isWorkspaceMindMap(document) ? document.frontmatter.title : activeDocumentFilename ?? document.frontmatter.title}</span>
+            </div>
             {connectionMode === "remote" && <SyncStatus />}
             {connectionMode === "local" && activeDocumentFilename && !isWorkspaceMindMap(document) && (
               <button
@@ -1880,14 +1956,8 @@ export function App() {
             onToggleCommandPalette={() => setCommandPaletteOpen((open) => !open)}
             onOpenFeedback={openFeedbackDialog}
             feedbackTestId="desktop-open-feedback"
-            onCreateFolder={connectionMode !== "remote" ? () => {
-              void listFolders().then((result) => setKnownFolders(result.folders));
-              setCreateKind("folder");
-            } : undefined}
-            onCreateFromTemplate={connectionMode !== "remote" ? () => {
-              void listFolders().then((result) => setKnownFolders(result.folders));
-              setCreateKind("file");
-            } : undefined}
+            onCreateFolder={connectionMode === "local" ? () => openCreateEntry("folder", workspaceCreationFolder(document, selectedNodeId)) : undefined}
+            onCreateFromTemplate={connectionMode === "local" ? () => openCreateEntry("file", workspaceCreationFolder(document, selectedNodeId)) : undefined}
             onCreateNew={handleCreateNew}
             onSaveFile={handleSaveFile}
             onImportFile={handleImportFile}
@@ -1901,6 +1971,8 @@ export function App() {
         <CreateEntryDialog
           kind={createKind}
           folders={knownFolders}
+          defaultParent={createParent}
+          parentForFolders
           onClose={() => setCreateKind(null)}
           loadCustomTemplates={loadCustomTemplates}
           onCreate={async (path, content) => {
@@ -2334,6 +2406,7 @@ export function App() {
         </Suspense>
       )}
     </div>
+    </PlatformProvider>
   );
 }
 

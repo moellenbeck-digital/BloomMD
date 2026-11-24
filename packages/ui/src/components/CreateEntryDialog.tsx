@@ -127,7 +127,7 @@ export function CreateEntryDialog({ kind, folders, defaultParent = "", parentFor
       <section
         role="dialog"
         aria-modal="true"
-        aria-label={kind === "folder" ? t.newFolder : t.newMindmap}
+        aria-label={kind === "folder" ? t.newFolder : t.newWorkspaceFile}
         data-testid="create-entry-dialog"
         className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xl"
         onClick={(event) => event.stopPropagation()}
@@ -135,7 +135,7 @@ export function CreateEntryDialog({ kind, folders, defaultParent = "", parentFor
         <header className="flex items-center gap-2 border-b border-[var(--color-border)] px-5 py-4">
           <Icon size={18} className="text-[#FF6B35]" aria-hidden />
           <h2 className="flex-1 text-base font-semibold text-[var(--color-ink)]">
-            {kind === "folder" ? t.newFolder : t.newMindmap}
+            {kind === "folder" ? t.newFolder : t.newWorkspaceFile}
           </h2>
           <button type="button" onClick={onClose} aria-label={t.close} className="rounded p-1 hover:bg-[var(--color-surface-sunken)] pointer-coarse:flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center pointer-coarse:justify-center">
             <X size={16} />

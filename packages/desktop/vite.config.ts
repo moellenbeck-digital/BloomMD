@@ -83,6 +83,7 @@ export default defineConfig({
       "@bloommd/core": resolve(packageDir, "../core/src/index.ts"),
       "@bloommd/ui/rename-dialog": resolve(packageDir, "../ui/src/components/RenameMindmapDialog.tsx"),
       "@bloommd/ui/visible-layout": resolve(packageDir, "../ui/src/hooks/visible-layout.ts"),
+      "@bloommd/ui/workspace-nodes.css": resolve(packageDir, "../ui/src/workspace/workspace-nodes.css"),
       "@bloommd/ui": resolve(packageDir, "../ui/src/index.ts"),
     },
   },

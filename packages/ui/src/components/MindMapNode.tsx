@@ -1,4 +1,7 @@
-import { workspaceSourceFile, openWorkspaceSource } from "../utils/workspaceSource";
+import { WorkspaceNodeContent, workspaceNodeLabels } from "../workspace/workspace-nodes";
+import { workspaceSourceFile, workspaceNodeKind, workspaceCreationFolder } from "../utils/workspaceSource";
+import { useWorkspaceSource } from "../hooks/useWorkspaceSource";
+import { usePlatform } from "../platform/PlatformContext";
 import { memo, useCallback, useState, useRef, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import {
@@ -7,18 +10,21 @@ import {
   CalendarDays,
   Bot,
   CheckSquare,
+  ChevronRight,
+  ChevronDown,
+  Eye,
   CornerDownRight,
   Edit3,
   ExternalLink,
   File,
   FileText,
+  Folder,
   Globe2,
   Link2,
   Plus,
   Scale,
   Signpost,
   Square,
-  Folder,
   Network,
   UserRound,
 } from "lucide-react";
@@ -104,8 +110,9 @@ const KIND_ICONS: Record<string, LucideIcon> = {
 
 function MindMapNodeComponent({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as MindMapNodeData;
-  const { t } = useLocale();
-  const style = getStyle(nodeData.level);
+  const { t, locale } = useLocale();
+  const platform = usePlatform();
+  const source = useWorkspaceSource();
   const toggleCollapse = useMindMapStore((s) => s.toggleCollapse);
   const renameNode = useMindMapStore((s) => s.renameNode);
   const document = useMindMapStore((s) => s.document);
@@ -127,6 +134,11 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
   const isSelected = selected || selectedNodeId === id;
   const metadata = nodeData.metadata;
   const sourceFile = workspaceSourceFile(document, id);
+  const workspaceKind = workspaceNodeKind(document, id);
+  const isOverview = Boolean(workspaceKind);
+  const isHeadingPreview = workspaceKind === "heading";
+  const style = getStyle(nodeData.level);
+  const sourceAction = workspaceKind === "file" ? t.openWorkspaceFile : source.canEdit ? t.editInFile : t.viewInFile;
   const KindIcon = KIND_ICONS[metadata?.kind ?? "topic"] ?? Signpost;
   const resourceIssue = nodeResourceIssue({
     id,
@@ -145,12 +157,24 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
   const skipBlurCommitRef = useRef(false);
 
   useEffect(() => {
-    if (editing) {
-      // Pending canvas focus is cancelled before editing; do not steal focus back later.
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editing]);
+    if (!editing) return;
+    if (selectedNodeId !== id) { setEditing(false); return; }
+    const { yDoc: owner, editorVisible: editorWasVisible } = useMindMapStore.getState();
+    let frame = 0;
+    let attempts = 0;
+    const focusInput = () => {
+      const state = useMindMapStore.getState();
+      if (state.yDoc !== owner || state.selectedNodeId !== id || (!editorWasVisible && state.editorVisible)) return;
+      const input = inputRef.current;
+      if (!input) return;
+      // React Flow hides newly measured nodes briefly. A focus on a hidden input is ignored.
+      input.focus({ preventScroll: true });
+      if (window.document.activeElement === input) { input.select(); return; }
+      if (++attempts < 60) frame = requestAnimationFrame(focusInput);
+    };
+    focusInput();
+    return () => cancelAnimationFrame(frame);
+  }, [editing, id, selectedNodeId]);
 
   // Auto-edit when triggered from store (e.g. after creating a new mindmap)
   useEffect(() => {
@@ -203,8 +227,13 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
   }, [id, metadata]);
 
   const onDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (isOverview) {
+      e.stopPropagation();
+      if (!(e.target as HTMLElement).closest("button") && sourceFile) void source.open(id);
+      return;
+    }
     startEditing(e);
-  }, [startEditing]);
+  }, [id, isOverview, sourceFile, source.open, startEditing]);
 
   const toggleTask = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -228,7 +257,8 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
             console.error("[BloomMD] Root rename failed:", error);
           })
           .finally(() => {
-            if (restoreFocus) requestNodeFocus(id);
+            const current = useMindMapStore.getState();
+            if (restoreFocus && current.selectedNodeId === id && !current.editorVisible && !current.autoEditNodeId) requestNodeFocus(id);
           });
         return;
       }
@@ -262,6 +292,13 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
 
   const onNodeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (isOverview && e.key === "Enter" && e.target === e.currentTarget && !e.repeat && !e.nativeEvent.isComposing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (sourceFile) void source.open(id);
+        else toggleCollapse(id);
+        return;
+      }
       if (editing || readOnly || e.nativeEvent.isComposing || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 
       if (e.key.toLowerCase() === "r") {
@@ -271,7 +308,7 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
         return;
       }
     },
-    [editing, readOnly, id, setAutoEditNodeId],
+    [editing, readOnly, id, setAutoEditNodeId, isOverview, sourceFile, source.open, toggleCollapse],
   );
 
   const isRoot = nodeData.level === 1;
@@ -322,6 +359,8 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
       data-node-label={nodeData.label}
       data-selected={isSelected ? "true" : "false"}
       data-node-kind={metadata?.kind ?? "topic"}
+      data-workspace-kind={workspaceKind}
+      data-node-root={isRoot ? "true" : "false"}
       tabIndex={selectedNodeId === id || (selectedNodeId === null && isRoot) ? 0 : -1}
       role="treeitem"
       aria-selected={isSelected}
@@ -333,16 +372,13 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
         requestNodeFocus(id, false);
       }}
       onKeyDown={onNodeKeyDown}
-      className={`
-        relative rounded-lg border-2 cursor-pointer
-        transition-colors duration-150
+      className={isOverview ? "bloommd-workspace-node" : `
+        relative rounded-lg border-2 cursor-pointer transition-colors duration-150
         font-[var(--font-display,Outfit,sans-serif)]
         ${isRoot ? "px-5 py-3" : "px-4 py-2"}
         min-w-[80px] max-w-[280px] text-center
         ${style.bg} ${style.text} ${style.border}
-        ${isSelected
-          ? `ring-2 ring-offset-2 ${style.ring} shadow-lg`
-          : "shadow-sm hover:shadow-md"}
+        ${isSelected ? `ring-2 ring-offset-2 ${style.ring} shadow-lg` : "shadow-sm hover:shadow-md"}
       `}
       onDoubleClick={onDoubleClick}
     >
@@ -351,11 +387,19 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
       {nodeData.dropPosition === "inside" && <div className="pointer-events-none absolute inset-0 rounded-lg ring-4 ring-[#FF6B35]/60" data-testid="drop-inside" />}
       <Handle
         type="target"
+        isConnectable={!isOverview}
+        style={isOverview ? { visibility: "hidden" } : undefined}
         position={Position.Left}
         className="!w-2.5 !h-2.5 !bg-[#D4CFC8] !border-2 !border-white !-left-[6px]"
       />
 
-      {editing ? (
+      {workspaceKind ? (
+        <WorkspaceNodeContent kind={workspaceKind} title={nodeData.label} path={sourceFile}
+          labels={workspaceNodeLabels(locale)} opening={source.opening}
+          completed={metadata?.kind === "task" && metadata.status === "done"}
+          titleAdornment={metadata?.kind === "task" ? <button type="button" disabled={readOnly} onClick={toggleTask} className="nodrag shrink-0 pointer-coarse:-m-[15px] pointer-coarse:p-[15px]" title={t.toggleTask} aria-label={t.toggleTask}>{metadata.status === "done" ? <CheckSquare size={15} /> : <Square size={15} />}</button> : undefined}
+          onOpen={sourceFile ? () => { void source.open(id); } : undefined} />
+      ) : editing ? (
         <input
           ref={inputRef}
           data-testid="node-rename-input"
@@ -380,10 +424,10 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
           `}
         />
       ) : (
-        <div className={`flex items-center justify-center gap-2 font-semibold tracking-tight ${isRoot ? "text-base" : "text-sm"}`}>
+        <div className={`flex items-center ${isOverview ? "justify-start" : "justify-center"} gap-2 ${isHeadingPreview ? "font-medium" : "font-semibold tracking-tight"} ${isRoot ? "text-base" : "text-sm"}`}>
           {metadata?.kind === "task" ? (
             <button type="button" disabled={readOnly} onClick={toggleTask} className="nodrag shrink-0 pointer-coarse:-m-[15px] pointer-coarse:p-[15px]" title={t.toggleTask} aria-label={t.toggleTask}>{metadata.status === "done" ? <CheckSquare size={15} /> : <Square size={15} />}</button>
-          ) : metadata?.kind && metadata.kind !== "topic" ? <KindIcon size={15} className="shrink-0" aria-hidden="true" /> : null}
+          ) : !isOverview && metadata?.kind && metadata.kind !== "topic" ? <KindIcon size={15} className="shrink-0" aria-hidden="true" /> : null}
           <span className={`truncate ${metadata?.kind === "task" && metadata.status === "done" ? "line-through opacity-70" : ""}`}>{nodeData.label}</span>
         </div>
       )}
@@ -427,6 +471,8 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
 
       <Handle
         type="source"
+        isConnectable={!isOverview}
+        style={isOverview ? { visibility: "hidden" } : undefined}
         position={Position.Right}
         className="!w-2.5 !h-2.5 !bg-[#D4CFC8] !border-2 !border-white !-right-[6px]"
       />
@@ -453,6 +499,8 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
           type="button"
           onClick={onToggle}
           data-testid="node-toggle-children"
+          aria-label={nodeData.collapsed ? t.expandBranch : t.collapseBranch}
+          aria-expanded={!nodeData.collapsed}
           className={`
             group absolute -right-3.5 top-1/2 -translate-y-1/2
             flex h-7 w-7 items-center justify-center
@@ -463,15 +511,16 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
         >
           <span
             className={`
-              flex h-7 w-7 items-center justify-center rounded-full
-              bg-white border-2 text-xs font-bold
+              flex h-7 w-7 items-center justify-center text-xs font-bold
               transition-all duration-150
-              ${nodeData.collapsed
+              ${isHeadingPreview
+                ? "text-[var(--color-ink-muted)] group-hover:text-[#FF6B35]"
+                : `rounded-full bg-white border-2 ${nodeData.collapsed
                 ? "border-[#FF6B35] text-[#FF6B35] group-hover:bg-[#FFF4EE]"
-                : "border-[#D4CFC8] text-[var(--color-ink-faint)] group-hover:border-[#FF6B35] group-hover:text-[#FF6B35]"}
+                : "border-[#D4CFC8] text-[var(--color-ink-faint)] group-hover:border-[#FF6B35] group-hover:text-[#FF6B35]"}`}
             `}
           >
-            {nodeData.collapsed ? `+${nodeData.childCount}` : "−"}
+            {isOverview ? (nodeData.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />) : nodeData.collapsed ? `+${nodeData.childCount}` : "−"}
           </span>
         </button>
       )}
@@ -504,16 +553,16 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
               <CornerDownRight size={15} />
             </button>
           )}
-          <button
+          {workspaceKind !== "folder" && workspaceKind !== "file" && <button
             type="button"
             onClick={openEditor}
             className="flex h-7 w-7 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-sunken)] hover:text-[#FF6B35]"
-            title={t.editNodeContent}
-            aria-label={t.editNodeContent}
+            title={readOnly ? t.showPreview : t.editNodeContent}
+            aria-label={readOnly ? t.showPreview : t.editNodeContent}
             data-testid="node-action-open-editor"
           >
-            <Edit3 size={15} />
-          </button>
+            {readOnly ? <Eye size={15} /> : <Edit3 size={15} />}
+          </button>}
           {nodeData.onAskAgent && (
             <button
               type="button"
@@ -533,8 +582,9 @@ function MindMapNodeComponent({ id, data, selected }: NodeProps) {
               )}
             </button>
           )}
-          {sourceFile && <button type="button" onClick={() => openWorkspaceSource(sourceFile)} className="nodrag nopan px-2 text-xs pointer-coarse:min-h-11" data-testid="node-action-open-source">{t.openSourceFile}</button>}
-          {metadata && !(sourceFile && metadata.kind === "file" && metadata.file === sourceFile) && metadata.kind !== "topic" && metadata.kind !== "task" && metadata.kind !== "decision" && (
+          {sourceFile && <button type="button" disabled={source.opening} onClick={() => void source.open(id)} className={`nodrag nopan min-h-8 whitespace-nowrap px-2 text-xs pointer-coarse:min-h-11 ${workspaceKind === "file" ? "hidden pointer-coarse:block" : ""}`} data-testid="node-action-open-source">{sourceAction}</button>}
+          {workspaceKind === "folder" && platform.workspace?.createEntry && <button type="button" onClick={() => platform.workspace?.createEntry?.("file", workspaceCreationFolder(document, id))} className="nodrag nopan min-h-8 whitespace-nowrap px-2 text-xs pointer-coarse:min-h-11">{t.newWorkspaceFile}</button>}
+          {metadata && workspaceKind !== "folder" && !(sourceFile && metadata.kind === "file" && metadata.file === sourceFile) && metadata.kind !== "topic" && metadata.kind !== "task" && metadata.kind !== "decision" && (
             <button
               type="button"
               onClick={openResource}

@@ -40,7 +40,7 @@ function focusCanvas() {
 }
 
 /** The rich editor is lazy-loaded, so one fixed timeout is not enough in the desktop webview. */
-function focusRichEditorWhenReady(nodeId: string) {
+export function focusRichEditorWhenReady(nodeId: string) {
   let attempts = 0;
   const tryFocus = () => {
     const state = useMindMapStore.getState();
@@ -50,7 +50,7 @@ function focusRichEditorWhenReady(nodeId: string) {
       editor.focus();
       return;
     }
-    if (++attempts < 30) window.setTimeout(tryFocus, 50);
+    if (++attempts < 100) window.setTimeout(tryFocus, 50);
   };
   window.setTimeout(tryFocus, 0);
 }

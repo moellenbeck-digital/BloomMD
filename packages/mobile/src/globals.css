@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@bloommd/ui/workspace-nodes.css";
 
 /* Classes used only by the shared UI package (node editor, canvas) must be generated too. */
 @source "../../ui/src/**/*.{ts,tsx}";
@@ -125,4 +126,9 @@ body {
 
 ::-webkit-scrollbar {
   display: none;
+}
+
+/* Keep the zoom controls below the map's central row on narrow screens. */
+@media (pointer: coarse) {
+  .react-flow__controls { flex-direction: row; }
 }

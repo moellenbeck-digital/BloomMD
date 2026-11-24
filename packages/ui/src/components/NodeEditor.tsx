@@ -1,6 +1,7 @@
 "use client";
+import { useWorkspaceSource } from "../hooks/useWorkspaceSource";
 
-import { workspaceSourceFile, openWorkspaceSource } from "../utils/workspaceSource";
+import { workspaceSourceFile, workspaceNodeKind } from "../utils/workspaceSource";
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent } from "react";
 import {
   AlertTriangle,
@@ -148,6 +149,7 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
   const selectedNodeId = useMindMapStore((s) => s.selectedNodeId);
   const document = useMindMapStore((s) => s.document);
   const readOnly = useMindMapStore((s) => s.readOnly);
+  const workspaceSource = useWorkspaceSource();
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setSelectedNodeId = useMindMapStore((s) => s.setSelectedNodeId);
   const setEditorVisible = useMindMapStore((s) => s.setEditorVisible);
@@ -624,14 +626,14 @@ export function NodeEditor({ embedded }: NodeEditorProps = {}) {
           {selectedNode.title}
         </h2>
         {readOnly && <p className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">{isWorkspaceDocument ? t.workspaceOverviewReadOnly : t.readOnlyMessage}</p>}
-        {sourceFile && <button type="button" className="mt-2 underline pointer-coarse:min-h-11" onClick={() => openWorkspaceSource(sourceFile)}>{t.openSourceFile}</button>}
+        {sourceFile && <button type="button" className="mt-2 underline pointer-coarse:min-h-11" disabled={workspaceSource.opening} onClick={() => void workspaceSource.open(selectedNode.id)}>{workspaceNodeKind(document, selectedNode.id) === "file" ? t.openWorkspaceFile : workspaceSource.canEdit ? t.editInFile : t.viewInFile}</button>}
         {!readOnly && selectedNode.id !== document?.rootId && <button type="button" onClick={() => { deleteNodeAction(selectedNode.id); setEditorVisible(false); }} className="absolute right-5 top-5 flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-md text-red-600 hover:bg-red-50" title={t.deleteNodeBranch} aria-label={t.deleteNodeBranch} data-testid="node-editor-delete"><Trash2 size={16} /></button>}
       </div>
 
       <div className={`${embedded ? "px-4 py-3" : "px-5 py-4"} grid gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]`} data-testid="node-metadata-editor">
         <label className="grid gap-1 text-xs font-semibold text-[var(--color-ink-muted)]">
           {t.nodeType}
-          <select value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
+          <select disabled={readOnly} value={kind} onChange={(event) => changeKind(event.target.value as MindMapNodeKind)} className="h-9 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-sm text-[var(--color-ink)]" data-testid="node-kind-select">
             {nodeKindOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}

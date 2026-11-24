@@ -12,6 +12,7 @@ import {
   serializeToMarkdown,
 } from "@bloommd/core";
 import { watchWorkspace } from "./workspace-watcher";
+import { createLocalMindmap } from "./create-local-mindmap";
 import { saveExportFile } from "./save-export";
 import { copyFile, mkdir, readFile, rename, access, stat } from "node:fs/promises";
 import { lookup } from "node:dns/promises";
@@ -1442,9 +1443,7 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
             storage: doc.storage,
           };
         }
-        const fullPath = resolveMarkdownPath(bloommdDir, sanitizeMarkdownFilename(filename));
-        const doc = parseFile(fullPath, markdown);
-        await localStore.write(doc);
+        const doc = await createLocalMindmap(bloommdDir, filename, markdown);
         return {
           filePath: doc.filePath,
           frontmatter: doc.frontmatter,

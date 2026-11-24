@@ -481,6 +481,27 @@ describe("useKeyboardShortcuts node creation", () => {
     expect(inputs[0]?.closest("[data-node-id]")?.getAttribute("data-node-id")).toBe(secondId);
   });
 
+  test("a newer selection cancels a pending creation rename", async () => {
+    const store = useMindMapStore.getState();
+    const doc = store.document!;
+    const child = store.addChildNode(doc.rootId, "New")!;
+    store.setSelectedNodeId(child);
+    store.requestAutoEditNode(child);
+    store.setSelectedNodeId(doc.rootId);
+    await tick();
+    expect(useMindMapStore.getState().selectedNodeId).toBe(doc.rootId);
+    expect(useMindMapStore.getState().autoEditNodeId).toBeNull();
+  });
+
+  test("changing files cancels rename even when the destination contains the same node ID", async () => {
+    const store = useMindMapStore.getState();
+    const doc = store.document!;
+    store.requestAutoEditNode(doc.rootId);
+    store.setDocument({ ...doc, filePath: "another.md", nodes: new Map(doc.nodes) });
+    await tick();
+    expect(useMindMapStore.getState().autoEditNodeId).toBeNull();
+  });
+
   test("keeps the rename flow working after deleting nodes before creating a child", async () => {
     const store = useMindMapStore.getState();
     const doc = store.document!;

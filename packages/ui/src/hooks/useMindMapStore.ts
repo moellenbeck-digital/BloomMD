@@ -279,7 +279,7 @@ function scheduleAfterRender(callback: () => void): void {
 
 function isAutoEditTargetVisible(id: string): boolean {
   if (typeof document === "undefined") return true;
-  const canvas = document.getElementById("mindmap-canvas");
+  const canvas = document.querySelector<HTMLElement>("#mindmap-canvas .react-flow") ?? document.getElementById("mindmap-canvas");
   if (!canvas || !canvas.clientWidth || !canvas.clientHeight) return true;
   const node = document.querySelector<HTMLElement>(`[data-node-id="${id}"]`);
   if (!node) return false;
@@ -330,6 +330,8 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
 
   setDocument: (doc, yDocOverride) => {
     cancelPendingNodeFocus();
+    requestAutoEditToken += 1;
+    set({ autoEditNodeId: null });
     cancelLayout();
     // A status message belongs to the document it was raised for; never carry it across navigation.
     set({ layoutPending: false, layoutFailed: false, statusMessage: null, editRevision: 0, savedRevision: 0, offlinePending: false });
@@ -662,14 +664,17 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     if (current.selectedNodeId === id && (id === null ? current.selectedNodeIds.length === 0 : current.selectedNodeIds.length === 1 && current.selectedNodeIds[0] === id)) {
       return;
     }
+    // A delayed creation/reveal must not override a more recent pointer or keyboard selection.
+    cancelPendingNodeFocus();
+    requestAutoEditToken += 1;
     // When deselecting, also close the editor
     const creationUpdate = current.lastCreatedNodeId && current.lastCreatedNodeId !== id
       ? { lastCreatedNodeId: null, lastCreatedParentId: null, lastCreatedInitialTitle: null }
       : {};
     if (id === null) {
-      set({ selectedNodeId: null, selectedNodeIds: [], editorVisible: false, ...creationUpdate });
+      set({ selectedNodeId: null, selectedNodeIds: [], editorVisible: false, autoEditNodeId: null, ...creationUpdate });
     } else {
-      set({ selectedNodeId: id, selectedNodeIds: [id], ...creationUpdate });
+      set({ selectedNodeId: id, selectedNodeIds: [id], autoEditNodeId: null, ...creationUpdate });
     }
     // Broadcast selection to remote users
     const { syncProvider } = get();
@@ -681,6 +686,11 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
     const unique = Array.from(new Set(ids));
     const current = get().selectedNodeIds;
     if (current.length === unique.length && current.every((id, index) => id === unique[index])) return;
+    if (get().selectedNodeId !== (unique.at(-1) ?? null)) {
+      cancelPendingNodeFocus();
+      requestAutoEditToken += 1;
+      set({ autoEditNodeId: null });
+    }
     set({ selectedNodeIds: unique, selectedNodeId: unique.at(-1) ?? null });
   },
   setAutoEditNodeId: (id) => {
@@ -690,17 +700,19 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
   },
   requestAutoEditNode: (id) => {
     const token = ++requestAutoEditToken;
+    const owner = get().yDoc;
+    const isCurrent = () => token === requestAutoEditToken && get().yDoc === owner
+      && get().selectedNodeId === id && Boolean(get().document?.nodes.has(id));
     // Clear a previous one-shot request first. Otherwise a stale request can be consumed by
     // an older node while React Flow is reconciling a delete/create sequence.
     set({ autoEditNodeId: null });
     scheduleAfterRender(() => {
-      if (token !== requestAutoEditToken) return;
-      if (!get().document?.nodes.has(id)) return;
+      if (!isCurrent()) return;
       requestNodeFocus(id);
       const startedAt = Date.now();
       let retriedReveal = false;
       const editWhenVisible = () => {
-        if (token !== requestAutoEditToken || !get().document?.nodes.has(id)) return;
+        if (!isCurrent()) return;
         const elapsed = Date.now() - startedAt;
         if (isAutoEditTargetVisible(id) || elapsed >= 1500) {
           set({ autoEditNodeId: id });

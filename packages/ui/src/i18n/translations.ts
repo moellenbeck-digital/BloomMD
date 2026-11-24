@@ -69,6 +69,19 @@ export interface Translations {
   readOnlyMessage: string;
   workspaceOverviewReadOnly: string;
   openSourceFile: string;
+  folderOverview: string;
+  folderOverviewHint: string;
+  folderOverviewReadHint: string;
+  markdownFile: string;
+  headingPreview: string;
+  openWorkspaceFile: string;
+  editInFile: string;
+  viewInFile: string;
+  showPreview: string;
+  sourceHeadingChanged: string;
+  expandBranch: string;
+  collapseBranch: string;
+  newWorkspaceFile: string;
   deleteNodeBranch: string;
   workspaceSource: string;
   folderPath: string;
@@ -639,6 +652,19 @@ export const translations: Record<Locale, Translations> = {
     nodeKindDecisionHint: "Ein Entscheidungsprotokoll mit Status und Begründung.",
     workspaceOverviewReadOnly: "Die Workspace-Übersicht ist nur lesbar. Öffne die Quelldatei zum Bearbeiten.",
     openSourceFile: "Quelldatei öffnen",
+    folderOverview: "Ordnerübersicht",
+    folderOverviewHint: "Öffne eine Datei, um Inhalte zu bearbeiten.",
+    folderOverviewReadHint: "Öffne eine Datei, um ihre Inhalte anzusehen.",
+    markdownFile: "Markdown-Datei",
+    headingPreview: "Inhaltsvorschau",
+    openWorkspaceFile: "Datei öffnen",
+    editInFile: "Abschnitt bearbeiten",
+    viewInFile: "Abschnitt ansehen",
+    showPreview: "Vorschau anzeigen",
+    sourceHeadingChanged: "Die Datei wurde geöffnet. Der Abschnitt hat sich geändert; wähle ihn bitte erneut aus.",
+    expandBranch: "Zweig aufklappen",
+    collapseBranch: "Zweig einklappen",
+    newWorkspaceFile: "Neue Datei",
     readOnlyMessage: "Dieser Workspace ist schreibgeschützt. Du kannst Änderungen ansehen, aber nicht speichern.",
     deleteNodeBranch: "Node und Unterstruktur löschen",
     workspaceSource: "Workspace-Quelle",
@@ -946,7 +972,7 @@ export const translations: Record<Locale, Translations> = {
     connectionSwitchFailed: "Verbindung konnte nicht gewechselt werden.",
     connectionProfileEmpty: "Noch kein Serverprofil gespeichert.",
     workspace: "Workspace",
-    backToWorkspace: "Zur Workspace-Übersicht",
+    backToWorkspace: "Zur Ordnerübersicht",
     forwardToFile: "Zur zuletzt geöffneten Datei",
     workspacesLoading: "Workspaces laden…",
     noMarkdownFiles: "Keine Markdown-Dateien",
@@ -1203,6 +1229,19 @@ export const translations: Record<Locale, Translations> = {
     nodeKindDecisionHint: "A decision record with status and rationale.",
     workspaceOverviewReadOnly: "The workspace overview is read-only. Open the source file to edit it.",
     openSourceFile: "Open source file",
+    folderOverview: "Folder overview",
+    folderOverviewHint: "Open a file to edit its contents.",
+    folderOverviewReadHint: "Open a file to view its contents.",
+    markdownFile: "Markdown file",
+    headingPreview: "Content preview",
+    openWorkspaceFile: "Open file",
+    editInFile: "Edit section",
+    viewInFile: "View section",
+    showPreview: "Show preview",
+    sourceHeadingChanged: "The file is open. The section has changed; please select it again.",
+    expandBranch: "Expand branch",
+    collapseBranch: "Collapse branch",
+    newWorkspaceFile: "New file",
     readOnlyMessage: "This workspace is read-only. You can view changes, but cannot save them.",
     deleteNodeBranch: "Delete node and branch",
     workspaceSource: "Workspace source",
@@ -1510,7 +1549,7 @@ export const translations: Record<Locale, Translations> = {
     connectionSwitchFailed: "The connection could not be switched.",
     connectionProfileEmpty: "No server profile saved yet.",
     workspace: "Workspace",
-    backToWorkspace: "Back to workspace overview",
+    backToWorkspace: "Back to folder overview",
     forwardToFile: "Forward to the previously opened file",
     workspacesLoading: "Loading workspaces…",
     noMarkdownFiles: "No Markdown files",

@@ -86,6 +86,15 @@ describe("node focus coordination", () => {
     expect(focusNodeElement("inactive")).toBe(false);
     expect(document.activeElement).not.toBe(node);
   });
+
+  test("a delayed node reveal never takes focus from an inline title input", () => {
+    const node = addNode("editing", 0);
+    const input = document.createElement("input"); node.appendChild(input); input.focus();
+    expect(focusNodeElement("editing")).toBe(false);
+    expect(document.activeElement).toBe(input);
+    input.remove();
+    expect(focusNodeElement("editing")).toBe(true);
+  });
 });
 
 

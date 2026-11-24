@@ -15,9 +15,6 @@ for (const map of interactiveMaps) {
     expect(source).toContain("panOnScrollMode={PanOnScrollMode.Free}");
     expect(source).toContain("zoomOnPinch");
     expect(source).toContain("zoomOnScroll={false}");
-    if (map.name === "mind map canvas") {
-      expect(source).toContain("fittedDocumentRef");
-      expect(source).toContain("fitView({ padding: 0.3, duration: 0 })");
-    }
+    // Initial fitting and viewport restoration are covered by useInitialCanvasViewport.test.tsx.
   });
 }

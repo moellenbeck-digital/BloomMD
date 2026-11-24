@@ -228,12 +228,12 @@ Gefunden, nicht behoben. Jede ist als Folge-Ticket gemeldet, nicht stillschweige
    Folge-Ticket-Vorschlag: `e2e/mobile-matrix.spec.ts` in den Schritt „Run app Chromium end-to-end tests“
    aufnehmen. Das ist eine Änderung an der Pipeline und gehört nicht in dieses Ticket.
 
-10. **Capacitor-App: Die Schließen-Schaltfläche des Editor-Sheets nimmt keinen Tipp an.** Sie ist `absolute`
-    ohne `z-index`; der Kopf des `NodeEditor` (`relative`, steht später im DOM) liegt darüber, `elementFromPoint`
-    in der Mitte der Schaltfläche liefert den Kopf (iPhone SE, iPad, Pixel 5 im Build). Die Größenprüfung
-    überspringt verdeckte Elemente (siehe Ausnahmen) und sieht es deshalb nicht. Abhilfe: Schaltfläche mit `z-10`.
-    Test: `test.fixme("the close button of the editor sheet takes the tap")` in
-    `packages/mobile/e2e/touch-views.spec.ts`. Zusammenhang mit Abweichung 5.
+10. **Behoben im lokalen Ordner-UX-Stand (#438): Schließen-Schaltfläche des Editor-Sheets.**
+    Sie liegt mit `z-10` über dem Editor-Kopf. Der zuvor übersprungene Test
+    `the close button of the editor sheet takes the tap` ist aktiv. Der zusätzliche Touch-Test
+    `folder preview opens the exact section, saves it and returns; new files use the selected folder`
+    prüft Vorschau, Quellbearbeitung, sofortiges Speichern beim Rückweg und Dateianlage.
+    Die Profile prüfen den gebauten Webview-Inhalt in Chromium, keine native Gerätefreigabe.
 
 ## Stand
 

@@ -4,6 +4,9 @@ export function focusNodeElement(nodeId: string): boolean {
   const element = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
   if (!element) return false;
   if (element.getAttribute("tabindex") === "-1") return false;
+  // A reveal queued before inline rename must not take focus away from its input.
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && element.contains(active) && active.matches("input, textarea, [contenteditable='true']")) return false;
   element.focus({ preventScroll: true });
   return document.activeElement === element;
 }

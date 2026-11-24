@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@bloommd/ui/workspace-nodes.css";
 
 @source "../../../../packages/ui/src/**/*.{ts,tsx}";
 

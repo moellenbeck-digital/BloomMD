@@ -205,3 +205,10 @@ test("distinct titles, multiple roots and semantic root metadata retain their he
     expect(doc.nodes.has(headingNodeId("Avatar.md", 0, markdown.includes("Different") ? "Different title" : "Avatar"))).toBe(true);
   }
 });
+
+test("empty physical directories are represented without placeholder Markdown files", () => {
+  const doc = buildWorkspaceMindMap([], { folders: ["Team/Empty", "Team/Empty", "Other"] });
+  expect([...doc.nodes.values()].filter((node) => node.metadata?.kind === "folder").map((node) => node.metadata?.file).sort()).toEqual(["Other", "Team", "Team/Empty"]);
+  expect(doc.nodes.get("folder:Team/Empty")?.parentId).toBe("folder:Team");
+  expect(doc.nodes.get("folder:Team")?.children).toEqual(["folder:Team/Empty"]);
+});

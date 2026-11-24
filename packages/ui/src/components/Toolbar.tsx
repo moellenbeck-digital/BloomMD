@@ -127,6 +127,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
   const { theme, toggleTheme, customTheme, saveCustomTheme, resetCustomTheme } = useTheme();
   const [themeDialogOpen, setThemeDialogOpen] = useState(false);
   const document = useMindMapStore((s) => s.document);
+  const isOverview = isWorkspaceMindMap(document);
   const setDocument = useMindMapStore((s) => s.setDocument);
   const setStorageMetadata = useMindMapStore((s) => s.setStorageMetadata);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,8 +228,9 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
 
   const onExport = useCallback(async () => {
     if (!document) return;
+    if (isWorkspaceMindMap(document)) { setStatusMessage(t.derivedWorkspaceExport); return; }
     setExportOpen((open) => !open);
-  }, [document]);
+  }, [document, setStatusMessage, t.derivedWorkspaceExport]);
 
   useEffect(() => {
     if (!exportOpen) return;
@@ -340,14 +342,15 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
       <button
         type="button"
         data-testid="toolbar-new"
-        onClick={onNew}
-        className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
-        title={`${t.newMindmap} (Cmd+N)`}
-        aria-label={t.newMindmap}
+        onClick={isOverview && onCreateFromTemplate ? onCreateFromTemplate : onNew}
+        className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+        title={isOverview ? t.newWorkspaceFile : `${t.newMindmap} (Cmd+N)`}
+        aria-label={isOverview ? t.newWorkspaceFile : t.newMindmap}
       >
         <FilePlus size={18} />
+        {isOverview && <span className="ml-1 text-xs">{t.newWorkspaceFile}</span>}
       </button>
-      <button
+      {!isOverview && <button
         type="button"
         data-testid="toolbar-save"
         onClick={onSave}
@@ -365,20 +368,20 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
         aria-label={saveError ? t.saveFailed : t.save}
       >
         {saveError ? <AlertTriangle size={18} /> : saved ? <Check size={18} /> : <Save size={18} />}
-      </button>
+      </button>}
       </div>
       <div className="flex items-center gap-0.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-0.5" role="group" aria-label={t.fileActions} data-testid="toolbar-file-actions">
       <button
         type="button"
         data-testid="toolbar-import"
         onClick={onImport}
-        className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+        className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
         title={`${t.importMd} (Cmd+I)`}
         aria-label={t.importMd}
       >
         <Upload size={18} />
       </button>
-      <div ref={exportMenuRef} className="relative">
+      {!isOverview && <div ref={exportMenuRef} className="relative">
         <button
           type="button"
           ref={exportButtonRef}
@@ -387,7 +390,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           aria-expanded={exportOpen}
           onClick={() => void onExport()}
           disabled={!document}
-          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={`${t.exportMenu} (Cmd+E)`}
           aria-label={t.exportMenu}
         >
@@ -423,14 +426,14 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
             })}
           </div>
         )}
-      </div>
+      </div>}
       {onShareLink && (
         <button
           type="button"
           data-testid="toolbar-share-link"
           onClick={() => void onShareLink()}
           disabled={!document}
-          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={t.shareReadOnlyLink}
           aria-label={t.shareReadOnlyLink}
         >
@@ -443,7 +446,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           data-testid="toolbar-history"
           onClick={onOpenHistory}
           disabled={!document}
-          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={t.historyAction}
           aria-label={t.historyAction}
         >
@@ -456,19 +459,19 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           data-testid="toolbar-reload"
           onClick={onReload}
           disabled={!document}
-          className="p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-lg text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150 disabled:opacity-30"
           title={`${t.reload} (Cmd+R)`}
           aria-label={t.reload}
         >
           <RefreshCw size={18} />
         </button>
       )}
-      {onCreateFromTemplate && (
+      {onCreateFromTemplate && !isOverview && (
         <button
           type="button"
           data-testid="toolbar-create-from-template"
           onClick={onCreateFromTemplate}
-          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={t.newFromTemplate}
           aria-label={t.newFromTemplate}
         >
@@ -480,11 +483,12 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           type="button"
           data-testid="toolbar-create-folder"
           onClick={onCreateFolder}
-          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={t.newFolder}
           aria-label={t.newFolder}
         >
           <FolderPlus size={18} />
+          {isOverview && <span className="ml-1 text-xs">{t.newFolder}</span>}
         </button>
       )}
       </div>
@@ -493,7 +497,7 @@ export const Toolbar = forwardRef<ToolbarHandle, ToolbarProps>(function Toolbar(
           type="button"
           data-testid="toolbar-search"
           onClick={onToggleCommandPalette}
-          className="p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
+          className="inline-flex items-center gap-1 p-2 pointer-coarse:p-[13px] rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-sunken)] hover:text-[var(--color-ink)] transition-all duration-150"
           title={`${t.commandPalette} (Cmd+K)`}
           aria-label={t.commandPalette}
         >

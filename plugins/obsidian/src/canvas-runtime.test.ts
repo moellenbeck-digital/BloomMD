@@ -81,6 +81,39 @@ const nodeTitles = () => [...container.querySelectorAll(".react-flow__node")].ma
 const button = (label: string) => [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === label) as HTMLButtonElement | undefined;
 const alert = () => container.querySelector('[role="alert"]');
 
+describe("canvas runtime: shared workspace cards", () => {
+  test("folder and file cards use the shared presentation and open the real source once", async () => {
+    const opened: string[] = [];
+    const actions = new Proxy(props().actions, { get: (target, key) => key === "openFile" ? (path: string) => opened.push(path) : Reflect.get(target, key) });
+    const headings: CanvasHeading[] = [
+      { id: "folder:Team", parentId: null, level: 1, title: "Team", content: "Team", children: ["file:Team/Plan.md"], kind: "folder", filePath: "Team" },
+      { id: "file:Team/Plan.md", parentId: "folder:Team", level: 2, title: "Plan", content: "Team/Plan.md", children: [], kind: "file", filePath: "Team/Plan.md" },
+    ];
+    const next = props({ locale: "de", headings, rootId: "folder:Team", actions });
+    await show(next);
+    expect(alert()).toBeNull();
+    expect(container.querySelectorAll(".bloommd-workspace-node")).toHaveLength(2);
+    expect(container.querySelectorAll(".react-flow__edge")).toHaveLength(1);
+    expect(container.querySelector('[data-workspace-kind="folder"]')?.textContent).toContain("Ordner");
+    const file = container.querySelector('[data-workspace-kind="file"]')!;
+    expect(file.textContent).toContain("Markdown-Datei");
+    expect(file.querySelector(".bloommd-workspace-path")?.textContent).toBe("Team/Plan.md");
+    expect(file.querySelector(".bloommd-node-preview")).toBeNull();
+    const open = file.querySelector<HTMLButtonElement>('[aria-label="Datei öffnen: Team/Plan.md"]')!;
+    act(() => open.dispatchEvent(new window.PointerEvent("pointerdown", { bubbles: true, pointerType: "touch" })));
+    await act(() => wait(650));
+    expect(file.classList.contains("is-press-armed")).toBe(false);
+    act(() => open.dispatchEvent(new window.PointerEvent("pointerup", { bubbles: true, pointerType: "touch" })));
+    act(() => open.click());
+    // The button must not trigger the node's double-click navigation as well.
+    act(() => open.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true })));
+    expect(opened).toEqual(["Team/Plan.md"]);
+    act(() => mount!.render({ ...next, locale: "en" }));
+    await act(() => wait(30));
+    expect(container.querySelector('[aria-label="Open file: Team/Plan.md"]')).not.toBeNull();
+  });
+});
+
 describe("canvas runtime: the demo note", () => {
   test("renders as a mind map with the root and every heading branch", async () => {
     await show(props());
@@ -187,5 +220,33 @@ describe("canvas runtime: first fit waits for a measured pane", () => {
     for (let waited = 0; waited < 2000 && (viewportTransform() === before || viewportTransform().includes("NaN")); waited += 50) await act(() => wait(50));
     expect(viewportTransform()).not.toBe(before);
     expect(viewportTransform()).not.toContain("NaN");
+  });
+});
+
+describe("folder previews stay read-only in the canvas", () => {
+  test("offers source navigation and lazy loading, with no inline editor or mutation shortcuts", async () => {
+    const observed: unknown[][] = [];
+    const actions = new Proxy(props().actions, { get: (_target, key) => (...args: unknown[]) => { observed.push([key, ...args]); return Promise.resolve(null); } });
+    const headings: CanvasHeading[] = [
+      { id: "folder:Team", parentId: null, level: 1, title: "Team", content: "", children: ["file:Team/Plan.md"], kind: "folder", filePath: "Team" },
+      { id: "file:Team/Plan.md", parentId: "folder:Team", level: 2, title: "Plan", content: "", children: ["preview"], kind: "file", filePath: "Team/Plan.md", previewState: "unloaded" },
+      { id: "preview", parentId: "file:Team/Plan.md", level: 3, title: "Section", content: "Preview content", children: [], kind: "heading", filePath: "Team/Plan.md", sourceHeadingId: "source-section" },
+    ];
+    await show(props({ headings, rootId: "folder:Team", filePath: "folder:Team", overview: true, actions }));
+    expect(container.querySelector('[aria-label="Editing tools"]')).toBeNull();
+    const load = container.querySelector<HTMLButtonElement>('[aria-label="Show contents"]')!;
+    act(() => load.click());
+    await act(() => wait(30));
+    expect(observed.some(([action, path]) => action === "loadFolderPreview" && path === "Team/Plan.md")).toBe(true);
+    const preview = container.querySelector<HTMLElement>('[data-id="preview"] .bloommd-workspace-node')!;
+    act(() => preview.click());
+    await act(() => wait(30));
+    for (const key of ["F2", "Delete", "Tab"]) act(() => preview.dispatchEvent(new window.KeyboardEvent("keydown", { key, bubbles: true })));
+    act(() => preview.dispatchEvent(new window.KeyboardEvent("keydown", { key: "v", ctrlKey: true, bubbles: true })));
+    expect(preview.querySelector("input")).toBeNull();
+    expect(container.querySelector(".bloommd-inspector")).toBeNull();
+    expect(observed.some(([action]) => ["renameNode", "deleteNode", "addChild", "copyBranches"].includes(String(action)))).toBe(false);
+    act(() => button("Edit section")!.click());
+    expect(observed).toContainEqual(["openOverviewSource", "Team/Plan.md", "source-section"]);
   });
 });

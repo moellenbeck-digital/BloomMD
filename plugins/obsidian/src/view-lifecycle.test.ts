@@ -14,11 +14,13 @@ import { installCanvasDom, resetPane } from "./canvas-test-env";
  */
 
 class FakeFile {
+  name: string;
   extension: string;
   basename: string;
   parent: FakeFolder | null = null;
   constructor(readonly path: string) {
     const name = path.split("/").pop() ?? path;
+    this.name = name;
     this.extension = name.split(".").pop() ?? "";
     this.basename = name.replace(/\.[^.]+$/, "");
   }
@@ -26,6 +28,8 @@ class FakeFile {
 class FakeFolder {
   children: unknown[] = [];
   constructor(readonly path: string) {}
+  get name() { return this.path.split("/").pop() ?? ""; }
+  isRoot() { return !this.path; }
 }
 class FakeMarkdownView {
   file: FakeFile | null = null;
@@ -114,7 +118,7 @@ function setup(options: { readError?: Error; processError?: Error; setViewStateE
   const plugin = Object.create(main.default.prototype) as InstanceType<typeof main.default> & Record<string, unknown>;
   const app = {
     vault: {
-      getAbstractFileByPath: (path: string) => (path === demoPath ? demo : null),
+      getAbstractFileByPath: (path: string) => (path === demoPath ? demo : path === folder.path ? folder : null),
       process: async (_file: FakeFile, change: (current: string) => string) => {
         if (options.processError) throw options.processError;
         const next = change(content);
@@ -122,7 +126,7 @@ function setup(options: { readError?: Error; processError?: Error; setViewStateE
         content = next;
         return content;
       },
-      read: async () => {
+      read: async (_file?: FakeFile) => {
         if (options.readError) throw options.readError;
         return content;
       },
@@ -170,7 +174,7 @@ function setup(options: { readError?: Error; processError?: Error; setViewStateE
   });
   const opened: unknown[] = [];
   plugin.openMarkdownFile = (async (file: unknown) => void opened.push(file)) as never;
-  return { plugin, app, demo, leaves, revealed, opened, writes, content: () => content, setContent: (next: string) => void (content = next), openView: () => leaves[0]?.view as InstanceType<typeof main.BloomMDView> | undefined };
+  return { plugin, app, demo, folder, leaves, revealed, opened, writes, content: () => content, setContent: (next: string) => void (content = next), openView: () => leaves[0]?.view as InstanceType<typeof main.BloomMDView> | undefined };
 }
 
 const settle = async () => act(() => wait(120));
@@ -503,5 +507,92 @@ describe("typing a title right after the edit starts", () => {
     await settle();
     expect(content()).toContain("## Details neu <!-- bloommd:id=");
     expect(headingIds(content())).toEqual(headingIds(before));
+  });
+});
+
+
+describe("folder overview source navigation", () => {
+  const folderProps = (view: InstanceType<typeof main.BloomMDView>) => (view as unknown as { canvasProps(): import("./canvas").CanvasProps }).canvasProps();
+
+  test("loads preview without writing, edits the exact source section and returns with refreshed contents", async () => {
+    const env = setup();
+    await env.plugin.visualizeCurrentNote();
+    const view = env.openView()!;
+    view.setFolder(env.folder as never);
+    await settle();
+    expect(folderProps(view).headings.filter((h) => h.kind === "heading")).toHaveLength(0);
+    await folderProps(view).actions.loadFolderPreview!(demoPath);
+    expect(env.writes).toHaveLength(0);
+    const preview = folderProps(view).headings.find((h) => h.sourceHeadingId)!;
+    expect(preview).toBeDefined();
+    folderProps(view).actions.openOverviewSource!(demoPath, preview.sourceHeadingId);
+    await settle();
+    expect(view.mapTarget()).toEqual({ kind: "file", path: demoPath });
+    expect(folderProps(view).initialSelection).toBe(preview.sourceHeadingId);
+    expect(folderProps(view).initialEditor).toBe(true);
+    expect(view.contentEl.querySelector<HTMLTextAreaElement>("#bloommd-node-content")?.value).toBe(preview.content);
+    expect(env.writes).toHaveLength(0);
+    expect(await folderProps(view).actions.updateContent(preview.sourceHeadingId!, "Changed through source", preview.content)).toBe(true);
+    folderProps(view).actions.backToOverview!();
+    await settle();
+    expect(view.mapTarget()).toEqual({ kind: "folder", path: env.folder.path });
+    expect(folderProps(view).headings.find((h) => h.sourceHeadingId === preview.sourceHeadingId)?.content).toContain("Changed through source");
+    expect(folderProps(view).initialSelection).toBe(preview.id);
+    expect(env.writes).toHaveLength(1);
+  });
+
+  test("a changed duplicate section cannot open an editor for stale preview contents", async () => {
+    const env = setup();
+    env.setContent("# Demo\n\n## Same\n\nFirst\n\n## Same\n\nSecond\n");
+    await env.plugin.visualizeCurrentNote();
+    const view = env.openView()!;
+    view.setFolder(env.folder as never);
+    await folderProps(view).actions.loadFolderPreview!(demoPath);
+    const preview = folderProps(view).headings.find((h) => h.content.includes("Second"))!;
+    env.setContent(env.content().replace("Second", "Externally changed"));
+    folderProps(view).actions.openOverviewSource!(demoPath, preview.sourceHeadingId);
+    await settle();
+    expect(folderProps(view).initialEditor).toBe(false);
+    expect(notices.join("\n")).toContain("section changed");
+    expect(env.writes).toHaveLength(0);
+  });
+
+  test("a late file read cannot replace a newer navigation", async () => {
+    const env = setup();
+    await env.plugin.visualizeCurrentNote();
+    const view = env.openView()!;
+    const second = new FakeFile("Aufnahmen/Second.md");
+    second.parent = env.folder;
+    env.folder.children.push(second);
+    const lookup = env.app.vault.getAbstractFileByPath;
+    env.app.vault.getAbstractFileByPath = (path) => path === second.path ? second : lookup(path);
+    view.setFolder(env.folder as never);
+    let releaseFirst!: (markdown: string) => void;
+    env.app.vault.read = async (file) => file === env.demo ? new Promise<string>((resolve) => { releaseFirst = resolve; }) : "# Second\n";
+    folderProps(view).actions.openOverviewSource!(demoPath);
+    folderProps(view).actions.openOverviewSource!(second.path);
+    await settle();
+    expect(view.mapTarget()?.path).toBe(second.path);
+    releaseFirst(demoMarkdown);
+    await settle();
+    expect(view.mapTarget()?.path).toBe(second.path);
+    expect(env.writes).toHaveLength(0);
+  });
+
+  test("a failed source read keeps the folder usable and does not write", async () => {
+    const env = setup();
+    await env.plugin.visualizeCurrentNote();
+    const view = env.openView()!;
+    view.setFolder(env.folder as never);
+    env.app.vault.read = async () => { throw new Error("Unavailable cloud file"); };
+    await silenced(async () => {
+      await folderProps(view).actions.loadFolderPreview!(demoPath);
+      folderProps(view).actions.openOverviewSource!(demoPath);
+      await settle();
+    });
+    expect(view.mapTarget()?.kind).toBe("folder");
+    expect(folderProps(view).headings.find((h) => h.filePath === demoPath)?.previewState).toBe("error");
+    expect(alertOf(view.contentEl)).toBeNull();
+    expect(env.writes).toHaveLength(0);
   });
 });

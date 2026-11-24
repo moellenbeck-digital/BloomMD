@@ -34,6 +34,8 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
+import { usePlatform } from "../platform/PlatformContext";
+import { useWorkspaceSource } from "../hooks/useWorkspaceSource";
 import { MindMapNode } from "./MindMapNode";
 import { WebsitePreviewCard } from "./WebsitePreviewCard";
 import { MindMapEdge } from "./MindMapEdge";
@@ -43,6 +45,7 @@ import { dropTargetToMoveIntent, findCanvasDropTarget, type CanvasDropTarget } f
 import { isNodeVisibleInViewport, focusNodeElement, isCurrentNodeFocusRequest, type NodeFocusRequest } from "../utils/nodeFocus";
 import { useLocale } from "../i18n/LocaleContext";
 import { CANVAS_ZOOM_VAR } from "../utils/canvas-zoom";
+import { useInitialCanvasViewport } from "../hooks/useInitialCanvasViewport";
 
 const nodeTypes: NodeTypes = { mindmap: MindMapNode };
 const edgeTypes: EdgeTypes = { mindmap: MindMapEdge };
@@ -161,9 +164,13 @@ export interface MindMapCanvasProps {
 
 function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRenderVisibleElements = false }: MindMapCanvasProps) {
   const { t } = useLocale();
+  const platform = usePlatform();
+  const workspaceSource = useWorkspaceSource();
   const storeNodes = useMindMapStore((state) => state.nodes);
   const storeEdges = useMindMapStore((state) => state.edges);
   const document = useMindMapStore((state) => state.document);
+  const isOverview = document?.derived?.kind === "workspace";
+  const readOnly = useMindMapStore((state) => state.readOnly);
   const selectedNodeId = useMindMapStore((state) => state.selectedNodeId);
   const selectedNodeIds = useMindMapStore((state) => state.selectedNodeIds);
   const setSelectedNodeId = useMindMapStore((state) => state.setSelectedNodeId);
@@ -196,23 +203,17 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const [savedViews, setSavedViews] = useState<SavedLocalView[]>([]);
   const [selectedViewId, setSelectedViewId] = useState("");
   const draggedNodeRef = useRef<string | null>(null);
-  const fittedDocumentRef = useRef<string | null>(null);
   const pendingFocusRef = useRef<NodeFocusRequest | null>(null);
-  const { fitView, getNode, getViewport, setCenter, setViewport } = useReactFlow();
+  const { getNode, getViewport, setCenter, setViewport } = useReactFlow();
   // Node controls cancel the zoom on touch screens (see `CANVAS_ZOOM_VAR`), so the variable follows every viewport change.
   const publishZoom = useCallback((_event: unknown, viewport: Viewport) => {
     window.document.getElementById("mindmap-canvas")?.style.setProperty(CANVAS_ZOOM_VAR, String(viewport.zoom));
   }, []);
   const viewStorageKey = `bloommd:views:${document?.frontmatter.id || document?.filePath || "none"}`;
   const documentViewKey = document ? `${document.frontmatter.id}:${document.filePath}` : null;
+  const initialViewportReady = useInitialCanvasViewport(documentViewKey, canvasMode, isOverview, storeNodes, layoutPending);
 
   useEffect(() => { setNodes(storeNodes); setEdges(storeEdges); }, [storeNodes, storeEdges, setNodes, setEdges]);
-  useEffect(() => {
-    if (canvasMode !== "map" || !documentViewKey || storeNodes.length === 0 || fittedDocumentRef.current === documentViewKey) return;
-    fittedDocumentRef.current = documentViewKey;
-    const frame = requestAnimationFrame(() => { void fitView({ padding: 0.3, duration: 0 }); });
-    return () => cancelAnimationFrame(frame);
-  }, [canvasMode, documentViewKey, fitView, storeNodes.length]);
   useEffect(() => {
     if (canvasMode !== "map") return;
     const nodesContainer = window.document.querySelector<HTMLElement>("#mindmap-canvas .react-flow__nodes");
@@ -230,6 +231,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       const { nodeId, requestId, reveal } = (event as CustomEvent<Partial<NodeFocusRequest>>).detail ?? {};
       if (!nodeId || typeof requestId !== "number" || !isCurrentNodeFocusRequest(requestId)) return;
       pendingFocusRef.current = { nodeId, requestId, reveal };
+      if (!initialViewportReady) return;
       requestAnimationFrame(() => {
         if (!isCurrentNodeFocusRequest(requestId)) return;
         focusNodeElement(nodeId);
@@ -239,7 +241,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
         const width = node.measured?.width ?? node.width ?? 180;
         const height = node.measured?.height ?? node.height ?? 54;
         const viewport = getViewport();
-        const canvas = window.document.getElementById("mindmap-canvas");
+        const canvas = window.document.querySelector<HTMLElement>("#mindmap-canvas .react-flow");
         if (canvas && isNodeVisibleInViewport(
           { ...node.position, width, height }, viewport,
           { width: canvas.clientWidth, height: canvas.clientHeight },
@@ -269,7 +271,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
     }
     window.addEventListener("bloommd:focus-node", focusNode);
     return () => window.removeEventListener("bloommd:focus-node", focusNode);
-  }, [getNode, getViewport, setCenter, storeNodes]);
+  }, [getNode, getViewport, initialViewportReady, setCenter, storeNodes]);
   useEffect(() => {
     try { setSavedViews(JSON.parse(localStorage.getItem(viewStorageKey) ?? "[]") as SavedLocalView[]); }
     catch { setSavedViews([]); }
@@ -350,7 +352,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   })), [agentActivity, document?.rootId, dropTarget, nodes, onAskAgent, onRootRename, selectedNodeId]);
 
   const modeToolbar = (
-    <div className="absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-sm" aria-label={t.canvasModes} data-testid="view-mode-toggle">
+    <div className="relative z-20 mx-3 my-2 flex w-fit max-w-[calc(100%-1.5rem)] shrink-0 flex-wrap items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-1 shadow-sm" aria-label={t.canvasModes} data-testid="view-mode-toggle">
       <button type="button" className={iconButton(canvasMode === "map")} onClick={() => setCanvasMode("map")} title={t.mindMap} aria-label={t.mindMap} data-testid="view-mode-map"><Network size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "outline")} onClick={() => setCanvasMode("outline")} title={t.outline} aria-label={t.outline} data-testid="view-mode-outline"><ListTree size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
@@ -363,12 +365,12 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
         <option value="all">{t.allRelations}</option>
       </select>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
-      <button type="button" className={iconButton()} disabled={!canUndo} onClick={undo} title={`${t.undo} (Cmd/Ctrl+Z)`} aria-label={t.undo} data-testid="canvas-undo"><Undo2 size={16} /></button>
-      <button type="button" className={iconButton()} disabled={!canRedo} onClick={redo} title={`${t.redo} (Cmd/Ctrl+Shift+Z)`} aria-label={t.redo} data-testid="canvas-redo"><Redo2 size={16} /></button>
+      {!readOnly && <><button type="button" className={iconButton()} disabled={!canUndo} onClick={undo} title={`${t.undo} (Cmd/Ctrl+Z)`} aria-label={t.undo} data-testid="canvas-undo"><Undo2 size={16} /></button>
+      <button type="button" className={iconButton()} disabled={!canRedo} onClick={redo} title={`${t.redo} (Cmd/Ctrl+Shift+Z)`} aria-label={t.redo} data-testid="canvas-redo"><Redo2 size={16} /></button></>}
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
       <button type="button" className={iconButton(Boolean(focusNodeId))} disabled={!selectedNodeId} onClick={() => setFocusNodeId(focusNodeId ? null : selectedNodeId)} title={focusNodeId ? t.exitFocus : t.focusBranch} aria-label={focusNodeId ? t.exitFocus : t.focusBranch} data-testid="canvas-focus"><Focus size={16} /></button>
-      <button type="button" className={iconButton()} disabled={selectedNodeIds.length === 0} onClick={() => copyBranches()} title={t.copyBranches} aria-label={t.copyBranches} data-testid="canvas-copy"><ClipboardCopy size={16} /></button>
-      <button type="button" className={iconButton()} onClick={() => pasteBranches()} title={t.pasteBranches} aria-label={t.pasteBranches} data-testid="canvas-paste"><ClipboardPaste size={16} /></button>
+      {!isOverview && <button type="button" className={iconButton()} disabled={selectedNodeIds.length === 0} onClick={() => copyBranches()} title={t.copyBranches} aria-label={t.copyBranches} data-testid="canvas-copy"><ClipboardCopy size={16} /></button>}
+      {!readOnly && <button type="button" className={iconButton()} onClick={() => pasteBranches()} title={t.pasteBranches} aria-label={t.pasteBranches} data-testid="canvas-paste"><ClipboardPaste size={16} /></button>}
       <button type="button" className={iconButton()} onClick={saveLocalView} title={t.saveLocalView} aria-label={t.saveLocalView}><BookmarkPlus size={16} /></button>
       {savedViews.length > 0 && <>
         <select className="h-8 pointer-coarse:h-11 max-w-32 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={selectedViewId} onChange={(event) => { setSelectedViewId(event.target.value); loadView(event.target.value); }} aria-label={t.loadSavedView}><option value="" disabled>{t.views}</option>{savedViews.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}</select>
@@ -380,10 +382,16 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
 
   return (
     <div
-      className="relative h-full w-full"
+      className="relative flex h-full w-full flex-col"
       id="mindmap-canvas"
       tabIndex={-1}
       data-testid="mindmap-canvas"
+      onKeyDown={(event) => {
+        if (isOverview && event.key === "Enter" && event.target === event.currentTarget && selectedNodeId && !event.repeat && !event.nativeEvent.isComposing && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+          event.preventDefault();
+          void workspaceSource.open(selectedNodeId);
+        }
+      }}
       onClickCapture={(event) => {
         const target = event.target as HTMLElement | null;
         if (target?.closest('[data-testid="node-action-ask-agent"]')) {
@@ -393,14 +401,21 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
         if (target?.closest(".react-flow__pane")) setSelectedNodeId(null);
       }}
     >
+      {isOverview && <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] px-4 py-3" data-testid="workspace-overview-banner">
+        <div>
+          <div className="text-sm font-semibold text-[var(--color-ink)]">{t.folderOverview}</div>
+          <p className="mt-0.5 text-xs text-[var(--color-ink-muted)]">{platform.workspace?.canEdit === false ? t.folderOverviewReadHint : t.folderOverviewHint}</p>
+        </div>
+      </div>}
       {modeToolbar}
       {(layoutPending || layoutFailed) && <div role="status" className="absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-md bg-[var(--color-surface-raised)] px-3 py-2 text-sm text-[var(--color-ink)] shadow-md">
         {layoutPending ? t.layoutInProgress : t.layoutFailed}
         {layoutFailed && <button type="button" onClick={relayout} className="ml-3 underline pointer-coarse:min-h-11 pointer-coarse:min-w-11">{t.retryLayout}</button>}
       </div>}
+      <div className="relative min-h-0 flex-1">
       {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
-            onlyRenderVisibleElements={onlyRenderVisibleElements && !exportRenderAll}
+            onlyRenderVisibleElements={onlyRenderVisibleElements && initialViewportReady && !exportRenderAll}
             nodes={styledNodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -438,8 +453,10 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             onNodeDragStop={onNodeDragStop}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
-            fitView
-            fitViewOptions={{ padding: 0.3 }}
+            edgesFocusable={!isOverview}
+            edgesReconnectable={!readOnly}
+            nodesDraggable={!readOnly}
+            nodesConnectable={!readOnly}
             minZoom={0.1}
             maxZoom={2}
             deleteKeyCode={null}
@@ -458,7 +475,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#D8D4CE" gap={24} size={1} />
-            <Controls position="bottom-right" data-testid="react-flow-controls" />
+            <Controls fitViewOptions={isOverview && typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? { padding: 0.6 } : undefined} showInteractive={!isOverview} position="bottom-right" data-testid="react-flow-controls" />
             <MiniMap data-testid="react-flow-minimap" className="hidden sm:block" position="bottom-left" nodeColor={(node) => (node.data as { metadata?: { kind?: string } }).metadata?.kind === "portal" ? "#2684FF" : "#FF6B35"} maskColor="rgba(26,26,26,0.06)" />
             {dropTarget && <Panel position="bottom-center"><div className="rounded-md border border-[#FF6B35] bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] shadow-md">{dropPositionLabel}</div></Panel>}
             {statusMessage && (
@@ -471,6 +488,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             )}
         </ReactFlow>
       )}
+      </div>
     </div>
   );
 }

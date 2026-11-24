@@ -2,6 +2,22 @@
 
 ## In Entwicklung
 
+## [Desktop 0.6.0] - 2026-11-24
+
+Technischer Quellstand / technical source: `255c646e` (Ordner-UI, Plattform-Übergänge, Layout-/Fokus-Laufzeittests; #438, #440).
+
+- Ordner, Markdown-Dateien und Inhaltsvorschauen sind in der Ordnerübersicht klar unterscheidbar. Ordner haben gestrichelte Rahmen, Dateien einen dezenten blauen Rand; Überschriften erscheinen als kompakte Textvorschau. Typnamen und Symbole ergänzen die Farben.
+- „Öffnen“ führt zur Datei; „Abschnitt bearbeiten“ öffnet den gewählten Markdown-Abschnitt im Editor. „Neue Datei“ übernimmt den ausgewählten Ordner. Beim Rückweg zur Übersicht werden Änderungen gespeichert und Auswahl, aufgeklappte Zweige und Ansicht wiederhergestellt.
+- Neue Knoten und Inline-Titel erhalten den Fokus erst, wenn sie sichtbar sind. Veraltete Fokusanforderungen überschreiben keine laufende Texteingabe. Die Startansicht wartet auf das fertig berechnete Layout.
+- Bereits auf main integrierte Offline-Warteschlange und Konfliktbehandlung der gemeinsamen Core-/UI-Bibliotheken sind Bestandteil dieses Desktop-Builds.
+- Dieses Release betrifft Desktop. Mobile- und Obsidian-Integrationen bleiben Entwicklungsstand ohne neue Veröffentlichung oder native Gerätefreigabe.
+
+- Folders, Markdown files and content previews are visually distinct in the folder overview. Folders use dashed outlines, files a subtle blue border; headings appear as compact text previews. Type labels and icons complement the colors.
+- “Open” opens a file; “Edit section” opens the selected Markdown section in the editor. “New file” uses the selected folder. Returning to the overview saves edits and restores selection, expanded branches and the view.
+- New nodes and inline titles receive focus once visible. Stale focus requests no longer interrupt text entry. The initial view waits for the completed layout.
+- This desktop build also includes the shared Core/UI offline queue and conflict handling already integrated on main.
+- Desktop release only. Mobile and Obsidian integrations remain development work, without a new release or native device sign-off.
+
 ## [Web-App 0.6.0-develop.4, Marketing 0.6.0-develop.4, Sync 0.6.0-develop.4] - 2026-11-21
 
 - Warteliste: Löschung nach 90 Tagen als planbarer Job (Ticket 166): Neuer Befehl `bun run --cwd apps/marketing waitlist purge-due [--apply]` für einen täglichen Job. Er nutzt dieselbe Prüfung und Löschung wie `purge`. Läuft die Frist noch, ist eine Einladung offen oder wurde noch keine gesendet, löscht er nichts und endet mit Exit 0, ebenso bei leerer Liste; gelöscht wird nur mit `--apply` und nur, wenn die Prüfung es erlaubt. Exit ≠ 0 nur bei echten Fehlern (Datenbank, fehlende Variable). Ausgabe: eine JSON-Zeile mit Zählern (`mode`, `total`, `notInvited`, `allowed`, `reason`, `allowedFrom`, `deleted`), keine Adressen. `purge` und die Frist von 90 Tagen sind unverändert. Neu: Runbook `docs/WAITLIST-PURGE.md`; `docs/LOESCHKONZEPT.md` nennt den Job statt „manuell“. Ob und wann der Job auf Prod läuft, klären Chief of Staff und Ops.

@@ -164,7 +164,7 @@
     },
     "packages/desktop": {
       "name": "@bloommd/desktop",
-      "version": "0.5.16",
+      "version": "0.6.0",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ui": "workspace:*",

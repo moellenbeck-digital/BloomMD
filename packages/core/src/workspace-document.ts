@@ -4,11 +4,12 @@ import {
   FILE_NODE_PREFIX,
   buildWorkspaceGraph,
   fileNodeId,
+  folderNodeId,
   type ReferenceEdge,
   type WorkspaceFileInput,
   WorkspaceGraphCache,
 } from "./workspace-graph";
-import { normalizeMarkdownPath } from "./path-rules";
+import { normalizeMarkdownPath, normalizeFolderPath } from "./path-rules";
 
 export const WORKSPACE_ROOT_NODE_ID = "workspace:root";
 export const HEADING_NODE_PREFIX = "heading:";
@@ -16,6 +17,8 @@ export const HEADING_NODE_PREFIX = "heading:";
 export interface WorkspaceMindMapOptions {
   title?: string;
   source?: string;
+  /** Real directories, including empty ones that cannot be inferred from Markdown paths. */
+  folders?: readonly string[];
   /** Parsed documents matching inputFiles; lets filesystem readers reuse validated snapshots. */
   parsedDocuments?: ReadonlyMap<string, MindMapDocument>;
   cache?: WorkspaceDocumentCache;
@@ -385,6 +388,23 @@ export function buildWorkspaceMindMap(
     reference.sourceId = foldedHeadings.get(reference.sourceId) ?? reference.sourceId;
     reference.targetId = foldedHeadings.get(reference.targetId) ?? reference.targetId;
     reference.id = `workspace-reference:${index}:${reference.sourceId}->${reference.targetId}`;
+  }
+
+  for (const folder of options.folders ?? []) {
+    const segments = normalizeFolderPath(folder).split("/");
+    let parent = root;
+    for (let index = 0; index < segments.length; index++) {
+      const path = segments.slice(0, index + 1).join("/");
+      const id = folderNodeId(path);
+      let node = nodes.get(id);
+      if (!node) {
+        node = { id, parentId: parent.id, level: levelBelow(parent), title: segments[index]!, content: path,
+          children: [], metadata: { kind: "folder", file: path } };
+        nodes.set(id, node);
+        appendChild(parent.id, id);
+      }
+      parent = node;
+    }
   }
 
   return {

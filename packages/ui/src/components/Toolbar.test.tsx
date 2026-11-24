@@ -157,14 +157,14 @@ test("@t6 Markdown and OPML entries hand <Title>.md / <Title>.opml to the platfo
   expect(delivered[1]!.text).toContain('<outline text="Hotel"/>');
 });
 
-test("@t6 the workspace map keeps its message and exports nothing", async () => {
+test("@t6 the workspace map hides export and protects the keyboard entry point", async () => {
   const delivered: string[] = [];
-  const { container } = mountToolbar({ onDeliverExport: (file) => { delivered.push(file.filename); } });
+  const { container, ref } = mountToolbar({ onDeliverExport: (file) => { delivered.push(file.filename); } });
   flushSync(() => useMindMapStore.getState().setDocument(buildWorkspaceMindMap([{ path: "a.md", markdown: "# A\n" }], { source: "/vault" })));
-  container.querySelector<HTMLButtonElement>("[data-testid='toolbar-export']")!.click();
+  expect(container.querySelector("[data-testid='toolbar-export']")).toBeNull();
+  ref.current!.triggerExport();
   await settle();
-  container.querySelector<HTMLButtonElement>("[data-testid='export-opml']")!.click();
-  await settle();
+  expect(container.querySelector("[data-testid='export-menu']")).toBeNull();
   expect(delivered).toEqual([]);
   expect(useMindMapStore.getState().statusMessage).toBe(translations.de.derivedWorkspaceExport);
 });

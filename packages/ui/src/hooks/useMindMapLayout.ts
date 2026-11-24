@@ -1,4 +1,5 @@
 import dagre from "dagre";
+import { workspaceNodeKind } from "../utils/workspaceSource";
 import type { Node, Edge } from "@xyflow/react";
 import type { MindMapDocument, MindMapNodeMetadata } from "@bloommd/core/browser";
 import { extractLinksFromMarkdown, extractMapLinksFromMarkdown, extractPdfLinksFromMarkdown } from "../utils/links";
@@ -47,7 +48,8 @@ export function layoutMindMap(doc: MindMapDocument, edgeMode: EdgeMode = "hierar
 
   for (const [id, node] of doc.nodes) {
     const estimatedWidth = Math.max(140, Math.min(node.title.length * 9 + 40, 280));
-    g.setNode(id, { width: estimatedWidth, height: 44 });
+    const kind = workspaceNodeKind(doc, id);
+    g.setNode(id, { width: kind === "file" || kind === "folder" ? Math.max(estimatedWidth, 230) : estimatedWidth, height: kind === "file" ? 108 : kind === "folder" ? 76 : 44 });
     if (node.parentId) {
       g.setEdge(node.parentId, id);
     }
@@ -89,7 +91,10 @@ export function layoutMindMap(doc: MindMapDocument, edgeMode: EdgeMode = "hierar
       source: node.parentId!,
       target: node.id,
       type: "mindmap",
-      data: { relation: "hierarchy" satisfies EdgeRelation },
+      data: {
+        relation: "hierarchy" satisfies EdgeRelation,
+        ...(workspaceNodeKind(doc, node.id) === "heading" ? { workspaceContent: true } : {}),
+      },
     }));
 
   const referenceEdges: Edge[] = [];

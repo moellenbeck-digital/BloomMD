@@ -92,6 +92,7 @@ export default defineConfig({
     alias: {
       "@bloommd/core/browser": resolve(packageDir, "../core/src/browser.ts"),
       "@bloommd/core": resolve(packageDir, "../core/src/index.ts"),
+      "@bloommd/ui/workspace-nodes.css": resolve(packageDir, "../ui/src/workspace/workspace-nodes.css"),
       "@bloommd/ui": resolve(packageDir, "../ui/src/index.ts"),
     },
   },

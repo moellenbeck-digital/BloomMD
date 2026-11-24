@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { Menu, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search, Folder, FolderPlus, ChevronRight, CornerLeftUp } from "lucide-react";
+import { Menu, Network, ArrowLeft, RefreshCw, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search, Folder, FolderPlus, ChevronRight, CornerLeftUp } from "lucide-react";
 import {
   ConflictCopyBadge,
   ConflictCopyBanner,
@@ -10,6 +10,8 @@ import {
   InkAttachmentsContext,
   PlatformProvider,
   requestNodeFocus,
+  resolveWorkspaceSourceNode,
+  type WorkspaceSourceTarget,
   useVisualViewport,
   VIEWPORT_ROOT_FILL_CLASS,
   useMindMapStore,
@@ -39,6 +41,7 @@ import { openFileUrl } from "./opened-file";
 import { NoteSaver } from "./note-saver";
 import { APP_DIRECTORY, IS_ANDROID } from "./platform";
 import { appInkAttachments, folderInkAttachments } from "./ink-attachments";
+import { readMobileOverview } from "./workspace-overview";
 import { shellText } from "./shell-text";
 
 const SELFTEST = import.meta.env.VITE_BLOOMMD_SELFTEST === "1";
@@ -148,6 +151,11 @@ export function App() {
   /** All folders of the store, empty ones included. */
   const [folders, setFolders] = useState<string[]>([]);
   /** The dialog for a new note or a new folder, while one is open. */
+  const [creationParent, setCreationParent] = useState<string | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const overviewVisit = useRef<{ store: MobileStore; folder: string; selection: string | null; collapsedIds: string[] } | null>(null);
+  const navigationRevision = useRef(0);
+  const isOverview = isWorkspaceMindMap(document);
   const [creating, setCreating] = useState<"file" | "folder" | null>(null);
   const [store, setStore] = useState<MobileStore>(() => createAppStore());
   const storeRef = useRef(store);
@@ -183,41 +191,62 @@ export function App() {
   const [truncated, setTruncated] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const conflictRef = useRef<(conflict: { path: string; copy: string | null; current: boolean }) => void>(() => undefined);
+  const saveFailed = useRef(false);
   const [saver] = useState(() => new NoteSaver({
     onSaved: () => {
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1500);
     },
     onConflict: (conflict) => conflictRef.current(conflict),
-    onError: () => setError(textRef.current.errors.saveFailed),
+    onError: () => { saveFailed.current = true; setError(textRef.current.errors.saveFailed); },
   }));
 
   /** Saves the open note's latest edits now; awaited before anything replaces the note. */
-  const flushSave = useCallback(() => saver.flush(useMindMapStore.getState().document), [saver]);
+  const flushSave = useCallback(async () => {
+    saveFailed.current = false;
+    await saver.flush(useMindMapStore.getState().document);
+    if (saveFailed.current) throw new Error(textRef.current.errors.saveFailed);
+  }, [saver]);
 
   const loadFile = useCallback(
-    async (path: string, node: string | null = null, from: MobileStore = storeRef.current) => {
+    async (path: string, node: string | null = null, from: MobileStore = storeRef.current, target?: WorkspaceSourceTarget) => {
+      const revision = ++navigationRevision.current;
+      setOverviewLoading(false);
       try {
         setError(null);
         await flushSave();
+        const before = useMindMapStore.getState();
+        if (isWorkspaceMindMap(before.document) && overviewVisit.current) {
+          overviewVisit.current.selection = before.selectedNodeId;
+          overviewVisit.current.collapsedIds = [...before.collapsedIds];
+        }
         if (remoteClient) {
+          const loaded = await remoteClient.read(path);
+          if (revision !== navigationRevision.current) return;
           saver.open(null, null);
-          setDocument(await remoteClient.read(path));
+          useMindMapStore.getState().setEditorVisible(false);
+          setDocument(loaded);
         } else {
           const loaded = await from.read(path);
+          if (revision !== navigationRevision.current || from !== storeRef.current) return;
           saver.open(from, loaded);
+          useMindMapStore.getState().setEditorVisible(false);
           setDocument(loaded.document);
         }
-        if (node && useMindMapStore.getState().document?.nodes.has(node)) {
-          useMindMapStore.getState().setSelectedNodeId(node);
-          window.setTimeout(() => requestNodeFocus(node), 150);
-        }
+        const state = useMindMapStore.getState();
+        const selected = target && state.document ? resolveWorkspaceSourceNode(state.document, target) : node;
+        if (selected && state.document?.nodes.has(selected)) {
+          state.setSelectedNodeId(selected);
+          if (target?.heading) state.setEditorVisible(true);
+          requestNodeFocus(selected);
+        } else if (target?.heading) setError(t.sourceHeadingChanged);
+        setDrawerOpen(false);
       } catch {
         setError(textRef.current.errors.openFailed(path));
         throw new Error(`Could not open ${path}`);
       }
     },
-    [flushSave, remoteClient, saver, setDocument],
+    [flushSave, remoteClient, saver, setDocument, t.sourceHeadingChanged],
   );
 
   const refreshFiles = useCallback(async (from: MobileStore = storeRef.current) => {
@@ -236,8 +265,47 @@ export function App() {
     return result.entries;
   }, [remoteClient]);
 
+  const openOverview = useCallback(async (folder = folderPathRef.current) => {
+    if (remoteClientRef.current || storeRef.current.kind === "file") return;
+    const revision = ++navigationRevision.current;
+    const source = storeRef.current;
+    setOverviewLoading(true);
+    setError(null);
+    try {
+      await flushSave();
+      const result = await readMobileOverview(source, folder);
+      if (revision !== navigationRevision.current || source !== storeRef.current) return;
+      const current = useMindMapStore.getState();
+      if (isWorkspaceMindMap(current.document) && overviewVisit.current) {
+        overviewVisit.current.selection = current.selectedNodeId;
+        overviewVisit.current.collapsedIds = [...current.collapsedIds];
+      }
+      const previous = overviewVisit.current;
+      saver.open(null, null);
+      useMindMapStore.getState().setEditorVisible(false);
+      setDocument(result.document);
+      if (!(previous?.store === source && previous.folder === folder)) {
+        const state = useMindMapStore.getState();
+        state.applyViewState({ collapsedIds: [...result.document.nodes.values()].filter((node) => node.metadata?.kind === "file" && node.children.length > 0).map((node) => node.id), focusNodeId: null, edgeMode: state.edgeMode });
+      }
+      if (previous?.store === source && previous.folder === folder) {
+        const state = useMindMapStore.getState();
+        state.applyViewState({ collapsedIds: previous.collapsedIds, focusNodeId: null, edgeMode: state.edgeMode });
+        if (previous.selection && result.document.nodes.has(previous.selection)) state.setSelectedNodeId(previous.selection);
+      }
+      overviewVisit.current = { store: source, folder, selection: useMindMapStore.getState().selectedNodeId, collapsedIds: [...useMindMapStore.getState().collapsedIds] };
+      setFiles(result.listing.entries); setFolders(result.listing.folders); setTruncated(Boolean(result.listing.truncated));
+      if (result.unreadable.length) setError(textRef.current.errors.unreadable(result.unreadable.length));
+      setFolderPath(folder); setDrawerOpen(false);
+    } catch (error) { console.error("[BloomMD] Folder overview failed:", error); setError(textRef.current.errors.folderFailed); }
+    finally { if (revision === navigationRevision.current) setOverviewLoading(false); }
+  }, [flushSave, saver, setDocument]);
+
   const switchStore = useCallback(async (next: MobileStore) => {
     await flushSave();
+    navigationRevision.current += 1;
+    setOverviewLoading(false);
+    overviewVisit.current = null;
     storeRef.current = next;
     setStore(next);
     setFolderPath("");
@@ -269,6 +337,8 @@ export function App() {
   // Another device (e.g. Obsidian on the Mac) changed or deleted the note while it was edited here.
   // The iPad's version is already kept as a copy next to the note; then the other version is shown.
   conflictRef.current = ({ path, copy, current }) => {
+    if (current) { navigationRevision.current += 1; setOverviewLoading(false); }
+    if (!copy) saveFailed.current = true;
     const conflictText = textRef.current.conflict;
     const kept = copy ? conflictText.kept(copy) : conflictText.notKept;
     void (async () => {
@@ -291,7 +361,7 @@ export function App() {
   };
 
   const handleSave = useCallback(async () => {
-    if (!document) return;
+    if (!document || isWorkspaceMindMap(document)) return;
     setSaving(true);
     setError(null);
     try {
@@ -410,6 +480,7 @@ export function App() {
   const handleNew = useCallback((kind: "file" | "folder" = "file") => {
     // A single file from the Files app has no folder to add notes or folders to.
     if (storeRef.current.kind === "file") return;
+    setCreationParent(null);
     setCreating(kind);
   }, []);
 
@@ -435,10 +506,18 @@ export function App() {
     if (files.some((entry) => entry.path.toLowerCase() === target.toLowerCase())) throw new Error(textRef.current.errors.noteExists(target));
     try {
       await flushSave();
+      navigationRevision.current += 1;
+      setOverviewLoading(false);
+      const before = useMindMapStore.getState();
+      if (isWorkspaceMindMap(before.document) && overviewVisit.current) {
+        overviewVisit.current.selection = before.selectedNodeId;
+        overviewVisit.current.collapsedIds = [...before.collapsedIds];
+      }
       const markdown = content ?? newNoteMarkdown(titleFromPath(target), crypto.randomUUID().slice(0, 8), new Date().toISOString());
       const doc = parseFile(target, markdown);
       const saved = await current.save({ document: doc, baseline: "" }, doc);
       saver.open(current, saved);
+      useMindMapStore.getState().setEditorVisible(false);
       setDocument(doc);
       // Show the folder the note is in, so it is in the list.
       setFolderPath(folderOf(target));
@@ -461,11 +540,12 @@ export function App() {
     try {
       await storeRef.current.createFolder(folder);
       await refreshFiles();
+      if (isWorkspaceMindMap(useMindMapStore.getState().document)) await openOverview(overviewVisit.current?.folder ?? "");
       return folder;
     } catch (error) {
       throw createFailure(error, textRef.current.errors.createFolderFailed);
     }
-  }, [folders, createFailure, refreshFiles]);
+  }, [folders, createFailure, refreshFiles, openOverview]);
 
   const handleImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -567,10 +647,11 @@ export function App() {
       else if (exportOpen) setExportOpen(false);
       else if (drawerOpen) setDrawerOpen(false);
       else if (editorVisible) useMindMapStore.getState().setEditorVisible(false);
+      else if (!isOverview && overviewVisit.current?.store === storeRef.current) void openOverview(overviewVisit.current.folder);
       else void flushSave().finally(() => void CapacitorApp.minimizeApp());
     });
     return () => { void listener.then((handle) => handle.remove()).catch(() => undefined); };
-  }, [drawerOpen, editorVisible, exportOpen, flushSave, helpOpen]);
+  }, [drawerOpen, editorVisible, exportOpen, flushSave, helpOpen, isOverview, openOverview]);
 
   const lastOpenedFile = useRef({ url: "", at: 0 });
 
@@ -700,8 +781,16 @@ export function App() {
   // The node panel reads maps through this; the source is picked per call, so a store switch or a
   // sign-in needs no new adapter.
   const platformAdapter = useMemo(
-    () => createMobilePlatformAdapter(() => mobileFileSource({ remote: remoteClientRef.current, store: storeRef.current })),
-    [],
+    () => ({ ...createMobilePlatformAdapter(() => mobileFileSource({ remote: remoteClientRef.current, store: storeRef.current })),
+      workspace: remoteClient || store.kind === "file" ? undefined : {
+        canEdit: true,
+        openSource: async (target: WorkspaceSourceTarget) => { await loadFile(target.file, null, storeRef.current, target); },
+        createEntry: (kind: "file" | "folder", parent: string) => {
+          setCreationParent(parent || overviewVisit.current?.folder || ""); setCreating(kind);
+        },
+      },
+    }),
+    [loadFile, remoteClient, store.kind],
   );
 
   // Handwriting files live next to the notes, like the Obsidian plugin keeps them.
@@ -758,7 +847,7 @@ export function App() {
           </span>
         )}
         <div className="ml-auto flex shrink-0 items-center">
-          <button
+          {!isOverview && <><button
             onClick={handleSave}
             aria-label={saved ? text.saved : text.save}
             title={saved ? text.saved : text.save}
@@ -797,7 +886,7 @@ export function App() {
                 </div>
               </>
             )}
-          </div>
+          </div></>}
         </div>
       </header>
 
@@ -814,6 +903,7 @@ export function App() {
         <>
           <div className="fixed inset-0 bg-[#1A1A1A]/20 z-40" onClick={() => setDrawerOpen(false)} />
           <aside className="fixed left-0 top-0 bottom-0 w-72 bg-white shadow-2xl z-50 flex flex-col border-r border-[#E8E4DF] pt-[env(safe-area-inset-top)]">
+            {!remoteClient && store.kind !== "file" && <button type="button" className="flex min-h-11 items-center gap-2 border-b border-[#E8E4DF] px-4 text-sm" data-testid="mobile-folder-overview" disabled={overviewLoading} onClick={() => void openOverview(shownFolder)}><Network size={17} />{t.folderOverview}</button>}
             <div className="h-12 border-b border-[#E8E4DF] flex items-center justify-between px-4">
               <h2 className="text-sm font-semibold font-[var(--font-display,Outfit,sans-serif)] text-[#1A1A1A]">{t.mindmaps}</h2>
               <button
@@ -968,13 +1058,21 @@ export function App() {
         <CreateEntryDialog
           kind={creating}
           folders={folders}
-          defaultParent={shownFolder}
+          defaultParent={creationParent ?? shownFolder}
           parentForFolders
           onCreate={creating === "file" ? createNote : createFolderEntry}
           onClose={() => setCreating(null)}
         />
       )}
 
+      {!remoteClient && store.kind !== "file" && <nav className="flex min-h-11 items-center gap-2 border-b border-[#E8E4DF] bg-white px-3 text-sm" aria-label={t.folderOverview}>
+        <button type="button" className="inline-flex min-h-11 shrink-0 items-center gap-2" data-testid="mobile-overview" disabled={overviewLoading}
+          onClick={() => void openOverview(overviewVisit.current?.store === store && !isOverview ? overviewVisit.current.folder : shownFolder)}>
+          {isOverview ? <RefreshCw size={17} /> : <ArrowLeft size={17} />}{isOverview ? (locale === "de" ? "Aktualisieren" : "Refresh") : t.folderOverview}
+        </button><span className="min-w-0 truncate text-xs text-[#666]">{isOverview ? document?.frontmatter.title : document?.filePath}</span>
+        {isOverview && <button type="button" className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-1" onClick={() => { setCreationParent(overviewVisit.current?.folder ?? ""); setCreating("file"); }}><FilePlus size={17} />{text.newMap}</button>}
+      </nav>}
+      {overviewLoading && <div role="status" className="px-3 py-2 text-sm">{t.loading}</div>}
       {/* Canvas */}
       <div className="flex-1 min-h-0 relative lg:flex">
         <div className={`relative h-full min-w-0 lg:flex-1 ${showConflictBanner ? "flex flex-col" : ""}`}>
@@ -1013,7 +1111,7 @@ export function App() {
               onClick={() => setSelectedNodeId(null)}
               aria-label={text.closeEditor}
               title={text.closeEditor}
-              className="absolute top-2 right-3 p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="absolute top-2 right-3 z-10 p-2 rounded-lg text-[#999] active:bg-[#F5F3F0] min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <X size={18} aria-hidden="true" />
             </button>

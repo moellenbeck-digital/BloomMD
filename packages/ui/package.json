@@ -27,11 +27,20 @@
     "./visible-layout": {
       "import": "./src/hooks/visible-layout.ts",
       "types": "./src/hooks/visible-layout.ts"
-    }
+    },
+    "./workspace-nodes": {
+      "import": "./src/workspace/workspace-nodes.tsx",
+      "types": "./src/workspace/workspace-nodes.tsx"
+    },
+    "./workspace-source": {
+      "import": "./src/utils/workspaceSource.ts",
+      "types": "./src/utils/workspaceSource.ts"
+    },
+    "./workspace-nodes.css": "./src/workspace/workspace-nodes.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun scripts/test-isolated.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",

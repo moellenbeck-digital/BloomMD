@@ -770,25 +770,20 @@ test.describe("discoverable workflows", () => {
     const folderNode = page.locator('[data-testid="mindmap-node"][data-node-kind="folder"][data-node-label="chapters"]').first();
     await expect(folderNode).toBeVisible();
     await folderNode.click();
-    await page.getByTestId("node-action-open-editor").click();
-    await expect(page.getByTestId("node-kind-select")).toHaveValue("folder");
-    await expect(page.getByTestId("node-structure-panel")).toBeVisible();
-    await expect(page.getByTestId("node-structure-panel")).toContainText("Ordnerpfad");
+    // Overview nodes represent real folders/files, so folders have no content editor.
+    await expect(page.getByTestId("node-action-open-editor")).toHaveCount(0);
     await expect(page.getByTestId("node-content-panel")).toHaveCount(0);
-    await expect(page.getByTestId("node-content-unavailable")).toBeVisible();
 
     const fileNode = page.locator('[data-testid="mindmap-node"][data-node-kind="file"][data-node-label="Local Intro"]').first();
     await expect(fileNode).toBeVisible();
-    await fileNode.click();
-    await page.getByTestId("node-action-open-editor").click();
-    await expect(page.getByTestId("node-kind-select")).toHaveValue("file");
-    await expect(page.getByTestId("node-file-panel")).toBeVisible();
-    await expect(page.getByTestId("node-file-panel")).toContainText("chapters/intro.md");
-    await expect(page.getByTestId("node-file-panel").getByRole("button", { name: "Datei wählen" })).toBeVisible();
-    await expect(page.getByTestId("node-content-panel")).toHaveCount(0);
-    await expect(page.getByTestId("node-content-unavailable")).toBeVisible();
-
-    await page.getByTestId("map-view-workspace").click();
+    await expect(fileNode).toContainText("chapters/intro.md");
+    await fileNode.getByTestId("workspace-open-file").click();
+    await expect(page.getByTestId("workspace-navigation-back")).toBeEnabled();
+    await expect(page.getByTestId("workspace-open-file")).toHaveCount(0);
+    await expect(page.locator('[data-testid="mindmap-node"][data-node-label="Local Intro"]').first()).toBeVisible();
+    await expect(page.getByTestId("workspace-readonly")).toBeVisible();
+    // The web host returns to its workspace graph; desktop restores its folder tree.
+    await page.getByTestId("workspace-navigation-back").click();
     await expect(page.getByTestId("map-view-workspace")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("workspace-map")).toBeVisible();
     await expect(page.getByTestId("workspace-node-folder").first()).toBeVisible();

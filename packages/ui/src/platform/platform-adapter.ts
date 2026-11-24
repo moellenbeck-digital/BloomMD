@@ -1,4 +1,5 @@
 import type { MindMapDocument, MindMapListEntry, MindMapNode } from "@bloommd/core/browser";
+import type { WorkspaceSourceTarget } from "../utils/workspaceSource";
 
 /**
  * What the shared UI needs from the host it runs in.
@@ -87,4 +88,10 @@ export interface PlatformApi {
 export interface PlatformAdapter {
   files: PlatformFiles;
   api: PlatformApi;
+  /** Navigation belongs to the host, which owns persistence, permissions and sync. */
+  workspace?: {
+    openSource(target: WorkspaceSourceTarget): Promise<void>;
+    canEdit: boolean;
+    createEntry?: (kind: "file" | "folder", parent: string) => void;
+  };
 }

@@ -18,7 +18,7 @@ export { FileContextMenu } from "./components/FileContextMenu";
 export { RenameMindmapDialog, type RenameMindmapDialogProps } from "./components/RenameMindmapDialog";
 export { useMindMapStore, configureLayoutWorker } from "./hooks/useMindMapStore";
 export type { CanvasMode, BranchSnapshot, LocalViewState } from "./hooks/useMindMapStore";
-export { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+export { useKeyboardShortcuts, focusRichEditorWhenReady } from "./hooks/useKeyboardShortcuts";
 export { layoutMindMap, type MindMapNodeData, type EdgeMode, type EdgeRelation, type RootRenameEvent } from "./hooks/useMindMapLayout";
 export { LocaleProvider, useLocale } from "./i18n/LocaleContext";
 export { useTheme, type Theme } from "./hooks/useTheme";
@@ -36,6 +36,7 @@ export {
 } from "./utils/theme-custom";
 export { ThemeCustomDialog, type ThemeCustomDialogProps } from "./components/ThemeCustomDialog";
 export { requestNodeFocus } from "./utils/nodeFocus";
+export { workspaceCreationFolder, resolveWorkspaceSourceNode, type WorkspaceSourceTarget } from "./utils/workspaceSource";
 export { useVisualViewport } from "./hooks/useVisualViewport";
 export { VIEWPORT_ROOT_CLASS, VIEWPORT_ROOT_FILL_CLASS } from "./utils/visual-viewport";
 export { type Locale, type Translations } from "./i18n/translations";

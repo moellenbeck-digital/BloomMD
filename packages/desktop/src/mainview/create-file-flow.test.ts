@@ -153,7 +153,7 @@ test("folder → create file → nodes → save keeps the file active despite a 
   const staleWorkspace = wire(await disk.readWorkspaceMindMap());
   fileChanged("existing.md");
   await waitFor(() => workspaceReadStarted);
-  click("toolbar-new");
+  await createFile();
   await waitFor(() => Boolean(createdFilename) && !isWorkspaceMindMap(ui.useMindMapStore.getState().document));
   delayedWorkspace.resolve(staleWorkspace);
   await new Promise((resolve) => setTimeout(resolve, 30));
@@ -171,7 +171,7 @@ test("folder → create file → nodes → save keeps the file active despite a 
 });
 
 test("a delayed watcher notification for the newly created file preserves nodes entered before saving", async () => {
-  click("toolbar-new");
+  await createFile();
   await waitFor(() => Boolean(createdFilename) && !isWorkspaceMindMap(ui.useMindMapStore.getState().document));
   const store = ui.useMindMapStore.getState();
   const doc = store.document!;
@@ -190,7 +190,7 @@ test("a delayed watcher notification for the newly created file preserves nodes 
 
 test("a watcher event between creating the file on disk and receiving the RPC response cannot reopen the workspace", async () => {
   delayedCreation = deferred<void>();
-  click("toolbar-new");
+  await createFile();
   await waitFor(() => createWritten);
   const previousReads = workspaceReads;
   fileChanged(createdFilename);
@@ -203,7 +203,7 @@ test("a watcher event between creating the file on disk and receiving the RPC re
 });
 
 test("actual external edits still reload a clean document but cannot overwrite unsaved nodes", async () => {
-  click("toolbar-new");
+  await createFile();
   await waitFor(() => Boolean(createdFilename) && !isWorkspaceMindMap(ui.useMindMapStore.getState().document));
   const doc = ui.useMindMapStore.getState().document!;
   const filePath = doc.filePath;
@@ -231,7 +231,7 @@ test("choose an empty folder → create file → add nodes → save writes every
   click("file-browser-toggle");
   click("change-folder");
   await waitFor(() => Boolean(container.querySelector('[data-testid="empty-workspace"]')));
-  click("toolbar-new");
+  await createFile();
   await waitFor(() => Boolean(createdFilename) && Boolean(ui.useMindMapStore.getState().document));
   const store = ui.useMindMapStore.getState();
   const doc = store.document!;
@@ -256,7 +256,7 @@ function setValue(element: HTMLInputElement | HTMLSelectElement, value: string) 
 }
 const byId = <T extends HTMLElement>(id: string) => container.querySelector<T>(`[data-testid="${id}"]`);
 async function openFileDialog() {
-  click("toolbar-create-from-template");
+  click(isWorkspaceMindMap(ui.useMindMapStore.getState().document) ? "toolbar-new" : "toolbar-create-from-template");
   await waitFor(() => Boolean(byId("create-entry-dialog")));
 }
 
@@ -300,4 +300,40 @@ test("without a template the new file is the usual blank one", async () => {
   await waitFor(() => createdFilename === "Leer.md");
   const doc = parseFile("Leer.md", createdMarkdown);
   expect([...doc.nodes.values()].map((node) => node.title)).toEqual(["Leer"]);
+});
+
+
+async function createFile() {
+  click("toolbar-new");
+  if (byId("create-entry-dialog")) {
+    setValue(byId<HTMLInputElement>("create-entry-name")!, "Testnotiz");
+    click("create-entry-submit");
+  }
+}
+
+test("returning to the overview saves edits without renaming the file and restores selection", async () => {
+  await disk.write(parseFile(join(directory, "Source Notes.md"), "# Source Notes\n"));
+  fileChanged("Source Notes.md");
+  await waitFor(() => [...ui.useMindMapStore.getState().document!.nodes.values()].some((node) => node.metadata?.file === "Source Notes.md"));
+  const overview = ui.useMindMapStore.getState().document!;
+  const file = [...overview.nodes.values()].find((node) => node.metadata?.kind === "file" && node.metadata.file === "Source Notes.md")!;
+  flushSync(() => ui.useMindMapStore.getState().setSelectedNodeId(file.id));
+  // The legacy resource event is retained for existing hosts and exercises the same loader.
+  window.dispatchEvent(new win.CustomEvent("bloommd:open-resource", { detail: { kind: "file", file: "Source Notes.md" } }) as unknown as Event);
+  await waitFor(() => !isWorkspaceMindMap(ui.useMindMapStore.getState().document));
+  const doc = ui.useMindMapStore.getState().document!;
+  flushSync(() => {
+    ui.useMindMapStore.getState().updateNodeContent(doc.rootId, "Saved on return");
+    ui.useMindMapStore.getState().addChildNode(doc.rootId, "Child");
+  });
+  click("workspace-breadcrumb");
+  await waitFor(() => isWorkspaceMindMap(ui.useMindMapStore.getState().document));
+  expect(await readFile(join(directory, "Source Notes.md"), "utf8")).toContain("Saved on return");
+  expect(ui.useMindMapStore.getState().selectedNodeId).toBe(file.id);
+  expect([...ui.useMindMapStore.getState().document!.nodes.values()].some((node) => node.title === "Child")).toBe(true);
+  // A late watcher refresh preserves both selection and forward navigation.
+  fileChanged("Source Notes.md");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(ui.useMindMapStore.getState().selectedNodeId).toBe(file.id);
+  expect(byId<HTMLButtonElement>("forward-to-file")?.disabled).toBe(false);
 });

@@ -1,3 +1,4 @@
+@import "./workspace-nodes.css";
 @import "./ink.css";
 
 @import "@xyflow/react/dist/style.css";
@@ -287,18 +288,18 @@
   transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
-.bloommd-flow-node:hover,
-.bloommd-flow-node.is-selected {
+.bloommd-flow-node:not(.bloommd-workspace-node):hover,
+.bloommd-flow-node:not(.bloommd-workspace-node).is-selected {
   border-color: #ff6b35;
   box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.16), 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
-.bloommd-flow-node.bloommd-level-1 {
+.bloommd-flow-node:not(.bloommd-workspace-node).bloommd-level-1 {
   border-color: #ff6b35;
   background: color-mix(in srgb, #ff6b35 12%, var(--background-primary));
 }
 
-.bloommd-flow-node.bloommd-level-2 {
+.bloommd-flow-node:not(.bloommd-workspace-node).bloommd-level-2 {
   border-color: color-mix(in srgb, #ff6b35 50%, var(--background-modifier-border));
 }
 
@@ -471,7 +472,7 @@
   stroke: var(--background-modifier-border-hover);
 }
 
-.react-flow__node.selected .bloommd-flow-node {
+.react-flow__node.selected .bloommd-flow-node:not(.bloommd-workspace-node) {
   border-color: #ff6b35;
 }
 
@@ -2411,4 +2412,28 @@ button.bloommd-agent-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Keep Obsidian theme ownership at the host boundary. */
+.bloommd-workspace-node .bloommd-node-meta:empty { display: none; }
+.bloommd-react-shell {
+  --bloommd-workspace-text: var(--text-normal);
+  --bloommd-workspace-muted: var(--text-muted);
+  --bloommd-workspace-surface: var(--background-primary);
+  --bloommd-workspace-folder: var(--background-secondary);
+  --bloommd-workspace-border: var(--background-modifier-border-hover);
+  --bloommd-workspace-font: var(--font-interface);
+}
+
+.bloommd-overview-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 12px; border-bottom: 1px solid var(--background-modifier-border); }
+.bloommd-overview-bar span { color: var(--text-muted); font-size: 12px; }
+.bloommd-overview-bar button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+.bloommd-workspace-node .bloommd-node-actions { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); flex-direction: row; width: max-content; }
+.bloommd-workspace-node .bloommd-node-actions button { width: auto; min-height: 44px; padding: 4px 10px; gap: 6px; white-space: nowrap; }
+.is-mobile .bloommd-workspace-node .bloommd-node-actions { display: flex; }
+.bloommd-node-actions button.bloommd-workspace-touch-open { display: none; }
+@media (pointer: coarse) {
+  .bloommd-node-actions button.bloommd-workspace-touch-open { display: inline-flex; }
+  .bloommd-workspace-node .bloommd-node-actions { scale: calc(1 / var(--bloommd-canvas-zoom, 1)); transform-origin: top center; }
+  .bloommd-workspace-node .bloommd-node-meta-button { min-height: 44px; min-width: 44px; }
 }

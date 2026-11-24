@@ -1,6 +1,6 @@
 # BloomMD Architecture
 
-Verified against: 2026-10-28 · BloomMD 0.5.1 · c4f794f
+Verified against: 2026-11-24 · BloomMD 0.6.0 · 255c646e
 
 ## Principles
 
@@ -72,6 +72,33 @@ The Wiki Bundle implements OKF v0.2 (reading v0.1 too): `index.md` declares `okf
 - Yjs undo/redo and character-level content updates
 
 The Obsidian plugin has its own React Flow host because it must use Obsidian views and vault APIs. It persists positions and viewport in local plugin data and edits the active Markdown note with conflict checks.
+
+Folder and file cards share the presentational `WorkspaceNodeContent` component through the narrow
+`@bloommd/ui/workspace-nodes` export and its `workspace-nodes.css` stylesheet. The app also uses it
+for workspace heading previews. Hosts provide translated labels, source paths and an optional
+open action; selection, tree semantics, canvas handles and persistence remain host-owned. The
+component does not import the app store, Yjs, React Flow or a platform API. Scoped CSS uses semantic
+tokens that the Obsidian host maps to its theme. The plugin builds it with Preact, and the public
+mirror generates and hashes standalone snapshots of both the component and its stylesheet.
+Obsidian folder maps load a file's heading preview only when it is expanded. Preview IDs are
+namespaced by source path and cannot enter editing, drag/reparent or mutation shortcuts. Opening a
+section reads the source again and checks its ID, title and content before opening the editor;
+a changed section opens the file with a notice instead. Returning waits for queued edits, refreshes
+the source preview and restores the selection and persisted folder view. Vault changes invalidate
+cached previews. Native Vault I/O and conflict-aware mutations stay in the plugin.
+
+The Capacitor shell offers the graphical overview alongside its file drawer for app storage and
+opened folders, including empty directories. It reads only the selected directory tree, with at
+most four concurrent reads, and uses the shared core workspace builder. Source paths remain relative
+to the store. The platform adapter opens files or exact source sections and preselects the creation
+folder. `NoteSaver.flush` completes before navigation; derived overviews are detached from the saver.
+Selection and collapsed branches survive the return. Files start collapsed on Mobile; touch file
+actions appear in the selected node's action bar at a size independent of canvas zoom. Single-file
+access and remote account lists do not advertise folder capabilities.
+
+These integrations share presentation, core parsing/structure and source-target resolution; they
+do not replace Obsidian's host state with the app's Zustand/Yjs store. Browser device-profile tests
+cover the mobile UI but do not substitute for native Files/iCloud/Android or Obsidian Mobile tests.
 
 ## Local Storage
 

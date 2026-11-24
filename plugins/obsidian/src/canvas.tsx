@@ -1,3 +1,5 @@
+import { isEditableHeading } from "./folder-preview";
+import { WorkspaceNodeContent, workspaceNodeLabels, type WorkspaceNodeLabels } from "./workspace-nodes";
 import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
@@ -19,7 +21,9 @@ import {
   useEdgesState,
   useInternalNode,
   useNodesState,
+  useNodesInitialized,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -98,6 +102,8 @@ export interface CanvasHeading {
   children: string[];
   kind: "heading" | "file" | "folder";
   filePath?: string;
+  sourceHeadingId?: string;
+  previewState?: "unloaded" | "loading" | "loaded" | "error";
   metadata?: MarkdownNodeMetadata;
   /** Changed by the agent since the map was last opened. */
   agentChanged?: boolean;
@@ -156,6 +162,10 @@ export interface CanvasActions {
   openExternalLink: (url: string) => void;
   switchFile: (path: string) => void;
   openFile: (path: string) => void;
+  openOverviewSource?: (path: string, sourceId?: string) => void;
+  loadFolderPreview?: (path: string) => Promise<void>;
+  createOverviewFile?: (folder: string) => void;
+  backToOverview?: () => void;
   readInk: (path: string) => Promise<string | null>;
   saveInk: (nodeId: string, path: string | null, svg: string, expectedSvg: string | null, conflictOf?: string) => Promise<string | null>;
   resolveEmbed: (link: string) => string | null;
@@ -190,6 +200,10 @@ export interface CanvasMenuItem {
 }
 
 export interface CanvasProps {
+  locale?: string;
+  overview?: boolean;
+  initialSelection?: string | null;
+  initialEditor?: boolean;
   filePath: string;
   headings: CanvasHeading[];
   rootId: string;
@@ -296,6 +310,7 @@ interface WikiLink {
 }
 
 interface BloomNodeData extends Record<string, unknown> {
+  workspaceLabels: WorkspaceNodeLabels;
   heading: CanvasHeading;
   collapsed: boolean;
   externalLinkCount: number;
@@ -334,7 +349,11 @@ interface BloomNodeData extends Record<string, unknown> {
   onToggleTask: (id: string) => void;
   onDelete: (id: string) => void;
   onOpenInspector: (id: string) => void;
-  onOpenFile: (path: string) => void;
+  onOpenFile: (path: string, sourceId?: string) => void;
+  onCreateFile?: (folder: string) => void;
+  editSectionLabel: string;
+  newFileLabel: string;
+  previewLabel: string;
   noteHandlers: LinkedNoteHandlers;
 }
 
@@ -367,9 +386,14 @@ function sameCanvasNodeSync(left: BloomFlowNode[], right: BloomFlowNode[]): bool
       && heading.level === nextHeading.level
       && heading.title === nextHeading.title
       && heading.content === nextHeading.content
+      && heading.kind === nextHeading.kind
+      && heading.filePath === nextHeading.filePath
+      && heading.sourceHeadingId === nextHeading.sourceHeadingId
+      && heading.previewState === nextHeading.previewState
       && heading.agentChanged === nextHeading.agentChanged
       && heading.children.join("\u0000") === nextHeading.children.join("\u0000")
       && metadataValue(heading.metadata) === metadataValue(nextHeading.metadata)
+      && node.data.workspaceLabels === next.data.workspaceLabels
       && node.data.collapsed === next.data.collapsed
       && unresolvedKey(node.data.unresolvedLinks) === unresolvedKey(next.data.unresolvedLinks)
       && node.data.showContent === next.data.showContent
@@ -608,7 +632,12 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
   const typedRef = useRef(false);
   const preview = contentPreview(heading.content);
   const isRoot = heading.parentId === null;
-  const editable = heading.kind === "heading";
+  const updateNodeInternals = useUpdateNodeInternals();
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => updateNodeInternals(id));
+    return () => cancelAnimationFrame(frame);
+  }, [id, heading.kind, heading.previewState, heading.children.length, updateNodeInternals]);
+  const editable = isEditableHeading(heading);
 
   useEffect(() => setTitle(heading.title), [heading.title]);
   useEffect(() => {
@@ -661,9 +690,12 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
 
   return (
     <div
-      className={`bloommd-flow-node bloommd-level-${Math.min(heading.level, 6)}${selected ? " is-selected" : ""}${data.sized ? " is-sized" : ""}${pressArmed ? " is-press-armed" : ""}${data.learnLevel !== null && data.learnStyle !== "off" ? ` learn-${data.learnStyle}` : ""}${data.learnDue ? " is-due" : ""}${data.outOfSession ? " is-out-of-session" : ""}${heading.agentChanged ? " is-agent-changed" : ""}`}
+      className={`bloommd-flow-node${!editable ? " bloommd-workspace-node" : ""} bloommd-level-${Math.min(heading.level, 6)}${selected ? " is-selected" : ""}${data.sized ? " is-sized" : ""}${pressArmed ? " is-press-armed" : ""}${data.learnLevel !== null && data.learnStyle !== "off" ? ` learn-${data.learnStyle}` : ""}${data.learnDue ? " is-due" : ""}${data.outOfSession ? " is-out-of-session" : ""}${heading.agentChanged ? " is-agent-changed" : ""}`}
       style={learnColor(data.learnColor)}
       data-node-id={id}
+      data-workspace-kind={!editable ? heading.kind : undefined}
+      data-node-root={isRoot ? "true" : "false"}
+      data-selected={selected ? "true" : "false"}
       data-learn-level={data.learnLevel ?? undefined}
       role="treeitem"
       aria-selected={selected}
@@ -689,7 +721,7 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         if (longPressFired.current) event.preventDefault();
       }}
       onPointerDown={(event) => {
-        if (event.pointerType === "mouse") return;
+        if (event.pointerType === "mouse" || (event.target as HTMLElement).closest("button, input")) return;
         longPressFired.current = false;
         const start = { x: event.clientX, y: event.clientY };
         longPress.current = { start, timer: window.setTimeout(() => {
@@ -731,9 +763,16 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
       onDoubleClick={(event) => {
         event.stopPropagation();
         if (editable) startEditing();
-        else if (heading.filePath) data.onOpenFile(heading.filePath);
+        else if (heading.kind === "folder") data.onToggleCollapse(id);
+        else if (heading.filePath) data.onOpenFile(heading.filePath, heading.sourceHeadingId);
       }}
       onKeyDown={(event) => {
+        if (!editable && event.key === "Enter" && event.target === event.currentTarget) {
+          event.preventDefault(); event.stopPropagation();
+          if (heading.kind === "folder") data.onToggleCollapse(id);
+          else if (heading.filePath) data.onOpenFile(heading.filePath, heading.sourceHeadingId);
+          return;
+        }
         if (editing || !editable) return;
         if (event.key === "F2" || event.key.toLowerCase() === "r") {
           event.preventDefault();
@@ -750,7 +789,9 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         onResizeEnd={(_, box) => data.onResize(id, box)}
       />
       {!isRoot && <Handle type="target" position={Position.Left} isConnectable={editable} className="bloommd-flow-handle bloommd-flow-handle--target" />}
-      <div className="bloommd-node-heading">
+      {!editable ? <WorkspaceNodeContent kind={heading.kind}
+        title={heading.title} path={heading.filePath} labels={data.workspaceLabels}
+        onOpen={heading.kind === "file" && heading.filePath ? () => data.onOpenFile(heading.filePath!) : undefined} /> : <div className="bloommd-node-heading">
         <span className="bloommd-node-level-dot" aria-label={editable ? `Heading level ${heading.level}` : heading.kind}>
           {editable ? `H${heading.level}` : heading.kind === "folder" ? "DIR" : "MD"}
         </span>
@@ -804,7 +845,7 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         ) : (
           <span className="bloommd-node-label">{heading.title}</span>
         )}
-      </div>
+      </div>}
       <TaskFacts metadata={heading.metadata} />
 
       {data.studyHidden ? (
@@ -822,7 +863,7 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         </button>
       ) : (
         <>
-          {data.showContent && preview && <div className="bloommd-node-preview">{preview}</div>}
+          {editable && data.showContent && preview && <div className="bloommd-node-preview">{preview}</div>}
           {data.showContent && data.drawingUrls[0] && (
             <img className="bloommd-node-drawing" src={data.drawingUrls[0]} alt={`Drawing in ${heading.title}`} draggable={false} />
           )}
@@ -838,18 +879,21 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         )}
         {data.learnDue && <span className="bloommd-learn-due" title="Due for review">Due</span>}
         {data.branchLabel && <span className="bloommd-learn-branch" title="Mastered in this branch"><Check size={12} />{data.branchLabel}</span>}
-        {heading.children.length > 0 && (
+        {(heading.children.length > 0 || (heading.previewState && heading.previewState !== "loaded")) && (
           <button
             type="button"
             className="bloommd-node-meta-button nodrag"
-            title={data.collapsed ? "Expand branch" : "Collapse branch"}
+            title={heading.previewState && heading.previewState !== "loaded" ? data.previewLabel : data.collapsed ? "Expand branch" : "Collapse branch"}
+            aria-label={heading.previewState && heading.previewState !== "loaded" ? data.previewLabel : data.collapsed ? "Expand branch" : "Collapse branch"}
+            aria-expanded={heading.previewState && heading.previewState !== "loaded" ? false : !data.collapsed}
+            disabled={heading.previewState === "loading"}
             onClick={(event) => {
               event.stopPropagation();
               data.onToggleCollapse(id);
             }}
           >
             {data.collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
-            {heading.children.length}
+            {heading.previewState && heading.previewState !== "loaded" ? data.previewLabel : heading.children.length}
           </button>
         )}
         {(data.externalLinkCount > 0 || data.wikiLinkCount > 0) && (
@@ -908,6 +952,11 @@ function BloomNode({ id, data, selected }: NodeProps<BloomFlowNode>) {
         )}
       </div>
 
+      {selected && !editable && <div className="bloommd-node-actions nodrag nopan">
+        {heading.kind === "file" && heading.filePath && <button type="button" className="bloommd-workspace-touch-open" onClick={(event) => { event.stopPropagation(); data.onOpenFile(heading.filePath!); }}><FileText size={15} />{data.workspaceLabels.openFile}</button>}
+        {heading.sourceHeadingId && heading.filePath && <button type="button" onClick={(event) => { event.stopPropagation(); data.onOpenFile(heading.filePath!, heading.sourceHeadingId); }}><PenLine size={15} />{data.editSectionLabel}</button>}
+        {heading.kind === "folder" && data.onCreateFile && <button type="button" onClick={(event) => { event.stopPropagation(); data.onCreateFile?.(heading.filePath ?? ""); }}><Plus size={15} />{data.newFileLabel}</button>}
+      </div>}
       {selected && !editing && editable && (
         <div className="bloommd-node-actions nodrag">
           <button type="button" title="Add child" onClick={(event) => { event.stopPropagation(); data.onAddChild(id); }}><Plus size={15} /></button>
@@ -1800,6 +1849,7 @@ function CanvasInner(props: CanvasProps) {
   const presentationIndex = Math.max(0, presentationIds.indexOf(selectedId ?? ""));
 
   const selectNode = useCallback((id: string, additive = false) => {
+    setAutoEditId(null);
     const next = additive ? new Set(selectedIdsRef.current) : new Set<string>();
     if (additive && next.has(id)) next.delete(id);
     else next.add(id);
@@ -1841,6 +1891,12 @@ function CanvasInner(props: CanvasProps) {
   }, [persist]);
 
   const toggleCollapse = useCallback((id: string) => {
+    const heading = headingsById.get(id);
+    if (heading?.kind === "file" && heading.previewState !== "loaded" && heading.filePath && props.actions.loadFolderPreview) {
+      void props.actions.loadFolderPreview(heading.filePath).catch((error: unknown) => console.error("BloomMD: preview failed", error));
+      setCollapsed((current) => { const next = new Set(current); next.delete(id); persist({ collapsed: [...next] }); return next; });
+      return;
+    }
     setCollapsed((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -1848,7 +1904,7 @@ function CanvasInner(props: CanvasProps) {
       persist({ collapsed: [...next] });
       return next;
     });
-  }, [persist]);
+  }, [persist, headingsById, props.actions]);
 
   const addChild = useCallback((id: string) => {
     if (!claimPendingAction(pendingChildAdds.current, id)) return;
@@ -2068,7 +2124,7 @@ function CanvasInner(props: CanvasProps) {
   const connectByStroke = useCallback((source: string, target: string) => {
     const from = headingsById.get(source);
     const to = headingsById.get(target);
-    if (!from || !to || from.kind !== "heading" || to.kind !== "heading") return;
+    if (!from || !to || !isEditableHeading(from) || !isEditableHeading(to)) return;
     const relations = [...(from.metadata?.relations ?? []).filter((relation) => relation.target !== target), { target }];
     void run(() => props.actions.updateMetadata(source, withRelations(from.metadata, relations), from.metadata)).then((saved) => {
       if (saved) showMapNotice(`Connected ${from.title} → ${to.title}`, () => applyHistoryRef.current("undo"));
@@ -2085,7 +2141,7 @@ function CanvasInner(props: CanvasProps) {
 
   const openNodeMenu = useCallback((id: string, position: { x: number; y: number }) => {
     const heading = headingsById.get(id);
-    if (!heading || heading.kind !== "heading") return;
+    if (!heading || !isEditableHeading(heading)) return;
     const isRoot = heading.parentId === null;
     const note = heading.metadata?.note;
     const items: CanvasMenuItem[] = [
@@ -2148,7 +2204,7 @@ function CanvasInner(props: CanvasProps) {
     }
     const layoutSizes = { ...measured, ...runtimeSizes.current };
     const automatic = autoLayout(props.headings, visibleIds, layoutSizes);
-    const stored = (id: string) => runtimePositions.current[id] ?? props.layout.positions[id];
+    const stored = (id: string) => props.overview ? undefined : runtimePositions.current[id] ?? props.layout.positions[id];
     const boxOf = (id: string, position: NodePosition) => ({
       ...position,
       width: layoutSizes[id]?.width ?? NODE_WIDTH,
@@ -2173,9 +2229,12 @@ function CanvasInner(props: CanvasProps) {
       .map((heading) => ({
         id: heading.id,
         type: "bloommd",
+        draggable: !props.overview,
+        connectable: !props.overview,
         position: positionOf(heading.id),
         ...(runtimeSizes.current[heading.id] ? { width: runtimeSizes.current[heading.id]!.width, height: runtimeSizes.current[heading.id]!.height } : {}),
         data: {
+          workspaceLabels: workspaceNodeLabels(props.locale ?? "en"),
           heading,
           collapsed: collapsed.has(heading.id),
           externalLinkCount: externalLinks(heading.content).length,
@@ -2210,10 +2269,19 @@ function CanvasInner(props: CanvasProps) {
           },
           onDelete: (id) => deleteNode(id),
           onOpenInspector: (id) => {
+            const heading = headingsById.get(id);
+            if (props.overview && heading?.filePath) {
+              (props.actions.openOverviewSource ?? props.actions.openFile)(heading.filePath, heading.sourceHeadingId);
+              return;
+            }
             selectNode(id);
             setInspectorOpen(true);
           },
-          onOpenFile: props.actions.openFile,
+          onOpenFile: props.overview ? props.actions.openOverviewSource ?? props.actions.openFile : props.actions.openFile,
+          onCreateFile: props.actions.createOverviewFile,
+          editSectionLabel: props.locale?.startsWith("de") ? "Abschnitt bearbeiten" : "Edit section",
+          newFileLabel: props.locale?.startsWith("de") ? "Neue Datei" : "New file",
+          previewLabel: props.locale?.startsWith("de") ? "Inhalte anzeigen" : "Show contents",
           noteHandlers,
         },
       }));
@@ -2245,17 +2313,19 @@ function CanvasInner(props: CanvasProps) {
     }));
     return { nodes, edges: [...edges, ...relations, ...backlinkList] };
     // sizeRevision is listed because sizes live in a ref and change without new props.
-  }, [addChild, addSibling, autoEditId, cards, collapsed, deleteNode, headingsById, learnData, noteHandlers, openNodeMenu, props.actions, reactFlow, reveal, revealed, sessionSet, study, props.headings, props.layout.positions, props.showNodeContent, backlinkModel, resetNodeSize, resizeNode, run, selectNode, sizeRevision, toggleCollapse, visibleIds]);
+  }, [addChild, addSibling, autoEditId, cards, collapsed, deleteNode, headingsById, learnData, noteHandlers, openNodeMenu, props.actions, reactFlow, reveal, revealed, sessionSet, study, props.locale, props.overview, props.headings, props.layout.positions, props.showNodeContent, backlinkModel, resetNodeSize, resizeNode, run, selectNode, sizeRevision, toggleCollapse, visibleIds]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<BloomFlowNode>(flowModel.nodes);
+  const nodesInitialized = useNodesInitialized();
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowModel.edges);
 
   useEffect(() => {
     setNodes((current) => {
+      const measured = new Map(current.map((node) => [node.id, node.measured]));
       const positions = new Map(current.map((node) => [node.id, node.position]));
       const selected = new Map(current.map((node) => [node.id, node.selected]));
       const next = flowModel.nodes.map((node) => {
-        const merged = { ...node, selected: selected.get(node.id) ?? false, position: positions.get(node.id) ?? node.position };
+        const merged = { ...node, measured: measured.get(node.id), selected: selected.get(node.id) ?? false, position: props.overview ? node.position : positions.get(node.id) ?? node.position };
         // A reset size must drop the fixed dimensions so the node measures its content again.
         if (node.width === undefined) {
           delete merged.width;
@@ -2266,7 +2336,7 @@ function CanvasInner(props: CanvasProps) {
       return sameCanvasNodeSync(current, next) ? current : next;
     });
     setEdges((current) => sameCanvasEdgeSync(current, flowModel.edges) ? current : flowModel.edges);
-  }, [flowModel, setEdges, setNodes]);
+  }, [flowModel, props.overview, setEdges, setNodes]);
 
   useEffect(() => {
     if (selectedId && !headingsById.has(selectedId)) {
@@ -2283,12 +2353,18 @@ function CanvasInner(props: CanvasProps) {
     runtimeSizes.current = { ...(props.layout.sizes ?? {}) };
     latestLayout.current = props.layout ?? EMPTY_LAYOUT;
     setCollapsed(new Set(props.layout.collapsed ?? []));
-    setSelectedId(props.rootId || null);
-    const next = new Set(props.rootId ? [props.rootId] : []);
+    const initial = props.initialSelection && headingsById.has(props.initialSelection) ? props.initialSelection : props.rootId;
+    if (props.initialEditor && initial) setCollapsed((current) => {
+      const next = new Set(current); let parent = headingsById.get(initial)?.parentId;
+      while (parent) { next.delete(parent); parent = headingsById.get(parent)?.parentId; }
+      return next;
+    });
+    setSelectedId(initial || null);
+    const next = new Set(initial ? [initial] : []);
     selectedIdsRef.current = next;
     setSelectedIds(next);
     setCopiedBranchIds([]);
-    setInspectorOpen(false);
+    setInspectorOpen(Boolean(props.initialEditor));
     setAutoEditId(null);
     setHelpOpen(false);
     setMode(props.layout.mode ?? "map");
@@ -2299,27 +2375,30 @@ function CanvasInner(props: CanvasProps) {
     setSessionIds(null);
     setOrderChoice(null);
     fitPending.current = true;
-    window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       reactFlow.setNodes((current) => current.map((node) => {
-        const selected = node.id === props.rootId;
+        const selected = node.id === initial;
         return node.selected === selected ? node : { ...node, selected };
       }));
-    }, 20);
-  }, [props.filePath]);
-
-  // Fitting into a pane that is still 0×0 (a leaf that was just split or is hidden) fits the map to
-  // React Flow's 500×500 fallback, and nothing refits once the real size arrives, which leaves the
-  // nodes outside the visible pane. So the first fit of a note waits until the pane has a size.
-  useEffect(() => {
-    if (!flowSized) return;
-    const timer = window.setTimeout(() => {
-      if (!fitPending.current) return;
-      fitPending.current = false;
-      if (props.layout.viewport) void reactFlow.setViewport(props.layout.viewport, { duration: 0 });
-      else void reactFlow.fitView({ padding: 0.25, duration: 180 });
+      if (initial) requestNodeFocus(initial);
     }, 20);
     return () => window.clearTimeout(timer);
-  }, [props.filePath, flowSized]);
+  }, [props.filePath]);
+
+  // Wait for this document's measured nodes, including lazy folder previews, before the first fit.
+  useEffect(() => {
+    if (!flowSized || !nodesInitialized || !fitPending.current) return;
+    const rendered = reactFlow.getNodes();
+    if (rendered.length !== visibleIds.size || rendered.some((node) => !visibleIds.has(node.id) || !node.measured?.width || !node.measured?.height)) return;
+    let cancelled = false;
+    const frame = requestAnimationFrame(() => {
+      const move = props.layout.viewport
+        ? reactFlow.setViewport(props.layout.viewport, { duration: 0 })
+        : reactFlow.fitView({ padding: 0.25, duration: 0 });
+      void move.then((applied) => { if (applied && !cancelled) fitPending.current = false; });
+    });
+    return () => { cancelled = true; cancelAnimationFrame(frame); };
+  }, [props.filePath, props.layout.viewport, flowSized, nodesInitialized, nodes, reactFlow, visibleIds]);
 
   useEffect(() => {
     if (!inspectorOpen) setInspectorFullscreen(false);
@@ -2337,9 +2416,15 @@ function CanvasInner(props: CanvasProps) {
   }, [mode, reactFlow, selectNode]);
 
   const openInspector = useCallback((id: string) => {
+    const heading = headingsById.get(id);
+    if (props.overview) {
+      if (heading?.filePath && heading.kind !== "folder") (props.actions.openOverviewSource ?? props.actions.openFile)(heading.filePath, heading.sourceHeadingId);
+      else toggleCollapse(id);
+      return;
+    }
     selectNode(id);
     setInspectorOpen(true);
-  }, [selectNode]);
+  }, [selectNode, headingsById, props.overview, props.actions, toggleCollapse]);
 
   /** Selects a node the way a click on it would, including React Flow's own selection. */
   const selectOnMap = useCallback((id: string) => {
@@ -2489,22 +2574,22 @@ function CanvasInner(props: CanvasProps) {
     // Keys pressed on inspector controls (e.g. Backspace on a drawing tool) must not edit the map.
     if (target.closest(".bloommd-inspector") && event.key !== "Escape") return;
 
-    if (primary && event.key.toLowerCase() === "c") {
+    if (!props.overview && primary && event.key.toLowerCase() === "c") {
       event.preventDefault();
       copySelection();
       return;
     }
-    if (primary && event.key.toLowerCase() === "v") {
+    if (!props.overview && primary && event.key.toLowerCase() === "v") {
       event.preventDefault();
       pasteSelection();
       return;
     }
-    if (primary && event.key.toLowerCase() === "z" && !event.shiftKey) {
+    if (!props.overview && primary && event.key.toLowerCase() === "z" && !event.shiftKey) {
       event.preventDefault();
       applyHistory("undo");
       return;
     }
-    if ((primary && event.key.toLowerCase() === "z" && event.shiftKey) || (primary && event.key.toLowerCase() === "y")) {
+    if (!props.overview && ((primary && event.key.toLowerCase() === "z" && event.shiftKey) || (primary && event.key.toLowerCase() === "y"))) {
       event.preventDefault();
       applyHistory("redo");
       return;
@@ -2516,7 +2601,15 @@ function CanvasInner(props: CanvasProps) {
       else selectNode(props.rootId);
       return;
     }
-    if (!selectedId || !selectedHeading || selectedHeading.kind !== "heading") return;
+    if (props.overview) {
+      if (event.key === "Enter" && selectedHeading) { event.preventDefault(); openInspector(selectedHeading.id); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); navigateSelection("child"); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); navigateSelection("parent"); }
+      else if (event.key === "ArrowDown") { event.preventDefault(); navigateSelection("next"); }
+      else if (event.key === "ArrowUp") { event.preventDefault(); navigateSelection("previous"); }
+      return;
+    }
+    if (!selectedId || !selectedHeading || !isEditableHeading(selectedHeading)) return;
     const currentId = selectedId;
     // Study mode: Space reveals the selected card, 1–5 rate a revealed one and move on to the next.
     if (study && mode === "map" && !primary && !event.altKey && sessionSet.has(currentId)) {
@@ -2648,7 +2741,11 @@ function CanvasInner(props: CanvasProps) {
     <div
       ref={shellRef}
       className={`bloommd-react-shell${focusMode ? " is-focus" : ""}`}
+      style={{ "--bloommd-canvas-zoom": props.layout.viewport?.zoom ?? 0.9 } as React.CSSProperties}
     >
+      {(props.overview || props.actions.backToOverview) && <div className="bloommd-overview-bar">
+        {props.overview ? <><strong>{props.locale?.startsWith("de") ? "Ordnerübersicht" : "Folder overview"}</strong><span>{props.locale?.startsWith("de") ? "Öffne eine Datei, um Inhalte zu bearbeiten." : "Open a file to edit its contents."}</span></> : <button type="button" onClick={props.actions.backToOverview}><ArrowLeft size={16} />{props.locale?.startsWith("de") ? "Zur Ordnerübersicht" : "Back to folder overview"}</button>}
+      </div>}
       <div className="bloommd-app-toolbar">
         <div className="bloommd-toolbar-group" aria-label="File navigation">
           <button type="button" className="bloommd-icon-control" title="Back to Markdown" aria-label="Back to Markdown" onClick={props.actions.openMarkdown}><ArrowLeft size={17} /></button>
@@ -2695,7 +2792,7 @@ function CanvasInner(props: CanvasProps) {
           ><Link2 size={15} /><span>Backlinks</span></button>
         )}
         <span className="bloommd-toolbar-spacer" />
-        <div className="bloommd-toolbar-group" aria-label="Editing tools">
+        {!props.overview && <div className="bloommd-toolbar-group" aria-label="Editing tools">
           {props.sharedStatus && <span className={`bloommd-share-status is-${props.sharedStatus}`} title={sharedStatusLabel(props.sharedStatus)}><Cloud size={14} />{sharedStatusLabel(props.sharedStatus)}</span>}
           <SaveState state={saveState} />
           <button type="button" className="bloommd-icon-control" title="Copy selected branches (Cmd/Ctrl+C)" aria-label="Copy selected branches" disabled={selectedIds.size === 0} onClick={copySelection}><Copy size={17} /></button>
@@ -2703,11 +2800,12 @@ function CanvasInner(props: CanvasProps) {
           <button type="button" className="bloommd-icon-control" title="Undo (Cmd/Ctrl+Z)" aria-label="Undo" disabled={!props.canUndo} onClick={() => applyHistory("undo")}><Undo2 size={17} /></button>
           <button type="button" className="bloommd-icon-control" title="Redo (Cmd/Ctrl+Shift+Z)" aria-label="Redo" disabled={!props.canRedo} onClick={() => applyHistory("redo")}><Redo2 size={17} /></button>
         </div>
+        }
         <div className="bloommd-toolbar-group" aria-label="Canvas tools">
           {mode === "map" && <button type="button" className="bloommd-icon-control" title="Auto layout" aria-label="Auto layout" onClick={performAutoLayout}><Sparkles size={17} /></button>}
           {mode === "map" && <button type="button" className="bloommd-icon-control" title="Fit view" aria-label="Fit view" onClick={() => void reactFlow.fitView({ padding: 0.25, duration: 240 })}><LocateFixed size={17} /></button>}
           {selectedId && <button type="button" className="bloommd-icon-control" title="Focus selected node" aria-label="Focus selected node" onClick={() => focusNode(selectedId)}><Focus size={17} /></button>}
-          {mode === "map" && (
+          {!props.overview && mode === "map" && (
             <button
               type="button"
               className="bloommd-icon-control"
@@ -2722,7 +2820,7 @@ function CanvasInner(props: CanvasProps) {
               <Signature size={17} />
             </button>
           )}
-          {mode === "map" && (
+          {!props.overview && mode === "map" && (
             <button
               type="button"
               className="bloommd-icon-control"
@@ -2743,7 +2841,7 @@ function CanvasInner(props: CanvasProps) {
               <ImageDown size={17} />
             </button>
           )}
-          <button
+          {!props.overview && <button
             type="button"
             className="bloommd-icon-control"
             title={study ? "Leave study mode" : "Study mode: cover node contents"}
@@ -2756,7 +2854,7 @@ function CanvasInner(props: CanvasProps) {
             }}
           >
             <GraduationCap size={17} />
-          </button>
+          </button>}
           <button
             type="button"
             className="bloommd-icon-control"
@@ -2768,7 +2866,7 @@ function CanvasInner(props: CanvasProps) {
             {focusMode ? <Shrink size={17} /> : <Expand size={17} />}
           </button>
           <button type="button" className="bloommd-icon-control" title="Shortcut help (F1 or ?)" aria-label="Shortcut help" onClick={() => setHelpOpen(true)}><Keyboard size={17} /></button>
-          {props.canOpenApp !== false && <button type="button" className="bloommd-text-control" title="Open this note in BloomMD Desktop, at the selected node" aria-label="Open app" onClick={() => props.actions.openBloomMD(selectedId)}><ExternalLink size={15} /><span>Open app</span></button>}
+          {!props.overview && props.canOpenApp !== false && <button type="button" className="bloommd-text-control" title="Open this note in BloomMD Desktop, at the selected node" aria-label="Open app" onClick={() => props.actions.openBloomMD(selectedId)}><ExternalLink size={15} /><span>Open app</span></button>}
         </div>
       </div>
 
@@ -2789,7 +2887,10 @@ function CanvasInner(props: CanvasProps) {
               setSelectedIds((current) => current.size === 0 ? current : next);
             }}
             onSelectionChange={({ nodes: selectedNodes }) => {
-              const ids = new Set(selectedNodes.map((node) => node.id));
+              const ids = new Set(selectedNodes.map((node) => node.id).filter((id) => headingsById.has(id)));
+              // React Flow can report the previous document while controlled nodes are replaced.
+              // Only an explicit pane click clears selection.
+              if (ids.size === 0) return;
               if (!sameStringSet(selectedIdsRef.current, ids)) {
                 selectedIdsRef.current = ids;
                 setSelectedIds(ids);
@@ -2821,6 +2922,7 @@ function CanvasInner(props: CanvasProps) {
             deleteKeyCode={null}
             selectionKeyCode="Shift"
             multiSelectionKeyCode="Shift"
+            onMove={(_, viewport) => shellRef.current?.style.setProperty("--bloommd-canvas-zoom", String(viewport.zoom))}
             onMoveEnd={(_, viewport) => persist({ viewport })}
             proOptions={{ hideAttribution: true }}
           >
@@ -2910,7 +3012,7 @@ function CanvasInner(props: CanvasProps) {
             </div>
           )}
           {/* In study mode the editor would show covered content, and the study bar needs the room. */}
-          {!inspectorOpen && !study && mode === "map" && selectedHeading?.kind === "heading" && (
+          {!inspectorOpen && !study && mode === "map" && selectedHeading && isEditableHeading(selectedHeading) && (
             <button type="button" className="bloommd-open-inspector" onClick={() => setInspectorOpen(true)} title="Open content editor">
               <PanelRightOpen size={16} />
               Edit content
@@ -2918,7 +3020,7 @@ function CanvasInner(props: CanvasProps) {
           )}
         </main>
 
-        {inspectorOpen && selectedHeading?.kind === "heading" && (
+        {inspectorOpen && selectedHeading && isEditableHeading(selectedHeading) && (
           <Inspector
             key={selectedHeading.id}
             heading={selectedHeading}

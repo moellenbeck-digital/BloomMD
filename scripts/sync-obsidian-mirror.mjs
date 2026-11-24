@@ -33,6 +33,8 @@ const assetPathSource = join(root, "packages", "core", "src", "asset-path.ts");
 const generatedAssetPathPath = "src/asset-path.ts";
 const mapExportSource = join(root, "packages", "ui", "src", "export", "map-export-core.ts");
 const generatedMapExportPath = "src/map-export.ts";
+const workspaceNodeSource = join(root, "packages", "ui", "src", "workspace");
+const workspaceNodeModules = ["workspace-nodes.tsx", "workspace-nodes.css"];
 const inkModules = ["ink-geometry.ts", "ink-document.ts", "ink-state.ts", "ink-preview.tsx", "ink-editor.tsx", "pen-gestures.ts", "ink.css"];
 
 // Agent rules shared with the wiki CLI: the plugin re-exports packages/core/src/agent-ledger.ts; the
@@ -63,6 +65,7 @@ const excludedCanonicalPaths = new Set([
   generatedAssetPathPath,
   generatedMapExportPath,
   ...inkModules.map((file) => `src/${file}`),
+  ...workspaceNodeModules.map((file) => `src/${file}`),
 ]);
 
 async function walk(directory) {
@@ -123,6 +126,9 @@ async function canonicalManifest() {
   entries.push({ path: "packages/core/src/opml.ts", bytes: await readBytes(opmlSource) });
   entries.push({ path: "packages/core/src/asset-path.ts", bytes: await readBytes(assetPathSource) });
   entries.push({ path: "packages/ui/src/export/map-export-core.ts", bytes: await readBytes(mapExportSource) });
+  for (const file of workspaceNodeModules) {
+    entries.push({ path: `packages/ui/src/workspace/${file}`, bytes: await readBytes(join(workspaceNodeSource, file)) });
+  }
   // The plugin's handwriting modules are re-exports of packages/ink: hash the shared sources.
   for (const file of inkModules) {
     entries.push({ path: `packages/ink/src/${file}`, bytes: await readBytes(join(inkSource, file)) });
@@ -260,6 +266,20 @@ async function expectedFiles() {
   if (packageJson.dependencies?.["@bloommd/ink"]) {
     delete packageJson.dependencies["@bloommd/ink"];
   }
+  const workspaceNodeSnapshots = [];
+  for (const file of workspaceNodeModules) {
+    const source = await readFile(join(workspaceNodeSource, file), "utf8");
+    const sourceSha256 = await sha256(Buffer.from(source));
+    const generated = [
+      "/**",
+      " * GENERATED FILE — DO NOT EDIT.",
+      ` * Snapshot of packages/ui/src/workspace/${file} by the BloomMD mirror sync.`,
+      ` * Source SHA-256: ${sourceSha256}`,
+      " */",
+      source,
+    ].join("\n");
+    workspaceNodeSnapshots.push({ file, sourceSha256, generated: Buffer.from(generated) });
+  }
   const inkSnapshots = [];
   for (const file of inkModules) {
     const source = await readFile(join(inkSource, file), "utf8");
@@ -301,6 +321,7 @@ async function expectedFiles() {
     "scripts/obsidian-mirror-shared-runtime.ts",
     "scripts/obsidian-mirror-shared-runtime.d.ts",
     "packages/ink/src",
+    "packages/ui/src/workspace",
   ]);
   const generated = new Map([
     [generatedParserPath, Buffer.from(generatedParser)],
@@ -316,6 +337,7 @@ async function expectedFiles() {
     [generatedSharedRuntimeTypesPath, await readBytes(sharedRuntimeTypesSource)],
     ["package.json", Buffer.from(`${JSON.stringify(packageJson, null, 2)}\n`)],
     ...inkSnapshots.map((entry) => [`src/${entry.file}`, entry.generated]),
+    ...workspaceNodeSnapshots.map((entry) => [`src/${entry.file}`, entry.generated]),
   ]);
 
   // This attestation describes the exact static source snapshot that is copied into the public
@@ -388,6 +410,12 @@ async function expectedFiles() {
       generatedPath: generatedMapExportPath,
       generatedSha256: await sha256(Buffer.from(generatedMapExport)),
     },
+    workspaceNodes: await Promise.all(workspaceNodeSnapshots.map(async (entry) => ({
+      sourcePath: `packages/ui/src/workspace/${entry.file}`,
+      sourceSha256: entry.sourceSha256,
+      generatedPath: `src/${entry.file}`,
+      generatedSha256: await sha256(entry.generated),
+    }))),
     ink: await Promise.all(inkSnapshots.map(async (entry) => ({
       sourcePath: `packages/ink/src/${entry.file}`,
       sourceSha256: entry.sourceSha256,

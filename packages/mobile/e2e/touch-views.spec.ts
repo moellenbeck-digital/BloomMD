@@ -118,10 +118,8 @@ test("map, node, editor and file drawer on the built assets", async ({ page }) =
   await expectTargetsAndFit(page, "file drawer");
 });
 
-// Known deviation, see docs/MOBILE-MATRIX.md (Abweichung 10): the close button of the editor sheet is
-// `absolute` without a z-index, so the editor header after it in the DOM covers it. The size scan
-// skips covered elements on purpose, so only this check can see it. Remove `fixme` with the fix.
-test.fixme("the close button of the editor sheet takes the tap", async ({ page }) => {
+// Regression: the editor header must not cover its close button.
+test("the close button of the editor sheet takes the tap", async ({ page }) => {
   await openDemoMap(page);
   const root = page.getByTestId("mindmap-node").first();
   const box = (await root.boundingBox())!;
@@ -136,4 +134,53 @@ test.fixme("the close button of the editor sheet takes the tap", async ({ page }
   expect(reachable, "the element at the centre of the close button is the button").toBe(true);
   await close.tap();
   await expect(page.getByTestId("mobile-node-editor")).toBeHidden();
+});
+
+test("folder preview opens the exact section, saves it and returns; new files use the selected folder", async ({ page }) => {
+  await openDemoMap(page);
+  await page.getByTestId("mobile-overview").tap();
+  const file = page.locator('[data-workspace-kind="file"]');
+  await expect(file).toBeVisible();
+  await fitView(page);
+  await page.screenshot({ path: test.info().outputPath("folder-overview.png") });
+  await file.getByTestId("node-toggle-children").tap();
+  await fitView(page);
+  await expectTargetsAndFit(page, "folder overview");
+  const heading = page.locator('[data-workspace-kind="heading"]').filter({ hasText: "Unterkunft" }).first();
+  await heading.tap();
+  await page.getByTestId("node-action-open-source").tap();
+  const sheet = page.getByTestId("mobile-node-editor");
+  await expect(sheet).toBeVisible();
+  const field = sheet.locator('[data-testid="node-content-panel"] [contenteditable="true"]').first();
+  await expect(field).toContainText("Kleines Hotel in Alfama");
+  await page.screenshot({ path: test.info().outputPath("source-editor.png") });
+  await field.fill("Hotel geändert auf dem Telefon.");
+  // Navigate immediately: the active note must flush before the read-only overview replaces it.
+  await page.getByTestId("mobile-overview").tap();
+  await expect(sheet).toBeHidden();
+  await page.locator('[data-workspace-kind="file"]').tap();
+  await page.getByTestId("node-action-open-source").tap();
+  await expect(page.locator('[data-workspace-kind="file"]')).toHaveCount(0);
+  await page.getByTestId("mobile-overview").tap();
+  await page.locator('[data-workspace-kind="heading"]').filter({ hasText: "Unterkunft" }).first().tap();
+  await page.getByTestId("node-action-open-source").tap();
+  await expect(field).toContainText("Hotel geändert auf dem Telefon.");
+  await page.getByTestId("mobile-overview").tap();
+  await page.getByTestId("mobile-files-toggle").tap();
+  await page.getByTestId("mobile-new-folder").tap();
+  await page.getByTestId("create-entry-name").fill("Team");
+  await page.getByTestId("create-entry-submit").tap();
+  await expect(page.getByTestId("create-entry-dialog")).toBeHidden();
+  const folder = page.locator('[data-workspace-kind="folder"][data-node-label="Team"]');
+  await expect(folder, "an empty physical folder is visible").toBeVisible();
+  await fitView(page);
+  await folder.tap();
+  await page.getByTestId("node-action-toolbar").getByRole("button", { name: "Neue Datei" }).tap();
+  await expect(page.getByTestId("create-entry-parent")).toHaveValue("Team");
+  await page.getByTestId("create-entry-name").fill("Mobil erstellt");
+  await page.getByTestId("create-entry-submit").tap();
+  await expect(page.getByTestId("create-entry-dialog")).toBeHidden();
+  await page.getByTestId("mobile-overview").tap();
+  await expect(page.locator('[data-workspace-kind="file"]')).toHaveCount(2);
+  await expect(page.locator('[data-workspace-kind="file"]').filter({ hasText: "Mobil erstellt" })).toBeVisible();
 });

@@ -40,7 +40,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test"
+    "test": "bun scripts/test-isolated.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",

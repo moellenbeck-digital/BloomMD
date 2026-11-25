@@ -1,0 +1,125 @@
+{
+ "erhoben": "2026-11-25, ab 23:56 CET",
+ "befehle": {
+  "live": "python3 docs/seo/audit.py https://bloommd.io",
+  "lokal": "bun run build:marketing; bun run --cwd apps/marketing start --port 3341; python3 docs/seo/audit.py http://localhost:3341",
+  "schema": "python3 docs/seo/schema-check.py <lokales audit.jsonl> <vocabulary.json>"
+ },
+ "live": {
+  "seiten": [
+   {"path": "/", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/en", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/download", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/download?lang=en", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/obsidian", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/obsidian?lang=en", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/docs", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/docs?lang=en", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/impressum", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/datenschutz", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/missing-seo-test", "status": 404, "h1": 1, "hreflang": 3},
+   {"path": "/robots.txt", "status": 200, "h1": 0, "hreflang": 0},
+   {"path": "/llms.txt", "status": 404, "h1": 1, "hreflang": 3},
+   {"path": "/sitemap.xml", "status": 200, "h1": 0, "hreflang": 0}
+  ],
+  "botStatusStartseite": {
+   "GPTBot": 200,
+   "OAI-SearchBot": 200,
+   "ChatGPT-User": 200,
+   "ClaudeBot": 200,
+   "Claude-SearchBot": 200,
+   "Claude-User": 200,
+   "PerplexityBot": 200,
+   "Perplexity-User": 200,
+   "Google-Extended": 200,
+   "Applebot-Extended": 200,
+   "Bingbot": 200,
+   "CCBot": 200
+  },
+  "llmsLinks": {},
+  "schemaStartseite": [
+   {
+    "@type": "SoftwareApplication",
+    "operatingSystem": "Web, macOS, Linux"
+   }
+  ],
+  "llmsFullStatus": 404
+ },
+ "lokal": {
+  "seiten": [
+   {"path": "/", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/en", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/download", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/download?lang=en", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/obsidian", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/obsidian?lang=en", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/docs", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/docs?lang=en", "status": 200, "h1": 1, "hreflang": 3},
+   {"path": "/impressum", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/datenschutz", "status": 200, "h1": 1, "hreflang": 0},
+   {"path": "/missing-seo-test", "status": 404, "h1": 1, "hreflang": 3},
+   {"path": "/robots.txt", "status": 200, "h1": 0, "hreflang": 0},
+   {"path": "/llms.txt", "status": 200, "h1": 0, "hreflang": 0},
+   {"path": "/sitemap.xml", "status": 200, "h1": 0, "hreflang": 0}
+  ],
+  "botStatusStartseite": {
+   "GPTBot": 200,
+   "OAI-SearchBot": 200,
+   "ChatGPT-User": 200,
+   "ClaudeBot": 200,
+   "Claude-SearchBot": 200,
+   "Claude-User": 200,
+   "PerplexityBot": 200,
+   "Perplexity-User": 200,
+   "Google-Extended": 200,
+   "Applebot-Extended": 200,
+   "Bingbot": 200,
+   "CCBot": 200
+  },
+  "llmsLinks": {
+   "/": 200,
+   "/docs": 200,
+   "/download": 200,
+   "/obsidian": 200,
+   "/en": 200,
+   "/docs?lang=en": 200,
+   "/download?lang=en": 200,
+   "/obsidian?lang=en": 200
+  },
+  "schemaStartseite": [
+   {
+    "@type": "WebSite",
+    "@id": "https://bloommd.io/#website"
+   },
+   {
+    "@type": "SoftwareApplication",
+    "@id": "https://bloommd.io/#software",
+    "operatingSystem": "Web, macOS, Linux, iOS, Android"
+   }
+  ],
+  "llmsFullStatus": 404
+ },
+ "schemaCheck": {
+  "typed_nodes": 13,
+  "vocabulary": "schema.org vocabulary supplied as argv[2]",
+  "validation": "type/property existence, inherited domain, object and scalar ranges",
+  "errors": [],
+  "vocabularySha256": "0a4b8c4c910fc831ec8695196510973390906a5ee34dc6b862dfec4d21a12f74"
+ },
+ "marketingTests": {
+  "befehl": "bun run --cwd apps/marketing test",
+  "ausgabe": [
+   "574 pass",
+   "0 fail",
+   "1527 expect() calls",
+   "Ran 574 tests across 35 files. [5.92s]"
+  ]
+ },
+ "build": {
+  "befehl": "bun run build:marketing",
+  "exit": 0,
+  "ausgabe": [
+   "@bloommd/marketing build: ✓ Generating static pages using 9 workers (126/126) in 1090ms"
+  ]
+ }
+}

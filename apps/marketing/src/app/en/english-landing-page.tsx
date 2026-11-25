@@ -928,9 +928,11 @@ export function EnglishLandingPage() {
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
+    "@id": "https://bloommd.io/#software",
+    url: "https://bloommd.io/",
     name: "BloomMD",
     applicationCategory: "ProductivityApplication",
-    operatingSystem: "Web, macOS, Linux",
+    operatingSystem: "Web, macOS, Linux, iOS, Android",
     description: "BloomMD turns open Markdown files into interactive visual maps without introducing a new file format. Local-first, portable and available as a beta.",
   };
 

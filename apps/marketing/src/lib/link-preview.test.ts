@@ -248,7 +248,8 @@ describe("requestPinned", () => {
     const port = await listen(() => ({ body: HTML }));
     // The pinned address is a closed port on another loopback address: no fallback to the server on 127.0.0.1.
     await expect(requestPinned(target(port, [{ address: "127.0.0.2", family: 4 }]), AbortSignal.timeout(5000))).rejects.toThrow();
-  });
+    // Leave time for the request abort on hosts that silently drop this address.
+  }, 10_000);
 
   test("decodes gzip and enforces the size limit on the decoded body", async () => {
     const big = "a".repeat(5000);

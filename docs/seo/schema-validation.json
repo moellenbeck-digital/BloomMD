@@ -1,0 +1,6 @@
+{
+  "typed_nodes": 13,
+  "vocabulary": "schema.org vocabulary supplied as argv[2]",
+  "validation": "type/property existence, inherited domain, object and scalar ranges",
+  "errors": []
+}

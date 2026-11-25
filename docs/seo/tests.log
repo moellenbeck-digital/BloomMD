@@ -1,0 +1,646 @@
+$ bun test src
+bun test v1.4.5 (a7733435c)
+
+src/proxy.test.ts:
+(pass) marketing proxy > rewrites the public desktop update path and marks the internal request [0.83ms]
+(pass) marketing proxy > does not expose the implementation route directly [0.04ms]
+(pass) marketing proxy > lets the well-known association files and /open pass untouched [0.14ms]
+(pass) marketing proxy > rewrites the public Plausible paths to the internal handlers without redirect or gate [0.07ms]
+(pass) marketing proxy > does not expose the Plausible handlers directly or proxy other /_plausible paths [0.09ms]
+
+src/proxy-waitlist.test.ts:
+(pass) retired waitlist pages > /waitlist redirects permanently (308) to the registration [0.20ms]
+(pass) retired waitlist pages > /waitlist/ redirects permanently (308) to the registration [0.04ms]
+(pass) retired waitlist pages > /waitlist/bestaetigt redirects permanently (308) to the registration [0.03ms]
+(pass) retired waitlist pages > /waitlist/ungueltig redirects permanently (308) to the registration [0.02ms]
+(pass) retired waitlist pages > keeps the language of the visitor [0.04ms]
+(pass) waitlist pages that keep working > the unsubscribe page is not redirected [0.03ms]
+(pass) waitlist pages that keep working > the unsubscribe API is not redirected [0.02ms]
+(pass) waitlist pages that keep working > an unrelated path is untouched [0.02ms]
+(pass) the waitlist admin is gone > the proxy no longer answers for /admin/waitlist (no basic-auth gate, no 401/503) [0.02ms]
+
+src/app/legal-pages.test.tsx:
+(pass) Impressum > renders every BLOOMMD_LEGAL_* value when they are set [6.68ms]
+(pass) Impressum > shows the placeholder instead of empty fields when a required value is missing [0.40ms]
+(pass) Impressum phone line > is dropped when BLOOMMD_LEGAL_PHONE is unset, empty, a dash or "Nicht angegeben" [2.98ms]
+(pass) Impressum phone line > is shown when a number is set [0.56ms]
+(pass) Impressum phone line > hasLegalValue treats empty, dash and the default as not filled in [0.06ms]
+(pass) Datenschutzerklärung > has the app section, share links and agents in German and English [1.50ms]
+(pass) Datenschutzerklärung > names retention, deletion and the processors in German and English [0.81ms]
+(pass) Datenschutzerklärung > names the Plausible instance of Ops and the flow through the own domain, not the former host [1.31ms]
+(pass) Datenschutzerklärung > does not leave placeholders for the owner in the public text [0.87ms]
+
+src/lib/openclaw-plugin-proxy.test.ts:
+(pass) OpenClaw plugin proxy > resolves the newest non-draft release asset and keeps GitHub hidden [0.72ms]
+(pass) OpenClaw plugin proxy > resolves an immutable versioned release asset [0.10ms]
+(pass) OpenClaw plugin proxy > uses the private archive when the new repository has no plugin release [0.09ms]
+(pass) OpenClaw plugin proxy > returns a cache-safe 404 when no released plugin exists [0.05ms]
+
+src/lib/plausible-bundle-check.test.ts:
+(pass) inlinedValues > reads the literal value of a key, with any quote style [0.14ms]
+(pass) checkPlausibleBundle > passes with domain, script path and API host in the same chunk [0.20ms]
+(pass) checkPlausibleBundle > passes with a configured domain such as localhost when it is the expected one [0.02ms]
+(pass) checkPlausibleBundle > fails for an empty domain even though bloommd.io is in the bundle as text [0.03ms]
+(pass) checkPlausibleBundle > fails when the domain is not baked in at all (variable unset at build time) [0.02ms]
+(pass) checkPlausibleBundle > fails when the baked-in domain differs from the expected one [0.02ms]
+(pass) checkPlausibleBundle > fails for the legacy host, in the client bundle or anywhere else in the build [0.04ms]
+(pass) checkPlausibleBundle > fails when the script path is missing in the chunk with the domain [0.02ms]
+(pass) checkPlausibleBundle > fails when the expected domain is empty
+(pass) describePlausibleBundleReport > lists file names and counts, not contents [0.05ms]
+
+src/lib/beta-invite-client.test.ts:
+(pass) beta invite client > is disabled until the shared internal secret exists [0.04ms]
+(pass) beta invite client > creates waitlist-sourced beta invites through the app internal API [0.18ms]
+(pass) beta invite client > maps invite statuses by lowercase email [0.10ms]
+
+src/lib/waitlist.test.ts:
+(pass) without a database > claiming an invitation reports nothing was claimed rather than throwing [0.23ms]
+(pass) without a database > unsubscribing reports failure rather than throwing [0.04ms]
+(pass) without a database > the export is empty rather than undefined [0.04ms]
+(pass) without a database > counts are zero rather than missing [0.07ms]
+(pass) the export contract > confirmedAt is a string, not whatever the driver returns [0.04ms]
+(pass) admin overview contract > returns counters and all admin entries with explicit status [0.26ms]
+(pass) waitlist retention cleanup > uses conservative default retention days with bounded env overrides [0.04ms]
+(pass) waitlist retention cleanup > dry-runs stale pending and unsubscribed entries before deleting anything [0.16ms]
+(pass) waitlist retention cleanup > deletes stale pending and unsubscribed entries only when explicitly applied [0.10ms]
+(pass) the one-time invitation > claims an address only while it is confirmed, not unsubscribed and not invited [0.20ms]
+(pass) the one-time invitation > a second claim for the same address gets nothing [0.05ms]
+(pass) the one-time invitation > the unsubscribe token is random, not derived from the address, and stored only as a hash [0.15ms]
+(pass) the one-time invitation > marking addresses as transferred touches only confirmed, not unsubscribed, not yet invited entries and sends nothing (#105) [0.06ms]
+(pass) the one-time invitation > releasing takes the marker and its token back [0.07ms]
+(pass) the one-time invitation > lists only confirmed, not unsubscribed, not yet invited addresses [0.06ms]
+(pass) the one-time invitation > unsubscribing works with the token from the old confirmation mail and from the invitation mail [0.05ms]
+(pass) the one-time invitation > the schema gets the marker columns without touching existing rows [0.04ms]
+(pass) purge > the retention period is the named 90 days
+(pass) purge > refuses while confirmed addresses have not been invited yet [0.04ms]
+(pass) purge > refuses when no invitation was ever sent
+(pass) purge > refuses before 90 days after the last invitation and names the date [0.02ms]
+(pass) purge > allows exactly after the 90 days, and an empty table at any time [0.01ms]
+(pass) purge > the library refuses to delete inside the retention period — no delete statement runs [0.09ms]
+(pass) purge > deletes all entries once the period is over and reports how many [0.06ms]
+(pass) schema initialization > serializes DDL behind a database advisory lock [0.11ms]
+(pass) waitlist rate limits > stores attempts in the waitlist database when configured [0.14ms]
+
+src/lib/docs-content.test.ts:
+(pass) help pages exist in both languages > there are help pages at all
+(pass) help pages exist in both languages > agent-wissen-en.md has agent-wissen.md
+(pass) help pages exist in both languages > agent-wissen.md has agent-wissen-en.md
+(pass) help pages exist in both languages > android-en.md has android.md
+(pass) help pages exist in both languages > android.md has android-en.md
+(pass) help pages exist in both languages > closed-beta-zugang-en.md has closed-beta-zugang.md
+(pass) help pages exist in both languages > closed-beta-zugang.md has closed-beta-zugang-en.md
+(pass) help pages exist in both languages > collaboration-en.md has collaboration.md
+(pass) help pages exist in both languages > collaboration.md has collaboration-en.md
+(pass) help pages exist in both languages > command-line-tools-en.md has command-line-tools.md
+(pass) help pages exist in both languages > command-line-tools.md has command-line-tools-en.md
+(pass) help pages exist in both languages > desktop-en.md has desktop.md
+(pass) help pages exist in both languages > desktop.md has desktop-en.md
+(pass) help pages exist in both languages > export-en.md has export.md
+(pass) help pages exist in both languages > export.md has export-en.md
+(pass) help pages exist in both languages > fehlerbehebung-en.md has fehlerbehebung.md
+(pass) help pages exist in both languages > fehlerbehebung.md has fehlerbehebung-en.md
+(pass) help pages exist in both languages > index-en.md has index.md
+(pass) help pages exist in both languages > index.md has index-en.md
+(pass) help pages exist in both languages > ipad-en.md has ipad.md
+(pass) help pages exist in both languages > ipad.md has ipad-en.md
+(pass) help pages exist in both languages > lokal-oder-cloud-en.md has lokal-oder-cloud.md
+(pass) help pages exist in both languages > lokal-oder-cloud.md has lokal-oder-cloud-en.md
+(pass) help pages exist in both languages > obsidian-en.md has obsidian.md
+(pass) help pages exist in both languages > obsidian.md has obsidian-en.md
+(pass) help pages exist in both languages > okf-wiki-en.md has okf-wiki.md
+(pass) help pages exist in both languages > okf-wiki.md has okf-wiki-en.md
+(pass) help pages exist in both languages > openclaw-agent-en.md has openclaw-agent.md
+(pass) help pages exist in both languages > openclaw-agent.md has openclaw-agent-en.md
+(pass) help pages exist in both languages > web-en.md has web.md
+(pass) help pages exist in both languages > web.md has web-en.md
+(pass) help pages exist in both languages > agent-wissen.md and agent-wissen-en.md show the same number of pictures [0.59ms]
+(pass) help pages exist in both languages > android.md and android-en.md show the same number of pictures [0.27ms]
+(pass) help pages exist in both languages > closed-beta-zugang.md and closed-beta-zugang-en.md show the same number of pictures [0.45ms]
+(pass) help pages exist in both languages > collaboration.md and collaboration-en.md show the same number of pictures [0.36ms]
+(pass) help pages exist in both languages > command-line-tools.md and command-line-tools-en.md show the same number of pictures [0.15ms]
+(pass) help pages exist in both languages > desktop.md and desktop-en.md show the same number of pictures [0.33ms]
+(pass) help pages exist in both languages > export.md and export-en.md show the same number of pictures [0.12ms]
+(pass) help pages exist in both languages > fehlerbehebung.md and fehlerbehebung-en.md show the same number of pictures [0.37ms]
+(pass) help pages exist in both languages > index.md and index-en.md show the same number of pictures [0.12ms]
+(pass) help pages exist in both languages > ipad.md and ipad-en.md show the same number of pictures [1.26ms]
+(pass) help pages exist in both languages > lokal-oder-cloud.md and lokal-oder-cloud-en.md show the same number of pictures [0.21ms]
+(pass) help pages exist in both languages > obsidian.md and obsidian-en.md show the same number of pictures [0.16ms]
+(pass) help pages exist in both languages > okf-wiki.md and okf-wiki-en.md show the same number of pictures [0.50ms]
+(pass) help pages exist in both languages > openclaw-agent.md and openclaw-agent-en.md show the same number of pictures [0.24ms]
+(pass) help pages exist in both languages > web.md and web-en.md show the same number of pictures [0.14ms]
+(pass) pictures > agent-wissen-en.md: every picture exists under public/ and has an alt text [0.17ms]
+(pass) pictures > agent-wissen.md: every picture exists under public/ and has an alt text [0.08ms]
+(pass) pictures > android-en.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > android.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > closed-beta-zugang-en.md: every picture exists under public/ and has an alt text [0.13ms]
+(pass) pictures > closed-beta-zugang.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > collaboration-en.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > collaboration.md: every picture exists under public/ and has an alt text [0.05ms]
+(pass) pictures > command-line-tools-en.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > command-line-tools.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > desktop-en.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > desktop.md: every picture exists under public/ and has an alt text [0.05ms]
+(pass) pictures > export-en.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > export.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > fehlerbehebung-en.md: every picture exists under public/ and has an alt text [0.05ms]
+(pass) pictures > fehlerbehebung.md: every picture exists under public/ and has an alt text [0.12ms]
+(pass) pictures > index-en.md: every picture exists under public/ and has an alt text [0.05ms]
+(pass) pictures > index.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > ipad-en.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > ipad.md: every picture exists under public/ and has an alt text [0.02ms]
+(pass) pictures > lokal-oder-cloud-en.md: every picture exists under public/ and has an alt text [0.03ms]
+(pass) pictures > lokal-oder-cloud.md: every picture exists under public/ and has an alt text [0.03ms]
+(pass) pictures > obsidian-en.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > obsidian.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > okf-wiki-en.md: every picture exists under public/ and has an alt text [0.03ms]
+(pass) pictures > okf-wiki.md: every picture exists under public/ and has an alt text [0.03ms]
+(pass) pictures > openclaw-agent-en.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > openclaw-agent.md: every picture exists under public/ and has an alt text [0.05ms]
+(pass) pictures > web-en.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > web.md: every picture exists under public/ and has an alt text [0.04ms]
+(pass) pictures > index.md contains at least one picture [0.04ms]
+(pass) pictures > index-en.md contains at least one picture [0.02ms]
+(pass) pictures > desktop.md contains at least one picture [0.04ms]
+(pass) pictures > desktop-en.md contains at least one picture [0.03ms]
+(pass) pictures > web.md contains at least one picture [0.03ms]
+(pass) pictures > web-en.md contains at least one picture [0.02ms]
+(pass) pictures > closed-beta-zugang.md contains at least one picture [0.03ms]
+(pass) pictures > closed-beta-zugang-en.md contains at least one picture [0.02ms]
+(pass) pictures > lokal-oder-cloud.md contains at least one picture [0.03ms]
+(pass) pictures > lokal-oder-cloud-en.md contains at least one picture [0.03ms]
+(pass) pictures > okf-wiki.md contains at least one picture [0.03ms]
+(pass) pictures > okf-wiki-en.md contains at least one picture [0.03ms]
+(pass) pictures > obsidian.md contains at least one picture [0.04ms]
+(pass) pictures > obsidian-en.md contains at least one picture [0.03ms]
+(pass) pictures > fehlerbehebung.md contains at least one picture [0.04ms]
+(pass) pictures > fehlerbehebung-en.md contains at least one picture [0.03ms]
+(pass) links between help pages > agent-wissen-en.md: every /docs link points to an existing page [0.14ms]
+(pass) links between help pages > agent-wissen.md: every /docs link points to an existing page [0.07ms]
+(pass) links between help pages > android-en.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > android.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > closed-beta-zugang-en.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > closed-beta-zugang.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > collaboration-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > collaboration.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > command-line-tools-en.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > command-line-tools.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > desktop-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > desktop.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > export-en.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > export.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > fehlerbehebung-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > fehlerbehebung.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > index-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > index.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > ipad-en.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > ipad.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > lokal-oder-cloud-en.md: every /docs link points to an existing page [0.02ms]
+(pass) links between help pages > lokal-oder-cloud.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > obsidian-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > obsidian.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > okf-wiki-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > okf-wiki.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > openclaw-agent-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > openclaw-agent.md: every /docs link points to an existing page [0.04ms]
+(pass) links between help pages > web-en.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > web.md: every /docs link points to an existing page [0.03ms]
+(pass) links between help pages > the troubleshooting page is linked from the start, desktop and web pages [0.19ms]
+
+src/lib/roadmap.test.ts:
+(pass) keeps the ten planning themes visible when GitHub is unavailable [0.21ms]
+(pass) shows the ten planning themes in their declared order [0.47ms]
+(pass) maps the current GitHub board statuses without inventing feedback status [0.12ms]
+
+src/lib/desktop-update-proxy.test.ts:
+(pass) desktop update proxy > allows only the versioned Linux Pacman artifacts and stable architecture aliases [0.08ms]
+(pass) desktop update proxy > rejects unknown artifacts without contacting GitHub [0.20ms]
+(pass) desktop update proxy > forwards range requests and keeps GitHub out of the client response [0.27ms]
+(pass) desktop update proxy > uses the private archive when the new repository has no desktop release [0.10ms]
+(pass) desktop update proxy > uses short revalidation for update metadata and supports HEAD [0.07ms]
+(pass) desktop update proxy > resolves a stable Linux alias to the matching architecture in the latest release [0.07ms]
+
+src/lib/telemetryPrivacy.test.ts:
+(pass) telemetry privacy > redacts sensitive query values [0.07ms]
+(pass) telemetry privacy > removes users, headers, cookies, and console breadcrumbs [0.09ms]
+(pass) telemetry privacy > allows only documented marketing analytics events and properties [0.05ms]
+(pass) telemetry privacy > allows the registration CTA without leaking properties [0.01ms]
+(pass) telemetry privacy > the retired waitlist events are no longer allowed
+(pass) telemetry privacy > allows Plausible conversion events without personal properties [0.01ms]
+(pass) telemetry privacy > keeps marketing pageviews path-only
+(pass) telemetry privacy > requires both PostHog key and host before analytics can run [0.01ms]
+
+src/lib/email.test.ts:
+(pass) waitlist invitation mail > goes to the provider with the recipient and links to the registration and the unsubscribe route [0.36ms]
+(pass) waitlist invitation mail > tells the recipient this is the only mail and when the address is deleted [0.05ms]
+(pass) waitlist invitation mail > English mail links to the English registration and unsubscribe page [0.05ms]
+(pass) waitlist invitation mail > does not send localhost links from production mail if runtime env is stale [0.05ms]
+(pass) waitlist invitation mail > reports a provider error instead of claiming it was sent [0.08ms]
+
+src/lib/templates.test.ts:
+(pass) @t78 validateTemplateMetadata > accepts all real templates [1.29ms]
+(pass) @t78 validateTemplateMetadata > copies only the known fields [0.05ms]
+(pass) @t78 validateTemplateMetadata > rejects a missing field [0.05ms]
+(pass) @t78 validateTemplateMetadata > rejects wrong types and empty strings [0.06ms]
+(pass) @t78 validateTemplateMetadata > rejects empty arrays [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects a slug that differs from the directory [0.04ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath templates/novel-writing/../research-project/template.md [0.04ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath templates/novel-writing/../../secret.md [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath /etc/passwd [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath C:/windows/system.ini [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath templates\novel-writing\template.md [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath templates/research-project/template.md [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath templates/novel-writing/ [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects filePath README.md [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects previewImage preview.png [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects previewImage //evil.example/x.png [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects previewImage https://evil.example/x.png [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects version 1.0 [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects version v1.0.0 [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects version 01.0.0 [0.02ms]
+(pass) @t78 validateTemplateMetadata > rejects version latest [0.02ms]
+(pass) @t78 validateTemplateMetadata > accepts version 1.2.3 [0.03ms]
+(pass) @t78 validateTemplateMetadata > accepts version 0.0.1-beta.1 [0.04ms]
+(pass) @t78 validateTemplateMetadata > accepts version 2.0.0+build.5 [0.03ms]
+(pass) @t78 validateTemplateMetadata > rejects root null
+(pass) @t78 validateTemplateMetadata > rejects root []
+(pass) @t78 validateTemplateMetadata > rejects root "text"
+(pass) @t78 validateTemplateMetadata > rejects root 7
+(pass) @t78 validateTemplateMetadata > rejects root undefined
+(pass) @t78 validateTemplateMetadata > violation reasons never contain content values [0.04ms]
+(pass) @t78 templates with injected root > all 6 real templates are valid and listed [4.09ms]
+(pass) @t78 templates with injected root > works against the real repository by default [2.34ms]
+(pass) @t78 templates with injected root > listTemplates skips a template with a missing field and logs slug, file and path [2.97ms]
+(pass) @t78 templates with injected root > getTemplate returns null for a slug that differs from the directory [2.52ms]
+(pass) @t78 templates with injected root > getTemplate returns null for a filePath with .. [2.34ms]
+(pass) @t78 templates with injected root > broken JSON is handled like a schema violation [2.42ms]
+(pass) @t78 templates with injected root > a root that is not an object is rejected [2.21ms]
+(pass) @t78 templates with injected root > an unreadable metadata file is handled like a schema violation [2.08ms]
+(pass) @t78 templates with injected root > a missing markdown file yields null instead of throwing [2.26ms]
+(pass) @t78 templates with injected root > a template directory that is missing entirely is skipped [2.71ms]
+
+src/lib/app-links.test.ts:
+(pass) apple-app-site-association > is absent without a team id and never carries a placeholder [0.06ms]
+(pass) apple-app-site-association > binds /open and /open/* to the app of the team [0.02ms]
+(pass) assetlinks.json > is absent without a valid fingerprint [0.09ms]
+(pass) assetlinks.json > lists every valid fingerprint once, normalized [0.06ms]
+(pass) wellKnownResponse > answers 404 without a body when there is nothing to publish [0.06ms]
+(pass) wellKnownResponse > serves application/json and no body for HEAD [0.05ms]
+(pass) parseOpenRequest / appOpenUrl > builds the scheme link from validated values only [0.12ms]
+(pass) parseOpenRequest / appOpenUrl > drops invalid nodes and rejects invalid targets [0.04ms]
+
+src/lib/command-tool-proxy.test.ts:
+(pass) command tool proxy > streams the latest command-tool binary from a cli release [0.46ms]
+(pass) command tool proxy > uses the private archive when the new repository has no CLI release [0.10ms]
+(pass) command tool proxy > rejects unknown artifact names without contacting GitHub [0.03ms]
+(pass) command tool proxy > resolves the agent runtime from the same versioned release contract [0.07ms]
+
+src/lib/plausible.test.ts:
+(pass) Plausible configuration > requires all public values [0.03ms]
+(pass) Plausible configuration > returns the configured first-party endpoints [0.01ms]
+(pass) Plausible configuration > rejects foreign hosts, the former host and other paths [0.04ms]
+(pass) Plausible host gate > loads only on the configured domain and its www host [0.02ms]
+(pass) Plausible host gate > keeps the test system and look-alike hosts out of the production statistics [0.02ms]
+
+src/lib/news-drafts.test.ts:
+(pass) release news drafts > creates bilingual drafts and excludes sensitive-looking release lines [2.71ms]
+
+src/lib/docs.test.ts:
+(pass) parseDocPage > reads title, description, order and slug [0.21ms]
+(pass) parseDocPage > keeps draft help pages unpublished [0.06ms]
+
+src/lib/plausible-proxy.test.ts:
+(pass) Plausible proxy target > defaults to the Ops instance [0.02ms]
+(pass) Plausible proxy target > accepts an http(s) override and keeps only its origin [0.01ms]
+(pass) Plausible proxy target > falls back to the default for anything else [0.03ms]
+(pass) Plausible event proxy > forwards User-Agent and X-Forwarded-For to the instance [0.24ms]
+(pass) Plausible event proxy > never forwards cookies, authorization or internal headers [0.04ms]
+(pass) Plausible event proxy > omits headers the browser did not send and defaults the content type [0.01ms]
+(pass) Plausible event proxy > is never cacheable and returns the status of the instance [0.09ms]
+(pass) Plausible event proxy > uses the configured target [0.04ms]
+(pass) Plausible event proxy > rejects oversized bodies without calling the instance [0.05ms]
+(pass) Plausible event proxy > answers 502 when the instance is unreachable or redirects [0.06ms]
+(pass) Plausible script proxy > serves the script of the instance with a short cache [0.10ms]
+(pass) Plausible script proxy > answers 502 without caching when the instance fails [0.06ms]
+
+src/lib/link-preview.test.ts:
+(pass) link previews > extracts Open Graph metadata and resolves relative images [0.17ms]
+(pass) link previews > rejects local and non-web preview targets [0.20ms]
+(pass) address blocklists > blocks IPv4 0.0.0.0 [0.01ms]
+(pass) address blocklists > blocks IPv4 0.1.2.3
+(pass) address blocklists > blocks IPv4 10.0.0.1
+(pass) address blocklists > blocks IPv4 100.64.0.1
+(pass) address blocklists > blocks IPv4 100.127.255.255
+(pass) address blocklists > blocks IPv4 127.0.0.1
+(pass) address blocklists > blocks IPv4 127.255.255.254
+(pass) address blocklists > blocks IPv4 169.254.169.254
+(pass) address blocklists > blocks IPv4 172.16.0.1
+(pass) address blocklists > blocks IPv4 172.31.255.255
+(pass) address blocklists > blocks IPv4 192.0.0.1
+(pass) address blocklists > blocks IPv4 192.0.2.10
+(pass) address blocklists > blocks IPv4 192.88.99.1
+(pass) address blocklists > blocks IPv4 192.168.1.1
+(pass) address blocklists > blocks IPv4 198.18.0.1
+(pass) address blocklists > blocks IPv4 198.19.255.255
+(pass) address blocklists > blocks IPv4 198.51.100.7
+(pass) address blocklists > blocks IPv4 203.0.113.9
+(pass) address blocklists > blocks IPv4 224.0.0.1
+(pass) address blocklists > blocks IPv4 239.255.255.250
+(pass) address blocklists > blocks IPv4 240.0.0.1
+(pass) address blocklists > blocks IPv4 255.255.255.255
+(pass) address blocklists > allows IPv4 1.1.1.1
+(pass) address blocklists > allows IPv4 8.8.8.8
+(pass) address blocklists > allows IPv4 93.184.216.34
+(pass) address blocklists > allows IPv4 100.63.255.255
+(pass) address blocklists > allows IPv4 100.128.0.1
+(pass) address blocklists > allows IPv4 172.15.255.255
+(pass) address blocklists > allows IPv4 172.32.0.1
+(pass) address blocklists > allows IPv4 192.0.1.1
+(pass) address blocklists > allows IPv4 192.169.0.1
+(pass) address blocklists > allows IPv4 198.17.255.255
+(pass) address blocklists > allows IPv4 198.20.0.1
+(pass) address blocklists > allows IPv4 223.255.255.255
+(pass) address blocklists > blocks IPv6 :: [0.03ms]
+(pass) address blocklists > blocks IPv6 ::1
+(pass) address blocklists > blocks IPv6 ::2
+(pass) address blocklists > blocks IPv6 ::ffff:127.0.0.1 [0.04ms]
+(pass) address blocklists > blocks IPv6 ::ffff:7f00:1
+(pass) address blocklists > blocks IPv6 ::ffff:10.1.2.3 [0.01ms]
+(pass) address blocklists > blocks IPv6 ::ffff:a9fe:a9fe [0.02ms]
+(pass) address blocklists > blocks IPv6 ::ffff:0:0
+(pass) address blocklists > blocks IPv6 ::127.0.0.1
+(pass) address blocklists > blocks IPv6 64:ff9b::7f00:1
+(pass) address blocklists > blocks IPv6 64:ff9b::808:808
+(pass) address blocklists > blocks IPv6 64:ff9b:1::1
+(pass) address blocklists > blocks IPv6 100::1
+(pass) address blocklists > blocks IPv6 2001::1 [0.01ms]
+(pass) address blocklists > blocks IPv6 2001:0:4136:e378:8000:63bf:3fff:fdd2
+(pass) address blocklists > blocks IPv6 2001:db8::1
+(pass) address blocklists > blocks IPv6 2001:db8:ffff::1
+(pass) address blocklists > blocks IPv6 2002:7f00:1::1
+(pass) address blocklists > blocks IPv6 2002:0a00:0001::
+(pass) address blocklists > blocks IPv6 3fff::1
+(pass) address blocklists > blocks IPv6 fc00::1
+(pass) address blocklists > blocks IPv6 fd12:3456::1
+(pass) address blocklists > blocks IPv6 fe80::1
+(pass) address blocklists > blocks IPv6 fe80::1%eth0
+(pass) address blocklists > blocks IPv6 fe90::1
+(pass) address blocklists > blocks IPv6 fea0::1
+(pass) address blocklists > blocks IPv6 febf::1
+(pass) address blocklists > blocks IPv6 fec0::1
+(pass) address blocklists > blocks IPv6 fef0::1
+(pass) address blocklists > blocks IPv6 ff00::1
+(pass) address blocklists > blocks IPv6 ff02::1
+(pass) address blocklists > blocks IPv6 4000::1
+(pass) address blocklists > blocks IPv6 8000::1
+(pass) address blocklists > allows IPv6 2606:4700:4700::1111 [0.02ms]
+(pass) address blocklists > allows IPv6 2a00:1450:4001:81b::200e
+(pass) address blocklists > allows IPv6 2001:4860:4860::8888
+(pass) address blocklists > allows IPv6 2002:5db8:d822::1
+(pass) address blocklists > allows IPv6 ::ffff:8.8.8.8
+(pass) address blocklists > allows IPv6 ::ffff:5db8:d822
+(pass) address blocklists > treats unparsable addresses as blocked [0.02ms]
+(pass) address blocklists > blocks bracketed IPv6 literals in URLs [0.15ms]
+(pass) address blocklists > blocks non-canonical IPv4 literals the URL parser normalizes [0.06ms]
+(pass) host names > normalizes case, trailing dots and brackets [0.01ms]
+(pass) host names > rejects local names even with a trailing dot or different case [0.05ms]
+(pass) host names > resolves a name once with all addresses and rejects it if any address is not public [0.13ms]
+(pass) fetchLinkPreview > connects only to the addresses it validated and resolves each host once (DNS rebinding) [0.23ms]
+(pass) fetchLinkPreview > follows redirects with a fresh resolve, check and pin per hop [0.12ms]
+(pass) fetchLinkPreview > rejects redirects to internal targets, other protocols and downgrades [0.17ms]
+(pass) fetchLinkPreview > rejects a redirect target that only resolves to a private network [0.06ms]
+(pass) fetchLinkPreview > allows HTTP to HTTPS upgrades and keeps the redirect limit [0.09ms]
+(pass) fetchLinkPreview > keeps the HTTP status, content type and size checks [0.08ms]
+(pass) requestPinned > connects to the pinned address, never resolves the name, and keeps the host name in the Host header [8.47ms]
+(pass) requestPinned > never uses an address outside the pinned set [5002.65ms]
+(pass) requestPinned > decodes gzip and enforces the size limit on the decoded body [17.09ms]
+(pass) requestPinned > rejects unsupported content encodings [6.16ms]
+(pass) requestPinned > rejects an already aborted signal [1.66ms]
+(pass) requestPinned > aborts a request that never answers [311.39ms]
+
+src/lib/production-config.test.ts:
+(pass) marketing app production config > accepts a complete public marketing configuration without app secrets [7.01ms]
+(pass) marketing app production config > allows Sentry to be deferred for Demo M1 but validates real values when set [0.25ms]
+(pass) marketing app production config > allows exactly one CMS value: the read token, checked for its shape (ADR 0001, section 4) [0.51ms]
+(pass) marketing app production config > rejects every other CMS value: database, Payload secret and the keys that sign the app's calls [0.18ms]
+(pass) marketing app production config > rejects app database, auth, sync and billing secrets [0.12ms]
+(pass) marketing app production config > rejects the obsolete runtime deployment switch [0.11ms]
+(pass) marketing app production config > requires distinct app and marketing origins [0.11ms]
+(pass) marketing app production config > requires a public HTTPS macOS desktop download URL [0.12ms]
+(pass) marketing app production config > requires a TLS waitlist database when persistence is enabled [0.09ms]
+(pass) marketing app production config > requires an internal app URL when beta invite forwarding is enabled [0.15ms]
+(pass) marketing app production config > accepts analytics disabled for M1 and validates PostHog only when enabled [0.25ms]
+(pass) marketing app production config > validates the first-party Plausible configuration when enabled [0.39ms]
+(pass) marketing app production config > rejects placeholder legal identity values [0.16ms]
+
+src/lib/build-info.test.ts:
+(pass) marketing build info > reports the marketing package and deployment [0.62ms]
+(pass) marketing build info > can ignore server-only metadata for client-rendered labels [2.74ms]
+
+src/lib/posts.test.ts:
+(pass) marketing posts > maps bilingual filenames to one stable slug [0.15ms]
+(pass) marketing posts > parses publishable frontmatter and removes a repeated title [1.11ms]
+(pass) marketing posts > does not publish drafts or invalid dates [0.22ms]
+(pass) marketing posts > loads German and English posts newest first [23.38ms]
+(pass) pictures in posts > blog/bloommd-fuer-ipad-obsidian-vault-als-mind-map-en.md: every picture has an alt text and exists under public/ [0.29ms]
+(pass) pictures in posts > blog/bloommd-fuer-ipad-obsidian-vault-als-mind-map.md: every picture has an alt text and exists under public/ [0.22ms]
+(pass) pictures in posts > blog/bloommd-und-obsidian-en.md: every picture has an alt text and exists under public/ [0.17ms]
+(pass) pictures in posts > blog/bloommd-und-obsidian.md: every picture has an alt text and exists under public/ [0.27ms]
+(pass) pictures in posts > blog/concept-maps-mit-apple-pencil-in-obsidian.md: every picture has an alt text and exists under public/ [0.23ms]
+(pass) pictures in posts > blog/concept-maps-with-apple-pencil-in-obsidian-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/handschrift-und-mind-maps-lernen-mit-bloommd-en.md: every picture has an alt text and exists under public/ [0.11ms]
+(pass) pictures in posts > blog/handschrift-und-mind-maps-lernen-mit-bloommd.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/local-first-ist-mehr-als-offline-en.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/local-first-ist-mehr-als-offline.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/markdown-als-visuelle-map-en.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/markdown-als-visuelle-map.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/openclaw-local-workspace-agents-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/openclaw-lokale-workspace-agenten.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/openclaw-proposals-in-shared-workspaces-en.md: every picture has an alt text and exists under public/ [0.69ms]
+(pass) pictures in posts > blog/openclaw-vorschlaege-im-geteilten-workspace.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/ordner-datei-abschnitt-en.md: every picture has an alt text and exists under public/ [0.18ms]
+(pass) pictures in posts > blog/ordner-datei-abschnitt.md: every picture has an alt text and exists under public/ [0.22ms]
+(pass) pictures in posts > blog/projektdateien-im-ordner-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/projektdateien-im-ordner.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/shared-mode-lokale-dateien-teilen.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/shared-mode-share-local-markdown-files-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/warum-bloommd-zwei-werkzeuge-hat.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/warum-handschrift-in-bloommd-eine-svg-datei-ist.md: every picture has an alt text and exists under public/ [0.08ms]
+(pass) pictures in posts > blog/why-bloommd-has-two-tools-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/why-handwriting-in-bloommd-is-an-svg-file-en.md: every picture has an alt text and exists under public/ [0.08ms]
+(pass) pictures in posts > blog/wissensworkflow-mit-bloommd-en.md: every picture has an alt text and exists under public/ [0.09ms]
+(pass) pictures in posts > blog/wissensworkflow-mit-bloommd.md: every picture has an alt text and exists under public/ [0.10ms]
+(pass) pictures in posts > blog/zusammenarbeit-ohne-format-lock-in-en.md: every picture has an alt text and exists under public/ [0.11ms]
+(pass) pictures in posts > blog/zusammenarbeit-ohne-format-lock-in.md: every picture has an alt text and exists under public/ [0.20ms]
+(pass) pictures in posts > news/app-navigation-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/app-navigation.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/bloommd-ipad-app-en.md: every picture has an alt text and exists under public/ [0.05ms]
+(pass) pictures in posts > news/bloommd-ipad-app.md: every picture has an alt text and exists under public/ [0.05ms]
+(pass) pictures in posts > news/bloommd-lizenz-elv2-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/bloommd-lizenz-elv2.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/bloommd-repository-public-en.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/bloommd-repository-public.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/command-line-tools-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/command-line-tools.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-auto-updates-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-auto-updates.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-031-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-031.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-0512-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-0512.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-0513-en.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/desktop-release-0513.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-0514-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-0514.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-057-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-057.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-060-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/desktop-release-060.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/keyboard-focus-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/keyboard-focus.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/knowledge-platform-on-the-homepage-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/landing-map-previews-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/landing-map-previews.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-omarchy-release-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-omarchy-release.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-secure-profiles-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-secure-profiles.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-typography-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/linux-typography.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/markdown-editor-formatting-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/markdown-editor-formatting.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-handschrift-ipad-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-handschrift-ipad.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-plugin-070-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-plugin-070.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-source-mirror-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/obsidian-source-mirror.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/plausible-geoip-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/plausible-geoip.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/privacy-safe-analytics-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/privacy-safe-analytics.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/release-news-drafts-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/release-news-drafts.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-collaboration-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-collaboration.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-document-delete-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-document-delete.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-reconnect-stabilitaet-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/remote-reconnect-stabilitaet.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/shared-mode-and-local-agents-release-en.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/shared-mode-und-lokale-agenten-release.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/trackpad-panning-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/trackpad-panning.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/web-release-050-en.md: every picture has an alt text and exists under public/ [0.04ms]
+(pass) pictures in posts > news/web-release-050.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/wissensplattform-auf-der-startseite.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/wissensplattform-roadmap-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/wissensplattform-roadmap.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/workspace-back-navigation-en.md: every picture has an alt text and exists under public/ [0.03ms]
+(pass) pictures in posts > news/workspace-back-navigation.md: every picture has an alt text and exists under public/ [0.03ms]
+
+src/lib/browser-workspace.test.ts:
+(pass) permission state > reports read-write when the folder was granted write access [0.15ms]
+(pass) permission state > reports read-only when only read was granted [0.03ms]
+(pass) permission state > reports denied when neither mode was granted [0.03ms]
+(pass) permission state > refuses to refresh when read access was denied [0.11ms]
+(pass) local handoff stays local > opening an attachment performs no network request [0.26ms]
+(pass) local handoff stays local > reading a Markdown file performs no network request [0.07ms]
+(pass) local handoff stays local > a file outside the workspace cannot be opened [0.07ms]
+(pass) write access > a write is refused when permission is denied [0.09ms]
+(pass) write access > writing a file that is not part of the workspace is refused [0.03ms]
+(pass) creating folders and files > creates a nested folder [0.15ms]
+(pass) creating folders and files > refuses a traversing folder path [0.03ms]
+(pass) creating folders and files > refuses an absolute folder path [0.02ms]
+(pass) creating folders and files > refuses to create anything without write permission [0.03ms]
+(pass) creating folders and files > creates a file and appends the extension [0.16ms]
+(pass) creating folders and files > creates the folders on the way to a nested file [0.05ms]
+(pass) creating folders and files > refuses to overwrite an existing file [0.05ms]
+(pass) creating folders and files > a created file is immediately part of the workspace [0.04ms]
+(pass) creating folders and files > folders() derives the folder list from the files present [0.07ms]
+
+src/lib/waitlist-invite.test.ts:
+(pass) waitlist invitation run > dry-run lists the addresses and sends and marks nothing [0.21ms]
+(pass) waitlist invitation run > apply sends one mail per address with its own unsubscribe token [0.07ms]
+(pass) waitlist invitation run > a second run writes to nobody again [0.04ms]
+(pass) waitlist invitation run > an address claimed by another run in between is skipped, not mailed [0.05ms]
+(pass) waitlist invitation run > a failed send gives the marker back so the next run tries again, and does not stop the others [0.06ms]
+(pass) waitlist invitation run > a throwing provider counts as failed and releases the marker [0.06ms]
+(pass) waitlist invitation run > picks the language from the signup source
+(pass) waitlist invitation against a mocked mail provider > apply sends exactly one provider request per address with the right content [0.15ms]
+
+src/lib/deployment.test.ts:
+(pass) marketing app deployment URLs > defaults to local split origins outside production [0.01ms]
+(pass) marketing app deployment URLs > ignores stale localhost site URLs outside production when no marketing URL is configured [0.01ms]
+(pass) marketing app deployment URLs > defaults to the public marketing and private app origins in production
+(pass) marketing app deployment URLs > uses explicit split URLs without trailing slashes [0.01ms]
+(pass) marketing app deployment URLs > does not expose localhost as the public app origin from marketing in production [0.02ms]
+
+src/lib/waitlist-purge-due.test.ts:
+(pass) waitlist purge-due > retention running: deletes nothing even with apply, names the end of the period [0.15ms]
+(pass) waitlist purge-due > an invitation is still open: deletes nothing, reason invitation-pending [0.04ms]
+(pass) waitlist purge-due > no invitation sent yet: deletes nothing, reason no-invitation-sent [0.03ms]
+(pass) waitlist purge-due > period over, without apply: only reports, deletes nothing [0.03ms]
+(pass) waitlist purge-due > period over, with apply: deletes everything and reports the count [0.04ms]
+(pass) waitlist purge-due > empty list: allowed, nothing to delete, no delete call [0.03ms]
+(pass) waitlist purge-due > the table changed between check and delete: the refusal is a result, not an error [0.04ms]
+(pass) waitlist purge-due > real failures (database not reachable) are not swallowed [0.06ms]
+(pass) waitlist purge-due > the result carries only counters and dates — no address [0.07ms]
+(pass) waitlist CLI purge-due > without the database variable it fails with a clear message [23.34ms]
+
+src/lib/request-security.test.ts:
+(pass) request security > requires an exact same origin for cookie-backed mutations [0.16ms]
+(pass) request security > rejects oversized and invalid JSON request bodies [0.15ms]
+(pass) request security > accepts only bounded URL-encoded forms [0.09ms]
+(pass) request security > client address (#208, same rule as apps/app) > believes the last x-forwarded-for entry by default, not the first [0.08ms]
+[request-security] No usable source address in x-forwarded-for; counting such requests under one shared rate-limit key. Check the proxy configuration.
+(pass) request security > client address (#208, same rule as apps/app) > in production only the configured header or x-forwarded-for is believed [0.07ms]
+(pass) request security > client address (#208, same rule as apps/app) > outside production the other common headers keep local development distinguishable [0.02ms]
+(pass) request security > client address (#208, same rule as apps/app) > validates the configured header name [0.01ms]
+(pass) request security > limits both IP and account identifiers [0.24ms]
+(pass) request security > accepts forms that leave the honeypot empty and waited briefly [0.05ms]
+(pass) request security > rejects filled honeypots and instant submissions [0.03ms]
+
+src/lib/waitlist-export.test.ts:
+(pass) waitlist export > writes email, status, time and source per entry [0.09ms]
+(pass) waitlist export > the summary counts all entries and the confirmed ones, as `count` does [0.03ms]
+(pass) waitlist export > an empty list still has a header and a summary [0.03ms]
+(pass) waitlist export > quotes cells with commas and neutralizes spreadsheet formulas from the visitor-typed source [0.03ms]
+
+src/app/open/open-page.test.tsx:
+(pass) /open fallback > offers download and web app, in German by default and English on request [0.86ms]
+(pass) /open fallback > never renders unvalidated path or node values into the page [0.83ms]
+(pass) /open fallback > shows no document content: validated values appear only inside the re-encoded app link [0.32ms]
+(pass) /open fallback > offers the app link only for validated requests, re-encoded [0.68ms]
+(pass) /open fallback > is noindex and its canonical URL carries no link parameters [0.11ms]
+
+src/app/openclaw-plugin/[artifact]/route.test.ts:
+(pass) OpenClaw plugin route > resolves latest.tgz through the shared dynamic handler [0.17ms]
+
+src/app/api/waitlist/waitlist-redirects.test.ts:
+(pass) closed waitlist: old confirmation links and signups > a confirmation link redirects permanently to the registration and confirms nothing [0.13ms]
+(pass) closed waitlist: old confirmation links and signups > the language of the link is kept [0.04ms]
+(pass) closed waitlist: old confirmation links and signups > the redirect does not point to localhost from production when runtime env is stale [0.05ms]
+(pass) closed waitlist: old confirmation links and signups > POST to confirm and POST to the signup endpoint answer 410 and write nothing [0.09ms]
+(pass) waitlist unsubscribe stays reachable > an unknown token ends on the unsubscribe page, not on a redirect to the registration [0.09ms]
+(pass) waitlist unsubscribe stays reachable > a valid token unsubscribes and lands on the confirmation page [0.11ms]
+(pass) waitlist unsubscribe stays reachable > unsubscribe redirects to the configured marketing origin, not the request origin [0.04ms]
+(pass) waitlist unsubscribe stays reachable > unsubscribe does not redirect to localhost from production when runtime env is stale [0.03ms]
+
+src/app/api/version/route.test.ts:
+(pass) marketing version route > returns public build metadata without secrets [0.07ms]
+
+src/app/api/link-preview/route.test.ts:
+(pass) link-preview rate limit (marketing) > serves requests up to the limit, then answers 429 with Retry-After [0.95ms]
+(pass) link-preview rate limit (marketing) > the 429 body is JSON and names neither the client address nor the requested URL [0.62ms]
+(pass) link-preview rate limit (marketing) > counts invalid URLs too: 422 up to the limit, then 429 [0.41ms]
+(pass) link-preview rate limit (marketing) > makes no outbound request for a rejected call [0.49ms]
+(pass) link-preview rate limit (marketing) > allows requests again once the window has passed [0.41ms]
+(pass) link-preview rate limit (marketing) > keeps clients apart [0.40ms]
+(pass) link-preview rate limit (marketing) > a forged leading x-forwarded-for entry does not buy a new allowance [0.41ms]
+(pass) link-preview rate limit (marketing) > logs a structured, hashed entry for each rejection and nothing identifying [0.42ms]
+(pass) link-preview rate limit (marketing) > counts in memory without a waitlist database [0.30ms]
+
+ 570 pass
+ 0 fail
+ 1523 expect() calls
+Ran 570 tests across 34 files. [5.73s]

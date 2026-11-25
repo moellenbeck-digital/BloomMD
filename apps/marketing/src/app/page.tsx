@@ -349,9 +349,11 @@ const faqItems = [
 const productJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
+    "@id": "https://bloommd.io/#software",
+    url: "https://bloommd.io/",
   name: "BloomMD",
   applicationCategory: "ProductivityApplication",
-  operatingSystem: "Web, macOS, Linux",
+  operatingSystem: "Web, macOS, Linux, iOS, Android",
   description: "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps. Local-first, portabel und ohne neues Dateiformat.",
 };
 

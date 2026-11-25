@@ -1,0 +1,26 @@
+{"path": "/", "status": 200, "url": "https://bloommd.io/", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "de", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "en", "href": "https://bloommd.io/en"}, {"rel": "alternate", "hreflang": "x-default", "href": "https://bloommd.io"}], "schemas": [{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BloomMD", "applicationCategory": "ProductivityApplication", "operatingSystem": "Web, macOS, Linux", "description": "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps. Local-first, portabel und ohne neues Dateiformat."}], "bytes": 69406}
+{"path": "/en", "status": 200, "url": "https://bloommd.io/en", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/en"}, {"rel": "alternate", "hreflang": "de", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "en", "href": "https://bloommd.io/en"}, {"rel": "alternate", "hreflang": "x-default", "href": "https://bloommd.io"}], "schemas": [{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BloomMD", "applicationCategory": "ProductivityApplication", "operatingSystem": "Web, macOS, Linux", "description": "BloomMD turns open Markdown files into interactive visual maps without introducing a new file format. Local-first, portable and available as a beta."}], "bytes": 65593}
+{"path": "/download", "status": 200, "url": "https://bloommd.io/download", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/download"}], "schemas": [], "bytes": 49286}
+{"path": "/download?lang=en", "status": 200, "url": "https://bloommd.io/download?lang=en", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/download?lang=en"}], "schemas": [], "bytes": 48951}
+{"path": "/obsidian", "status": 200, "url": "https://bloommd.io/obsidian", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/obsidian"}], "schemas": [], "bytes": 24996}
+{"path": "/obsidian?lang=en", "status": 200, "url": "https://bloommd.io/obsidian?lang=en", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/obsidian?lang=en"}], "schemas": [], "bytes": 24925}
+{"path": "/docs", "status": 200, "url": "https://bloommd.io/docs", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/docs"}], "schemas": [], "bytes": 36156}
+{"path": "/docs?lang=en", "status": 200, "url": "https://bloommd.io/docs?lang=en", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/docs?lang=en"}], "schemas": [], "bytes": 36305}
+{"path": "/impressum", "status": 200, "url": "https://bloommd.io/impressum", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/impressum"}], "schemas": [], "bytes": 16254}
+{"path": "/datenschutz", "status": 200, "url": "https://bloommd.io/datenschutz", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io/datenschutz"}], "schemas": [], "bytes": 60078}
+{"path": "/missing-seo-test", "status": 404, "url": "https://bloommd.io/missing-seo-test", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "de", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "en", "href": "https://bloommd.io/en"}, {"rel": "alternate", "hreflang": "x-default", "href": "https://bloommd.io"}], "schemas": [], "bytes": 12328}
+{"path": "/robots.txt", "status": 200, "url": "https://bloommd.io/robots.txt", "h1": 0, "alternates": [], "schemas": [], "bytes": 183}
+{"path": "/llms.txt", "status": 404, "url": "https://bloommd.io/llms.txt", "h1": 1, "alternates": [{"rel": "canonical", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "de", "href": "https://bloommd.io"}, {"rel": "alternate", "hreflang": "en", "href": "https://bloommd.io/en"}, {"rel": "alternate", "hreflang": "x-default", "href": "https://bloommd.io"}], "schemas": [], "bytes": 12320}
+{"path": "/sitemap.xml", "status": 200, "url": "https://bloommd.io/sitemap.xml", "h1": 0, "alternates": [], "schemas": [], "bytes": 12104}
+bot GPTBot 200
+bot OAI-SearchBot 200
+bot ChatGPT-User 200
+bot ClaudeBot 200
+bot Claude-SearchBot 200
+bot Claude-User 200
+bot PerplexityBot 200
+bot Perplexity-User 200
+bot Google-Extended 200
+bot Applebot-Extended 200
+bot Bingbot 200
+bot CCBot 200

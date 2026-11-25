@@ -1,0 +1,80 @@
+$ next build --webpack
+▲ Next.js 16.4.6 (webpack)
+✓ Running next.config.mjs took 182ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 8.4s
+  Running TypeScript ...
+  Finished TypeScript in 452ms ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/126) ...
+  Generating static pages using 9 workers (31/126)
+  Generating static pages using 9 workers (62/126)
+  Generating static pages using 9 workers (94/126)
+✓ Generating static pages using 9 workers (126/126) in 1691ms
+(node:3617) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)                                  Revalidate  Expire
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /.well-known/apple-app-site-association
+├ ƒ /.well-known/assetlinks.json
+├ ƒ /agb
+├ ƒ /api/config
+├ ƒ /api/health/ready
+├ ƒ /api/link-preview
+├ ƒ /api/templates
+├ ƒ /api/templates/[slug]
+├ ƒ /api/templates/[slug]/markdown
+├ ƒ /api/version
+├ ƒ /api/waitlist
+├ ƒ /api/waitlist/confirm
+├ ƒ /api/waitlist/unsubscribe
+├ ƒ /api/wiki
+├ ƒ /blog
+├ ƒ /blog/[slug]
+├ ƒ /command-tools/[artifact]
+├ ƒ /cookies
+├ ƒ /datenschutz
+├ ƒ /demo
+├ ƒ /desktop
+├ ƒ /desktop-updates/[artifact]
+├ ƒ /docs/[[...slug]]
+├ ƒ /download
+├ ƒ /downloads
+├ ƒ /en
+├ ƒ /en/blog
+├ ƒ /en/blog/[slug]
+├ ƒ /en/news
+├ ƒ /en/news/[slug]
+├ ○ /en/news/feed.xml                                5m      1y
+├ ƒ /en/roadmap
+├ ƒ /impressum
+├ ƒ /leistungen
+├ ƒ /lizenz
+├ ƒ /news
+├ ƒ /news/[slug]
+├ ○ /news/feed.xml                                   5m      1y
+├ ƒ /obsidian
+├ ƒ /open
+├ ƒ /open/[doc]
+├ ƒ /openclaw-plugin/[artifact]
+├ ƒ /plausible-proxy/event
+├ ƒ /plausible-proxy/script
+├ ƒ /roadmap
+├ ○ /robots.txt
+├ ○ /sitemap.xml
+├ ƒ /templates
+├ ƒ /templates/[slug]
+├ ƒ /waitlist/abgemeldet
+├ ƒ /widerruf
+└ ƒ /wiki
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

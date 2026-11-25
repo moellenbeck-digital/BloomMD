@@ -1,0 +1,439 @@
+{
+  "pages": 120,
+  "statuses": [
+    200
+  ],
+  "h1_not_one": [],
+  "missing_hreflang": [],
+  "overlong": [
+    {
+      "path": "/blog/ordner-datei-abschnitt",
+      "title": "Ordner, Datei oder Abschnitt: Wo bearbeite ich meinen Inhalt? · BloomMD",
+      "titleLength": 71,
+      "descriptionLength": 93
+    },
+    {
+      "path": "/blog/openclaw-vorschlaege-im-geteilten-workspace",
+      "title": "OpenClaw im geteilten Workspace: Vorschläge dort prüfen, wo die Entscheidung fällt · BloomMD",
+      "titleLength": 92,
+      "descriptionLength": 137
+    },
+    {
+      "path": "/blog/shared-mode-lokale-dateien-teilen",
+      "title": "Eine lokale Markdown-Datei teilen — ohne den Ordner freizugeben · BloomMD",
+      "titleLength": 73,
+      "descriptionLength": 142
+    },
+    {
+      "path": "/blog/markdown-als-visuelle-map",
+      "title": "Markdown bleibt die Quelle, BloomMD macht Struktur sichtbar · BloomMD",
+      "titleLength": 69,
+      "descriptionLength": 104
+    },
+    {
+      "path": "/en/blog/ordner-datei-abschnitt",
+      "title": "Folders, files or sections: where do I edit my content? · BloomMD",
+      "titleLength": 65,
+      "descriptionLength": 94
+    },
+    {
+      "path": "/en/blog/openclaw-proposals-in-shared-workspaces",
+      "title": "OpenClaw in a shared workspace: review proposals where the decision happens · BloomMD",
+      "titleLength": 85,
+      "descriptionLength": 119
+    },
+    {
+      "path": "/en/blog/shared-mode-share-local-markdown-files",
+      "title": "Share one local Markdown file — without sharing the folder · BloomMD",
+      "titleLength": 68,
+      "descriptionLength": 129
+    },
+    {
+      "path": "/en/blog/markdown-als-visuelle-map",
+      "title": "Markdown stays the source, BloomMD makes structure visible · BloomMD",
+      "titleLength": 68,
+      "descriptionLength": 87
+    },
+    {
+      "path": "/news/desktop-release-060",
+      "title": "BloomMD Desktop 0.6.0: vom Ordner direkt zum passenden Abschnitt · BloomMD",
+      "titleLength": 74,
+      "descriptionLength": 108
+    },
+    {
+      "path": "/news/obsidian-plugin-070",
+      "title": "BloomMD für Obsidian 0.7: jetzt auf iPad, iPhone und Android · BloomMD",
+      "titleLength": 70,
+      "descriptionLength": 159
+    },
+    {
+      "path": "/news/desktop-release-0514",
+      "title": "BloomMD Desktop 0.5.14: Knoten ohne Sprünge bearbeiten · BloomMD",
+      "titleLength": 64,
+      "descriptionLength": 126
+    },
+    {
+      "path": "/news/web-release-050",
+      "title": "BloomMD Web-App 0.5: Maps mit Lese-Links teilen, Aufgaben direkt am Knoten · BloomMD",
+      "titleLength": 84,
+      "descriptionLength": 101
+    },
+    {
+      "path": "/news/desktop-release-0513",
+      "title": "BloomMD Desktop 0.5.13: Knoten zuverlässig speichern · BloomMD",
+      "titleLength": 62,
+      "descriptionLength": 117
+    },
+    {
+      "path": "/news/shared-mode-und-lokale-agenten-release",
+      "title": "Shared Mode und lokale Agenten: Zusammenarbeit mit klaren Grenzen · BloomMD",
+      "titleLength": 75,
+      "descriptionLength": 113
+    },
+    {
+      "path": "/news/command-line-tools",
+      "title": "Zwei kleine Werkzeuge für lokale BloomMD-Automatisierung · BloomMD",
+      "titleLength": 66,
+      "descriptionLength": 111
+    },
+    {
+      "path": "/news/linux-typography",
+      "title": "BloomMD bleibt unter Omarchy auch bei 160 Prozent gut lesbar · BloomMD",
+      "titleLength": 70,
+      "descriptionLength": 102
+    },
+    {
+      "path": "/news/remote-document-delete",
+      "title": "Remote-Dokumente lassen sich jetzt auch aktiv löschen · BloomMD",
+      "titleLength": 63,
+      "descriptionLength": 94
+    },
+    {
+      "path": "/news/remote-reconnect-stabilitaet",
+      "title": "Remote-Verbindungen verbinden sich kontrolliert neu · BloomMD",
+      "titleLength": 61,
+      "descriptionLength": 124
+    },
+    {
+      "path": "/news/obsidian-source-mirror",
+      "title": "Das Obsidian-Plugin hat jetzt eine klare Entwicklungsquelle · BloomMD",
+      "titleLength": 69,
+      "descriptionLength": 120
+    },
+    {
+      "path": "/en/news/knowledge-platform-on-the-homepage",
+      "title": "BloomMD homepage: product, pilot and roadmap clearly separated · BloomMD",
+      "titleLength": 72,
+      "descriptionLength": 103
+    },
+    {
+      "path": "/en/news/wissensplattform-roadmap",
+      "title": "Knowledge platform roadmap: ten themes, one clear starting point · BloomMD",
+      "titleLength": 74,
+      "descriptionLength": 87
+    },
+    {
+      "path": "/en/news/obsidian-plugin-070",
+      "title": "BloomMD for Obsidian 0.7: now on iPad, iPhone and Android · BloomMD",
+      "titleLength": 67,
+      "descriptionLength": 142
+    },
+    {
+      "path": "/en/news/desktop-release-0514",
+      "title": "BloomMD Desktop 0.5.14: edit nodes without losing your place · BloomMD",
+      "titleLength": 70,
+      "descriptionLength": 124
+    },
+    {
+      "path": "/en/news/web-release-050",
+      "title": "BloomMD web app 0.5: share maps with read-only links, tasks right on the node · BloomMD",
+      "titleLength": 87,
+      "descriptionLength": 89
+    },
+    {
+      "path": "/en/news/desktop-release-0513",
+      "title": "BloomMD Desktop 0.5.13: reliable saving for new mind maps · BloomMD",
+      "titleLength": 67,
+      "descriptionLength": 100
+    },
+    {
+      "path": "/en/news/desktop-release-0512",
+      "title": "BloomMD Desktop 0.5.12: smoother navigation in large folders · BloomMD",
+      "titleLength": 70,
+      "descriptionLength": 84
+    },
+    {
+      "path": "/en/news/shared-mode-and-local-agents-release",
+      "title": "Shared Mode and local agents: collaboration with clear boundaries · BloomMD",
+      "titleLength": 75,
+      "descriptionLength": 119
+    },
+    {
+      "path": "/en/news/linux-omarchy-release",
+      "title": "BloomMD Desktop is now available for Omarchy and Linux · BloomMD",
+      "titleLength": 64,
+      "descriptionLength": 102
+    },
+    {
+      "path": "/en/news/linux-secure-profiles",
+      "title": "Linux server profiles now store credentials securely · BloomMD",
+      "titleLength": 62,
+      "descriptionLength": 104
+    },
+    {
+      "path": "/en/news/markdown-editor-formatting",
+      "title": "Markdown lists and checklists are now easier to read · BloomMD",
+      "titleLength": 62,
+      "descriptionLength": 100
+    },
+    {
+      "path": "/en/news/remote-reconnect-stabilitaet",
+      "title": "Remote connections now reconnect in a controlled way · BloomMD",
+      "titleLength": 62,
+      "descriptionLength": 116
+    }
+  ],
+  "fixed": [
+    {
+      "path": "/demo",
+      "status": 200,
+      "title": "BloomMD Demo",
+      "titleLength": 12,
+      "descriptionLength": 109,
+      "meta": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "BloomMD ohne Account ausprobieren: Vorlagen oder eigenes Markdown lokal im Browser als Mindmap visualisieren.",
+        "robots": "index, follow",
+        "og:title": "BloomMD Demo",
+        "og:description": "BloomMD ohne Account ausprobieren: Vorlagen oder eigenes Markdown lokal im Browser als Mindmap visualisieren.",
+        "og:url": "https://bloommd.io/demo",
+        "og:site_name": "BloomMD",
+        "og:locale": "de_DE",
+        "og:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "BloomMD — Markdown, visualized.",
+        "og:locale:alternate": "en_US",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "BloomMD Demo",
+        "twitter:description": "BloomMD ohne Account ausprobieren: Vorlagen oder eigenes Markdown lokal im Browser als Mindmap visualisieren.",
+        "twitter:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "color-scheme": "light dark"
+      },
+      "links": [
+        {
+          "rel": "canonical",
+          "href": "https://bloommd.io/demo"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "de",
+          "href": "https://bloommd.io/demo"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "en",
+          "href": "https://bloommd.io/demo?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "x-default",
+          "href": "https://bloommd.io/demo"
+        }
+      ],
+      "h1": 1
+    },
+    {
+      "path": "/demo?lang=en",
+      "status": 200,
+      "title": "BloomMD Demo",
+      "titleLength": 12,
+      "descriptionLength": 96,
+      "meta": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Try BloomMD without an account. Visualize templates or your own Markdown locally in the browser.",
+        "robots": "index, follow",
+        "og:title": "BloomMD Demo",
+        "og:description": "Try BloomMD without an account. Visualize templates or your own Markdown locally in the browser.",
+        "og:url": "https://bloommd.io/demo?lang=en",
+        "og:site_name": "BloomMD",
+        "og:locale": "en_US",
+        "og:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "BloomMD — Markdown, visualized.",
+        "og:locale:alternate": "de_DE",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "BloomMD Demo",
+        "twitter:description": "Try BloomMD without an account. Visualize templates or your own Markdown locally in the browser.",
+        "twitter:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "color-scheme": "light dark"
+      },
+      "links": [
+        {
+          "rel": "canonical",
+          "href": "https://bloommd.io/demo?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "de",
+          "href": "https://bloommd.io/demo"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "en",
+          "href": "https://bloommd.io/demo?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "x-default",
+          "href": "https://bloommd.io/demo"
+        }
+      ],
+      "h1": 1
+    },
+    {
+      "path": "/templates",
+      "status": 200,
+      "title": "BloomMD Vorlagen",
+      "titleLength": 16,
+      "descriptionLength": 116,
+      "meta": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Markdown-Mindmap-Vorlagen für Architektur, Startups, Obsidian, Forschung, Schreiben und Content-Strategie entdecken.",
+        "robots": "index, follow",
+        "og:title": "BloomMD Vorlagen",
+        "og:description": "Markdown-Mindmap-Vorlagen für Architektur, Startups, Obsidian, Forschung, Schreiben und Content-Strategie entdecken.",
+        "og:url": "https://bloommd.io/templates",
+        "og:site_name": "BloomMD",
+        "og:locale": "de_DE",
+        "og:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "BloomMD — Markdown, visualized.",
+        "og:locale:alternate": "en_US",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "BloomMD Vorlagen",
+        "twitter:description": "Markdown-Mindmap-Vorlagen für Architektur, Startups, Obsidian, Forschung, Schreiben und Content-Strategie entdecken.",
+        "twitter:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "color-scheme": "light dark"
+      },
+      "links": [
+        {
+          "rel": "canonical",
+          "href": "https://bloommd.io/templates"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "de",
+          "href": "https://bloommd.io/templates"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "en",
+          "href": "https://bloommd.io/templates?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "x-default",
+          "href": "https://bloommd.io/templates"
+        }
+      ],
+      "h1": 1
+    },
+    {
+      "path": "/templates?lang=en",
+      "status": 200,
+      "title": "BloomMD Templates",
+      "titleLength": 17,
+      "descriptionLength": 112,
+      "meta": {
+        "": "",
+        "viewport": "width=device-width, initial-scale=1",
+        "description": "Browse Markdown mind map templates for architecture, startups, Obsidian, research, writing and content strategy.",
+        "robots": "index, follow",
+        "og:title": "BloomMD Templates",
+        "og:description": "Browse Markdown mind map templates for architecture, startups, Obsidian, research, writing and content strategy.",
+        "og:url": "https://bloommd.io/templates?lang=en",
+        "og:site_name": "BloomMD",
+        "og:locale": "en_US",
+        "og:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "og:image:width": "1200",
+        "og:image:height": "630",
+        "og:image:alt": "BloomMD — Markdown, visualized.",
+        "og:locale:alternate": "de_DE",
+        "og:type": "website",
+        "twitter:card": "summary_large_image",
+        "twitter:title": "BloomMD Templates",
+        "twitter:description": "Browse Markdown mind map templates for architecture, startups, Obsidian, research, writing and content strategy.",
+        "twitter:image": "https://bloommd.io/og/bloommd-og-banner.png",
+        "color-scheme": "light dark"
+      },
+      "links": [
+        {
+          "rel": "canonical",
+          "href": "https://bloommd.io/templates?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "de",
+          "href": "https://bloommd.io/templates"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "en",
+          "href": "https://bloommd.io/templates?lang=en"
+        },
+        {
+          "rel": "alternate",
+          "hreflang": "x-default",
+          "href": "https://bloommd.io/templates"
+        }
+      ],
+      "h1": 1
+    }
+  ],
+  "lighthouse": {
+    "mobile": {
+      "categories": {
+        "performance": 0.89,
+        "accessibility": 1,
+        "best-practices": 1,
+        "seo": 1
+      },
+      "LCP_ms": 3670.2363750000004,
+      "CLS": 0,
+      "failed": {
+        "unused-javascript": "Reduce unused JavaScript",
+        "bf-cache": "Page prevented back/forward cache restoration",
+        "lcp-discovery-insight": "LCP request discovery",
+        "legacy-javascript-insight": "Legacy JavaScript",
+        "network-dependency-tree-insight": "Network dependency tree",
+        "render-blocking-insight": "Render-blocking requests"
+      }
+    },
+    "desktop": {
+      "categories": {
+        "performance": 1,
+        "accessibility": 0.99,
+        "best-practices": 1,
+        "seo": 1
+      },
+      "LCP_ms": 290.3624,
+      "CLS": 0,
+      "failed": {
+        "heading-order": "Heading elements are not in a sequentially-descending order",
+        "label-content-name-mismatch": "Elements with visible text labels do not have matching accessible names.",
+        "bf-cache": "Page prevented back/forward cache restoration",
+        "network-dependency-tree-insight": "Network dependency tree",
+        "render-blocking-insight": "Render-blocking requests"
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug?: st
     description: page.description,
     path: locale === "en" ? `${pagePath}?lang=en` : pagePath,
     locale,
+    languages: { de: pagePath, en: `${pagePath}?lang=en`, "x-default": pagePath },
   });
 }
 

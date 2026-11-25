@@ -36,6 +36,11 @@ export default async function RootLayout({
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org", "@type": "WebSite",
+          "@id": "https://bloommd.io/#website", url: "https://bloommd.io/",
+          name: "BloomMD", inLanguage: ["de", "en"],
+        }) }} />
         <meta name="color-scheme" content="light dark" />
         {/*
           Set the Marketing theme before first paint, matching the product app.

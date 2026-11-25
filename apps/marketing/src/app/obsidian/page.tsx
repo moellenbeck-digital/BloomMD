@@ -124,5 +124,6 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
       : "BloomMD-Obsidian-Plugin auf Desktop, iPad, iPhone oder Android über BRAT oder GitHub-Release installieren, ohne BloomMD-Konto.",
     path: locale === "en" ? "/obsidian?lang=en" : "/obsidian",
     locale,
+    languages: { de: "/obsidian", en: "/obsidian?lang=en", "x-default": "/obsidian" },
   });
 }

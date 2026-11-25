@@ -35,6 +35,7 @@ export async function generateMetadata({
         : "macOS- und Omarchy/Linux-Desktop-Beta ohne Einladung herunterladen. Sieh, was öffentlich ist und wofür du ein Konto brauchst.",
     path: locale === "en" ? "/download?lang=en" : "/download",
     locale,
+    languages: { de: "/download", en: "/download?lang=en", "x-default": "/download" },
   });
 }
 

@@ -928,6 +928,8 @@ export function EnglishLandingPage() {
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
+    "@id": "https://bloommd.io/#software",
+    url: "https://bloommd.io/",
     name: "BloomMD",
     applicationCategory: "ProductivityApplication",
     operatingSystem: "Web, macOS, Linux, iOS, Android",

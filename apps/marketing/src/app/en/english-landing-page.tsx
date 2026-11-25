@@ -930,7 +930,7 @@ export function EnglishLandingPage() {
     "@type": "SoftwareApplication",
     name: "BloomMD",
     applicationCategory: "ProductivityApplication",
-    operatingSystem: "Web, macOS, Linux",
+    operatingSystem: "Web, macOS, Linux, iOS, Android",
     description: "BloomMD turns open Markdown files into interactive visual maps without introducing a new file format. Local-first, portable and available as a beta.",
   };
 

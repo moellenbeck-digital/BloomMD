@@ -1,0 +1,15 @@
+# BloomMD
+
+> BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps. Local-first, portabel und ohne neues Dateiformat.
+
+## Deutsch
+- [BloomMD](https://bloommd.io/): Markdown-Dateien als visuelle Maps.
+- [Dokumentation](https://bloommd.io/docs): Hilfe zur Nutzung von BloomMD.
+- [Download](https://bloommd.io/download): Verfügbare Downloads und Plattformhinweise.
+- [Obsidian](https://bloommd.io/obsidian): Informationen zum Obsidian-Plugin.
+
+## English
+- [BloomMD](https://bloommd.io/en): Open Markdown files as visual maps.
+- [Documentation](https://bloommd.io/docs?lang=en): Help with using BloomMD.
+- [Downloads](https://bloommd.io/download?lang=en): Available downloads and platform information.
+- [Obsidian](https://bloommd.io/obsidian?lang=en): Information about the Obsidian plugin.

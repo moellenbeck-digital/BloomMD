@@ -1,0 +1,24 @@
+bun test v1.4.5 (a7733435c)
+
+apps/marketing/src/app/legal-pages.test.tsx:
+(pass) Impressum > renders every BLOOMMD_LEGAL_* value when they are set [7.16ms]
+(pass) Impressum > shows the placeholder instead of empty fields when a required value is missing [0.39ms]
+(pass) Impressum phone line > is dropped when BLOOMMD_LEGAL_PHONE is unset, empty, a dash or "Nicht angegeben" [2.99ms]
+(pass) Impressum phone line > is shown when a number is set [0.68ms]
+(pass) Impressum phone line > hasLegalValue treats empty, dash and the default as not filled in [0.05ms]
+(pass) Datenschutzerklärung > has the app section, share links and agents in German and English [1.66ms]
+(pass) Datenschutzerklärung > names retention, deletion and the processors in German and English [1.28ms]
+(pass) Datenschutzerklärung > names the Plausible instance of Ops and the flow through the own domain, not the former host [2.85ms]
+(pass) Datenschutzerklärung > does not leave placeholders for the owner in the public text [2.20ms]
+
+apps/marketing/src/proxy.test.ts:
+(pass) marketing proxy > rewrites the public desktop update path and marks the internal request [1.02ms]
+(pass) marketing proxy > does not expose the implementation route directly [0.04ms]
+(pass) marketing proxy > lets the well-known association files and /open pass untouched [0.15ms]
+(pass) marketing proxy > rewrites the public Plausible paths to the internal handlers without redirect or gate [0.08ms]
+(pass) marketing proxy > does not expose the Plausible handlers directly or proxy other /_plausible paths [0.08ms]
+
+ 14 pass
+ 0 fail
+ 130 expect() calls
+Ran 14 tests across 2 files. [102.00ms]

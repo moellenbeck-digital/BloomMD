@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseDocPage } from "./docs";
 
 /**
  * Checks on the help pages in `content/docs` themselves, not on how they are parsed (that is
@@ -27,7 +28,13 @@ const PAGES_WITH_A_PICTURE = [
 
 const files = readdirSync(DOCS_DIR).filter((file) => file.endsWith(".md")).sort();
 const germanFiles = files.filter((file) => !file.endsWith("-en.md"));
-const germanSlugs = new Set(germanFiles.map((file) => file.replace(/\.md$/, "")));
+/** Published pages as `slug` (German) and `slug?lang=en` (English), the way the site serves them. */
+const publishedPages = new Set(files.flatMap((file) => {
+  const page = parseDocPage(file, read(file));
+  return page ? [file.endsWith("-en.md") ? `${page.slug}?lang=en` : page.slug] : [];
+}));
+/** Every page, drafts included, in the same form. */
+const allPages = new Set(files.map((file) => file.endsWith("-en.md") ? `${file.replace(/-en\.md$/, "").replace(/^index$/, "")}?lang=en` : file.replace(/\.md$/, "").replace(/^index$/, "")));
 
 function counterpart(file: string): string {
   return file.endsWith("-en.md") ? file.replace(/-en\.md$/, ".md") : file.replace(/\.md$/, "-en.md");
@@ -93,15 +100,32 @@ describe("pictures", () => {
   }
 });
 
+/** Link targets to help pages as `slug` or `slug?lang=en`; an anchor is cut off. */
+function docPageLinks(markdown: string): string[] {
+  return [...withoutCode(markdown).matchAll(/(?<!!)\[[^\]]*\]\(\/docs(?:\/([^)\s?#/]*))?\/?(\?[^)\s#]*)?(?:#[^)\s]*)?\)/g)]
+    .map((match) => `${match[1] ?? ""}${/(?:^\?|&)lang=en(?:&|$)/.test(match[2] ?? "") ? "?lang=en" : ""}`);
+}
+
 describe("links between help pages", () => {
   for (const file of files) {
-    test(`${file}: every /docs link points to an existing page`, () => {
-      for (const target of docLinks(read(file))) {
-        const slug = target.replace(/^\/docs\/?/, "");
-        if (slug) expect(germanSlugs.has(slug), `${target} has no page ${slug}.md`).toBe(true);
+    const draft = parseDocPage(file, read(file)) === null;
+    // Drafts answer 404, so a published page must not link to one. A draft may link to another
+    // draft: both go live together with the release they describe.
+    test(`${file}: every /docs link points to a ${draft ? "page" : "published page"} in the linked language`, () => {
+      for (const target of docPageLinks(read(file))) {
+        expect((draft ? allPages : publishedPages).has(target), `/docs/${target} is not ${draft ? "a page" : "a published page"}`).toBe(true);
       }
     });
   }
+
+  test("the link check rejects drafts, missing languages and missing pages", () => {
+    expect(docPageLinks("[a](/docs/web?lang=en#x) [b](/docs) [c](/docs/web#top)")).toEqual(["web?lang=en", "", "web"]);
+    expect(publishedPages.has("export")).toBe(false);
+    expect(allPages.has("export")).toBe(true);
+    expect(publishedPages.has("agent-wissen?lang=en")).toBe(false);
+    expect(publishedPages.has("okf-wiki?lang=en")).toBe(true);
+    expect(allPages.has("does-not-exist")).toBe(false);
+  });
 
   test("the troubleshooting page is linked from the start, desktop and web pages", () => {
     for (const slug of ["index", "desktop", "web"]) {

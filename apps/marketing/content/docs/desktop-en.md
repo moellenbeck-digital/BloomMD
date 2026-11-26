@@ -133,7 +133,7 @@ The full flow is described under [Collaboration](/docs/collaboration?lang=en).
 ## Connecting to the Web app
 
 Local work needs no account. To collaborate with someone in a cloud file, create a personal token
-under [Account](/account?lang=en), open **Connect to server** in the desktop app, enter
+under [Account](https://bloommd.app/account), open **Connect to server** in the desktop app, enter
 `https://bloommd.app`, paste the token, and open the same cloud file.
 
 Windows is intentionally outside this beta. A separate release follows after installer, OS

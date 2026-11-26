@@ -1,5 +1,5 @@
 ---
-title: "BloomMD Web-App 0.5: Maps mit Lese-Links teilen, Aufgaben direkt am Knoten"
+title: "Web 0.5: Lese-Links und Aufgaben am Knoten"
 description: "Kolleg:innen sehen eine Map ohne Konto. Knoten zeigen Fälligkeit, Verantwortliche und Entscheidungen."
 date: 2026-10-19
 commitDate: 2026-10-19

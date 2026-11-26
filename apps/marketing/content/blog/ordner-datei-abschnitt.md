@@ -1,5 +1,5 @@
 ---
-title: "Ordner, Datei oder Abschnitt: Wo bearbeite ich meinen Inhalt?"
+title: "Ordner, Datei oder Abschnitt bearbeiten"
 description: "Die Ordnerübersicht in Desktop 0.6.0 erklärt den Weg von der Datei zur passenden Überschrift."
 date: 2026-11-24
 tags:

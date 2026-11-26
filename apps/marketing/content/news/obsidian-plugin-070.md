@@ -1,5 +1,5 @@
 ---
-title: "BloomMD für Obsidian 0.7: jetzt auf iPad, iPhone und Android"
+title: "Obsidian 0.7 für iPad, iPhone und Android"
 description: "Handschrift mit dem Apple Pencil im Knoten, Lernfortschritt auf der Map und ein Agenten-Panel – auf Desktop und Mobilgeräten. Das Plugin bleibt MIT-lizenziert."
 date: 2026-10-24
 commitDate: 2026-10-24

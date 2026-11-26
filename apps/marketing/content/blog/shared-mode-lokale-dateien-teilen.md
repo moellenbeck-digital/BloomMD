@@ -1,5 +1,5 @@
 ---
-title: "Eine lokale Markdown-Datei teilen — ohne den Ordner freizugeben"
+title: "Eine Markdown-Datei sicher teilen"
 description: "Shared Mode verbindet genau eine bewusst ausgewählte lokale Datei mit einem BloomMD-Workspace und macht Grenzen, Rollen und Zustände sichtbar."
 date: 2026-09-22
 tags:

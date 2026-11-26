@@ -1,5 +1,5 @@
 ---
-title: "Shared Mode and local agents: collaboration with clear boundaries"
+title: "Shared Mode and local agents"
 description: "Deliberately share one local Markdown file, assign workspace roles, and review OpenClaw proposals at the relevant node."
 date: 2026-09-22
 commitDate: 2026-09-22

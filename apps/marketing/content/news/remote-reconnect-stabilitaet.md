@@ -1,5 +1,5 @@
 ---
-title: "Remote-Verbindungen verbinden sich kontrolliert neu"
+title: "Remote-Verbindungen kontrolliert erneuern"
 description: "BloomMD unterscheidet temporäre Netzwerkunterbrechungen von dauerhaften Sync-Fehlern und hält den Reconnect nachvollziehbar."
 date: 2026-08-28
 commitDate: 2026-08-28

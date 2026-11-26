@@ -1,5 +1,5 @@
 ---
-title: "BloomMD Desktop 0.6.0: vom Ordner direkt zum passenden Abschnitt"
+title: "Desktop 0.6.0: Abschnitte direkt öffnen"
 description: "Ordner, Dateien und Inhaltsvorschauen klar unterscheiden und im richtigen Markdown-Abschnitt weiterarbeiten."
 date: 2026-11-24
 commitDate: 2026-11-24

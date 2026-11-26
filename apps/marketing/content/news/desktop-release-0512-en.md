@@ -1,5 +1,5 @@
 ---
-title: "BloomMD Desktop 0.5.12: smoother navigation in large folders"
+title: "Desktop 0.5.12: navigate large folders"
 description: "A compact overview, background layout and reliable updates for local Markdown files."
 date: 2026-10-08
 commitDate: 2026-10-08

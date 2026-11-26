@@ -26,6 +26,7 @@ export async function generateMetadata({ params, searchParams }: TemplatePagePro
     description: template.description,
     path: `${withMarketingLocale(`/templates/${template.slug}`, locale)}`,
     locale,
+    languages: { de: `/templates/${slug}`, en: `/templates/${slug}?lang=en`, "x-default": `/templates/${slug}` },
   });
 }
 

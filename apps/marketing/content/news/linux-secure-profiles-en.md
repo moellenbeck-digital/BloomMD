@@ -1,5 +1,5 @@
 ---
-title: "Linux server profiles now store credentials securely"
+title: "Linux: secure server credentials"
 description: "BloomMD uses the system Secret Service on Linux so server profiles can be reused safely after a restart."
 date: 2026-09-05
 commitDate: 2026-09-05

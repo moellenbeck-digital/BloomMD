@@ -3,6 +3,9 @@ import { listMarketingPosts, marketingPostPath } from "@/lib/posts";
 import { listDocs } from "@/lib/docs";
 import { withMarketingLocale } from "@/lib/locale";
 
+import modified from "@/lib/content-modified.json";
+import { listTemplates } from "@/lib/templates";
+
 const siteUrl = "https://bloommd.io";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -24,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/download",
     "/download?lang=en",
   ];
-  const staticEntries = staticPaths.map((path) => ({ url: `${siteUrl}${path}` }));
+  const staticEntries = staticPaths.map((path) => ({ url: `${siteUrl}${path}`, lastModified: modified[("src/app" + (path.split("?")[0] === "/" ? "" : path.split("?")[0]) + "/page.tsx") as keyof typeof modified] }));
   const [blogPosts, englishBlogPosts, newsPosts, englishNewsPosts] = await Promise.all([
     listMarketingPosts("blog", "de"),
     listMarketingPosts("blog", "en"),
@@ -39,7 +42,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const pages = await listDocs(locale);
     return pages.map((page) => ({
       url: `${siteUrl}${withMarketingLocale(page.slug ? `/docs/${page.slug}` : "/docs", locale)}`,
+      lastModified: modified[`content/docs/${page.slug || "index"}${locale === "en" ? "-en" : ""}.md` as keyof typeof modified],
     }));
   }));
-  return [...staticEntries, ...posts, ...docs.flat()];
+  const templates = (await listTemplates()).flatMap((page) => ["de", "en"].map((locale) => ({ url: `${siteUrl}/templates/${page.slug}${locale === "en" ? "?lang=en" : ""}` })));
+  return [...staticEntries, ...posts, ...docs.flat(), ...templates];
 }

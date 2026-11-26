@@ -1,5 +1,5 @@
 ---
-title: "Remote connections now reconnect in a controlled way"
+title: "Controlled reconnection for remote connections"
 description: "BloomMD distinguishes temporary network interruptions from permanent sync failures and makes reconnects predictable."
 date: 2026-08-28
 commitDate: 2026-08-28

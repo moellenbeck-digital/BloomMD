@@ -1,5 +1,5 @@
 ---
-title: "Markdown lists and checklists are now easier to read"
+title: "More readable Markdown lists and checklists"
 description: "The MDX editor now shows list markers and checkboxes with consistent spacing across web and desktop."
 date: 2026-08-28
 tags:

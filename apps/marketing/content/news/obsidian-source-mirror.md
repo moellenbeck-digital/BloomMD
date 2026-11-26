@@ -1,5 +1,5 @@
 ---
-title: "Das Obsidian-Plugin hat jetzt eine klare Entwicklungsquelle"
+title: "Die Entwicklungsquelle des Obsidian-Plugins"
 description: "Plugin-Code und gemeinsame Markdown-Logik werden im Monorepo entwickelt; das öffentliche Repo bleibt ein Release-Mirror."
 date: 2026-08-24
 commitDate: 2026-08-24

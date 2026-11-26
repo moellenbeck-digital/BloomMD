@@ -1,5 +1,5 @@
 ---
-title: "BloomMD Desktop 0.5.13: reliable saving for new mind maps"
+title: "Desktop 0.5.13: reliable mind map saving"
 description: "New files keep their edits. The folder overview displays matching file and heading titles only once."
 date: 2026-10-12
 commitDate: 2026-10-12

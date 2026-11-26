@@ -1,5 +1,6 @@
 ---
 title: "Shared Mode und lokale Agenten: Zusammenarbeit mit klaren Grenzen"
+seoTitle: "Shared Mode und lokale Agenten mit klaren Grenzen"
 description: "Eine lokale Markdown-Datei gezielt teilen, Rollen im Workspace vergeben und OpenClaw-Vorschläge am Knoten prüfen."
 date: 2026-09-22
 commitDate: 2026-09-22

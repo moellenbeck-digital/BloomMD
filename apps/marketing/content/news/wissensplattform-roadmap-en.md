@@ -1,5 +1,6 @@
 ---
 title: "Knowledge platform roadmap: ten themes, one clear starting point"
+seoTitle: "Knowledge platform roadmap: ten themes"
 description: "Our public direction starts with local Markdown files and the internal learnings pilot."
 date: 2026-11-04
 commitDate: 2026-11-04

@@ -18,6 +18,7 @@ export async function generateMetadata({ searchParams }: DemoPageProps): Promise
       : "BloomMD ohne Account ausprobieren: Vorlagen oder eigenes Markdown lokal im Browser als Mindmap visualisieren.",
     path: locale === "en" ? "/demo?lang=en" : "/demo",
     locale,
+    languages: { de: "/demo", en: "/demo?lang=en", "x-default": "/demo" },
   });
 }
 

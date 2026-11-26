@@ -13,6 +13,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
       : "Markdown-Mindmap-Vorlagen für Architektur, Startups, Obsidian, Forschung, Schreiben und Content-Strategie entdecken.",
     path: locale === "en" ? "/templates?lang=en" : "/templates",
     locale,
+    languages: { de: "/templates", en: "/templates?lang=en", "x-default": "/templates" },
   });
 }
 

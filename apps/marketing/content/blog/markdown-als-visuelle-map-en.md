@@ -1,5 +1,6 @@
 ---
 title: "Markdown stays the source, BloomMD makes structure visible"
+seoTitle: "Markdown as the source, BloomMD shows structure"
 description: "Why BloomMD starts with Markdown files and turns them into a navigable knowledge space."
 date: 2026-08-28
 tags:

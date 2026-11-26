@@ -1,4 +1,5 @@
 ---
+translationKey: openclaw-lokale-workspace-agenten
 title: "Local AI agents that think with your workspace"
 description: "How OpenClaw agents work on selected BloomMD nodes, return proposals and wait for your approval."
 date: 2026-09-10

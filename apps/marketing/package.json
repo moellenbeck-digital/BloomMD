@@ -21,7 +21,8 @@
     "docs:screenshots:gate": "DOCS_SCREENSHOTS_TARGET=gate playwright test --config playwright.docs-screenshots.config.ts",
     "typecheck": "tsc --noEmit",
     "waitlist": "bun run scripts/waitlist.ts",
-    "news:draft": "bun run scripts/generate-news-draft.ts"
+    "news:draft": "bun run scripts/generate-news-draft.ts",
+    "seo:dates": "bun scripts/update-content-modified.ts"
   },
   "dependencies": {
     "@bloommd/core": "workspace:*",

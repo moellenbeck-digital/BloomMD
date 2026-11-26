@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.5.14: Knoten ohne Sprünge bearbeiten"
+seoTitle: "Desktop 0.5.14: Knoten ohne Sprünge bearbeiten"
 description: "Die Map bleibt beim Auswählen sichtbarer Knoten ruhig. Umbenennen, Tastaturnavigation und Editor-Shortcuts sind zuverlässiger."
 date: 2026-10-21
 commitDate: 2026-10-21

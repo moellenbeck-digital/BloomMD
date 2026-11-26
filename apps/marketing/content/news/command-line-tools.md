@@ -1,5 +1,6 @@
 ---
 title: "Zwei kleine Werkzeuge für lokale BloomMD-Automatisierung"
+seoTitle: "Zwei Werkzeuge für lokale BloomMD-Automatisierung"
 description: "Die Agent-Runtime und die Wiki-CLI werden getrennt ausgeliefert – klarer für OpenClaw, CI und lokale Workflows."
 date: 2026-09-12
 tags:

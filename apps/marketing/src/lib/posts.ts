@@ -9,7 +9,10 @@ export interface MarketingPost {
   kind: MarketingPostKind;
   slug: string;
   locale: MarketingLocale;
+  translationKey?: string;
   title: string;
+  /** Shorter wording for `<title>` and social previews only; the H1 and lists keep `title`. */
+  seoTitle?: string;
   description: string;
   date: string;
   commitDate?: string;
@@ -72,10 +75,10 @@ export function marketingPostSlug(filename: string): string {
   return base === "index" ? "" : base;
 }
 
-function stripLeadingTitle(content: string, title: string): string {
+function stripLeadingTitle(content: string): string {
   const lines = content.replace(/^\s*\n/, "").split("\n");
   const first = lines[0]?.trim() ?? "";
-  if (first.startsWith("# ") && first.slice(2).trim() === title.trim()) {
+  if (first.startsWith("# ")) {
     return lines.slice(1).join("\n").replace(/^\s*\n/, "");
   }
   return content;
@@ -98,13 +101,15 @@ export function parseMarketingPost({ filename, raw, kind, locale }: MarketingPos
     slug: marketingPostSlug(filename),
     locale,
     title,
+    ...(stringValue(data.seoTitle) ? { seoTitle: stringValue(data.seoTitle)! } : {}),
     description,
     date,
     ...(validDate(data.commitDate) ? { commitDate: validDate(data.commitDate)! } : {}),
     tags: parseTags(data.tags),
     ...(stringValue(data.version) ? { version: stringValue(data.version)! } : {}),
     ...(safeExternalUrl(data.sourceUrl) ? { sourceUrl: safeExternalUrl(data.sourceUrl) } : {}),
-    content: stripLeadingTitle(content, title),
+    translationKey: stringValue(data.translationKey) ?? marketingPostSlug(filename),
+    content: stripLeadingTitle(content),
   };
 }
 
@@ -128,7 +133,25 @@ export async function getMarketingPost(kind: MarketingPostKind, slug: string, lo
   return posts.find((post) => post.slug === slug) ?? null;
 }
 
+/** Document title of an article page, including the site suffix. */
+export function marketingPostDocumentTitle(post: Pick<MarketingPost, "title" | "seoTitle">): string {
+  return `${post.seoTitle ?? post.title} · BloomMD`;
+}
+
 export function marketingPostPath(kind: MarketingPostKind, slug: string, locale: MarketingLocale): string {
   const prefix = locale === "en" ? "/en" : "";
   return `${prefix}/${kind}/${slug}`;
+}
+
+/** Only advertise published translations; translationKey pairs localized filenames. */
+export async function marketingPostLanguages(post: MarketingPost): Promise<Record<string, string>> {
+  const languages: Record<string, string> = {};
+  for (const locale of ["de", "en"] as const) {
+    const posts = await listMarketingPosts(post.kind, locale);
+    const peer = posts.find(candidate => candidate.translationKey === post.translationKey);
+    if (peer) languages[locale] = marketingPostPath(peer.kind, peer.slug, locale);
+  }
+  const defaultPath = languages.de ?? languages.en;
+  if (defaultPath) languages["x-default"] = defaultPath;
+  return languages;
 }

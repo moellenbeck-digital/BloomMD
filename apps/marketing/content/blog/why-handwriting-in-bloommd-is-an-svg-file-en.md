@@ -1,4 +1,5 @@
 ---
+translationKey: warum-handschrift-in-bloommd-eine-svg-datei-ist
 title: "Why handwriting in BloomMD is an SVG file"
 description: "Handwriting without format lock-in: drawings are ordinary files in the vault, readable without the plugin and still editable without loss."
 date: 2026-09-28

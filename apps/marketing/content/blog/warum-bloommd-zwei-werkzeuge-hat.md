@@ -1,5 +1,6 @@
 ---
 title: "Warum BloomMD zwei Werkzeuge statt einer großen CLI hat"
+seoTitle: "Warum BloomMD zwei Werkzeuge statt einer CLI hat"
 description: "OpenClaw-Agenten sollen einfach installierbar bleiben. Lokale Wiki- und CI-Workflows brauchen trotzdem ein verlässliches Werkzeug."
 date: 2026-09-12
 tags:

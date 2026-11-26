@@ -1,5 +1,6 @@
 ---
 title: "Die Landingpage zeigt Mindmaps jetzt im BloomMD-Stil"
+seoTitle: "Landingpage zeigt Mindmaps im BloomMD-Stil"
 description: "Marketing-Previews verwenden echte Markdown-Strukturen, BloomMD-Grid, Nodes und Kanten."
 date: 2026-08-25
 commitDate: 2026-08-25

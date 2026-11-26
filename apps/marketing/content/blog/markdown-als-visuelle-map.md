@@ -1,5 +1,6 @@
 ---
 title: "Markdown bleibt die Quelle, BloomMD macht Struktur sichtbar"
+seoTitle: "Markdown als Quelle, BloomMD zeigt die Struktur"
 description: "Warum BloomMD Markdown-Dateien als Ausgangspunkt nimmt und daraus einen navigierbaren Wissensraum macht."
 date: 2026-08-28
 tags:

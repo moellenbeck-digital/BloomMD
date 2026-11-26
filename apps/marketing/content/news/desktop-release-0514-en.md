@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.5.14: edit nodes without losing your place"
+seoTitle: "Desktop 0.5.14: edit nodes, keep your place"
 description: "The map stays in place when you select a visible node. Renaming, keyboard navigation and editor shortcuts are more reliable."
 date: 2026-10-21
 commitDate: 2026-10-21

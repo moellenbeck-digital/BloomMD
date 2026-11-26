@@ -1,4 +1,5 @@
 ---
+translationKey: concept-maps-mit-apple-pencil-in-obsidian
 title: "Concept maps with Apple Pencil in Obsidian"
 description: "Why a good concept map stays short – and how linked handwriting in BloomMD brings formulas, arrows and Obsidian notes together."
 date: 2026-09-28

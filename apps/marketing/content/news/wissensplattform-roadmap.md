@@ -1,5 +1,6 @@
 ---
 title: "Wissensplattform-Roadmap: zehn Themen, ein klarer Ausgangspunkt"
+seoTitle: "Wissensplattform-Roadmap: zehn Themen"
 description: "Unsere öffentliche Richtung beginnt bei lokalen Markdown-Dateien und dem internen Learnings-Pilot."
 date: 2026-11-04
 commitDate: 2026-11-04

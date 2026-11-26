@@ -1,5 +1,6 @@
 ---
 title: "BloomMD-Startseite: Produkt, Pilot und Roadmap klar getrennt"
+seoTitle: "Startseite: Produkt, Pilot und Roadmap getrennt"
 description: "Der neue Einstieg zeigt den heutigen Markdown-Workspace und die Richtung zur Wissensplattform."
 date: 2026-11-04
 commitDate: 2026-11-04

@@ -1,5 +1,7 @@
 ---
+translationKey: shared-mode-lokale-dateien-teilen
 title: "Share one local Markdown file — without sharing the folder"
+seoTitle: "Share one file, not the folder"
 description: "Shared Mode connects one deliberately selected local file to a BloomMD workspace and keeps boundaries, roles, and states visible."
 date: 2026-09-22
 tags:

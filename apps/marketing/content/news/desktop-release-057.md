@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.5.7: signierte macOS-Installation"
+seoTitle: "Desktop 0.5.7: signierte macOS-Installation"
 description: "Developer-ID-Signatur und Apple-Notarisierung für den macOS-arm64-Release."
 date: 2026-10-05
 commitDate: 2026-10-05

@@ -1,5 +1,6 @@
 ---
 title: "Markdown-Listen und Checklisten sind jetzt klarer formatiert"
+seoTitle: "Markdown-Listen und Checklisten klarer formatiert"
 description: "Der MDX-Editor zeigt Listenmarker und Checkboxen mit konsistentem Abstand — im Web und in der Desktop-App."
 date: 2026-08-28
 tags:

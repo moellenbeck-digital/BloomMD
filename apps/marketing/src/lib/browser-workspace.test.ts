@@ -64,6 +64,10 @@ function directoryHandle(
 }
 
 const originalFetch = globalThis.fetch;
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
+// Test files share one global scope: a leftover `window` makes later imports assume a browser.
+const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 let networkCalls: string[] = [];
 
 beforeEach(() => {
@@ -85,6 +89,10 @@ beforeEach(() => {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
+  if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+  else delete (globalThis as { window?: unknown }).window;
 });
 
 describe("permission state", () => {

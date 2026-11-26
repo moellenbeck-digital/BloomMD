@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop ist jetzt für Omarchy und Linux verfügbar"
+seoTitle: "BloomMD Desktop für Omarchy und Linux verfügbar"
 description: "Die Beta bringt native Pacman-Pakete für Omarchy 4 und Arch-basierte Linux-Systeme auf x86_64 und ARM64."
 date: 2026-09-05
 commitDate: 2026-09-05

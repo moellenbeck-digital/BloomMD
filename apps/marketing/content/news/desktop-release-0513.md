@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.5.13: Knoten zuverlässig speichern"
+seoTitle: "Desktop 0.5.13: Knoten zuverlässig speichern"
 description: "Neue Dateien behalten ihre Änderungen. Die Ordnerübersicht zeigt identische Datei- und Überschriftentitel nur einmal."
 date: 2026-10-12
 commitDate: 2026-10-12

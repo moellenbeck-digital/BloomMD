@@ -1,5 +1,7 @@
 ---
+translationKey: wissensplattform-auf-der-startseite
 title: "BloomMD homepage: product, pilot and roadmap clearly separated"
+seoTitle: "Homepage: product, pilot and roadmap separated"
 description: "The updated entry point shows today's Markdown workspace and the direction toward a knowledge platform."
 date: 2026-11-04
 commitDate: 2026-11-04

@@ -1,5 +1,6 @@
 ---
 title: "Folders, files or sections: where do I edit my content?"
+seoTitle: "Folder, file, section: where to edit?"
 description: "The folder overview in Desktop 0.6.0 makes the path from a file to the right heading explicit."
 date: 2026-11-24
 tags:

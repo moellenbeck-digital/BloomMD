@@ -7,9 +7,11 @@
 - [Dokumentation](https://bloommd.io/docs): Hilfe zur Nutzung von BloomMD.
 - [Download](https://bloommd.io/download): Verfügbare Downloads und Plattformhinweise.
 - [Obsidian](https://bloommd.io/obsidian): Informationen zum Obsidian-Plugin.
+- [Dokumentation als Volltext](https://bloommd.io/llms-full.txt): Alle veröffentlichten Hilfeseiten in einer Textdatei.
 
 ## English
 - [BloomMD](https://bloommd.io/en): Open Markdown files as visual maps.
 - [Documentation](https://bloommd.io/docs?lang=en): Help with using BloomMD.
 - [Downloads](https://bloommd.io/download?lang=en): Available downloads and platform information.
 - [Obsidian](https://bloommd.io/obsidian?lang=en): Information about the Obsidian plugin.
+- [Full documentation text](https://bloommd.io/llms-full.txt): All published help pages in one text file.

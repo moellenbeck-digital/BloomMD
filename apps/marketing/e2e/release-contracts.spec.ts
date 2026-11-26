@@ -30,6 +30,32 @@ test.describe("marketing release contracts", () => {
     }
   });
 
+  // Next streams metadata into <body> for user agents outside its HTML-limited bot list unless
+  // next.config sets htmlLimitedBots. Crawlers that only read the raw head would miss these tags.
+  test("serves title, canonical and hreflang in the raw head of every article for all user agents", async ({ request }) => {
+    test.setTimeout(180_000);
+    const xml = await (await request.get("/sitemap.xml")).text();
+    const articles = [...xml.matchAll(/<loc>https:\/\/bloommd\.io(\/(?:en\/)?(?:blog|news)\/[^<]+)<\/loc>/g)].map((match) => match[1]!);
+    expect(articles.length).toBeGreaterThan(0);
+    const agents = [
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)",
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)",
+    ];
+    const missing: string[] = [];
+    for (const path of articles) {
+      for (const agent of agents) {
+        const html = await (await request.get(path, { headers: { "user-agent": agent } })).text();
+        const head = html.slice(0, html.indexOf("</head>"));
+        if (!/<title>[^<]+<\/title>/.test(head)) missing.push(`${path} title (${agent})`);
+        if (!/<link rel="canonical"/.test(head)) missing.push(`${path} canonical (${agent})`);
+        if (!/<link rel="alternate" hrefLang="x-default"/i.test(head)) missing.push(`${path} hreflang (${agent})`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
   for (const path of ["/news/desktop-release-0512", "/en/news/desktop-release-0512", "/docs/desktop", "/docs/desktop?lang=en"]) {
     test(`allows indexing of public content: ${path}`, async ({ page }) => {
       const response = await page.goto(path, { waitUntil: "domcontentloaded" });

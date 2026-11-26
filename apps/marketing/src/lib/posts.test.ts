@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { listMarketingPosts, marketingPostSlug, parseMarketingPost } from "./posts";
+import { listMarketingPosts, marketingPostDocumentTitle, marketingPostLanguages, marketingPostPath, marketingPostSlug, parseMarketingPost } from "./posts";
 
 describe("marketing posts", () => {
   test("maps bilingual filenames to one stable slug", () => {
@@ -92,22 +92,46 @@ describe("pictures in posts", () => {
   }
 });
 
-test("shortened SEO titles do not leave a second article H1", () => {
+test("a leading Markdown H1 never becomes a second article H1", () => {
   const post = parseMarketingPost({ filename: "article.md", kind: "blog", locale: "de", raw: "---\ntitle: Short\ndate: 2026-09-22\n---\n# Original long title\n\nBody" });
   expect(post?.content).toBe("Body");
 });
 
-test("translated slugs resolve reciprocally to published articles", async () => {
-  const { marketingPostLanguages } = await import("./posts");
+describe("SEO titles", () => {
+  test("seoTitle shortens only the document title; the article title stays", () => {
+    const post = parseMarketingPost({ filename: "a.md", kind: "news", locale: "de", raw: "---\ntitle: Ein langer Originaltitel\nseoTitle: Kurz\ndate: 2026-09-22\n---\nBody" })!;
+    expect(post.title).toBe("Ein langer Originaltitel");
+    expect(marketingPostDocumentTitle(post)).toBe("Kurz · BloomMD");
+    expect(marketingPostDocumentTitle({ title: "Ohne" })).toBe("Ohne · BloomMD");
+  });
+
+  test.each(["blog", "news"] as const)("published %s articles keep <title> at 60 and the description at 155 characters", async (kind) => {
+    const tooLong: string[] = [];
+    for (const locale of ["de", "en"] as const) {
+      for (const post of await listMarketingPosts(kind, locale)) {
+        const title = marketingPostDocumentTitle(post);
+        if (title.length > 60) tooLong.push(`${locale}/${post.slug} title ${title.length}`);
+        if (post.description.length > 155) tooLong.push(`${locale}/${post.slug} description ${post.description.length}`);
+      }
+    }
+    expect(tooLong).toEqual([]);
+  });
+});
+
+test("language links point to published articles and resolve reciprocally; monolingual articles are allowed", async () => {
   for (const kind of ["blog", "news"] as const) {
-    const de = await listMarketingPosts(kind, "de");
-    const en = await listMarketingPosts(kind, "en");
-    for (const post of [...de, ...en]) {
+    const published = { de: await listMarketingPosts(kind, "de"), en: await listMarketingPosts(kind, "en") };
+    for (const post of [...published.de, ...published.en]) {
       const links = await marketingPostLanguages(post);
-      expect(de.some(p => links.de === `/${kind}/${p.slug}`)).toBe(true);
-      expect(en.some(p => links.en === `/en/${kind}/${p.slug}`)).toBe(true);
-      const peer = [...de, ...en].find(p => p.locale !== post.locale && links[p.locale]?.endsWith(`/${p.slug}`))!;
-      expect(await marketingPostLanguages(peer)).toEqual(links);
+      expect(links[post.locale]).toBe(marketingPostPath(kind, post.slug, post.locale));
+      expect(links["x-default"]).toBe(links.de ?? links.en);
+      for (const locale of ["de", "en"] as const) {
+        const target = links[locale];
+        if (!target) continue;
+        const peer = published[locale].find(candidate => marketingPostPath(kind, candidate.slug, locale) === target);
+        expect(peer).toBeDefined();
+        expect(await marketingPostLanguages(peer!)).toEqual(links);
+      }
     }
   }
 });

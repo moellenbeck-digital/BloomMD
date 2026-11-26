@@ -11,6 +11,8 @@ export interface MarketingPost {
   locale: MarketingLocale;
   translationKey?: string;
   title: string;
+  /** Shorter wording for `<title>` and social previews only; the H1 and lists keep `title`. */
+  seoTitle?: string;
   description: string;
   date: string;
   commitDate?: string;
@@ -99,6 +101,7 @@ export function parseMarketingPost({ filename, raw, kind, locale }: MarketingPos
     slug: marketingPostSlug(filename),
     locale,
     title,
+    ...(stringValue(data.seoTitle) ? { seoTitle: stringValue(data.seoTitle)! } : {}),
     description,
     date,
     ...(validDate(data.commitDate) ? { commitDate: validDate(data.commitDate)! } : {}),
@@ -128,6 +131,11 @@ export async function listMarketingPosts(kind: MarketingPostKind, locale: Market
 export async function getMarketingPost(kind: MarketingPostKind, slug: string, locale: MarketingLocale = "de"): Promise<MarketingPost | null> {
   const posts = await listMarketingPosts(kind, locale);
   return posts.find((post) => post.slug === slug) ?? null;
+}
+
+/** Document title of an article page, including the site suffix. */
+export function marketingPostDocumentTitle(post: Pick<MarketingPost, "title" | "seoTitle">): string {
+  return `${post.seoTitle ?? post.title} · BloomMD`;
 }
 
 export function marketingPostPath(kind: MarketingPostKind, slug: string, locale: MarketingLocale): string {

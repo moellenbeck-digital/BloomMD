@@ -1,5 +1,6 @@
 ---
-title: "Gut lesbar unter Omarchy bei 160 Prozent"
+title: "BloomMD bleibt unter Omarchy auch bei 160 Prozent gut lesbar"
+seoTitle: "BloomMD unter Omarchy bei 160 Prozent gut lesbar"
 description: "Die Linux-Desktop-App nutzt lokale Schriften und bessere Kontraste für Mindmap, Dateiliste und Editor."
 date: 2026-09-07
 commitDate: 2026-09-07

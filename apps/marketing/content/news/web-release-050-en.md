@@ -1,5 +1,6 @@
 ---
-title: "Web 0.5: read-only links and node tasks"
+title: "BloomMD web app 0.5: share maps with read-only links, tasks right on the node"
+seoTitle: "Web app 0.5: read-only links and tasks on nodes"
 description: "Colleagues can view a map without an account. Nodes show due dates, owners and decisions."
 date: 2026-10-19
 commitDate: 2026-10-19

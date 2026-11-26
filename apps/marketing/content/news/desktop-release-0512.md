@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.5.12: große Ordner flüssiger öffnen"
+seoTitle: "Desktop 0.5.12: große Ordner flüssiger öffnen"
 description: "Eine kompakte Übersicht, Layout im Hintergrund und zuverlässige Aktualisierung lokaler Markdown-Dateien."
 date: 2026-10-08
 commitDate: 2026-10-08

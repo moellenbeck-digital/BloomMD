@@ -1,5 +1,6 @@
 ---
-title: "OpenClaw: Vorschläge im Workspace prüfen"
+title: "OpenClaw im geteilten Workspace: Vorschläge dort prüfen, wo die Entscheidung fällt"
+seoTitle: "OpenClaw: Vorschläge im geteilten Workspace prüfen"
 description: "Lokale Agenten ergänzen Shared Mode mit knotengebundenen Aufträgen, sichtbarem Status und menschlicher Freigabe statt direktem Schreiben."
 date: 2026-09-22
 tags:

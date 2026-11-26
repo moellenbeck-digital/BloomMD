@@ -1,5 +1,6 @@
 ---
-title: "Remote-Dokumente aktiv löschen"
+title: "Remote-Dokumente lassen sich jetzt auch aktiv löschen"
+seoTitle: "Remote-Dokumente jetzt auch aktiv löschen"
 description: "BloomMD trennt eine aktive Sync-Session kontrolliert, bevor ein Remote-Dokument gelöscht wird."
 date: 2026-09-07
 commitDate: 2026-09-07

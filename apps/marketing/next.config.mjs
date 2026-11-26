@@ -42,6 +42,11 @@ const nextConfig = {
   transpilePackages: ["@bloommd/core", "@bloommd/ui", "@bloommd/ink"],
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
+  // Next streams generateMetadata output into <body> for every user agent outside its built-in
+  // HTML-limited bot list (e.g. browsers, Googlebot, GPTBot, ClaudeBot). Crawlers that read only the
+  // raw HTML head then miss title, canonical and hreflang. Blocking metadata for all agents keeps
+  // them in <head>; the marketing pages resolve metadata from local files, so the delay is small.
+  htmlLimitedBots: /.*/,
   async headers() {
     return [
       {

@@ -1,5 +1,6 @@
 ---
 title: "BloomMD Desktop 0.6.0: from folders to the right section"
+seoTitle: "Desktop 0.6.0: from folders to the right section"
 description: "Distinguish folders, files and content previews, then continue in the right Markdown section."
 date: 2026-11-24
 commitDate: 2026-11-24

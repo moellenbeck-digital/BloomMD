@@ -1,6 +1,7 @@
 ---
 translationKey: warum-bloommd-zwei-werkzeuge-hat
 title: "Why BloomMD has two tools instead of one large CLI"
+seoTitle: "Why BloomMD has two tools instead of one CLI"
 description: "OpenClaw agents should stay simple to install, while local Wiki and CI workflows still need a dependable tool."
 date: 2026-09-12
 tags:

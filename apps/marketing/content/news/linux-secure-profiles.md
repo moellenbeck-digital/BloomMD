@@ -1,5 +1,6 @@
 ---
 title: "Linux-Serverprofile speichern Zugangsdaten jetzt sicher"
+seoTitle: "Linux-Serverprofile speichern Zugangsdaten sicher"
 description: "BloomMD nutzt unter Linux den systemweiten Secret Service, damit Serverprofile nach einem Neustart sicher weiterverwendet werden können."
 date: 2026-09-05
 commitDate: 2026-09-05

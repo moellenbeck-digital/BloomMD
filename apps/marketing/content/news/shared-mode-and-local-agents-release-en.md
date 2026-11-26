@@ -1,6 +1,7 @@
 ---
 translationKey: shared-mode-und-lokale-agenten-release
-title: "Shared Mode and local agents"
+title: "Shared Mode and local agents: collaboration with clear boundaries"
+seoTitle: "Shared Mode and local agents with clear boundaries"
 description: "Deliberately share one local Markdown file, assign workspace roles, and review OpenClaw proposals at the relevant node."
 date: 2026-09-22
 commitDate: 2026-09-22

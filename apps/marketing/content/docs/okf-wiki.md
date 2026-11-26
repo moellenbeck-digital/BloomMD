@@ -90,13 +90,11 @@ sind, wirkt gesünder als es ist.
 
 Ein Agent kann Seiten **vorschlagen**, nicht schreiben. Jeder Vorschlag braucht eine ausdrückliche
 Freigabe, und beim Anwenden werden die Inhalts-Hashes erneut geprüft: Hat sich die Seite seit dem
-Vorschlag geändert, wird er abgelehnt statt fremde Arbeit zu überschreiben. Vorschläge ohne
-Quellenangabe werden verworfen.
+Vorschlag geändert, wird er abgelehnt statt fremde Arbeit zu überschreiben.
 
-Das gilt unabhängig vom Anbieter — OpenAI, Anthropic, lokale Modelle oder MCP-Clients laufen alle
-durch dieselbe Prüfung. Lokal läuft das mit `bloommd-wiki` in drei Schritten:
-`bloommd-wiki propose` erstellt den Vorschlag, `bloommd-wiki approve` gibt ihn namentlich frei und
-`bloommd-wiki apply` schreibt ihn erst nach der Hash-Prüfung. Download und Einstieg stehen unter
+Lokal läuft das mit `bloommd-wiki` in drei Schritten: `bloommd-wiki propose` erstellt den Vorschlag,
+`bloommd-wiki approve` gibt ihn namentlich frei und `bloommd-wiki apply` schreibt ihn erst nach der
+Hash-Prüfung. Eine Quellenangabe erzwingen diese Befehle nicht. Download und Einstieg stehen unter
 [Optionale Kommandozeilen-Tools](/docs/command-line-tools).
 
 ## Was OKF nicht leistet

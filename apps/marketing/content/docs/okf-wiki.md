@@ -94,8 +94,8 @@ Vorschlag geändert, wird er abgelehnt statt fremde Arbeit zu überschreiben. Vo
 Quellenangabe werden verworfen.
 
 Das gilt unabhängig vom Anbieter — OpenAI, Anthropic, lokale Modelle oder MCP-Clients laufen alle
-durch dieselbe Prüfung. Den Ablauf `propose → approve → apply` und die Einrichtung eines Agenten
-beschreibt [Notizen vom Agenten ablegen lassen](/docs/agent-wissen).
+durch dieselbe Prüfung. Wie du einen Agenten einrichtest und seine Vorschläge
+freigibst, beschreibt [OpenClaw-Agenten im Workspace](/docs/openclaw-agent).
 
 ## Was OKF nicht leistet
 

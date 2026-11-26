@@ -87,9 +87,9 @@ page would reveal who is reading what. Broken references and missing files remai
 An agent may **propose** changes but cannot write directly. Every proposal needs explicit approval,
 and content hashes are checked again before applying it. A changed page causes the proposal to be
 rejected instead of overwriting someone else's work. Proposals without a source are discarded. The
-same rule applies to OpenAI, Anthropic, local models, and MCP clients. The flow
-`propose → approve → apply` and the setup of an agent are described in
-[Let an agent file your notes](/docs/agent-wissen?lang=en).
+same rule applies to OpenAI, Anthropic, local models, and MCP clients. How to set up
+an agent and approve its proposals is described in
+[OpenClaw agents in the workspace](/docs/openclaw-agent?lang=en).
 
 ## What OKF does not do
 

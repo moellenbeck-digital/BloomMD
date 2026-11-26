@@ -27,7 +27,8 @@ const PAGES_WITH_A_PICTURE = [
 
 const files = readdirSync(DOCS_DIR).filter((file) => file.endsWith(".md")).sort();
 const germanFiles = files.filter((file) => !file.endsWith("-en.md"));
-const germanSlugs = new Set(germanFiles.map((file) => file.replace(/\.md$/, "")));
+/** Drafts answer 404, so a link to one is as dead as a link to a missing page. */
+const publishedGermanSlugs = new Set(germanFiles.filter((file) => !/^draft:\s*(true|"true")\s*$/m.test(read(file))).map((file) => file.replace(/\.md$/, "")));
 
 function counterpart(file: string): string {
   return file.endsWith("-en.md") ? file.replace(/-en\.md$/, ".md") : file.replace(/\.md$/, "-en.md");
@@ -95,10 +96,10 @@ describe("pictures", () => {
 
 describe("links between help pages", () => {
   for (const file of files) {
-    test(`${file}: every /docs link points to an existing page`, () => {
+    test(`${file}: every /docs link points to a published page`, () => {
       for (const target of docLinks(read(file))) {
         const slug = target.replace(/^\/docs\/?/, "");
-        if (slug) expect(germanSlugs.has(slug), `${target} has no page ${slug}.md`).toBe(true);
+        if (slug) expect(publishedGermanSlugs.has(slug), `${target} has no published page ${slug}.md`).toBe(true);
       }
     });
   }

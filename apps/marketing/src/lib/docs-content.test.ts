@@ -143,17 +143,19 @@ describe("command-line tools page", () => {
     expect(usage).toContain("propose <pfad> <changes.json> <proposal.json>");
   });
 
-  // `propose` stores sourceIds when given but never requires them; the page must not claim otherwise.
+  // `propose` never requires reason or sourceIds. The page describes the shipped binary (0.4.4), which has no
+  // `--allow-agent-approval` option, and `approve` writes the proposal file, not the Wiki directory.
   for (const [file, synopsis, optional] of [
-    ["command-line-tools.md", "propose <pfad> <changes.json> <proposal.json>", "`sourceIds` ist optional"],
-    ["command-line-tools-en.md", "propose <path> <changes.json> <proposal.json>", "`sourceIds` is optional"],
+    ["command-line-tools.md", "propose <pfad> <changes.json> <proposal.json>", "optional `reason` und `sourceIds`"],
+    ["command-line-tools-en.md", "propose <path> <changes.json> <proposal.json>", "optionally `reason` and `sourceIds`"],
   ] as const) {
     test(`${file} documents bloommd-wiki propose`, () => {
       const page = read(file);
       expect(page).toContain("bloommd-wiki propose ./wiki ./changes.json ./proposal.json");
       expect(page).toContain(synopsis);
       expect(page).toContain(optional);
-      expect(page).toContain("--allow-agent-approval");
+      expect(page).not.toContain("--allow-agent-approval");
+      expect(page).not.toMatch(/`approve`,? (und|and) `apply` (schreiben|write)/);
     });
   }
 });

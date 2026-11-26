@@ -44,7 +44,7 @@ bloommd-wiki mcp ./wiki
 
 `workspace index` shows, per file and per heading, who links to it (a link with an anchor counts for the heading, one without for the file) and reports three findings: broken or ambiguous links, stale targets (an anchor without a heading; a target file with status `veraltet`/`ersetzt` or a past `stale_after`, naming `replaced_by` as the successor) and duplicate `bloommd:id`s. Options as for `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; errors (broken links) exit 1, with `--strict` warnings do too. `workspace lint` is unchanged.
 
-Only `init`, `index`, `log`, `approve`, and `apply` write to the explicitly named Wiki directory. `propose` writes only the named proposal file. The other commands read and report.
+`init`, `index`, `log`, and `apply` write to the named Wiki directory. `propose` writes the named proposal file, and `approve` records the approval in the named proposal file. The proposal file can also be outside the Wiki directory. `status`, `lint`, and `workspace lint`, `check`, `search`, and `backlinks` read and report.
 
 ## Propose Wiki changes
 
@@ -59,7 +59,7 @@ bloommd-wiki apply ./wiki ./proposal.json
 Arguments of `propose <path> <changes.json> <proposal.json>`, all three required:
 
 - **`<path>`**: the Wiki directory. `propose` reads the current state of every affected page there.
-- **`<changes.json>`**: a JSON array. Each entry has `path` (page relative to the Wiki directory, ending in `.md`), `content` (the complete new page content), `reason` and optionally `sourceIds`.
+- **`<changes.json>`**: a JSON array. Each entry has `path` (page relative to the Wiki directory, ending in `.md`), `content` (the complete new page content), and optionally `reason` and `sourceIds`.
 - **`<proposal.json>`**: the target file for the proposal. An existing file is overwritten.
 
 ```json
@@ -77,9 +77,7 @@ The proposal file contains `version: 1`, an `id`, `createdAt` and the changes. E
 
 On success `propose` prints JSON, for example `{ "ok": true, "command": "wiki propose", "proposalId": "…", "outputPath": "…" }`, and exits 0.
 
-`propose` exits 2 and writes no file when an argument is missing, a `path` is absolute, contains `..` or does not end in `.md`, a `path` appears twice, or a `content` is larger than 2,000,000 bytes. `propose` does not enforce a source: `sourceIds` is optional.
-
-Through `bloommd-wiki mcp`, agents can propose changes. `approve` and `apply` are available to them only when the server was started with `--allow-agent-approval`.
+`propose` exits 2 and writes no file when an argument is missing, a `path` is absolute, contains `..` or does not end in `.md`, a `path` appears twice, or a `content` is larger than 2,000,000 bytes. `propose` does not enforce a source: `sourceIds` is optional. Only `apply` checks for a `type` in the frontmatter: without it, `apply` exits 2.
 
 ## Use the agent runtime only for automation
 

@@ -91,3 +91,23 @@ describe("pictures in posts", () => {
     }
   }
 });
+
+test("shortened SEO titles do not leave a second article H1", () => {
+  const post = parseMarketingPost({ filename: "article.md", kind: "blog", locale: "de", raw: "---\ntitle: Short\ndate: 2026-09-22\n---\n# Original long title\n\nBody" });
+  expect(post?.content).toBe("Body");
+});
+
+test("translated slugs resolve reciprocally to published articles", async () => {
+  const { marketingPostLanguages } = await import("./posts");
+  for (const kind of ["blog", "news"] as const) {
+    const de = await listMarketingPosts(kind, "de");
+    const en = await listMarketingPosts(kind, "en");
+    for (const post of [...de, ...en]) {
+      const links = await marketingPostLanguages(post);
+      expect(de.some(p => links.de === `/${kind}/${p.slug}`)).toBe(true);
+      expect(en.some(p => links.en === `/en/${kind}/${p.slug}`)).toBe(true);
+      const peer = [...de, ...en].find(p => p.locale !== post.locale && links[p.locale]?.endsWith(`/${p.slug}`))!;
+      expect(await marketingPostLanguages(peer)).toEqual(links);
+    }
+  }
+});

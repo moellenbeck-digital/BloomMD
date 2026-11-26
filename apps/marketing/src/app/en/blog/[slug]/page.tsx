@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MarketingContentArticle } from "@/components/marketing-content";
 import { marketingMetadata } from "@/lib/metadata";
-import { getMarketingPost, listMarketingPosts, marketingPostPath } from "@/lib/posts";
+import { getMarketingPost, listMarketingPosts, marketingPostPath, marketingPostLanguages } from "@/lib/posts";
 
 export async function generateStaticParams() {
   return (await listMarketingPosts("blog", "en")).map((post) => ({ slug: post.slug }));
@@ -17,11 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     description: post.description,
     path: marketingPostPath("blog", post.slug, "en"),
     locale: "en",
-    languages: {
-      de: marketingPostPath("blog", post.slug, "de"),
-      en: marketingPostPath("blog", post.slug, "en"),
-      "x-default": marketingPostPath("blog", post.slug, "de"),
-    },
+    languages: await marketingPostLanguages(post),
     type: "article",
     publishedTime: post.date,
   });

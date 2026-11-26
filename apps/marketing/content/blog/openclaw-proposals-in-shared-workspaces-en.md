@@ -1,4 +1,5 @@
 ---
+translationKey: openclaw-vorschlaege-im-geteilten-workspace
 title: "OpenClaw: review workspace proposals"
 description: "Local agents extend Shared Mode with node-scoped requests, visible status, and human approval instead of direct writes."
 date: 2026-09-22

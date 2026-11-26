@@ -135,3 +135,25 @@ describe("links between help pages", () => {
     }
   });
 });
+
+describe("command-line tools page", () => {
+  const usage = readFileSync(join(ROOT, "..", "..", "packages", "wiki-cli", "src", "index.ts"), "utf8");
+
+  test("the CLI help still names propose with three arguments", () => {
+    expect(usage).toContain("propose <pfad> <changes.json> <proposal.json>");
+  });
+
+  // `propose` stores sourceIds when given but never requires them; the page must not claim otherwise.
+  for (const [file, synopsis, optional] of [
+    ["command-line-tools.md", "propose <pfad> <changes.json> <proposal.json>", "`sourceIds` ist optional"],
+    ["command-line-tools-en.md", "propose <path> <changes.json> <proposal.json>", "`sourceIds` is optional"],
+  ] as const) {
+    test(`${file} documents bloommd-wiki propose`, () => {
+      const page = read(file);
+      expect(page).toContain("bloommd-wiki propose ./wiki ./changes.json ./proposal.json");
+      expect(page).toContain(synopsis);
+      expect(page).toContain(optional);
+      expect(page).toContain("--allow-agent-approval");
+    });
+  }
+});

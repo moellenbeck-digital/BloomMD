@@ -44,7 +44,42 @@ bloommd-wiki mcp ./wiki
 
 `workspace index` zeigt je Datei und je Überschrift, wer darauf verweist (ein Link mit Anker zählt für die Überschrift, einer ohne Anker für die Datei), und meldet drei Befunde: defekte oder mehrdeutige Links, veraltete Ziele (Anker ohne Überschrift; Zieldatei mit Status `veraltet`/`ersetzt` oder abgelaufenem `stale_after`, mit `replaced_by` als Nachfolger) und doppelte `bloommd:id`. Optionen wie bei `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; Fehler (defekte Links) ergeben Exit-Code 1, mit `--strict` auch Warnungen. `workspace lint` bleibt unverändert.
 
-`init`, `index`, `log`, `approve` und `apply` schreiben nur in den ausdrücklich angegebenen Wiki-Ordner. Die anderen Befehle lesen und berichten.
+`init`, `index`, `log`, `approve` und `apply` schreiben nur in den ausdrücklich angegebenen Wiki-Ordner. `propose` schreibt nur die angegebene Vorschlagsdatei. Die anderen Befehle lesen und berichten.
+
+## Wiki-Änderungen vorschlagen
+
+`propose` macht aus einer Liste von Änderungen einen Vorschlag. Der Vorschlag ändert noch keine Wiki-Seite. `approve` gibt ihn mit dem Namen der prüfenden Person frei. Erst danach schreibt `apply` ihn in den Wiki-Ordner.
+
+```bash
+bloommd-wiki propose ./wiki ./changes.json ./proposal.json
+bloommd-wiki approve ./proposal.json "Name der prüfenden Person"
+bloommd-wiki apply ./wiki ./proposal.json
+```
+
+Argumente von `propose <pfad> <changes.json> <proposal.json>`, alle drei Pflicht:
+
+- **`<pfad>`**: der Wiki-Ordner. `propose` liest dort den aktuellen Stand jeder betroffenen Seite.
+- **`<changes.json>`**: ein JSON-Array. Jeder Eintrag hat `path` (Seite relativ zum Wiki-Ordner, Endung `.md`), `content` (der vollständige neue Seiteninhalt), `reason` und optional `sourceIds`.
+- **`<proposal.json>`**: die Zieldatei für den Vorschlag. Eine vorhandene Datei wird überschrieben.
+
+```json
+[
+  {
+    "path": "concepts/launch.md",
+    "content": "---\ntype: concept\n---\n# Launch\n\nNeuer Plan.\n",
+    "reason": "Plan aktualisiert",
+    "sourceIds": ["docs:launch"]
+  }
+]
+```
+
+Die Vorschlagsdatei enthält `version: 1`, eine `id`, `createdAt` und die Änderungen. Jede Änderung trägt zusätzlich `beforeHash` (SHA-256 der Seite beim Vorschlag, `null` für eine neue Seite) und `afterHash`. Ein eigenes Statusfeld gibt es nicht: Ohne `approvedBy` und `approvedAt` ist der Vorschlag nicht freigegeben, und `apply` lehnt ihn ab. `apply` lehnt ihn auch ab, wenn sich eine Seite seit dem Vorschlag geändert hat.
+
+Bei Erfolg gibt `propose` JSON aus, zum Beispiel `{ "ok": true, "command": "wiki propose", "proposalId": "…", "outputPath": "…" }`, und endet mit Exit-Code 0.
+
+`propose` bricht mit Exit-Code 2 ab und schreibt keine Datei, wenn ein Argument fehlt, ein `path` absolut ist, `..` enthält oder nicht auf `.md` endet, ein `path` doppelt vorkommt oder ein `content` größer als 2.000.000 Bytes ist. Eine Quellenangabe erzwingt `propose` nicht: `sourceIds` ist optional.
+
+Über `bloommd-wiki mcp` können Agenten Änderungen vorschlagen. `approve` und `apply` stehen ihnen nur zur Verfügung, wenn der Server mit `--allow-agent-approval` gestartet wurde.
 
 ## Agent-Runtime nur für Automatisierung
 

@@ -246,7 +246,7 @@ bloommd-wiki workspace open ./note.md         # open a Markdown file in the Desk
 bloommd-wiki workspace lint .                 # analyse Markdown links and duplicate names
 bloommd-wiki workspace check .                # verify round-trip safety
 bloommd-wiki workspace search "term" .        # search a local workspace
-bloommd-wiki workspace index .                # backlinks per file and heading, plus broken links, stale targets, duplicate node ids
+bloommd-wiki workspace index .                # backlinks per file and heading, plus broken links, stale targets, duplicate node ids (not yet released: next version after 0.4.4)
 bloommd-wiki status ./wiki                    # inspect a local OKF/LLM-Wiki bundle
 ```
 

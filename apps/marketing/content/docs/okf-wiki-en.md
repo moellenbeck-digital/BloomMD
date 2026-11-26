@@ -50,7 +50,8 @@ With the optional command-line tool `bloommd-wiki` (download and checksum:
 4. Findings in detail: `bloommd-wiki lint ./wiki`. The command exits with code 1 as soon as there
    are findings, which suits a CI check.
 5. Compare source hashes: `status` and `lint` accept a `source-hashes.json` file or, with
-   `--sources <folder>`, a folder with the source files. Without either, the comparison stays off.
+   `--sources <folder>`, a folder with the source files. Without either, the comparison stays off. `--sources` ships with
+   the next version after 0.4.4; the current release `cli-v0.4.4` only accepts `source-hashes.json`.
 
 The head of a reviewed page looks like this:
 

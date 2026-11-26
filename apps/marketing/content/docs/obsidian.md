@@ -162,7 +162,7 @@ Im Zeichenmodus lässt sich die ganze Map mit dem Apple Pencil (oder der Maus) b
 
 - **Langes Drücken** (iPad) bzw. **Rechtsklick** auf einen Knoten öffnet ein Menü mit allen Aktionen.
 - **Lernmodus** (Hut-Symbol): Knoteninhalte sind verdeckt, Tippen deckt sie einzeln auf.
-- **Export** (Bild-Symbol): Markdown, OPML, PDF, PNG oder SVG der ganzen Map im Anhangsordner — dieselben fünf Einträge wie in den Apps. Der Befehl **Import OPML** legt aus einer OPML-Datei (MindNode, Xmind) eine neue Notiz an.
+- **Export** (Bild-Symbol): Markdown, OPML, PDF, PNG oder SVG der ganzen Map im Anhangsordner — dieselben fünf Einträge wie in den Apps, siehe [Export und Import](/docs/export). Der Befehl **Import OPML** legt aus einer OPML-Datei (MindNode, Xmind) eine neue Notiz an.
 
 ## Lernfortschritt auf der Map
 

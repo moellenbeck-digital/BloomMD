@@ -87,9 +87,10 @@ page would reveal who is reading what. Broken references and missing files remai
 An agent may **propose** changes but cannot write directly. Every proposal needs explicit approval,
 and content hashes are checked again before applying it. A changed page causes the proposal to be
 rejected instead of overwriting someone else's work. Proposals without a source are discarded. The
-same rule applies to OpenAI, Anthropic, local models, and MCP clients. How to set up
-an agent and approve its proposals is described in
-[OpenClaw agents in the workspace](/docs/openclaw-agent?lang=en).
+same rule applies to OpenAI, Anthropic, local models, and MCP clients. Locally, `bloommd-wiki`
+does this in three steps: `bloommd-wiki propose` creates the proposal, `bloommd-wiki approve`
+records a named approval, and `bloommd-wiki apply` writes it only after the hash check. Download
+and first steps are under [Optional command-line tools](/docs/command-line-tools?lang=en).
 
 ## What OKF does not do
 

@@ -94,8 +94,10 @@ Vorschlag geändert, wird er abgelehnt statt fremde Arbeit zu überschreiben. Vo
 Quellenangabe werden verworfen.
 
 Das gilt unabhängig vom Anbieter — OpenAI, Anthropic, lokale Modelle oder MCP-Clients laufen alle
-durch dieselbe Prüfung. Wie du einen Agenten einrichtest und seine Vorschläge
-freigibst, beschreibt [OpenClaw-Agenten im Workspace](/docs/openclaw-agent).
+durch dieselbe Prüfung. Lokal läuft das mit `bloommd-wiki` in drei Schritten:
+`bloommd-wiki propose` erstellt den Vorschlag, `bloommd-wiki approve` gibt ihn namentlich frei und
+`bloommd-wiki apply` schreibt ihn erst nach der Hash-Prüfung. Download und Einstieg stehen unter
+[Optionale Kommandozeilen-Tools](/docs/command-line-tools).
 
 ## Was OKF nicht leistet
 

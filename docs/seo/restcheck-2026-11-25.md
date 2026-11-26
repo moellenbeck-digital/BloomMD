@@ -2,6 +2,25 @@
 
 Basis: origin/main 3048b8ab60683f4434ab9dd7b1ea681d1ab2b44a (#447 bereits gemergt). Kein Release/Deploy/Merge ausgeführt.
 
+## Stand nach Korrekturrunde 1 (26.11.2026)
+
+Ersetzt widersprechende Angaben weiter unten. Messung lokal mit `next start`, Skript `docs/seo/crawl-head.py`, Ergebnis `docs/seo/crawl-2026-11-26.json` (E).
+
+| Prüfung | Ergebnis | Rang |
+|---|---|---|
+| Sitemap-URLs | 132, alle 200 | E |
+| lastmod | 130 von 132; ohne: `/roadmap`, `/en/roadmap` (Inhalt live aus GitHub, kein Quelldatum) | E |
+| H1 | genau eine je URL | E |
+| title, canonical, hreflang im Raw-`<head>` | alle 84 Artikel × Chrome, GPTBot, Googlebot, ClaudeBot; übrige 48 URLs × Chrome, GPTBot | E |
+| `<title>` > 60 | 0 | E |
+| Description > 155 | 0 | E |
+| `/templates/<slug>` | 12 URLs in der Sitemap, hreflang de/en/x-default | E |
+| `/llms-full.txt` | statisch gebaut, absolute Links, in `/llms.txt` verlinkt | E |
+
+Ursache Head-Fehler auf Artikeln (E): Next 16 streamt `generateMetadata` in den `<body>` für alle User-Agents außerhalb seiner HTML-limited-Bot-Liste. Am Stand `0ae65d9` gemessen: Chrome, GPTBot, Googlebot ohne title/canonical/hreflang im Head, Bingbot mit. Alle Seiten sind dynamisch gerendert (Build-Ausgabe `ƒ`). Fix: `htmlLimitedBots: /.*/` in `apps/marketing/next.config.mjs` (Next-Doku „Disabling streaming metadata“). Annahme (B, nicht isoliert gemessen): Am Basisstand `3048b8a` war die Metadata oft vor dem Head-Flush fertig (116/168); das zusätzliche `await marketingPostLanguages(post)` machte sie immer zu spät.
+
+Titel: Originaltitel wiederhergestellt, Kürzung nur noch über `seoTitle`. Liste alt/neu: `docs/seo/titel-2026-11-26.md`.
+
 ## Geht mit Release live (E)
 
 Belege: `restcheck-2026-11-25-belege.json` (E, 25.11.2026 ab 23:56 CET, live und lokaler Build).
@@ -21,13 +40,13 @@ Bot-Zugriffe sind HTTP-Abrufe mit gesetztem User-Agent. Sie belegen keinen Besuc
 
 ## Kleiner Restfix
 
-/demo und /templates hatten in beiden Sprachen keine hreflang-Links. Zwei Metadata-Ergänzungen liefern jetzt de/en/x-default auf allen vier Varianten. Keine Claims oder Texte geändert. Vollständiges lokales Sitemap-Inventar: 120 URLs, alle 200, jeweils eine H1, Canonicals korrekt (Root-Slash normalisiert, B), Social-Bild vorhanden (B); jetzt keine fehlenden Sprachalternativen. Bild per sips: 1200×630. Sitemap: 84 lastmod-Werte, 36 statische/Docs-URLs ohne belegtes Änderungsdatum.
+/demo und /templates hatten in beiden Sprachen keine hreflang-Links. Zwei Metadata-Ergänzungen liefern jetzt de/en/x-default auf allen vier Varianten. Keine Claims oder Texte geändert. Stand 25.11. (vor Korrekturrunde 1): Sitemap-Inventar 120 URLs, alle 200, jeweils eine H1, Canonicals korrekt (Root-Slash normalisiert, B), Social-Bild vorhanden (B); jetzt keine fehlenden Sprachalternativen. Bild per sips: 1200×630. Sitemap: 84 lastmod-Werte, 36 statische/Docs-URLs ohne belegtes Änderungsdatum.
 
 ## Offene Restpunkte
 
-- 31 Titel >60 Zeichen; eine Description >155 (/news/obsidian-plugin-070: 159). Vollständige Liste im JSON. Redaktionelle Kürzungen separat, kein blindes Abschneiden.
-- Folgeaufgabe (nicht gebaut): `/templates/[slug]` hat nur einen Canonical, kein hreflang, und steht nicht in der Sitemap (6 Vorlagen, je de/en).
-- llms-full.txt fehlt live und lokal (404). Optionaler buildgenerierter Dokumentationsspiegel, keine Voraussetzung für Indexierung; nicht als Schnellfix mit ungeprüfter Inhaltsauswahl gebaut.
+- Erledigt in Korrekturrunde 1: 0 Titel > 60, 0 Descriptions > 155 (siehe oben).
+- Erledigt: `/templates/[slug]` mit hreflang und in der Sitemap (6 Vorlagen, je de/en).
+- Erledigt: `llms-full.txt` aus veröffentlichten Docs (Drafts ausgeschlossen), live erst nach Release.
 - Organization/Person/sameAs benötigen bestätigte Betreiber-/Profilwerte. Keine Werte erfunden. Begrenzter Schema.org-Vokabularcheck: 13 typisierte Knoten, 0 Fehler; kein Rich-Results-Nachweis.
 - GSC/Bing-Verifizierung, Feld-CWV/INP, KI-Sichtbarkeit und externe Profilkonsistenz N. Keine Null-Prozent-Sichtbarkeit behauptet.
 - Lokal mobil Performance 89, desktop 100. Kein Performance-Fix aus lokaler Messung abgeleitet: Live mobil laut Auftrag bereits 98 (B). Desktop Accessibility 99, mobil 100; Details im JSON.
@@ -46,7 +65,7 @@ E (Ausgabe im Beleg-JSON oder hier):
 - `sips` auf `apps/marketing/public/og/bloommd-og-banner.png`: `pixelWidth: 1200, pixelHeight: 630`.
 - `/demo` und `/templates`, je de und en, auf `next start :3341`: eigener Canonical plus hreflang `de`, `en`, `x-default`.
 - Sitemap lokal: `loc 120 · lastmod 84 · /templates/<slug> 0`.
-- Sitemap-HTTP-Inventar (früherer Lauf): `restcheck-2026-11-25.json`, 120 Seiten, Status nur 200, `h1_not_one: []`, `missing_hreflang: []`. Lighthouse-Werte stehen im selben JSON.
+- Sitemap-HTTP-Inventar (Lauf 25.11., vor Korrekturrunde 1; aktuell siehe oben, 132 URLs): `restcheck-2026-11-25.json`, 120 Seiten, Status nur 200, `h1_not_one: []`, `missing_hreflang: []`. Lighthouse-Werte stehen im selben JSON.
 
 B (berichtet, kein Rohbeleg im Repo):
 

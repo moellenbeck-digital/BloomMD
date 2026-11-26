@@ -5,18 +5,22 @@ OKF/LLM Wiki bundles. It does not need a BloomMD server, an LLM, or an OpenClaw 
 
 ## Commands
 
+The current release is `cli-v0.4.4`. Commands marked "not yet released" are on `main` and ship
+with the next version after 0.4.4: `export`, `--sources`, `watch`, the `agent …` learning commands and
+`workspace index`.
+
 ```bash
 # Wiki lifecycle
 bloommd-wiki init ./wiki "My Knowledge Wiki"
 bloommd-wiki status ./wiki
 bloommd-wiki lint ./wiki
-bloommd-wiki export ./wiki ./wiki-export --overwrite   # static, offline-readable copy
+bloommd-wiki export ./wiki ./wiki-export --overwrite   # static, offline-readable copy (not yet released)
 bloommd-wiki propose ./wiki ./changes.json ./proposal.json
 bloommd-wiki approve ./proposal.json "reviewer"
 bloommd-wiki apply ./wiki ./proposal.json
 bloommd-wiki mcp ./wiki
 
-# Live source checks: hashes come from the source folder, not from a hand-kept JSON file
+# Live source checks: hashes come from the source folder, not from a hand-kept JSON file (not yet released)
 bloommd-wiki status ./wiki --sources ./sources
 bloommd-wiki lint ./wiki --sources ./sources
 bloommd-wiki watch ./wiki --sources ./sources --state ./wiki-sources.state.json
@@ -28,13 +32,15 @@ bloommd-wiki workspace lint ./docs --format github --strict
 bloommd-wiki workspace check ./vault
 bloommd-wiki workspace search "term" ./docs
 bloommd-wiki workspace backlinks "Note.md" ./docs
-bloommd-wiki workspace index ./docs --format json   # backlinks per file and heading; broken links, stale targets, duplicate node ids
+bloommd-wiki workspace index ./docs --format json   # backlinks per file and heading; broken links, stale targets, duplicate node ids (not yet released)
 ```
 
 The binary writes only where the command explicitly requests it: `init`, `index`, `log`,
 `approve`, `apply`, and `export` (only into the target folder; a non-empty one needs `--overwrite` and must be an earlier export). `apply` needs a named approval and verifies source hashes before writing.
 
 ## Live source checks (`--sources`, `watch`)
+
+Not yet released: ships with the next version after 0.4.4.
 
 A page cites a source with `sources[].resource` (a path relative to the source folder) and,
 optionally, `contentHash`. With `--sources <folder>` the current hash of each cited local source is
@@ -67,6 +73,8 @@ when a person starts the server; it is never a tool argument, and hashes an agen
 ignored in that mode.
 
 ## Learning commands (`agent search|read|create|append|stale`)
+
+Not yet released: ships with the next version after 0.4.4.
 
 Single commands for the learnings of a vault (`--vault <folder>`) or a cloud workspace (`--cloud <url>
 [--workspace <id>]`, token in `BLOOMMD_TOKEN`), with **JSON on stdout** and messages on stderr. They are the

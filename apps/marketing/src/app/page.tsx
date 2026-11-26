@@ -354,7 +354,7 @@ const productJsonLd = {
   name: "BloomMD",
   applicationCategory: "ProductivityApplication",
   operatingSystem: "Web, macOS, Linux, iOS, Android",
-  description: "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps. Local-first, portabel und ohne neues Dateiformat.",
+  description: "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps, ohne ein neues Dateiformat einzuführen. Local-first, portabel und als Beta verfügbar.",
 };
 
 function Header() {

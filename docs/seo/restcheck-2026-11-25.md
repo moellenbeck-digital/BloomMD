@@ -36,8 +36,12 @@ Bot-Zugriffe sind HTTP-Abrufe mit gesetztem User-Agent. Sie belegen keinen Besuc
 
 E (Ausgabe im Beleg-JSON oder hier):
 
-- `bun run --cwd apps/marketing test`: `574 pass · 0 fail · 1527 expect() calls · 35 files`. Darin 4 neue hreflang-Tests (`src/app/language-alternates.test.ts`); ohne die zwei Metadata-Zeilen `0 pass · 4 fail`.
-- `bun run build:marketing`: Exit 0, `Generating static pages (126/126)`. Node 26.7.0 statt engines-Ziel 22; Node-22-Reproduktion N.
+- CI-Lauf [45727905024](https://github.com/moellenbeck-digital/BloomMD/actions/runs/45727905024) am Commit `f68a0e4`: `changes`, `verify`, `full-e2e` pass; `release-artifacts` übersprungen.
+- CI, Job `verify`, Marketing-Tests (Bun 1.4.4): `574 pass · 0 fail · 1527 expect() calls · 35 files`.
+- CI, Job `verify`, Marketing-Build (Node 22.23.4): `Generating static pages (126/126)`.
+- Lokal am selben Teststand (26.11.2026), Bun 1.4.4 und 1.4.5: `bun test ./apps/marketing/src/lib/browser-workspace.test.ts ./apps/marketing/src/app/language-alternates.test.ts` je `22 pass · 0 fail`. Ohne den Testfix (Bun 1.4.4): `18 pass · 1 fail · 1 error`, `ReferenceError: document is not defined`. Ursache: `browser-workspace.test.ts` ließ `globalThis.window` gesetzt.
+- Lokal `bun run --cwd apps/marketing test`: `574 pass · 0 fail · 1527 expect() calls · 35 files`. Darin 4 neue hreflang-Tests (`src/app/language-alternates.test.ts`); ohne die zwei Metadata-Zeilen `0 pass · 4 fail`.
+- `bun run build:marketing`: Exit 0, `Generating static pages (126/126)`. Lokal Node 26.7.0 statt engines-Ziel 22; Node-22-Build siehe CI oben.
 - Schema-Check: `typed_nodes: 13, errors: []` (nur Startseiten und Stichprobe aus `audit.py`; Vokabular-Hash im JSON).
 - `sips` auf `apps/marketing/public/og/bloommd-og-banner.png`: `pixelWidth: 1200, pixelHeight: 630`.
 - `/demo` und `/templates`, je de und en, auf `next start :3341`: eigener Canonical plus hreflang `de`, `en`, `x-default`.

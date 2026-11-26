@@ -106,6 +106,26 @@
   "errors": [],
   "vocabularySha256": "0a4b8c4c910fc831ec8695196510973390906a5ee34dc6b862dfec4d21a12f74"
  },
+ "ci": {
+  "lauf": "https://github.com/moellenbeck-digital/BloomMD/actions/runs/45727905024",
+  "commit": "f68a0e44afe3c473fbb6e82167deaf5258bdd62b",
+  "jobs": {"changes": "pass", "verify": "pass", "full-e2e": "pass", "release-artifacts": "skipped"},
+  "marketingTests": {
+   "bun": "1.4.4",
+   "ausgabe": [
+    "574 pass",
+    "0 fail",
+    "1527 expect() calls",
+    "Ran 574 tests across 35 files. [820.00ms]"
+   ]
+  },
+  "marketingBuild": {
+   "node": "22.23.4",
+   "ausgabe": [
+    "✓ Generating static pages using 3 workers (126/126) in 5.8s"
+   ]
+  }
+ },
  "marketingTests": {
   "befehl": "bun run --cwd apps/marketing test",
   "ausgabe": [

@@ -44,7 +44,40 @@ bloommd-wiki mcp ./wiki
 
 `workspace index` shows, per file and per heading, who links to it (a link with an anchor counts for the heading, one without for the file) and reports three findings: broken or ambiguous links, stale targets (an anchor without a heading; a target file with status `veraltet`/`ersetzt` or a past `stale_after`, naming `replaced_by` as the successor) and duplicate `bloommd:id`s. Options as for `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; errors (broken links) exit 1, with `--strict` warnings do too. `workspace lint` is unchanged.
 
-Only `init`, `index`, `log`, `approve`, and `apply` write to the explicitly named Wiki directory. The other commands read and report.
+`init`, `index`, `log`, and `apply` write to the named Wiki directory. `propose` writes the named proposal file, and `approve` records the approval in the named proposal file. The proposal file can also be outside the Wiki directory. `status`, `lint`, and `workspace lint`, `check`, `search`, and `backlinks` read and report.
+
+## Propose Wiki changes
+
+`propose` turns a list of changes into a proposal. The proposal does not change any Wiki page yet. `approve` approves it with the name of the reviewer. Only then does `apply` write it to the Wiki directory.
+
+```bash
+bloommd-wiki propose ./wiki ./changes.json ./proposal.json
+bloommd-wiki approve ./proposal.json "Reviewer name"
+bloommd-wiki apply ./wiki ./proposal.json
+```
+
+Arguments of `propose <path> <changes.json> <proposal.json>`, all three required:
+
+- **`<path>`**: the Wiki directory. `propose` reads the current state of every affected page there.
+- **`<changes.json>`**: a JSON array. Each entry has `path` (page relative to the Wiki directory, ending in `.md`), `content` (the complete new page content), and optionally `reason` and `sourceIds`.
+- **`<proposal.json>`**: the target file for the proposal. An existing file is overwritten.
+
+```json
+[
+  {
+    "path": "concepts/launch.md",
+    "content": "---\ntype: concept\n---\n# Launch\n\nNew plan.\n",
+    "reason": "Update the plan",
+    "sourceIds": ["docs:launch"]
+  }
+]
+```
+
+The proposal file contains `version: 1`, an `id`, `createdAt` and the changes. Each change also carries `beforeHash` (SHA-256 of the page at proposal time, `null` for a new page) and `afterHash`. There is no separate status field: without `approvedBy` and `approvedAt` the proposal is not approved, and `apply` rejects it. `apply` also rejects it when a page has changed since the proposal.
+
+On success `propose` prints JSON, for example `{ "ok": true, "command": "wiki propose", "proposalId": "…", "outputPath": "…" }`, and exits 0.
+
+`propose` exits 2 and writes no file when an argument is missing, a `path` is absolute, contains `..` or does not end in `.md`, a `path` appears twice, or a `content` is larger than 2,000,000 bytes. `propose` does not enforce a source: `sourceIds` is optional. Only `apply` checks for a `type` in the frontmatter: without it, `apply` exits 2.
 
 ## Use the agent runtime only for automation
 

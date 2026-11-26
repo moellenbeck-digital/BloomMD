@@ -28,6 +28,8 @@ In study mode you reveal nodes and rate how well you know them. The map shows yo
 
 Agents such as OpenClaw that maintain notes through `bloommd-wiki agent mcp` now file their proposals in the new **BloomMD agent** panel. You see each change as an outline diff, approve or reject it, and can undo approved changes. You set the rights per folder yourself.
 
+**Not yet released:** `bloommd-wiki agent mcp` ships with the next version after 0.4.4. The current release `cli-v0.4.4` does not include the command yet.
+
 ## Still MIT-licensed
 
 The Obsidian plugin stays under the MIT license. The other parts of BloomMD use the Elastic License 2.0, see [License](/lizenz).

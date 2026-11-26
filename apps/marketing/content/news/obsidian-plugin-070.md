@@ -28,6 +28,8 @@ Im Lernmodus deckst du Knoten auf und bewertest, wie sicher du sie kannst. Die M
 
 Agenten wie OpenClaw, die über `bloommd-wiki agent mcp` Notizen pflegen, machen ihre Vorschläge im neuen **BloomMD-Agent**-Panel. Du siehst die Änderung als Gliederungs-Diff, nimmst sie an oder lehnst sie ab, und kannst angenommene Änderungen rückgängig machen. Rechte pro Ordner legst du selbst fest.
 
+**Noch nicht veröffentlicht:** `bloommd-wiki agent mcp` ist erst in der nächsten Version nach 0.4.4 enthalten. Das aktuelle Release `cli-v0.4.4` kennt den Befehl noch nicht.
+
 ## Weiterhin MIT-lizenziert
 
 Das Obsidian-Plugin bleibt unter der MIT-Lizenz. Die übrigen Teile von BloomMD stehen unter der Elastic License 2.0, siehe [Lizenz](/lizenz).

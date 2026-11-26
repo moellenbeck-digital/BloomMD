@@ -51,7 +51,8 @@ Mit dem optionalen Kommandozeilen-Werkzeug `bloommd-wiki` (Download und Prüfsum
 4. Befunde im Einzelnen: `bloommd-wiki lint ./wiki`. Der Befehl endet mit Exit-Code 1, sobald es
    Befunde gibt — brauchbar für eine CI-Prüfung.
 5. Quell-Hashes vergleichen: `status` und `lint` nehmen eine Datei `source-hashes.json` oder mit
-   `--sources <ordner>` einen Ordner mit den Quelldateien. Ohne beides bleibt der Vergleich aus.
+   `--sources <ordner>` einen Ordner mit den Quelldateien. Ohne beides bleibt der Vergleich aus. `--sources` ist erst in
+   der nächsten Version nach 0.4.4 enthalten; das aktuelle Release `cli-v0.4.4` nimmt nur `source-hashes.json`.
 
 So sieht der Kopf einer geprüften Seite aus:
 

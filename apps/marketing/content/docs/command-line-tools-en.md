@@ -42,6 +42,8 @@ bloommd-wiki status ./wiki
 bloommd-wiki mcp ./wiki
 ```
 
+**Not yet released:** `workspace index` ships with the next version after 0.4.4. The current release `cli-v0.4.4` does not include the command yet.
+
 `workspace index` shows, per file and per heading, who links to it (a link with an anchor counts for the heading, one without for the file) and reports three findings: broken or ambiguous links, stale targets (an anchor without a heading; a target file with status `veraltet`/`ersetzt` or a past `stale_after`, naming `replaced_by` as the successor) and duplicate `bloommd:id`s. Options as for `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; errors (broken links) exit 1, with `--strict` warnings do too. `workspace lint` is unchanged.
 
 `init`, `index`, `log`, and `apply` write to the named Wiki directory. `propose` writes the named proposal file, and `approve` records the approval in the named proposal file. The proposal file can also be outside the Wiki directory. `status`, `lint`, and `workspace lint`, `check`, `search`, and `backlinks` read and report.

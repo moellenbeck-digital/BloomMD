@@ -42,6 +42,8 @@ bloommd-wiki status ./wiki
 bloommd-wiki mcp ./wiki
 ```
 
+**Noch nicht veröffentlicht:** `workspace index` ist erst in der nächsten Version nach 0.4.4 enthalten. Das aktuelle Release `cli-v0.4.4` kennt den Befehl noch nicht.
+
 `workspace index` zeigt je Datei und je Überschrift, wer darauf verweist (ein Link mit Anker zählt für die Überschrift, einer ohne Anker für die Datei), und meldet drei Befunde: defekte oder mehrdeutige Links, veraltete Ziele (Anker ohne Überschrift; Zieldatei mit Status `veraltet`/`ersetzt` oder abgelaufenem `stale_after`, mit `replaced_by` als Nachfolger) und doppelte `bloommd:id`. Optionen wie bei `workspace lint`: `--format text|json|github`, `--strict`, `--quiet`; Fehler (defekte Links) ergeben Exit-Code 1, mit `--strict` auch Warnungen. `workspace lint` bleibt unverändert.
 
 `init`, `index`, `log` und `apply` schreiben in den angegebenen Wiki-Ordner. `propose` schreibt die angegebene Vorschlagsdatei, `approve` trägt die Freigabe in die angegebene Vorschlagsdatei ein. Die Vorschlagsdatei kann auch außerhalb des Wiki-Ordners liegen. `status`, `lint` sowie `workspace lint`, `check`, `search` und `backlinks` lesen und berichten.

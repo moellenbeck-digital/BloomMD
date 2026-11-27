@@ -178,5 +178,24 @@ test("without JavaScript the server render is the finished map", async ({ browse
   await expect(scene).toHaveAttribute("data-state", "end");
   await expect(page.getByTestId("bloom-agent-scene-toggle")).toHaveCount(0);
   for (const title of locales[0].titles) await expect(visibleNodes(page).locator("[data-bloom-title]", { hasText: title })).toBeVisible();
+  // The agent comes from <noscript>, so the final image is complete without JavaScript.
+  const layers = page.getByTestId("bloom-agent-avatar").locator("img");
+  await expect(layers).toHaveCount(4);
+  expect(await layers.first().evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
   await context.close();
+});
+
+test("the agent image is requested only when the scene comes close, not during the page load", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/agents/md-avatar")) requests.push(request.url());
+  });
+  await page.goto("/", { waitUntil: "load" });
+  await page.waitForTimeout(500);
+  expect(requests).toEqual([]);
+  await page.getByTestId("bloom-agent-scene").scrollIntoViewIfNeeded();
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+  // Phones take the 200 px file.
+  expect(requests.every((url) => url.includes("md-avatar-200.webp"))).toBe(true);
 });

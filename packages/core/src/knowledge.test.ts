@@ -4,6 +4,7 @@ import {
   applyKnowledgeNodes,
   isKnowledgeInputError,
   isKnowledgeRetired,
+  knowledgeMatchesQuery,
   KnowledgeInputError,
   KnowledgeNodeNotFoundError,
   knowledgeDecisions,
@@ -405,5 +406,72 @@ describe("knowledgeNodeDetail and knowledgeNodeAtLine", () => {
     expect(knowledgeNodeAtLine(markdown, 9)).toEqual({ id: "ziel01", title: "Ziel" });
     expect(knowledgeNodeAtLine(markdown, 11)).toEqual({ id: "ziel01", title: "Ziel" });
     expect(knowledgeNodeAtLine(markdown, 15)).toEqual({ id: "schr01", title: "Schritt" });
+  });
+});
+
+describe("multi-word search", () => {
+  // "CSP", "Login" and "Testsystem" stand in different sections, like in the tester learning; tags and scope are in the frontmatter.
+  const csp = [
+    "---",
+    'title: "Oberflächentests scheitern am HTTP-Dev-System"',
+    'status: "neu"',
+    'scope: "BloomMD, tester"',
+    'tags: ["tester", "Kubernetes-Frei"]',
+    "---",
+    "",
+    "# Oberflächentests scheitern am HTTP-Dev-System",
+    "",
+    "## Symptom",
+    "",
+    "Der Login schlägt fehl.",
+    "",
+    "## Ursache",
+    "",
+    "Die CSP blockiert das Formular.",
+    "",
+    "## Gilt für",
+    "",
+    "Jedes Testsystem ohne HTTPS.",
+    "",
+  ].join("\n");
+  const titles = (query: string) => searchKnowledge(csp, query).map((hit) => hit.title);
+
+  test("words in different nodes match the card, in any order and case", () => {
+    expect(knowledgeMatchesQuery(csp, "CSP Login Testsystem")).toBe(true);
+    expect(knowledgeMatchesQuery(csp, "testsystem csp")).toBe(true);
+    expect(knowledgeMatchesQuery(csp, "  LOGIN   csp ")).toBe(true);
+    // Hit nodes are the ones with at least one word.
+    expect(titles("CSP Login Testsystem")).toEqual(["Symptom", "Ursache", "Gilt für"]);
+    expect(titles("Testsystem CSP")).toEqual(["Ursache", "Gilt für"]);
+  });
+
+  test("words spread over frontmatter and content match the card", () => {
+    expect(knowledgeMatchesQuery(csp, "tester Login")).toBe(true);
+    expect(knowledgeMatchesQuery(csp, "BloomMD CSP neu")).toBe(true);
+    expect(titles("tester Login")).toEqual(["Symptom"]);
+    const frontmatter = readKnowledgeFrontmatter(csp);
+    expect(searchKnowledgeFrontmatter(frontmatter, "tester Login", csp)).toEqual({ field: "tags", snippet: "tags: tester" });
+    expect(searchKnowledgeFrontmatter(frontmatter, "bloommd csp", csp)).toEqual({ field: "scope", snippet: "scope: BloomMD, tester" });
+  });
+
+  test("one missing word means no hit", () => {
+    expect(knowledgeMatchesQuery(csp, "CSP Kubernetesxyz")).toBe(false);
+    expect(titles("CSP Kubernetesxyz")).toEqual([]);
+    expect(searchKnowledgeFrontmatter(readKnowledgeFrontmatter(csp), "tester Kubernetesxyz", csp)).toBeNull();
+    expect(knowledgeMatchesQuery(csp, "  ")).toBe(false);
+    expect(titles("")).toEqual([]);
+  });
+
+  test("a one-word query behaves as before", () => {
+    expect(titles("CSP")).toEqual(["Ursache"]);
+    expect(searchKnowledge(csp, "CSP")[0]!.snippet).toBe("Ursache Die CSP blockiert das Formular.");
+    expect(searchKnowledge(csp, " csp ")).toEqual(searchKnowledge(csp, "CSP"));
+    expect(searchKnowledgeFrontmatter(readKnowledgeFrontmatter(csp), "tester")).toEqual({ field: "tags", snippet: "tags: tester" });
+    expect(searchKnowledgeFrontmatter(readKnowledgeFrontmatter(csp), "tester", csp)).toEqual({ field: "tags", snippet: "tags: tester" });
+  });
+
+  test("repeated words count once and the limit still applies", () => {
+    expect(knowledgeMatchesQuery(csp, "csp CSP Csp")).toBe(true);
+    expect(searchKnowledge(csp, "CSP Login Testsystem", 2)).toHaveLength(2);
   });
 });

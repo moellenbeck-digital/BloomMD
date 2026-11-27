@@ -2427,7 +2427,6 @@ function CanvasInner(props: CanvasProps) {
     setCollapsed(next);
     persist({ collapsed: [...next], mode: "map" });
     setMode("map");
-    setInspectorOpen(false);
     selectNode(id);
     setPendingReveal(id);
   }, [collapsed, headingsById, persist, selectNode]);

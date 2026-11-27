@@ -45,21 +45,21 @@ async function frame() {
 
 beforeEach(() => {
   installDom();
-  const request = globalThis.requestAnimationFrame;
-  const cancel = globalThis.cancelAnimationFrame;
-  restoreFrames = () => { globalThis.requestAnimationFrame = request; globalThis.cancelAnimationFrame = cancel; };
+  const request = window.setTimeout;
+  const cancel = window.clearTimeout;
+  restoreFrames = () => { window.setTimeout = request; window.clearTimeout = cancel; };
   container = document.createElement("div"); document.body.appendChild(container);
   root = createRoot(container);
   frames = new Map(); nextFrame = 0;
-  globalThis.requestAnimationFrame = (callback) => { frames.set(++nextFrame, callback); return nextFrame; };
-  globalThis.cancelAnimationFrame = (id) => { frames.delete(id); };
+  window.setTimeout = ((callback: () => void) => { frames.set(++nextFrame, callback); return nextFrame; }) as typeof window.setTimeout;
+  window.clearTimeout = (id) => { frames.delete(id); };
   flow.width = 800; flow.height = 600; flow.nodes = [];
   fitView.mockClear(); fitBounds.mockClear(); getNodesBounds.mockClear(); setViewport.mockClear();
   viewport = { x: 17, y: 29, zoom: 0.6 };
 });
 afterEach(() => { flushSync(() => root.unmount()); container.remove(); restoreFrames?.(); });
 
-test("a cancelled initial frame is retried for the new layout, then later edits keep the view", async () => {
+test("a cancelled initial fit is retried for the new layout, then later edits keep the view", async () => {
   const first = [node("root")]; measured(first); show("file", first);
   expect(fitted).toBe(false);
   const updated = [node("root"), node("child", 250)]; measured(updated); show("file", updated);
@@ -70,6 +70,19 @@ test("a cancelled initial frame is retried for the new layout, then later edits 
   const edited = [...updated, node("sibling", 300)]; measured(edited); show("file", edited);
   await frame();
   expect(fitView).toHaveBeenCalledTimes(1);
+});
+
+test("initial fitting completes even when the native WebView suspends animation frames", async () => {
+  const request = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = () => 0;
+  try {
+    const nodes = [{ ...node("root"), initialWidth: 180, initialHeight: 54 }];
+    flow.nodes = nodes.map((n) => ({ ...n, measured: {} }));
+    show("occluded", nodes, true, false, true);
+    await frame();
+    expect(fitted).toBe(true);
+    expect(fitBounds).toHaveBeenCalledTimes(1);
+  } finally { globalThis.requestAnimationFrame = request; }
 });
 
 test("waits for the current document, final positions, measurements and a nonzero pane", async () => {

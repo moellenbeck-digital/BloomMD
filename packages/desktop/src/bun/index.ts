@@ -1,3 +1,4 @@
+import { workspaceLoadIssue, type WorkspaceLoadIssue } from "../shared/workspace-load-issue";
 import Electrobun, { BrowserWindow, BrowserView, Updater, Utils } from "electrobun/bun";
 import {
   FileStore,
@@ -1057,11 +1058,13 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
           return { files };
         }
         const unreadablePaths: string[] = [];
+        const loadIssues: WorkspaceLoadIssue[] = [];
         const files = await localStore.list((path, error) => {
           console.error("[BloomMD] Could not list workspace entry:", path, error);
           unreadablePaths.push(path);
+          loadIssues.push(workspaceLoadIssue(path, error));
         });
-        return { files, unreadablePaths };
+        return { files, unreadablePaths, loadIssues };
       },
 
       openMindmap: async ({ filename }) => {
@@ -1087,11 +1090,13 @@ const mainRPC = BrowserView.defineRPC<BloomMDRPC>({
           return serializeDocument(doc);
         }
         const unreadablePaths: string[] = [];
+        const loadIssues: WorkspaceLoadIssue[] = [];
         const doc = await localStore.readWorkspaceMindMap(basename(bloommdDir), (path, error) => {
           console.error("[BloomMD] Could not read workspace entry:", path, error);
           unreadablePaths.push(path);
+          loadIssues.push(workspaceLoadIssue(path, error));
         });
-        return { ...serializeDocument(doc), unreadablePaths };
+        return { ...serializeDocument(doc), unreadablePaths, loadIssues };
       },
 
       saveMindmap: async ({ filePath, markdown, storage }) => {

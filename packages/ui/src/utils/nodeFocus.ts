@@ -1,7 +1,8 @@
 /** Focus the rendered node element without moving the browser's page scroll position. */
 export function focusNodeElement(nodeId: string): boolean {
   if (typeof document === "undefined") return false;
-  const element = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
+  // Workspace IDs contain real filenames, including quotes and other CSS metacharacters.
+  const element = Array.from(document.querySelectorAll<HTMLElement>("[data-node-id]")).find((node) => node.dataset.nodeId === nodeId);
   if (!element) return false;
   if (element.getAttribute("tabindex") === "-1") return false;
   // A reveal queued before inline rename must not take focus away from its input.
@@ -15,6 +16,7 @@ export interface NodeFocusRequest {
   nodeId: string;
   requestId: number;
   reveal?: boolean;
+  center?: boolean;
 }
 
 let latestRequestId = 0;
@@ -38,14 +40,14 @@ export function isCurrentNodeFocusRequest(requestId: number): boolean {
  * Request focus after a state mutation. Focus an existing selected node immediately, then retry
  * if React Flow still needs to render it. A newer request invalidates the previous request.
  */
-export function requestNodeFocus(nodeId: string, reveal = true): void {
+export function requestNodeFocus(nodeId: string, reveal = true, center = false): void {
   if (typeof window === "undefined") return;
 
   cancelPendingNodeFocus();
   const requestId = latestRequestId;
 
   window.dispatchEvent(new window.CustomEvent<NodeFocusRequest>("bloommd:focus-node", {
-    detail: { nodeId, requestId, reveal },
+    detail: { nodeId, requestId, reveal, center },
   }));
 
   let attempts = 0;

@@ -29,8 +29,6 @@ export function useInitialCanvasViewport(
         && actual.position.x === expected.position.x && actual.position.y === expected.position.y;
     });
   const fitted = fittedVisit === visit;
-
-
   useEffect(() => {
     if (!overview || !documentKey || canvasMode !== "map") return;
     return () => { overviewViewports.current.set(documentKey, getViewport()); };
@@ -39,7 +37,8 @@ export function useInitialCanvasViewport(
   useEffect(() => {
     if (canvasMode !== "map" || !documentKey || !ready || layoutPending || fitted) return;
     let cancelled = false;
-    const frame = requestAnimationFrame(() => {
+    // Native WebViews can suspend animation frames while occluded; navigation must still finish.
+    const timer = window.setTimeout(() => {
       const saved = overview ? overviewViewports.current.get(documentKey) : undefined;
       const padding = overview && window.matchMedia?.("(pointer: coarse)").matches ? 0.6 : 0.3;
       const move = saved
@@ -49,11 +48,11 @@ export function useInitialCanvasViewport(
           ? fitBounds(getNodesBounds(nodes), { padding, duration: 0 })
           : fitView({ padding, duration: 0, nodes: nodes.map(({ id }) => ({ id })) });
       void move.then((applied) => {
-        // Scheduling a frame is not a completed fit: a new layout may cancel it before it runs.
+        // Scheduling is not a completed fit: a new layout may cancel it before it runs.
         if (applied && !cancelled) setFittedVisit(visit);
       }).catch((error: unknown) => console.error("[BloomMD] Initial canvas view failed:", error));
-    });
-    return () => { cancelled = true; cancelAnimationFrame(frame); };
+    }, 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [canvasMode, documentKey, fitBounds, fitView, fitted, getNodesBounds, layoutPending, nodes, overview, ready, setViewport, virtualized, visit]);
 
   return fitted;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2, History, Quote, BookOpen } from "lucide-react";
+import { Command, FileText, Search, CornerDownLeft, Plus, Save, Upload, Download, RefreshCw, LocateFixed, Link2, History, Quote, BookOpen, X } from "lucide-react";
 import { buildPdfCitationNode, parseFile, serializeToMarkdown, type MindMapListEntry } from "@bloommd/core/browser";
 import { useMindMapStore } from "../hooks/useMindMapStore";
 import { useLocale } from "../i18n/LocaleContext";
@@ -11,6 +11,7 @@ import { extractLinksFromMarkdown } from "../utils/links";
 import { ConflictCopyBadge } from "./ConflictCopyBadge";
 
 interface CommandPaletteProps {
+  initialScope?: "all" | "nodes";
   open: boolean;
   onClose: () => void;
   onNew: () => void;
@@ -29,6 +30,7 @@ type PaletteItem =
   | { id: string; category: string; title: string; subtitle: string; kind: "node"; nodeId: string; linkCount: number };
 
 export function CommandPalette({
+  initialScope = "all",
   open,
   onClose,
   onNew,
@@ -41,6 +43,7 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const { t } = useLocale();
   const [query, setQuery] = useState("");
+  const [scope, setScope] = useState<"all" | "nodes">(initialScope);
   const [files, setFiles] = useState<MindMapListEntry[]>([]);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,17 +62,19 @@ export function CommandPalette({
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    setScope(initialScope);
     setFocusedIndex(0);
     setPdfForm(null);
     setNotice(null);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
     platform.files.list()
       .then(setFiles)
       .catch((error: unknown) => {
         console.error("[BloomMD] File list could not be loaded:", error);
         setFiles([]);
       });
-  }, [open, platform]);
+    return () => window.clearTimeout(focusTimer);
+  }, [open, platform, initialScope]);
 
   const openMindmap = useCallback(
     async (filename: string) => {
@@ -221,11 +226,20 @@ export function CommandPalette({
     const nodes: PaletteItem[] = document
       ? [...document.nodes.values()].map((node) => {
           const linkCount = extractLinksFromMarkdown(node.content).length;
+          let source = node;
+          const visited = new Set<string>();
+          while (!source.metadata?.file && source.parentId && !visited.has(source.id)) {
+            visited.add(source.id);
+            const parent = document.nodes.get(source.parentId);
+            if (!parent) break;
+            source = parent;
+          }
+          const sourcePath = source.metadata?.kind === "workspace" ? undefined : source.metadata?.file;
           return {
             id: `node-${node.id}`,
             category: t.categoryNodes,
             title: node.title,
-            subtitle: linkCount > 0 ? `${linkCount} ${linkCount === 1 ? t.resourceSingular : t.resourcesPlural}` : `${t.level} ${node.level}`,
+            subtitle: [sourcePath, node.parentId ? document.nodes.get(node.parentId)?.title : undefined, linkCount > 0 ? `${linkCount} ${linkCount === 1 ? t.resourceSingular : t.resourcesPlural}` : `${t.level} ${node.level}`].filter(Boolean).join(" · "),
             kind: "node",
             nodeId: node.id,
             linkCount,
@@ -238,18 +252,26 @@ export function CommandPalette({
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return items;
-    return items.filter((item) => {
+    const scoped = scope === "nodes" ? items.filter((item) => item.kind === "node") : items;
+    if (!normalized) return scoped;
+    return scoped.filter((item) => {
       return [item.title, item.subtitle, item.category]
         .join(" ")
         .toLowerCase()
         .includes(normalized);
     });
-  }, [items, query]);
+  }, [items, query, scope]);
+  // A workspace may contain thousands of headings; keep opening/searching the palette responsive.
+  const visibleItems = filteredItems.slice(0, 100);
 
   useEffect(() => {
     setFocusedIndex(0);
-  }, [query]);
+  }, [query, scope]);
+
+  useEffect(() => {
+    if (!open) return;
+    globalThis.document.querySelector<HTMLElement>(`[data-palette-index="${focusedIndex}"]`)?.scrollIntoView?.({ block: "nearest" });
+  }, [focusedIndex, open]);
 
   const runItem = useCallback(
     async (item: PaletteItem) => {
@@ -260,8 +282,9 @@ export function CommandPalette({
       } else if (item.kind === "mindmap") {
         await openMindmap(item.filename);
       } else {
-        setSelectedNodeId(item.nodeId);
-        setEditorVisible(true);
+        onClose();
+        useMindMapStore.getState().revealNode(item.nodeId);
+        return;
       }
       onClose();
     },
@@ -270,6 +293,13 @@ export function CommandPalette({
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.key === "Tab") {
+        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), textarea:not([disabled])'))
+          .filter((element) => !element.closest(".hidden"));
+        const active = globalThis.document.activeElement;
+        if (e.shiftKey && active === controls[0]) { e.preventDefault(); controls.at(-1)?.focus(); }
+        else if (!e.shiftKey && active === controls.at(-1)) { e.preventDefault(); controls[0]?.focus(); }
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         if (pdfForm) setPdfForm(null);
@@ -278,19 +308,19 @@ export function CommandPalette({
       }
       // Inside the PDF form Enter and the arrows belong to the fields, not to the command list.
       if (pdfForm) return;
-      if (filteredItems.length === 0) return;
+      if (visibleItems.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusedIndex((index) => Math.min(index + 1, filteredItems.length - 1));
+        setFocusedIndex((index) => Math.min(index + 1, visibleItems.length - 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setFocusedIndex((index) => Math.max(index - 1, 0));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        void runItem(filteredItems[focusedIndex] ?? filteredItems[0]!);
+        void runItem(visibleItems[focusedIndex] ?? visibleItems[0]!);
       }
     },
-    [filteredItems, focusedIndex, onClose, pdfForm, runItem],
+    [visibleItems, focusedIndex, onClose, pdfForm, runItem],
   );
 
   if (!open) return null;
@@ -301,6 +331,9 @@ export function CommandPalette({
       <div className="fixed inset-x-0 top-20 z-50 mx-auto w-[min(680px,calc(100vw-24px))]">
         <section
           data-testid="command-palette"
+          role="dialog"
+          aria-modal="true"
+          aria-label={scope === "nodes" ? t.searchNodes : t.commandPlaceholder}
           className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] shadow-2xl"
           onKeyDown={onKeyDown}
           onClick={(e) => e.stopPropagation()}
@@ -311,7 +344,12 @@ export function CommandPalette({
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.commandPlaceholder}
+              placeholder={scope === "nodes" ? t.searchNodes : t.commandPlaceholder}
+              aria-label={scope === "nodes" ? t.searchNodes : t.commandPlaceholder}
+              role="combobox"
+              aria-expanded="true"
+              aria-controls="command-palette-results"
+              aria-activedescendant={filteredItems[focusedIndex] ? `palette-result-${focusedIndex}` : undefined}
               disabled={Boolean(pdfForm)}
               className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-faint)]"
               data-testid="command-palette-input"
@@ -320,7 +358,14 @@ export function CommandPalette({
               <Command size={12} />
               <span>K</span>
             </div>
+            <button type="button" onClick={onClose} aria-label={t.dismissMessage} className="p-2"><X size={16} /></button>
           </div>
+
+          {!pdfForm && <div className="flex gap-2 px-4 py-2 text-xs">
+            <button type="button" aria-pressed={scope === "all"} className={`rounded px-3 py-1.5 ${scope === "all" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("all")}>{t.searchEverything}</button>
+            <button type="button" aria-pressed={scope === "nodes"} className={`rounded px-3 py-1.5 ${scope === "nodes" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("nodes")}>{t.categoryNodes}</button>
+            <span className="ml-auto self-center text-[var(--color-ink-muted)]">{filteredItems.length} {t.searchResults}</span>
+          </div>}
 
           {notice && (
             <p role="status" className="border-b border-[var(--color-border)] px-4 py-2 text-xs text-[var(--color-ink-muted)]" data-testid="command-palette-notice">
@@ -396,14 +441,15 @@ export function CommandPalette({
             </form>
           )}
 
-          <div className={pdfForm ? "hidden" : "max-h-[420px] overflow-y-auto p-2"}>
+          <div id="command-palette-results" role="listbox" className={pdfForm ? "hidden" : "max-h-[min(420px,55vh)] overflow-y-auto p-2"}>
             {filteredItems.length === 0 && (
               <div className="px-3 py-8 text-center text-sm text-[var(--color-ink-faint)]">
                 {t.noSearchResults}
               </div>
             )}
 
-            {filteredItems.map((item, index) => {
+            {filteredItems.length > visibleItems.length && <p className="px-3 py-2 text-xs text-[var(--color-ink-muted)]">{t.searchRefine}</p>}
+            {visibleItems.map((item, index) => {
               const selected = index === focusedIndex;
               const Icon =
                 item.kind === "action"
@@ -417,6 +463,11 @@ export function CommandPalette({
               return (
                 <button
                   key={item.id}
+                  id={`palette-result-${index}`}
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={selected}
+                  data-palette-index={index}
                   type="button"
                   onClick={() => void runItem(item)}
                   className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left ${

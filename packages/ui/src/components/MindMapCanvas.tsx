@@ -28,6 +28,8 @@ import {
   Focus,
   ListTree,
   Maximize,
+  LocateFixed,
+  Search,
   Network,
   Pencil,
   Presentation,
@@ -155,6 +157,7 @@ function PresentationView() {
 }
 
 export interface MindMapCanvasProps {
+  onSearchNodes?: () => void;
   /** Mount only nodes intersecting the viewport (enabled by the desktop host). */
   onlyRenderVisibleElements?: boolean;
   onRootRename?: (event: RootRenameEvent) => void;
@@ -164,7 +167,7 @@ export interface MindMapCanvasProps {
   agentActivity?: { queuedOrRunning: number; pendingProposals: number };
 }
 
-function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRenderVisibleElements = false }: MindMapCanvasProps) {
+function MindMapCanvasInner({ onRootRename, onAskAgent, onSearchNodes, agentActivity, onlyRenderVisibleElements = false }: MindMapCanvasProps) {
   const { t } = useLocale();
   const platform = usePlatform();
   const workspaceSource = useWorkspaceSource();
@@ -230,21 +233,21 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   }, [canvasMode, t.mindMap]);
   useEffect(() => {
     const focusNode = (event: Event) => {
-      const { nodeId, requestId, reveal } = (event as CustomEvent<Partial<NodeFocusRequest>>).detail ?? {};
+      const { nodeId, requestId, reveal, center } = (event as CustomEvent<Partial<NodeFocusRequest>>).detail ?? {};
       if (!nodeId || typeof requestId !== "number" || !isCurrentNodeFocusRequest(requestId)) return;
-      pendingFocusRef.current = { nodeId, requestId, reveal };
-      if (!initialViewportReady) return;
-      requestAnimationFrame(() => {
+      pendingFocusRef.current = { nodeId, requestId, reveal, center };
+      if (!initialViewportReady || layoutPending) return;
+      const revealTarget = () => {
         if (!isCurrentNodeFocusRequest(requestId)) return;
         focusNodeElement(nodeId);
         if (reveal === false) { pendingFocusRef.current = null; return; }
         const node = getNode(nodeId);
         if (!node) return;
-        const width = node.measured?.width ?? node.width ?? 180;
-        const height = node.measured?.height ?? node.height ?? 54;
+        const width = node.measured?.width ?? node.width ?? node.initialWidth ?? 180;
+        const height = node.measured?.height ?? node.height ?? node.initialHeight ?? 54;
         const viewport = getViewport();
         const canvas = window.document.querySelector<HTMLElement>("#mindmap-canvas .react-flow");
-        if (canvas && isNodeVisibleInViewport(
+        if (!center && canvas && isNodeVisibleInViewport(
           { ...node.position, width, height }, viewport,
           { width: canvas.clientWidth, height: canvas.clientHeight },
         )) {
@@ -252,18 +255,20 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
           return;
         }
         void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
-          duration: 250,
-          zoom: viewport.zoom,
+          duration: center ? 0 : 250,
+          zoom: center ? Math.max(0.8, viewport.zoom) : viewport.zoom,
         }).then(() => {
           // A culled node mounts after the viewport reaches it. Focus only the current request.
-          requestAnimationFrame(() => {
+          window.setTimeout(() => {
             if (isCurrentNodeFocusRequest(requestId)) {
               focusNodeElement(nodeId);
               pendingFocusRef.current = null;
             }
-          });
+          }, 0);
         });
-      });
+      };
+      if (center) revealTarget();
+      else requestAnimationFrame(revealTarget);
     };
     if (pendingFocusRef.current) {
       const pending = pendingFocusRef.current;
@@ -273,7 +278,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
     }
     window.addEventListener("bloommd:focus-node", focusNode);
     return () => window.removeEventListener("bloommd:focus-node", focusNode);
-  }, [getNode, getViewport, initialViewportReady, setCenter, storeNodes]);
+  }, [getNode, getViewport, initialViewportReady, layoutPending, nodes, setCenter, storeNodes]);
   useEffect(() => {
     try { setSavedViews(JSON.parse(localStorage.getItem(viewStorageKey) ?? "[]") as SavedLocalView[]); }
     catch { setSavedViews([]); }
@@ -359,6 +364,8 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <button type="button" className={iconButton(canvasMode === "outline")} onClick={() => setCanvasMode("outline")} title={t.outline} aria-label={t.outline} data-testid="view-mode-outline"><ListTree size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
+      {onSearchNodes && <button type="button" style={{ width: "auto" }} className={`${iconButton(false)} gap-2 px-2`} onClick={onSearchNodes} title={t.searchNodes} aria-label={t.searchNodes}><Search size={16} /><span className="hidden sm:inline text-xs">{t.searchNodes}</span></button>}
+      <button type="button" className={iconButton(false)} disabled={!selectedNodeId} onClick={() => { if (selectedNodeId) useMindMapStore.getState().revealNode(selectedNodeId); }} title={t.showSelectedNode} aria-label={t.showSelectedNode}><LocateFixed size={16} /></button>
       <label className="sr-only" htmlFor="edge-mode">{t.edgeMode}</label>
       <select id="edge-mode" className="h-8 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
         <option value="hierarchy">{t.structure}</option>

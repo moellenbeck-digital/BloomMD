@@ -36,7 +36,7 @@ class FakeMarkdownView {
 }
 
 const demoPath = "Aufnahmen/Obsidian Demo.md";
-const demoMarkdown = readFileSync(new URL("../../../test-vault/Aufnahmen/Obsidian Demo.md", import.meta.url), "utf8");
+const demoMarkdown = readFileSync(new URL("./fixtures/Obsidian Demo.md", import.meta.url), "utf8");
 
 const notices: string[] = [];
 const wait = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));

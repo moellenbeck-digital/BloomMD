@@ -164,7 +164,7 @@
     },
     "packages/desktop": {
       "name": "@bloommd/desktop",
-      "version": "0.6.0",
+      "version": "0.6.1",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ui": "workspace:*",
@@ -439,7 +439,7 @@
     },
     "packages/mobile": {
       "name": "@bloommd/mobile",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@bloommd/capacitor-folder": "workspace:*",
         "@bloommd/capacitor-keychain": "workspace:*",
@@ -537,7 +537,7 @@
     },
     "plugins/obsidian": {
       "name": "bloommd-obsidian",
-      "version": "0.7.1",
+      "version": "0.8.0",
       "dependencies": {
         "@bloommd/core": "workspace:*",
         "@bloommd/ink": "workspace:*",

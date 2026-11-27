@@ -364,7 +364,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, onSearchNodes, agentActi
       <button type="button" className={iconButton(canvasMode === "outline")} onClick={() => setCanvasMode("outline")} title={t.outline} aria-label={t.outline} data-testid="view-mode-outline"><ListTree size={16} /></button>
       <button type="button" className={iconButton(canvasMode === "presentation")} onClick={() => setCanvasMode("presentation")} title={t.presentation} aria-label={t.presentation} data-testid="view-mode-presentation"><Presentation size={16} /></button>
       <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />
-      {onSearchNodes && <button type="button" style={{ width: "auto" }} className={`${iconButton(false)} gap-2 px-2`} onClick={onSearchNodes} title={t.searchNodes} aria-label={t.searchNodes}><Search size={16} /><span className="hidden sm:inline text-xs">{t.searchNodes}</span></button>}
+      {onSearchNodes && <button type="button" style={{ width: "auto" }} className={`${iconButton(false)} gap-2 px-2 pointer-coarse:min-w-11`} onClick={onSearchNodes} title={t.searchNodes} aria-label={t.searchNodes}><Search size={16} /><span className="hidden sm:inline text-xs">{t.searchNodes}</span></button>}
       <button type="button" className={iconButton(false)} disabled={!selectedNodeId} onClick={() => { if (selectedNodeId) useMindMapStore.getState().revealNode(selectedNodeId); }} title={t.showSelectedNode} aria-label={t.showSelectedNode}><LocateFixed size={16} /></button>
       <label className="sr-only" htmlFor="edge-mode">{t.edgeMode}</label>
       <select id="edge-mode" className="h-8 pointer-coarse:h-11 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-2 text-xs text-[var(--color-ink)]" value={edgeMode} onChange={(event) => setEdgeMode(event.target.value as typeof edgeMode)} aria-label={t.edgeMode} data-testid="edge-mode">
@@ -485,7 +485,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, onSearchNodes, agentActi
           >
             <Background color="#D8D4CE" gap={24} size={1} />
             <Controls showFitView={!onlyRenderVisibleElements} fitViewOptions={isOverview && typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? { padding: 0.6 } : undefined} showInteractive={!isOverview} position="bottom-right" data-testid="react-flow-controls">
-              {onlyRenderVisibleElements && <ControlButton title={t.canvasFitView} aria-label={t.canvasFitView} onClick={() => {
+              {onlyRenderVisibleElements && <ControlButton className="react-flow__controls-fitview" title={t.canvasFitView} aria-label={t.canvasFitView} onClick={() => {
                 if (storeNodes.length === 0) return;
                 void fitBounds(getNodesBounds(storeNodes), { padding: isOverview && window.matchMedia?.("(pointer: coarse)").matches ? 0.6 : 0.3 })
                   .catch((error: unknown) => console.error("[BloomMD] Canvas fit failed:", error));

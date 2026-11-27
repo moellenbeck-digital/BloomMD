@@ -2437,3 +2437,16 @@ button.bloommd-agent-path {
   .bloommd-workspace-node .bloommd-node-actions { scale: calc(1 / var(--bloommd-canvas-zoom, 1)); transform-origin: top center; }
   .bloommd-workspace-node .bloommd-node-meta-button { min-height: 44px; min-width: 44px; }
 }
+
+/* Search and recoverable preview failures remain available in narrow/touch panes. */
+.bloommd-search-toggle { display: none; }
+.bloommd-search-results small { display: block; opacity: .65; overflow-wrap: anywhere; }
+.bloommd-preview-errors { display: flex; gap: 8px; align-items: start; padding: 6px 10px; border-bottom: 1px solid var(--background-modifier-border); }
+.bloommd-preview-errors details { flex: 1; max-height: 180px; overflow: auto; }
+.bloommd-preview-errors button, .bloommd-preview-errors summary { min-height: 44px; }
+@container (max-width: 820px) {
+  .bloommd-search-toggle { display: inline-flex; }
+  .bloommd-search.is-open { display: flex; position: absolute; left: 8px; right: 8px; top: 48px; width: auto; max-width: none; z-index: 60; background: var(--background-primary); }
+  .bloommd-search.is-open input { min-width: 0; flex: 1; min-height: 44px; }
+  .bloommd-search-results button { min-height: 44px; }
+}

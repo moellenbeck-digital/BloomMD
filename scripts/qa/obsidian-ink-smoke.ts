@@ -328,7 +328,7 @@ async function main(): Promise<void> {
     const cdp = await context.newCDPSession(page);
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "error") { consoleErrors.push(message.text()); console.error(`[Obsidian console] ${message.text()}`); }
     });
     await page.waitForFunction(() => Boolean((window as unknown as { app?: Partial<ObsidianApp> }).app?.workspace?.layoutReady), undefined, { timeout: 30_000 });
 
@@ -339,19 +339,20 @@ async function main(): Promise<void> {
         const obsidian = (window as unknown as { app: ObsidianApp & { vault: { setConfig(key: string, value: unknown): void } } }).app;
         // macOS uses native OS menus by default, which the DOM cannot see; iPad always uses DOM menus.
         obsidian.vault.setConfig("nativeMenus", false);
-        await obsidian.plugins.setEnable(true);
         // Obsidian may still be loading the plugin from community-plugins.json; enabling it again in
         // parallel would register the view twice. Wait for that load before enabling explicitly.
         for (let attempt = 0; attempt < 40 && !obsidian.plugins.plugins.bloommd; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
-        if (!obsidian.plugins.plugins.bloommd) await obsidian.plugins.enablePlugin("bloommd");
+        if (!obsidian.plugins.plugins.bloommd) await obsidian.plugins.setEnable(true);
         return obsidian.plugins.plugins.bloommd?.manifest.version;
       });
       expect(Boolean(version), "BloomMD did not load.");
       await openDemoMap(page!);
       return `BloomMD ${version}, map rendered`;
     });
+
+    if (!results[0]?.ok) throw new Error(`Plugin startup failed: ${consoleErrors.join(" | ")}`);
 
     await step("Inspector full screen", page, async () => {
       await page!.locator(".bloommd-open-inspector").click();
@@ -700,7 +701,7 @@ async function main(): Promise<void> {
     const focusOn = async (title: string) => {
       await nodeByTitle(title).locator(".bloommd-node-label").click();
       // Work at a readable zoom like a user would; at the fitted overview handles and action bars overlap.
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
       await page!.waitForTimeout(400);
     };
 
@@ -796,7 +797,7 @@ async function main(): Promise<void> {
     /** Selects a node without hit-testing (the study bar may cover it) and centres it like a user would. */
     const showNode = async (title: string) => {
       await nodeByTitle(title).locator(".bloommd-node-label").dispatchEvent("click");
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
       await page!.waitForTimeout(400);
     };
 
@@ -1303,6 +1304,29 @@ async function main(): Promise<void> {
       return "all map toolbar targets ≥ 44 px, no horizontal overflow, no Open app on mobile";
     });
 
+    await step("Mobile: search reveals a collapsed node and shows its source", page, async () => {
+      await openDemoMap(page!);
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
+      await page!.waitForTimeout(250);
+      const root = page!.locator(".react-flow__node").filter({ hasText: "Obsidian Demo" }).first();
+      const collapse = root.getByRole("button", { name: "Collapse branch", exact: true });
+      if (await collapse.count()) await collapse.click();
+      const toggle = page!.getByRole("button", { name: /^(Find node|Knoten suchen)$/ });
+      if (await toggle.isVisible()) await toggle.click();
+      const search = page!.getByRole("textbox", { name: /^(Find node|Knoten suchen)$/ });
+      await search.fill("Projekt");
+      const match = page!.locator(".bloommd-search-results button").filter({ hasText: "Projekt" }).first();
+      expect((await match.textContent())?.includes(DEMO_NOTE), "Search result lacks the note path");
+      await match.click();
+      await page!.locator(".react-flow__node.selected").filter({ hasText: "Projekt" }).waitFor();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
+      const box = await page!.locator(".react-flow__node.selected").filter({ hasText: "Projekt" }).boundingBox();
+      expect(Boolean(box && box.x >= 0 && box.y >= 0 && box.x < 1180 && box.y < 820), "Search target is outside the viewport");
+      await page!.screenshot({ path: path.join(artifacts, "mobile-node-search.png") });
+      await openDemoMap(page!);
+      return "folded node found by title, source path visible, selected node centered";
+    });
+
     await step("Mobile: study bar and rating buttons are touch-sized", page, async () => { try {
       await page!.getByRole("button", { name: "Study mode" }).click();
       await showNode("Quellen");
@@ -1536,7 +1560,7 @@ async function main(): Promise<void> {
       const label = (await nodeByTitle(focus).locator(".bloommd-node-label").boundingBox())!;
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: label.x + label.width / 2, y: label.y + label.height / 2, id: 1 }] });
       await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
       await page!.waitForTimeout(500);
       await tap(cdp, page!, 'button[aria-label="Draw on map"]');
       await page!.getByRole("toolbar", { name: "Map drawing tools" }).waitFor();

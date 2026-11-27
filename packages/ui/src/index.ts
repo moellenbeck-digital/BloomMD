@@ -76,3 +76,5 @@ export {
 } from "./platform/platform-adapter";
 export { PlatformProvider, usePlatform } from "./platform/PlatformContext";
 export { createWebPlatformAdapter, type WebPlatformAdapterOptions } from "./platform/web-adapter";
+
+export { WorkspaceLoadNotice, loadIssueExplanation } from "./components/WorkspaceLoadNotice";

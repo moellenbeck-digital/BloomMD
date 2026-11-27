@@ -11,6 +11,7 @@ import { extractLinksFromMarkdown } from "../utils/links";
 import { ConflictCopyBadge } from "./ConflictCopyBadge";
 
 interface CommandPaletteProps {
+  nodesOnly?: boolean;
   initialScope?: "all" | "nodes";
   open: boolean;
   onClose: () => void;
@@ -30,6 +31,7 @@ type PaletteItem =
   | { id: string; category: string; title: string; subtitle: string; kind: "node"; nodeId: string; linkCount: number };
 
 export function CommandPalette({
+  nodesOnly = false,
   initialScope = "all",
   open,
   onClose,
@@ -67,14 +69,14 @@ export function CommandPalette({
     setPdfForm(null);
     setNotice(null);
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    platform.files.list()
+    if (!nodesOnly) platform.files.list()
       .then(setFiles)
       .catch((error: unknown) => {
         console.error("[BloomMD] File list could not be loaded:", error);
         setFiles([]);
       });
     return () => window.clearTimeout(focusTimer);
-  }, [open, platform, initialScope]);
+  }, [open, platform, initialScope, nodesOnly]);
 
   const openMindmap = useCallback(
     async (filename: string) => {
@@ -252,7 +254,7 @@ export function CommandPalette({
 
   const filteredItems = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const scoped = scope === "nodes" ? items.filter((item) => item.kind === "node") : items;
+    const scoped = (nodesOnly || scope === "nodes") ? items.filter((item) => item.kind === "node") : items;
     if (!normalized) return scoped;
     return scoped.filter((item) => {
       return [item.title, item.subtitle, item.category]
@@ -260,7 +262,7 @@ export function CommandPalette({
         .toLowerCase()
         .includes(normalized);
     });
-  }, [items, query, scope]);
+  }, [items, query, scope, nodesOnly]);
   // A workspace may contain thousands of headings; keep opening/searching the palette responsive.
   const visibleItems = filteredItems.slice(0, 100);
 
@@ -351,19 +353,19 @@ export function CommandPalette({
               aria-controls="command-palette-results"
               aria-activedescendant={filteredItems[focusedIndex] ? `palette-result-${focusedIndex}` : undefined}
               disabled={Boolean(pdfForm)}
-              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-faint)]"
+              className="min-w-0 flex-1 pointer-coarse:min-h-11 bg-transparent text-sm text-[var(--color-ink)] outline-none placeholder:text-[var(--color-ink-faint)]"
               data-testid="command-palette-input"
             />
             <div className="hidden items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1 text-[10px] font-semibold text-[var(--color-ink-faint)] sm:flex">
               <Command size={12} />
               <span>K</span>
             </div>
-            <button type="button" onClick={onClose} aria-label={t.dismissMessage} className="p-2"><X size={16} /></button>
+            <button type="button" onClick={onClose} aria-label={t.dismissMessage} className="p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"><X size={16} /></button>
           </div>
 
           {!pdfForm && <div className="flex gap-2 px-4 py-2 text-xs">
-            <button type="button" aria-pressed={scope === "all"} className={`rounded px-3 py-1.5 ${scope === "all" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("all")}>{t.searchEverything}</button>
-            <button type="button" aria-pressed={scope === "nodes"} className={`rounded px-3 py-1.5 ${scope === "nodes" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("nodes")}>{t.categoryNodes}</button>
+            {!nodesOnly && <button type="button" aria-pressed={scope === "all"} className={`rounded px-3 py-1.5 pointer-coarse:min-h-11 ${scope === "all" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("all")}>{t.searchEverything}</button>}
+            <button type="button" aria-pressed={scope === "nodes"} className={`rounded px-3 py-1.5 pointer-coarse:min-h-11 ${scope === "nodes" ? "bg-[var(--color-bloom-light)]" : "border border-[var(--color-border)]"}`} onClick={() => setScope("nodes")}>{t.categoryNodes}</button>
             <span className="ml-auto self-center text-[var(--color-ink-muted)]">{filteredItems.length} {t.searchResults}</span>
           </div>}
 
@@ -470,7 +472,7 @@ export function CommandPalette({
                   data-palette-index={index}
                   type="button"
                   onClick={() => void runItem(item)}
-                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left ${
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left pointer-coarse:min-h-11 ${
                     selected ? "bg-[var(--color-bloom-light)]" : "hover:bg-[var(--color-surface-sunken)]"
                   }`}
                   data-testid={`command-palette-item-${item.kind}`}

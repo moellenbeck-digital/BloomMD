@@ -1,4 +1,4 @@
-import { buildWorkspaceMindMap, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
+import { workspaceLoadIssue, type WorkspaceLoadIssue, buildWorkspaceMindMap, serializeToMarkdown, type MindMapDocument } from "@bloommd/core/browser";
 import type { MobileStore } from "./stores";
 
 /** Read only the chosen directory tree. Paths stay relative to the store for opening and creation. */
@@ -9,13 +9,14 @@ export async function readMobileOverview(store: MobileStore, folder: string) {
   const entries = listing.entries.filter((entry) => inside(entry.path));
   const parsed = new Map<string, MindMapDocument>();
   const unreadable = [...listing.unreadable];
+  const loadIssues: WorkspaceLoadIssue[] = listing.loadIssues ?? listing.unreadable.map((path) => ({ path, kind: "unknown" }));
   let cursor = 0;
   // Bound parallel native reads; an unavailable iCloud note must not prevent browsing other files.
   await Promise.all(Array.from({ length: Math.min(4, entries.length) }, async () => {
     while (cursor < entries.length) {
       const entry = entries[cursor++]!;
       try { parsed.set(entry.path, (await store.read(entry.path)).document); }
-      catch (error) { console.error("[BloomMD] Overview could not read note:", entry.path, error); unreadable.push(entry.path); }
+      catch (error) { console.error("[BloomMD] Overview could not read note:", entry.path, error); unreadable.push(entry.path); loadIssues.push(workspaceLoadIssue(entry.path, error)); }
     }
   }));
   const document = buildWorkspaceMindMap([...parsed].map(([path, doc]) => ({ path, markdown: serializeToMarkdown(doc) })), {
@@ -39,5 +40,5 @@ export async function readMobileOverview(store: MobileStore, folder: string) {
       document.references = document.references?.filter((edge) => keep.has(edge.sourceId) && keep.has(edge.targetId));
     }
   }
-  return { document, listing, unreadable };
+  return { document, listing, unreadable, loadIssues };
 }

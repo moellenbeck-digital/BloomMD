@@ -228,3 +228,5 @@ export {
   type OfflineMergePlan,
   type ConflictCopyInfo as OfflineConflictCopy,
 } from "./offline-conflict";
+
+export { workspaceLoadIssue, type WorkspaceLoadIssue } from "./workspace-load-issue";

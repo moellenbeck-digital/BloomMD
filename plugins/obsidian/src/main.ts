@@ -243,7 +243,7 @@ function canvasHeadings(nodes: MarkdownHeadingNode[]): CanvasHeading[] {
   return result;
 }
 
-function folderHeadings(folder: TFolder, previews: ReadonlyMap<string, CanvasHeading[]> = new Map(), loading: ReadonlySet<string> = new Set(), failed: ReadonlySet<string> = new Set()): CanvasHeading[] {
+function folderHeadings(folder: TFolder, previews: ReadonlyMap<string, CanvasHeading[]> = new Map(), loading: ReadonlySet<string> = new Set(), failed: ReadonlyMap<string, string> = new Map()): CanvasHeading[] {
   const result: CanvasHeading[] = [];
   const walk = (current: TFolder, parentId: string | null, level: number) => {
     const id = `folder:${current.path || "/"}`;
@@ -272,6 +272,7 @@ function folderHeadings(folder: TFolder, previews: ReadonlyMap<string, CanvasHea
           title: child instanceof TFile ? child.basename : child.name,
           content: child.path,
           children: previews.get(child.path)?.filter((heading) => heading.parentId === `file:${child.path}`).map((heading) => heading.id) ?? [],
+          previewError: failed.get(child.path),
           previewState: loading.has(child.path) ? "loading" : failed.has(child.path) ? "error" : previews.has(child.path) ? "loaded" : "unloaded",
           kind: "file",
           filePath: child.path,
@@ -303,7 +304,7 @@ export class BloomMDView extends ItemView {
   private scopeFolder: TFolder | null = null;
   private readonly folderPreviews = new Map<string, CanvasHeading[]>();
   private readonly previewLoading = new Set<string>();
-  private readonly previewFailed = new Set<string>();
+  private readonly previewFailed = new Map<string, string>();
   private previewRevision = 0;
   private navigationRevision = 0;
   private returnFolder: TFolder | null = null;
@@ -540,6 +541,9 @@ export class BloomMDView extends ItemView {
     this.layoutKey = `folder:${folder.path || "/"}`;
     this.headings = folderHeadings(folder, this.folderPreviews, this.previewLoading, this.previewFailed);
     this.rootId = this.headings[0]?.id ?? "";
+    if (this.headings.length >= 200 && this.plugin.getLayout(this.layoutKey) === EMPTY_LAYOUT) {
+      this.plugin.saveLayout(this.layoutKey, { positions: {}, collapsed: this.headings.filter((heading) => heading.id !== this.rootId && heading.kind === "folder").map((heading) => heading.id) });
+    }
     this.undoStack = [];
     this.redoStack = [];
     this.clearFailure();
@@ -560,8 +564,12 @@ export class BloomMDView extends ItemView {
       this.folderPreviews.set(path, folderFilePreview(path, file.basename, markdown));
     } catch (error) {
       console.error("BloomMD: folder preview failed", error);
-      this.previewFailed.add(path);
-      new Notice(getLanguage().startsWith("de") ? "Die Inhaltsvorschau konnte nicht geladen werden." : "Could not load the content preview.");
+      const code = (error as { code?: string } | null)?.code;
+      const de = getLanguage().startsWith("de");
+      this.previewFailed.set(path, code === "EACCES" || code === "EPERM"
+        ? (de ? "Lesezugriff verweigert. Prüfe die Dateiberechtigungen." : "Read access denied. Check file permissions.")
+        : code === "ENOENT" ? (de ? "Die Datei wurde verschoben oder gelöscht." : "The note was moved or deleted.")
+        : (de ? "Die Datei konnte nicht gelesen oder verarbeitet werden. Prüfe, ob sie lokal verfügbar und in Obsidian lesbar ist." : "The note could not be read or processed. Check that it is available locally and readable in Obsidian."));
     } finally {
       this.previewLoading.delete(path);
       if (!this.sourceFile && this.scopeFolder === folder) this.setFolder(folder);

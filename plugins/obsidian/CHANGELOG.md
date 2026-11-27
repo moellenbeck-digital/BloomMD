@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+### Navigation / Navigation
+
+- Die Suche findet geladene Knoten über Titel und Dateipfad, klappt Vorfahren auf und zentriert den Treffer. Sie bleibt auch in schmalen Touch-Ansichten erreichbar. Große Ordnerübersichten starten eingeklappt.
+- Fehler einer Inhaltsvorschau lassen den Dateiknoten sichtbar; Ladehinweise können ausgeblendet und die Vorschau erneut geladen werden. Noch nicht geladene Inhalte werden nicht durchsucht.
+- Search finds loaded nodes by title and file path, expands ancestors and centers the result, including narrow touch panes. Large folder overviews start collapsed.
+- Failed content previews retain their file node with dismissible guidance and retry. Contents that have not been loaded are not searched.
+
 
 ### Map
 

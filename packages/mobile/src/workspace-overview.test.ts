@@ -42,3 +42,15 @@ test("single-file access cannot be treated as a writable folder", async () => {
   const { store } = fixture();
   await expect(readMobileOverview({ ...store, kind: "file" }, "")).rejects.toThrow("single file");
 });
+
+
+test("unreadable notes retain the reason while other notes remain usable", async () => {
+  const { store, contents } = fixture();
+  contents["Team/Plan.md"] = "---\ntitle: invalid: yaml\n---\n# Plan";
+  const result = await readMobileOverview(store, "");
+  expect(result.unreadable).toEqual(["Team/Plan.md"]);
+  expect(result.loadIssues[0]?.kind).toBe("yaml");
+  expect(result.loadIssues[0]?.line).toBeGreaterThan(0);
+  expect([...result.document.nodes.values()].some((node) => node.metadata?.file === "Elsewhere/Plan.md")).toBe(true);
+  expect(JSON.stringify(result.loadIssues)).not.toContain("invalid: yaml");
+});

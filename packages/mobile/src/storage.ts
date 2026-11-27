@@ -1,3 +1,4 @@
+import { workspaceLoadIssue, type WorkspaceLoadIssue } from "@bloommd/core/browser";
 import { Filesystem, Encoding } from "@capacitor/filesystem";
 import { normalizeFolderPath, parseFile, serializeToMarkdown } from "@bloommd/core/browser";
 import type { MindMapDocument, MindMapFrontmatter } from "@bloommd/core/browser";
@@ -81,11 +82,12 @@ export async function listMarkdownPaths(): Promise<string[]> {
   return (await walk()).files;
 }
 
-export async function listMindmaps(): Promise<{ entries: ListEntry[]; folders: string[]; unreadable: string[] }> {
+export async function listMindmaps(): Promise<{ entries: ListEntry[]; folders: string[]; unreadable: string[]; loadIssues?: WorkspaceLoadIssue[] }> {
   const { files, folders } = await walk();
 
   const entries: ListEntry[] = [];
   const unreadable: string[] = [];
+  const loadIssues: WorkspaceLoadIssue[] = [];
 
   for (const path of files) {
     try {
@@ -100,12 +102,14 @@ export async function listMindmaps(): Promise<{ entries: ListEntry[]; folders: s
         filename: path,
         frontmatter: doc.frontmatter,
       });
-    } catch {
+    } catch (error) {
+      console.error("[BloomMD] Could not read mobile entry:", path, error);
+      loadIssues.push(workspaceLoadIssue(path, error));
       unreadable.push(path);
     }
   }
 
-  return { entries, folders, unreadable };
+  return { entries, folders, unreadable, ...(loadIssues.length ? { loadIssues } : {}) };
 }
 
 export async function readMindmap(path: string): Promise<MindMapDocument> {

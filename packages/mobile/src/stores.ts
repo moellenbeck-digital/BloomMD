@@ -1,3 +1,4 @@
+import type { WorkspaceLoadIssue } from "@bloommd/core/browser";
 /**
  * Where the app keeps maps: its own folder (default), a folder the user opened from the Files app,
  * typically an Obsidian vault in iCloud Drive, or one single Markdown file the Files app handed over
@@ -35,7 +36,7 @@ export interface MobileStore {
    * `folders` are all folders of the store, "/"-separated and including empty ones (without hidden
    * folders and `node_modules`). `truncated`: the folder holds more notes than one listing returns.
    */
-  list(): Promise<{ entries: StoreEntry[]; folders: string[]; unreadable: string[]; truncated?: boolean }>;
+  list(): Promise<{ entries: StoreEntry[]; folders: string[]; unreadable: string[]; loadIssues?: WorkspaceLoadIssue[]; truncated?: boolean }>;
   /**
    * Creates a folder, also nested, without writing anything into it; one that exists already is
    * fine. Resolves to the normalized folder path. Rejects paths that leave the store with
@@ -134,6 +135,7 @@ export function createAppStore(): MobileStore {
         }),
         folders: folderPaths(result.folders),
         unreadable: result.unreadable,
+        ...(result.loadIssues ? { loadIssues: result.loadIssues } : {}),
       };
     },
     createFolder: (path) => createCheckedFolder(path, createFolder),

@@ -32,3 +32,10 @@ im Obsidian-Plugin.
 ## Links
 
 `bloommd://open?path=Ordner/Notiz.md&node=<id>` öffnet eine Notiz des geöffneten Ordners am Knoten.
+
+
+## Knoten finden und Ladehinweise — Mobile 1.1.0 (Testkanäle)
+
+Mit **Knoten suchen** (Lupe über der Karte) suchst du nach Titel oder Dateipfad. Ein Treffer öffnet eingeklappte Vorfahren und wird zentriert. Das Fadenkreuz bringt den ausgewählten Knoten wieder ins Bild. Gesucht wird in der aktuellen Karte oder geladenen Ordnerübersicht.
+
+**Details** im Ladehinweis erklärt die Ursache. Bei YAML-Fehlern beziehen sich Zeile und Spalte auf den YAML-Block, nicht die ganze Datei. Mit × ausblenden, über **Ladehinweise anzeigen** wieder öffnen und nach einer Korrektur im Texteditor **Erneut prüfen** wählen. Nicht geladene Dateien haben noch keinen Knoten.

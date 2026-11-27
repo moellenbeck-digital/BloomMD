@@ -40,8 +40,12 @@ const clip = {
   handR: "polygon(73% 62.84%, 92.5% 62.84%, 92.5% 81.23%, 73% 81.23%)",
 };
 
-function Layer({ part }: { part: keyof typeof clip }) {
-  return <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} />;
+/* near: the scene is close to the viewport. Only then the avatar image is requested, so it never competes
+   with the LCP element of the page (native lazy loading starts far earlier). Without JS the image comes
+   from <noscript>, so the server render stays the complete final image. */
+function Layer({ part, near }: { part: keyof typeof clip; near: boolean }) {
+  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} />;
+  return near ? image : <noscript>{image}</noscript>;
 }
 
 /* Node titles: the "Produktstrategie" / "Product strategy" example map that the landing page already shows
@@ -385,6 +389,23 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   const [state, setState] = useState<SceneState>("end");
   const [offscreen, setOffscreen] = useState(false);
   const [motion, setMotion] = useState(false);
+  const [near, setNear] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    if (!("IntersectionObserver" in window)) {
+      setNear(true);
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setNear(true);
+      observer.disconnect();
+    }, { rootMargin: "600px 0px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const node = ref.current;
@@ -475,11 +496,11 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
           <div className={styles.hop}>
             <div className={styles.float}>
               <div className={`${styles.part} ${styles.body}`}>
-                <Layer part="body" />
+                <Layer part="body" near={near} />
               </div>
               <div className={`${styles.part} ${styles.headAct}`}>
                 <div className={`${styles.part} ${styles.headIdle}`}>
-                  <Layer part="head" />
+                  <Layer part="head" near={near} />
                   <span className={styles.screen} style={{ left: "39.5%", top: "29.5%", width: "13%", height: "14.6%" }} />
                   <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
                   <span className={styles.screen} style={{ left: "52.5%", top: "43.6%", width: "13%", height: "5%" }} />
@@ -498,10 +519,10 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                 </div>
               </div>
               <div className={`${styles.part} ${styles.handL}`}>
-                <Layer part="handL" />
+                <Layer part="handL" near={near} />
               </div>
               <div className={`${styles.part} ${styles.handR}`}>
-                <Layer part="handR" />
+                <Layer part="handR" near={near} />
                 {motion ? (
                   <div className={styles.canWrap}>
                     <WateringCan />

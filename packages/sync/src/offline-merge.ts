@@ -108,20 +108,35 @@ export function handleReconcileMessage(
       authors: state.authors,
     });
     if (!plan.changed) return;
-    if (base.length > 0 && state.snapshots) {
-      try {
-        state.snapshots.save({
-          roomKey: room.key,
-          filename: room.filename,
-          at,
-          device,
-          conflictNodeIds: plan.conflicts.map((conflict) => conflict.nodeId),
-          serverMarkdown: serializeToMarkdown(plan.serverDocument),
-          clientMarkdown: serializeToMarkdown(plan.localDocument),
-        });
-      } catch (error) {
-        // The merge must not be lost because the snapshot could not be written; make it visible.
-        telemetry?.event({ operation: "offline.snapshot", outcome: "error", roomKey: room.key, correlationId, error });
+    if (base.length > 0 && (state.snapshots || state.history)) {
+      const serverMarkdown = serializeToMarkdown(plan.serverDocument);
+      const clientMarkdown = serializeToMarkdown(plan.localDocument);
+      if (state.snapshots) {
+        try {
+          state.snapshots.save({
+            roomKey: room.key,
+            filename: room.filename,
+            at,
+            device,
+            conflictNodeIds: plan.conflicts.map((conflict) => conflict.nodeId),
+            serverMarkdown,
+            clientMarkdown,
+          });
+        } catch (error) {
+          // The merge must not be lost because the snapshot could not be written; make it visible.
+          telemetry?.event({ operation: "offline.snapshot", outcome: "error", roomKey: room.key, correlationId, error });
+        }
+      }
+      if (state.history && plan.conflicts.length > 0) {
+        // Both starting versions also go into the file's version history, where the user restores
+        // them. Server first: the device's version is the newer entry. Not awaited (the merge is
+        // synchronous) and, like the snapshot, never a reason to lose the merge.
+        const history = state.history;
+        state.historyPending = (state.historyPending ?? Promise.resolve())
+          .then(() => history(room.filename, [serverMarkdown, clientMarkdown], at))
+          .catch((error) => {
+            telemetry?.event({ operation: "offline.history", outcome: "error", roomKey: room.key, correlationId, error });
+          });
       }
     }
     const { conflictCopyIds } = plan.commit(ws);

@@ -287,20 +287,49 @@ export class FileStore {
     const backupDir = this.backupDirFor(filePath);
     await mkdir(backupDir, { recursive: true });
 
+    const used = await this.createBackupFile(filePath, Date.now(), (target) => copyFile(filePath, target, constants.COPYFILE_EXCL));
+    if (used === null) return;
+    await this.pruneBackups(filePath);
+  }
+
+  /**
+   * Puts versions of a note into its history that were never the file on disk (#261): the two
+   * starting versions of an offline merge with a conflict. They are ordinary backups, so the history
+   * lists and restores them like any other and `NOTE_HISTORY_LIMIT` applies. They are written in the
+   * given order, each at least one millisecond after the one before, so the later one is the newer
+   * entry. Written even when automatic backups are off, like restoring does.
+   */
+  async addBackups(filename: string, versions: readonly string[], at: number = Date.now()): Promise<void> {
+    const filePath = resolveMarkdownPath(this.baseDir, filename);
+    await mkdir(this.backupDirFor(filePath), { recursive: true });
+    let from = at;
+    for (const markdown of versions) {
+      const used = await this.createBackupFile(filePath, from, (target) => writeFile(target, markdown, { encoding: "utf-8", flag: "wx" }));
+      if (used === null) break;
+      from = used + 1;
+    }
+    await this.pruneBackups(filePath);
+  }
+
+  /**
+   * Creates the next free backup file from `from` (epoch ms) on: two writes within one millisecond
+   * would share a name, the later one moves on to the next free one. Returns the millisecond used,
+   * null when the directory is gone.
+   */
+  private async createBackupFile(filePath: string, from: number, create: (target: string) => Promise<void>): Promise<number | null> {
+    const backupDir = this.backupDirFor(filePath);
     const filename = basename(filePath);
-    // Two writes within one millisecond would share a name; the later one moves on to the next free one.
-    for (let at = Date.now(); ; at += 1) {
+    for (let at = from; ; at += 1) {
       const timestamp = new Date(at).toISOString().replace(/[:.]/g, "-");
       try {
-        await copyFile(filePath, join(backupDir, `${filename}.${timestamp}${BACKUP_SUFFIX}`), constants.COPYFILE_EXCL);
-        break;
+        await create(join(backupDir, `${filename}.${timestamp}${BACKUP_SUFFIX}`));
+        return at;
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
-        if (code === "ENOENT") return;
+        if (code === "ENOENT") return null;
         if (code !== "EEXIST") throw err;
       }
     }
-    await this.pruneBackups(filePath);
   }
 
   /** A backup that cannot be removed must not fail the save it belongs to; the next write retries. */

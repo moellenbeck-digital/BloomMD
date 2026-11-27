@@ -2,6 +2,11 @@
 
 ## In Entwicklung
 
+## [Marketing 0.7.0-develop.3] - 2026-11-27
+
+- DE/EN-News und Hilfe zu Desktop 0.6.1: Knotensuche, große Ordner und verständliche Ladehinweise. Mobile-Testkanäle und der separate Obsidian-Freigabestatus werden ausdrücklich unterschieden.
+- DE/EN news and help for Desktop 0.6.1: node search, large folders and actionable loading notices. Mobile test channels and the separate Obsidian release status are stated explicitly.
+
 ## [Web-App 0.7.0-develop.2, Marketing 0.7.0-develop.2, Sync 0.7.0-develop.2] - 2026-11-27
 
 - Offline-Konflikt (Ticket 261): Nach einem Offline-Merge mit Konflikt stehen beide Ausgangsfassungen (Stand des Servers und Stand des wiederverbindenden Geräts) in der Versionshistorie der Datei und lassen sich dort wiederherstellen.

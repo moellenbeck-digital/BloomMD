@@ -189,3 +189,13 @@ reveals the selected node, **1–5** rate it and move on to the next one.
 - **Recognition of existing ink** is not included yet; for text, use text fields with Scribble.
 - If you choose "Don't update" when Obsidian asks about links after a rename, the drawing points to
   the renamed note while the `[[…]]` in the node keeps the old name.
+
+## Finding nodes again (from 0.8.0)
+
+The **Find node** magnifier remains available in narrow panes. Search by title or file path and select a result: its ancestor branches expand and the node comes into view. **Focus selected node** centers the selection again after panning. File previews that have not loaded yet are not searched.
+
+If a file preview fails, the file stays visible in the overview. Dismiss, reopen or retry the compact notice; its details explain the cause. Narrow panes hide the minimap so that it does not cover node actions.
+
+![Obsidian in mobile emulation: the searched Projekt node is expanded, selected and centered](/releases/obsidian-0.8.0-node-search.png)
+
+Captured in the native Obsidian app with mobile emulation; the additional physical iPad test was confirmed separately.

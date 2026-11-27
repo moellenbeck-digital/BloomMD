@@ -27,8 +27,11 @@ const copy = {
   },
 } as const;
 
-/* Avatar layers: the same image, clipped into head, body and hands (geometry of avatar-200.webp, in percent). */
-const AVATAR_SRC = "/agents/md-avatar-200.webp";
+/* Avatar layers: the same image, clipped into head, body and hands (geometry of the avatar, in percent).
+   md-avatar-400.webp is the same crop as md-avatar-200.webp at twice the resolution, for the larger stage. */
+const AVATAR_SRC = "/agents/md-avatar-400.webp";
+const AVATAR_SRCSET = "/agents/md-avatar-200.webp 200w, /agents/md-avatar-400.webp 400w";
+const AVATAR_SIZES = "(min-width: 720px) 240px, 130px";
 const clip = {
   head: "polygon(0% 0%, 100% 0%, 100% 49.04%, 80% 54.02%, 71% 55.75%, 56% 56.7%, 50% 57.28%, 43.5% 57.47%, 37.5% 57.66%, 31% 57.28%, 22.5% 54.79%, 0% 51.72%)",
   body: "polygon(31% 100%, 31% 71.26%, 36% 62.84%, 39.5% 59.39%, 43.5% 56.7%, 47% 55.56%, 50.5% 55.36%, 54% 55.75%, 56.5% 56.7%, 61% 59%, 65.5% 63.22%, 72.5% 72.8%, 72.5% 100%)",
@@ -37,54 +40,139 @@ const clip = {
 };
 
 function Layer({ part }: { part: keyof typeof clip }) {
-  return <img src={AVATAR_SRC} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} />;
+  return <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} />;
 }
 
 /* Node titles: the "Produktstrategie" / "Product strategy" example map that the landing page already shows
    (useCases[0].file and .markdown in app/page.tsx and app/en/english-landing-page.tsx). No new claims.
    The hierarchy is the one of that Markdown: # root, ## children, ### leaves under the second child. */
 const MAP = {
-  de: { file: "strategie.md", rootWidth: 132, root: "Strategie", children: ["Ziele", "Initiativen"], leaves: ["Kundenbindung", "Startrisiko"] },
-  en: { file: "strategy.md", rootWidth: 164, root: "Product Strategy", children: ["Goals", "Initiatives"], leaves: ["Retention", "Launch risk"] },
+  de: { file: "strategie.md", root: "Strategie", children: ["Ziele", "Initiativen"], leaves: ["Kundenbindung", "Startrisiko"] },
+  en: { file: "strategy.md", root: "Product Strategy", children: ["Goals", "Initiatives"], leaves: ["Retention", "Launch risk"] },
 } as const;
 
-/* Layout in a 440 × 280 viewBox, balanced around the root: one child top left, one top right,
-   the leaves bottom right, the agent bottom left, the stem in the middle. Ground line at y 254.
-   The pause button lives in the tab bar above the stage, so it never covers the map. */
-const W = 440;
-const H = 280;
-const GROUND = 254;
-const SEED = { x: 160, y: 253 };
-const ROOT = { cx: 220, y: 99, h: 38 };
-const ROOT_CY = ROOT.y + ROOT.h / 2;
-const CHILD = { w: 112, h: 32, cy: 44, cx: [106, 350] as const };
-const LEAF = { x: 320, w: 112, h: 28, spine: 312, cy: [168, 210] as const };
-/* Where the spout of the tilted watering can ends (see .handR and .canWrap in the CSS). */
-const DROP = { x: 150, y: 218 };
-const STEM = `M${SEED.x} ${SEED.y + 2} C${SEED.x} 214 ${ROOT.cx - 2} 196 ${ROOT.cx} ${ROOT.y + ROOT.h}`;
+/* Two stages with the same story. "wide" from 720 px: a broad stage, the map spreads to the right of the
+   agent. "tall" below 720 px: a portrait stage, the root at the top and the stem grows the full height.
+   Only one of them is displayed (CSS media query), so there is no layout shift and no JS decision.
+   The avatar box is in viewBox units; seed, can drops and the toss follow from it.
+   Keep .stage aspect ratios and the avatar vars in the CSS module in sync with W and H. */
+type Point = readonly [number, number];
+type Cubic = readonly [Point, Point, Point, Point];
 
-const MOTES = [
-  [SEED.x + 14, 230],
-  [ROOT.cx + 40, 150],
-  [LEAF.x + 20, 236],
-  [CHILD.cx[0] + 40, 96],
-  [ROOT.cx - 46, 176],
-] as const;
+type Layout = {
+  W: number;
+  H: number;
+  ground: number;
+  avatar: { x: number; w: number };
+  root: { cx: number; cy: number; h: number; font: number; pad: number };
+  child: { cx: readonly [number, number]; cy: number; h: number; font: number; pad: number };
+  leaf: { x: number; h: number; cy: readonly [number, number]; font: number };
+  /* Stem from the seed to the root as cubic segments; leaves sit on [segment, t]. */
+  stem: (seed: Point, rootBottom: Point) => Cubic[];
+  stemLeaves: readonly [readonly [number, number], readonly [number, number]];
+  spark: number;
+  motes: readonly Point[];
+};
+
+const LAYOUTS: Record<"wide" | "tall", Layout> = {
+  wide: {
+    W: 1000,
+    H: 440,
+    ground: 404,
+    avatar: { x: 30, w: 196 },
+    root: { cx: 556, cy: 204, h: 64, font: 25, pad: 30 },
+    child: { cx: [330, 800], cy: 84, h: 54, font: 20, pad: 26 },
+    leaf: { x: 784, h: 48, cy: [270, 340], font: 17 },
+    stem: ([sx, sy], [rx, ry]) => [[[sx, sy], [sx, sy - 70], [rx, ry + 80], [rx, ry]]],
+    stemLeaves: [[0, 0.2], [0, 0.52]],
+    spark: 1.55,
+    motes: [[330, 360], [600, 300], [880, 400], [380, 160], [470, 250], [700, 150]],
+  },
+  tall: {
+    W: 360,
+    H: 470,
+    ground: 440,
+    avatar: { x: 4, w: 138 },
+    root: { cx: 180, cy: 64, h: 52, font: 19.5, pad: 22 },
+    child: { cx: [84, 270], cy: 172, h: 44, font: 15.5, pad: 18 },
+    leaf: { x: 188, h: 40, cy: [264, 320], font: 13.5 },
+    /* A gentle S: left over the hand of the agent, back through the gap between the children, up into the root. */
+    stem: ([sx, sy], [rx, ry]) => [
+      [[sx, sy], [sx, sy - 44], [146, 372], [146, 318]],
+      [[146, 318], [146, 264], [170, 230], [170, 176]],
+      [[170, 176], [170, 140], [rx, ry + 30], [rx, ry]],
+    ],
+    stemLeaves: [[0, 0.62], [1, 0.45]],
+    spark: 1,
+    motes: [[170, 400], [300, 384], [110, 240], [256, 116], [60, 116]],
+  },
+};
+
+/* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
+const AV_RATIO = 261 / 200;
+const SPOUT = { x: 1.207, y: 0.755 };
+const SEED_AT = 1.29;
+/* Old card scale: the CSS keyframes of the seed toss are written for an avatar 118.8 units wide. */
+const BASE_AVATAR_W = 118.8;
+
+/* Text width estimate in em, on the wide side, so the pill fits any sans-serif fallback (system-ui differs
+   per OS). The pill is centred around its text, so a narrower font only adds a little air on both sides. */
+function textWidth(text: string, font: number, weight = 1) {
+  let em = 0;
+  for (const char of text) {
+    if ("iljtfrI.,' ".includes(char)) em += 0.34;
+    else if ("mwMW".includes(char)) em += 0.9;
+    else if (char === "#") em += 0.62;
+    else if (char === char.toUpperCase()) em += 0.7;
+    else em += 0.58;
+  }
+  return em * font * weight * 1.06;
+}
+
+function geometry(layout: Layout, locale: Locale) {
+  const { W, H, ground, avatar, root, child, leaf } = layout;
+  const map = MAP[locale];
+  const avH = avatar.w * AV_RATIO;
+  const avY = ground + 4 - avH;
+  const seed = { x: Math.round(avatar.x + SEED_AT * avatar.w), y: ground - 1 };
+  const drop = { x: avatar.x + SPOUT.x * avatar.w, y: avY + SPOUT.y * avH };
+  const markGap = (font: number) => font * 0.42;
+  const rootW = Math.round(2 * root.pad + textWidth("#", root.font * 0.78) + markGap(root.font) + textWidth(map.root, root.font, 1.05));
+  const childW = map.children.map((title) => Math.round(2 * child.pad + textWidth("##", child.font * 0.72) + markGap(child.font) + textWidth(title, child.font, 1.02)));
+  const dot = { x: leaf.h * 0.46, gap: leaf.font * 0.75 };
+  const leafW = Math.round(dot.x + dot.gap + Math.max(...map.leaves.map((title) => textWidth(title, leaf.font))) + leaf.h * 0.42);
+  return {
+    W, H, avH, avY, seed, drop, markGap,
+    rootW, rootX: root.cx - rootW / 2, rootY: root.cy - root.h / 2,
+    childW, childTop: child.cy - child.h / 2, childBottom: child.cy + child.h / 2,
+    leafW, dot,
+    u: avatar.w / BASE_AVATAR_W,
+  };
+}
+
+/* A point on a cubic Bézier, for leaves along the stem and forks of the twigs. */
+function bez([p0, p1, p2, p3]: Cubic, t: number): Point {
+  const m = 1 - t;
+  const at = (axis: 0 | 1) => m * m * m * p0[axis] + 3 * m * m * t * p1[axis] + 3 * m * t * t * p2[axis] + t * t * t * p3[axis];
+  return [at(0), at(1)];
+}
+const cubicPath = (segments: readonly Cubic[]) => `M${segments[0]![0].join(" ")}${segments.map(([, a, b, c]) => ` C${a.join(" ")} ${b.join(" ")} ${c.join(" ")}`).join("")}`;
+const r1 = (value: number) => Math.round(value * 10) / 10;
 
 /* Deterministic sparks: a fan that rises from a burst point. */
-function Sparks({ x, y, delay, count = 8, spread = 1, rise = 1 }: { x: number; y: number; delay: number; count?: number; spread?: number; rise?: number }) {
+function Sparks({ x, y, delay, count = 8, spread = 1, rise = 1, scale = 1 }: { x: number; y: number; delay: number; count?: number; spread?: number; rise?: number; scale?: number }) {
   return (
     <g className={styles.burst} style={{ "--d": `${delay}s` } as CSSProperties} aria-hidden="true">
-      <circle cx={x} cy={y} r={14} className={styles.ring} />
+      <circle cx={x} cy={y} r={14 * scale} className={styles.ring} />
       {Array.from({ length: count }, (_, index) => {
         const angle = ((-90 + (index - (count - 1) / 2) * (150 / count) * spread) * Math.PI) / 180;
-        const reach = (24 + (index % 3) * 9) * rise;
+        const reach = (24 + (index % 3) * 9) * rise * scale;
         const style = {
           "--dx": `${Math.round(Math.cos(angle) * reach)}px`,
-          "--dy": `${Math.round(Math.sin(angle) * reach - 10 * rise)}px`,
+          "--dy": `${Math.round(Math.sin(angle) * reach - 10 * rise * scale)}px`,
           "--k": index % 4,
         } as CSSProperties;
-        return <circle key={index} cx={x} cy={y} r={index % 3 === 0 ? 2.6 : 1.8} className={styles.spark} style={style} />;
+        return <circle key={index} cx={x} cy={y} r={(index % 3 === 0 ? 2.6 : 1.8) * scale} className={styles.spark} style={style} />;
       })}
     </g>
   );
@@ -103,11 +191,190 @@ function WateringCan() {
   );
 }
 
+/* Everything behind the agent: light, ground, stem, branches, nodes and their pollen. */
+function MapBack({ kind, locale }: { kind: "wide" | "tall"; locale: Locale }) {
+  const layout = LAYOUTS[kind];
+  const map = MAP[locale];
+  const g = geometry(layout, locale);
+  const { root, child, leaf, ground, spark } = layout;
+  const id = (name: string) => `bloom-${kind}-${name}`;
+  const s = kind === "wide" ? 1.6 : 1.05;
+  const rootBottom = g.rootY + root.h;
+
+  const stemSegments = layout.stem([g.seed.x, g.seed.y + 2], [root.cx, rootBottom - 4]);
+  const stem = cubicPath(stemSegments);
+  const [ax, ay] = bez(stemSegments[layout.stemLeaves[0][0]]!, layout.stemLeaves[0][1]);
+  const [bx, by] = bez(stemSegments[layout.stemLeaves[1][0]]!, layout.stemLeaves[1][1]);
+
+  /* Branches root → children. Wide: out of the top of the root, sweeping into the inner end of each child.
+     Tall: out of the bottom of the root, down into the top of each child. */
+  const edges = child.cx.map((cx, index) => {
+    const side = index === 0 ? -1 : 1;
+    const w = g.childW[index]!;
+    if (kind === "wide") {
+      const sx = root.cx + side * (g.rootW / 2 - 34);
+      const ex = cx - side * (w / 2 - 2);
+      return `M${sx} ${g.rootY + 4} C${sx} ${child.cy + 18} ${ex - side * 70} ${child.cy} ${ex} ${child.cy}`;
+    }
+    const sx = root.cx + side * Math.min(g.rootW / 2 - 34, 58);
+    return `M${sx} ${rootBottom - 4} C${sx} ${rootBottom + 34} ${cx} ${g.childTop - 40} ${cx} ${g.childTop + 2}`;
+  });
+  /* Twigs child → leaves: one twig leaves the second child and sweeps into the first leaf,
+     the second forks off that twig, like a branch. */
+  const iw = g.childW[1]!;
+  const tx = child.cx[1] - iw / 2 + (kind === "wide" ? 44 : 28);
+  const ty = g.childBottom - 3;
+  const lead = kind === "wide" ? 40 : 8;
+  const twig0: Cubic = [[tx, ty], [tx - (kind === "wide" ? 12 * s : 14), ty + (leaf.cy[0] - ty) * 0.55], [leaf.x - lead, leaf.cy[0]], [leaf.x + 2, leaf.cy[0]]];
+  /* The fork leaves twig0 along its tangent, so the branch has no corner. */
+  const forkT = 0.42;
+  const fork = bez(twig0, forkT);
+  const ahead = bez(twig0, forkT + 0.02);
+  const reach = (leaf.cy[1] - fork[1]) * 0.45;
+  const norm = Math.hypot(ahead[0] - fork[0], ahead[1] - fork[1]) || 1;
+  const twig1: Cubic = [fork, [fork[0] + ((ahead[0] - fork[0]) / norm) * reach, fork[1] + ((ahead[1] - fork[1]) / norm) * reach], [leaf.x - lead * 1.2, leaf.cy[1]], [leaf.x + 2, leaf.cy[1]]];
+  const twigs = [twig0, twig1].map((cubic) => cubicPath([cubic.map(([x, y]) => [r1(x), r1(y)] as const) as unknown as Cubic]));
+
+  return (
+    <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u } as CSSProperties} aria-hidden="true" focusable="false" data-bloom-stage={kind}>
+      <defs>
+        <radialGradient id={id("glow")}>
+          <stop offset="0" stopColor="#FF6B35" stopOpacity="0.3" />
+          <stop offset="0.55" stopColor="#FF6B35" stopOpacity="0.08" />
+          <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={id("seedglow")}>
+          <stop offset="0" stopColor="#FFD27A" stopOpacity="0.9" />
+          <stop offset="0.45" stopColor="#FF8A5C" stopOpacity="0.35" />
+          <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={id("soil")} cy="0.2" r="0.6">
+          <stop offset="0" stopColor="#FF8A5C" stopOpacity="0.2" />
+          <stop offset="1" stopColor="#FF8A5C" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={id("ground")} x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0" stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.3" stopColor="#fff" stopOpacity="0.1" />
+          <stop offset="0.7" stopColor="#fff" stopOpacity="0.1" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={id("root")} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#FF9364" />
+          <stop offset="1" stopColor="#F2561F" />
+        </linearGradient>
+        <linearGradient id={id("child")} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#3A3430" />
+          <stop offset="1" stopColor="#272321" />
+        </linearGradient>
+        <linearGradient id={id("leaf")} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#2F3A2B" />
+          <stop offset="1" stopColor="#222821" />
+        </linearGradient>
+      </defs>
+      <ellipse cx={root.cx} cy={root.cy} rx={kind === "wide" ? 420 : 230} ry={260} fill={`url(#${id("glow")})`} className={styles.glow} />
+      <ellipse cx={g.W / 2} cy={ground + 4} rx={g.W * 0.48} ry={kind === "wide" ? 40 : 28} fill={`url(#${id("soil")})`} />
+      <path d={`M${g.W * 0.03} ${ground + 0.5} H${g.W * 0.97}`} stroke={`url(#${id("ground")})`} className={styles.ground} />
+
+      <ellipse cx={layout.avatar.x + layout.avatar.w * 0.52} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
+      <ellipse cx={g.seed.x} cy={ground + 1} rx={24 * s} ry={4.5 * s} className={styles.soil} />
+      <circle cx={g.seed.x} cy={g.seed.y - 3} r={30 * s} fill={`url(#${id("seedglow")})`} className={styles.seedGlow} />
+      <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} />
+
+      <path d={stem} pathLength={1} className={`${styles.stemHalo} ${styles.draw}`} />
+      <path d={stem} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
+      <path d={`M${r1(ax + 1)} ${r1(ay)} c${15 * s} ${-1 * s} ${23 * s} ${-9 * s} ${24 * s} ${-19 * s} c${-11 * s} ${-1 * s} ${-21 * s} ${6 * s} ${-24 * s} ${19 * s} z`} className={`${styles.leaf} ${styles.leafA}`} />
+      <path d={`M${r1(bx - 1)} ${r1(by)} c${-13 * s} ${-7 * s} ${-25 * s} ${-6 * s} ${-30 * s} ${1 * s} c${9 * s} ${7 * s} ${22 * s} ${7 * s} ${30 * s} ${-1 * s} z`} className={`${styles.leaf} ${styles.leafB}`} />
+      <ellipse cx={root.cx} cy={rootBottom - 2} rx={9 * s} ry={11 * s} className={styles.bud} />
+
+      {edges.map((d, index) => (
+        <g key={d} style={{ "--i": index } as CSSProperties}>
+          <path d={d} pathLength={1} className={`${styles.edge} ${styles.halo} ${styles.draw}`} />
+          <path d={d} pathLength={1} className={`${styles.edge} ${styles.draw}`} />
+          <path d={d} pathLength={1} className={styles.flow} />
+        </g>
+      ))}
+      {twigs.map((d, index) => (
+        <g key={d} style={{ "--i": index } as CSSProperties}>
+          <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.halo} ${styles.draw}`} />
+          <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.draw}`} />
+          <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} />
+        </g>
+      ))}
+
+      <g className={styles.rootNode} data-bloom-node="root">
+        <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
+        <rect x={g.rootX + 1} y={g.rootY + 1} width={g.rootW - 2} height={root.h - 2} rx={root.h / 2 - 1} className={styles.rootRim} />
+        <text x={root.cx} y={root.cy + root.font * 0.36} textAnchor="middle" className={styles.rootTitle} style={{ fontSize: root.font }}>
+          <tspan className={styles.rootMark} style={{ fontSize: root.font * 0.78 }}>#</tspan>
+          <tspan dx={g.markGap(root.font)} data-bloom-title>{map.root}</tspan>
+        </text>
+      </g>
+
+      {child.cx.map((cx, index) => {
+        const w = g.childW[index]!;
+        return (
+          <g key={`node-${cx}`} className={styles.childNode} style={{ "--i": index } as CSSProperties} data-bloom-node="child">
+            <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
+            <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>
+              <tspan className={styles.childMark} style={{ fontSize: child.font * 0.72 }}>##</tspan>
+              <tspan dx={g.markGap(child.font)} data-bloom-title>{map.children[index]}</tspan>
+            </text>
+          </g>
+        );
+      })}
+
+      {leaf.cy.map((cy, index) => (
+        <g key={`leaf-${cy}`} className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
+          <rect x={leaf.x} y={cy - leaf.h / 2} width={g.leafW} height={leaf.h} rx={leaf.h / 2} fill={`url(#${id("leaf")})`} className={styles.leafRect} />
+          <circle cx={leaf.x + g.dot.x} cy={cy} r={kind === "wide" ? 4.2 : 3.4} className={styles.leafDot} />
+          <text x={leaf.x + g.dot.x + g.dot.gap} y={cy + leaf.font * 0.35} className={styles.leafTitle} style={{ fontSize: leaf.font }}>
+            <tspan data-bloom-title>{map.leaves[index]}</tspan>
+          </text>
+        </g>
+      ))}
+
+      <Sparks x={root.cx} y={g.rootY} delay={2.72} count={10} rise={1.2} scale={spark} />
+      <Sparks x={child.cx[0]} y={g.childTop + 4} delay={3.36} scale={spark} />
+      <Sparks x={child.cx[1]} y={g.childTop + 4} delay={3.54} scale={spark} />
+      <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={3.96} count={6} rise={0.8} scale={spark} />
+      <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={4.1} count={6} rise={0.8} scale={spark} />
+
+      {/* Ambient pollen after the scene: a few motes drift up from the map. */}
+      {layout.motes.map(([x, y], k) => (
+        <circle key={k} cx={x} cy={y} r={(k % 2 ? 1.6 : 2.2) * s} className={styles.mote} style={{ "--k": k } as CSSProperties} />
+      ))}
+    </svg>
+  );
+}
+
+/* In front of the agent: water drops, the seed and the cheer sparks. */
+function MapFront({ kind }: { kind: "wide" | "tall" }) {
+  const layout = LAYOUTS[kind];
+  const g = geometry(layout, "de");
+  const s = kind === "wide" ? 1.6 : 1.05;
+  return (
+    <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u } as CSSProperties} aria-hidden="true" focusable="false">
+      {[0, 1, 2, 3, 4, 5].map((index) => (
+        <g key={index} transform={`translate(${g.drop.x + (index % 3) * 1.5 * s} ${g.drop.y}) scale(${s})`}>
+          <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" className={styles.drop} style={{ "--i": index } as CSSProperties} />
+        </g>
+      ))}
+      <g className={styles.seedFall}>
+        <g className={styles.seedSquash}>
+          <ellipse cx={g.seed.x} cy={g.seed.y - 3.5 * s} rx={4.8 * s} ry={5.8 * s} className={styles.seed} />
+        </g>
+      </g>
+      {/* Above the head at the top of the jump. */}
+      <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.12} delay={4.78} count={9} spread={2.2} rise={1.1} scale={layout.spark} />
+    </svg>
+  );
+}
+
+const pct = (value: number, of: number) => `${((value / of) * 100).toFixed(3)}%`;
+
 export function BloomAgentScene({ locale }: { locale: Locale }) {
   const t = copy[locale];
   const map = MAP[locale];
-  const rootW = map.rootWidth;
-  const rootX = ROOT.cx - rootW / 2;
   const ref = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SceneState>("end");
   const [offscreen, setOffscreen] = useState(false);
@@ -164,8 +431,17 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     requestAnimationFrame(() => requestAnimationFrame(() => setState("play")));
   };
 
-  const childStart = [rootX + 30, rootX + rootW - 30] as const;
-  const childBottom = CHILD.cy + CHILD.h / 2;
+  const avatarVars = Object.fromEntries(
+    (["wide", "tall"] as const).flatMap((kind) => {
+      const layout = LAYOUTS[kind];
+      const g = geometry(layout, locale);
+      return [
+        [`--${kind}-left`, pct(layout.avatar.x, g.W)],
+        [`--${kind}-top`, pct(g.avY, g.H)],
+        [`--${kind}-width`, pct(layout.avatar.w, g.W)],
+      ];
+    }),
+  ) as CSSProperties;
 
   return (
     <div ref={ref} className={styles.scene} data-state={state} data-offscreen={offscreen || undefined} data-testid="bloom-agent-scene">
@@ -178,93 +454,18 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         </span>
         {motion ? (
           <button type="button" className={styles.toggle} onClick={toggle} aria-label={running ? t.pause : t.play} data-testid="bloom-agent-scene-toggle">
-            {running ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
+            {running ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
           </button>
         ) : null}
       </div>
 
       <div className={styles.stage} role="img" aria-label={t.label} data-testid="bloom-agent-stage">
-        <svg className={styles.map} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
-          <defs>
-            <radialGradient id="bloom-agent-glow">
-              <stop offset="0" stopColor="#FF6B35" stopOpacity="0.26" />
-              <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="bloom-agent-seedglow">
-              <stop offset="0" stopColor="#FFD27A" stopOpacity="0.9" />
-              <stop offset="0.45" stopColor="#FF8A5C" stopOpacity="0.35" />
-              <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <circle cx={ROOT.cx} cy={ROOT_CY - 10} r="190" fill="url(#bloom-agent-glow)" className={styles.glow} />
-          <path d={`M0 ${GROUND + 0.5} H${W}`} className={styles.ground} />
-
-          <ellipse cx="66" cy={GROUND + 2} rx="40" ry="5" className={styles.shadow} />
-          <ellipse cx={SEED.x} cy={GROUND + 1} rx="26" ry="4.5" className={styles.soil} />
-          <circle cx={SEED.x} cy={SEED.y - 3} r="30" fill="url(#bloom-agent-seedglow)" className={styles.seedGlow} />
-          <ellipse cx={SEED.x} cy={GROUND} rx="20" ry="5" className={styles.ripple} />
-
-          <path d={STEM} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
-          <path d={`M${SEED.x + 9} 228 c15 -1 23 -9 24 -19 c-11 -1 -21 6 -24 19 z`} className={`${styles.leaf} ${styles.leafA}`} />
-          <path d={`M${SEED.x + 36} 203 c-13 -7 -25 -6 -30 1 c9 7 22 7 30 -1 z`} className={`${styles.leaf} ${styles.leafB}`} />
-          <ellipse cx={ROOT.cx} cy={ROOT.y + ROOT.h - 2} rx="9" ry="11" className={styles.bud} />
-
-          {CHILD.cx.map((cx, index) => {
-            const d = `M${childStart[index]} ${ROOT.y} C${childStart[index]} ${ROOT.y - 30} ${cx} ${childBottom + 34} ${cx} ${childBottom}`;
-            return (
-              <g key={`edge-${cx}`} style={{ "--i": index } as CSSProperties}>
-                <path d={d} pathLength={1} className={`${styles.edge} ${styles.draw}`} />
-                <path d={d} pathLength={1} className={styles.flow} />
-              </g>
-            );
-          })}
-          {LEAF.cy.map((cy, index) => {
-            const d = `M${LEAF.spine} ${childBottom} V${cy - 10} Q${LEAF.spine} ${cy} ${LEAF.x} ${cy}`;
-            return (
-              <g key={`twig-${cy}`} style={{ "--i": index } as CSSProperties}>
-                <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.draw}`} />
-                <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} />
-              </g>
-            );
-          })}
-
-          <g className={styles.rootNode} data-bloom-node="root">
-            <rect x={rootX} y={ROOT.y} width={rootW} height={ROOT.h} rx="11" className={styles.rootRect} />
-            <text x={rootX + 13} y={ROOT_CY + 5} className={styles.rootMark}>#</text>
-            <text x={rootX + 29} y={ROOT_CY + 5} className={styles.rootTitle}>{map.root}</text>
-          </g>
-
-          {CHILD.cx.map((cx, index) => (
-            <g key={`node-${cx}`} className={styles.childNode} style={{ "--i": index } as CSSProperties} data-bloom-node="child">
-              <rect x={cx - CHILD.w / 2} y={CHILD.cy - CHILD.h / 2} width={CHILD.w} height={CHILD.h} rx="9" className={styles.childRect} />
-              <text x={cx - CHILD.w / 2 + 11} y={CHILD.cy + 4.5} className={styles.childMark}>##</text>
-              <text x={cx - CHILD.w / 2 + 31} y={CHILD.cy + 4.5} className={styles.childTitle}>{map.children[index]}</text>
-            </g>
-          ))}
-
-          {LEAF.cy.map((cy, index) => (
-            <g key={`leaf-${cy}`} className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
-              <rect x={LEAF.x} y={cy - LEAF.h / 2} width={LEAF.w} height={LEAF.h} rx="14" className={styles.leafRect} />
-              <circle cx={LEAF.x + 11} cy={cy} r="2.6" className={styles.leafDot} />
-              <text x={LEAF.x + LEAF.w / 2 + 6} y={cy + 4} textAnchor="middle" className={styles.leafTitle}>{map.leaves[index]}</text>
-            </g>
-          ))}
-
-          <Sparks x={ROOT.cx} y={ROOT.y} delay={2.72} count={10} rise={1.2} />
-          <Sparks x={CHILD.cx[0]} y={CHILD.cy - 8} delay={3.36} />
-          <Sparks x={CHILD.cx[1]} y={CHILD.cy - 8} delay={3.54} />
-          <Sparks x={LEAF.x + LEAF.w / 2} y={LEAF.cy[0] - 6} delay={3.96} count={6} rise={0.8} />
-          <Sparks x={LEAF.x + LEAF.w / 2} y={LEAF.cy[1] - 6} delay={4.1} count={6} rise={0.8} />
-
-          {/* Ambient pollen after the scene: a few motes drift up from the map. */}
-          {MOTES.map(([x, y], k) => (
-            <circle key={k} cx={x} cy={y} r={k % 2 ? 1.6 : 2.2} className={styles.mote} style={{ "--k": k } as CSSProperties} />
-          ))}
-        </svg>
+        <MapBack kind="wide" locale={locale} />
+        <MapBack kind="tall" locale={locale} />
 
         <div className={styles.shine} aria-hidden="true" />
 
-        <div className={styles.avatar} aria-hidden="true" data-testid="bloom-agent-avatar">
+        <div className={styles.avatar} style={avatarVars} aria-hidden="true" data-testid="bloom-agent-avatar">
           <div className={styles.hop}>
             <div className={styles.float}>
               <div className={`${styles.part} ${styles.body}`}>
@@ -303,19 +504,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
           </div>
         </div>
 
-        <svg className={styles.map} viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
-          {[0, 1, 2, 3, 4, 5].map((index) => (
-            <g key={index} transform={`translate(${DROP.x + (index % 3) * 1.5} ${DROP.y})`}>
-              <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" className={styles.drop} style={{ "--i": index } as CSSProperties} />
-            </g>
-          ))}
-          <g className={styles.seedFall}>
-            <g className={styles.seedSquash}>
-              <ellipse cx={SEED.x} cy={SEED.y - 3.5} rx="4.8" ry="5.8" className={styles.seed} />
-            </g>
-          </g>
-          <Sparks x={72} y={100} delay={4.78} count={9} spread={2.2} rise={1.1} />
-        </svg>
+        <MapFront kind="wide" />
+        <MapFront kind="tall" />
       </div>
     </div>
   );

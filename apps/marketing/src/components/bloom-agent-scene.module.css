@@ -18,16 +18,25 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
+  margin-inline: auto;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: 26px;
   background:
-    radial-gradient(120% 80% at 18% 100%, rgba(255, 107, 53, 0.12), rgba(255, 107, 53, 0) 60%),
-    radial-gradient(90% 70% at 85% 10%, rgba(109, 190, 99, 0.07), rgba(109, 190, 99, 0) 60%),
-    #1f1d1b;
-  box-shadow: 0 24px 60px -28px rgba(31, 29, 27, 0.55), 0 2px 6px rgba(31, 29, 27, 0.12);
+    radial-gradient(70% 60% at 55% 42%, rgba(255, 107, 53, 0.16), rgba(255, 107, 53, 0) 70%),
+    radial-gradient(60% 50% at 12% 100%, rgba(255, 138, 92, 0.14), rgba(255, 138, 92, 0) 70%),
+    radial-gradient(50% 45% at 92% 8%, rgba(109, 190, 99, 0.1), rgba(109, 190, 99, 0) 70%),
+    linear-gradient(180deg, #262220 0%, #1c1a18 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 40px 80px -36px rgba(120, 52, 20, 0.45),
+    0 18px 40px -24px rgba(31, 29, 27, 0.5),
+    0 2px 6px rgba(31, 29, 27, 0.1);
   contain: layout paint;
+}
+@media (min-width: 720px) {
+  .scene { max-width: none; border-radius: 32px; }
 }
 
 /* ── Tab bar: file name and the pause button, outside the map ── */
@@ -35,31 +44,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
-  padding: 0 2px 0 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.025);
+  height: 56px;
+  padding: 0 8px 0 16px;
+}
+@media (min-width: 720px) {
+  .bar { height: 64px; padding: 0 14px 0 24px; }
 }
 .file {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 26px;
-  padding: 0 10px 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(246, 240, 235, 0.8);
-  font: 500 12px/1 var(--font-mono, ui-monospace, monospace);
+  height: 30px;
+  padding: 0 13px 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(246, 240, 235, 0.82);
+  font: 500 12.5px/1 var(--font-mono, ui-monospace, monospace);
+}
+@media (min-width: 720px) {
+  .file { height: 34px; padding: 0 16px 0 13px; font-size: 14px; }
 }
 .fileIcon { width: 11px; height: 13px; fill: none; stroke: #ff8a5c; stroke-width: 1.3; stroke-linejoin: round; }
 
 .stage {
   pointer-events: none;
   position: relative;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.055) 0.9px, rgba(255, 255, 255, 0) 1.3px) 50% 50% / 18px 18px;
   width: 100%;
-  aspect-ratio: 440 / 280;
+  /* Tall layout: viewBox 360 × 470 (LAYOUTS.tall in the component). */
+  aspect-ratio: 360 / 470;
+}
+/* A soft dot grid that fades out towards the edges, like the canvas of the app. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0.9px, rgba(255, 255, 255, 0) 1.4px) 50% 50% / 20px 20px;
+  mask-image: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%);
 }
 .map {
   position: absolute;
@@ -68,41 +89,62 @@
   height: 100%;
   overflow: visible;
 }
+.wide { display: none; }
+@media (min-width: 720px) {
+  /* Wide layout: viewBox 1000 × 440 (LAYOUTS.wide in the component). */
+  .stage { aspect-ratio: 1000 / 440; }
+  .stage::before { background-size: 26px 26px; }
+  .wide { display: block; }
+  .tall { display: none; }
+}
 
 /* ── Map ── */
-.ground { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; fill: none; }
-.soil { fill: rgba(255, 138, 92, 0.14); }
-.shadow { fill: rgba(0, 0, 0, 0.45); }
+.ground { stroke-width: 1.2; fill: none; }
+.soil { fill: rgba(255, 138, 92, 0.16); }
+.shadow { fill: rgba(0, 0, 0, 0.42); }
 .ripple { fill: none; stroke: #ff8a5c; stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
 .glow,
 .seedGlow { transform-box: fill-box; transform-origin: center; }
 .seedGlow { opacity: 0.45; }
 
-.draw { stroke-dasharray: 1; stroke-dashoffset: 0; }
-.stem { fill: none; stroke: #6dbe63; stroke-width: 3.2; stroke-linecap: round; }
+/* Dash 1, gap 1.1: at offset 1.05 no dash touches the path, so the round caps leave no dot before the draw. */
+.draw { stroke-dasharray: 1 1.1; stroke-dashoffset: 0; }
+.stem { fill: none; stroke: #74c869; stroke-width: 4; stroke-linecap: round; }
+.stemHalo { fill: none; stroke: rgba(116, 200, 105, 0.16); stroke-width: 12; stroke-linecap: round; }
+.wide .stem { stroke-width: 5.5; }
+.wide .stemHalo { stroke-width: 16; }
 .leaf { fill: #6dbe63; transform-box: fill-box; }
 .leafA { transform-origin: 0% 100%; }
 .leafB { transform-origin: 100% 60%; fill: #85cf78; }
 .bud { fill: #6dbe63; opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
 
-.edge { fill: none; stroke: rgba(255, 138, 92, 0.72); stroke-width: 2; stroke-linecap: round; }
-.twig { stroke: rgba(109, 190, 99, 0.55); stroke-width: 1.6; }
-.flow { fill: none; stroke: #ffd2b8; stroke-width: 2.6; stroke-linecap: round; stroke-dasharray: 0.14 1.3; stroke-dashoffset: 0.14; opacity: 0; }
-.flowTwig { stroke: #c9f0c0; stroke-width: 2.2; }
+.edge { fill: none; stroke: rgba(255, 145, 100, 0.85); stroke-width: 2.6; stroke-linecap: round; }
+.twig { stroke: rgba(128, 206, 116, 0.75); stroke-width: 2.2; }
+.edge.halo { stroke: rgba(255, 120, 70, 0.14); stroke-width: 10; }
+.twig.halo { stroke: rgba(116, 200, 105, 0.12); stroke-width: 9; }
+.wide .edge { stroke-width: 3.6; }
+.wide .twig { stroke-width: 3; }
+.wide .edge.halo { stroke-width: 14; }
+.wide .twig.halo { stroke-width: 12; }
+.flow { fill: none; stroke: #ffd2b8; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 0.12 1.3; stroke-dashoffset: 0.12; opacity: 0; }
+.flowTwig { stroke: #c9f0c0; stroke-width: 2.8; }
+.wide .flow { stroke-width: 4.4; }
 
 .rootNode,
 .childNode,
 .leafNode { transform-box: fill-box; transform-origin: center; }
-.rootRect { fill: #ff6b35; }
-.rootNode { filter: drop-shadow(0 6px 14px rgba(255, 107, 53, 0.35)); }
-.rootMark { fill: rgba(26, 26, 26, 0.7); font: 700 15px var(--font-mono, ui-monospace, monospace); }
-.rootTitle { fill: #1a1a1a; font: 700 14.5px var(--font-body, ui-sans-serif, system-ui, sans-serif); }
-.childRect { fill: #2a2724; stroke: rgba(255, 107, 53, 0.65); stroke-width: 1; }
-.childMark { fill: #ff8a5c; font: 700 11px var(--font-mono, ui-monospace, monospace); }
-.childTitle { fill: #f6f0eb; font: 600 13px var(--font-body, ui-sans-serif, system-ui, sans-serif); }
-.leafRect { fill: #262822; stroke: rgba(109, 190, 99, 0.6); stroke-width: 1; }
-.leafDot { fill: #6dbe63; }
-.leafTitle { fill: rgba(246, 240, 235, 0.88); font: 500 11.5px var(--font-body, ui-sans-serif, system-ui, sans-serif); }
+.rootNode { filter: drop-shadow(0 8px 22px rgba(255, 107, 53, 0.45)); }
+.rootRim { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
+.rootMark { fill: rgba(26, 26, 26, 0.55); font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
+.rootTitle { fill: #1a1a1a; font-weight: 700; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); letter-spacing: -0.01em; }
+.childNode { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+.childRect { stroke: rgba(255, 128, 80, 0.6); stroke-width: 1.4; }
+.childMark { fill: #ff8a5c; font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
+.childTitle { fill: #f6f0eb; font-weight: 600; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
+.leafNode { filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.3)); }
+.leafRect { stroke: rgba(128, 206, 116, 0.55); stroke-width: 1.3; }
+.leafDot { fill: #80ce74; }
+.leafTitle { fill: rgba(246, 240, 235, 0.9); font-weight: 500; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
 
 .burst,
 .drop,
@@ -125,16 +167,19 @@
   width: 38%;
   opacity: 0;
   background: linear-gradient(100deg, rgba(255, 210, 184, 0) 0%, rgba(255, 210, 184, 0.09) 50%, rgba(255, 210, 184, 0) 100%);
-  transform: translateX(-110%) skewX(-12deg);
+  transform: translateX(-160%) skewX(-12deg);
 }
 
 /* ── Avatar (layers of avatar-200.webp, geometry as on moellenbeck-digital.io) ── */
 .avatar {
   position: absolute;
-  left: 1.5%;
-  top: 36.07%;
-  width: 27%;
+  left: var(--tall-left);
+  top: var(--tall-top);
+  width: var(--tall-width);
   aspect-ratio: 200 / 261;
+}
+@media (min-width: 720px) {
+  .avatar { left: var(--wide-left); top: var(--wide-top); width: var(--wide-width); }
 }
 .avatar::before {
   content: "";
@@ -239,8 +284,8 @@
 
   /* Before the start: seed in the hand, empty bed. */
   .scene[data-state="ready"] :is(.leaf, .rootNode, .childNode, .leafNode, .glow, .seedGlow) { opacity: 0; }
-  .scene[data-state="ready"] .draw { stroke-dashoffset: 1; }
-  .scene[data-state="ready"] .seedFall { transform: translate(-55px, -38px); }
+  .scene[data-state="ready"] .draw { stroke-dashoffset: 1.05; }
+  .scene[data-state="ready"] .seedFall { transform: translate(calc(-55px * var(--u)), calc(-38px * var(--u))); }
 
   /* Act 1 (0–1.5 s): the agent tosses the seed, it bounces into the soil and glows. */
   .scene[data-state="play"] .seedFall { animation: bloom-seed 1.5s linear both; }
@@ -251,7 +296,7 @@
   /* Act 2 (1.3–2.7 s): watering, the stem draws itself, leaves unfurl, a bud swells. */
   .scene[data-state="play"] .canWrap { animation: bloom-can 6s linear both; }
   .scene[data-state="play"] .drop { animation: bloom-drop 0.48s var(--fall) calc(1.62s + var(--i) * 0.15s) both; }
-  .scene[data-state="play"] .stem { animation: bloom-draw 0.95s var(--out) 1.75s both; }
+  .scene[data-state="play"] :is(.stem, .stemHalo) { animation: bloom-draw 0.95s var(--out) 1.75s both; }
   .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.7s var(--spring) 2.1s both; }
   .scene[data-state="play"] .leafB { animation: bloom-unfurl-b 0.7s var(--spring) 2.3s both; }
   .scene[data-state="play"] .bud { animation: bloom-bud 0.6s var(--out) 2.3s both; }
@@ -291,14 +336,14 @@
 }
 
 @keyframes bloom-seed {
-  0% { transform: translate(-55px, -38px) rotate(0deg); animation-timing-function: var(--in-out); }
-  20% { transform: translate(-58px, -32px) rotate(-20deg); animation-timing-function: var(--in-out); }
-  30% { transform: translate(-50px, -48px) rotate(40deg); animation-timing-function: var(--out); }
-  48% { transform: translate(-26px, -80px) rotate(260deg); animation-timing-function: var(--fall); }
+  0% { transform: translate(calc(-55px * var(--u)), calc(-38px * var(--u))) rotate(0deg); animation-timing-function: var(--in-out); }
+  20% { transform: translate(calc(-58px * var(--u)), calc(-32px * var(--u))) rotate(-20deg); animation-timing-function: var(--in-out); }
+  30% { transform: translate(calc(-50px * var(--u)), calc(-48px * var(--u))) rotate(40deg); animation-timing-function: var(--out); }
+  48% { transform: translate(calc(-26px * var(--u)), calc(-80px * var(--u))) rotate(260deg); animation-timing-function: var(--fall); }
   70% { transform: translate(0, 0) rotate(540deg); animation-timing-function: var(--out); }
-  80% { transform: translate(0, -11px) rotate(560deg); animation-timing-function: var(--fall); }
+  80% { transform: translate(0, calc(-11px * var(--u))) rotate(560deg); animation-timing-function: var(--fall); }
   88% { transform: translate(0, 0) rotate(570deg); animation-timing-function: var(--out); }
-  94% { transform: translate(0, -2.5px) rotate(574deg); animation-timing-function: var(--fall); }
+  94% { transform: translate(0, calc(-2.5px * var(--u))) rotate(574deg); animation-timing-function: var(--fall); }
   100% { transform: translate(0, 0) rotate(576deg); }
 }
 @keyframes bloom-squash {
@@ -330,7 +375,7 @@
   100% { opacity: 0; transform: translate(9px, 31px) scale(1); }
 }
 @keyframes bloom-draw {
-  from { stroke-dashoffset: 1; }
+  from { stroke-dashoffset: 1.05; }
   to { stroke-dashoffset: 0; }
 }
 @keyframes bloom-unfurl {
@@ -371,8 +416,8 @@
   100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.6); }
 }
 @keyframes bloom-shine {
-  0% { opacity: 1; transform: translateX(-110%) skewX(-12deg); }
-  100% { opacity: 1; transform: translateX(290%) skewX(-12deg); }
+  0% { opacity: 1; transform: translateX(-160%) skewX(-12deg); }
+  100% { opacity: 1; transform: translateX(300%) skewX(-12deg); }
 }
 @keyframes bloom-flow {
   0% { opacity: 0; stroke-dashoffset: 0.14; }

@@ -98,7 +98,8 @@ export async function startRun(browser: Browser, testInfo: TestInfo, options: { 
   testInfo.setTimeout(240_000);
   const tag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const run = {
-    local: testInfo.project.name === LOCAL_PROJECT,
+    // Own configs of later tickets (e.g. "chromium-offline-t346") run against the same local servers.
+    local: testInfo.project.name === LOCAL_PROJECT || testInfo.project.name.startsWith(`${LOCAL_PROJECT}-`),
     origin: "",
     email: `offline-${tag}@bloommd.local`,
     tag,

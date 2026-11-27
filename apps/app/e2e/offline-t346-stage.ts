@@ -60,9 +60,15 @@ html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#0d1117;
 <div id="bottom"></div>
 </body></html>`;
 
+/** Mit `T346_TIMING=1` schreibt jeder Schritt seine Zeit seit Beginn in das Log (Suche nach langsamen Stellen). */
+const t0 = Date.now();
+export const logTiming = (text: string) => {
+  if (process.env.T346_TIMING === "1") console.log(`T346 +${((Date.now() - t0) / 1000).toFixed(1)}s ${text}`);
+};
+
 function noopStage(): Stage {
   const nothing = async () => undefined;
-  return { enabled: false, attach: () => undefined, show: nothing, step: nothing, pause: nothing, finish: nothing };
+  return { enabled: false, attach: () => undefined, show: nothing, step: async (text) => logTiming(text), pause: nothing, finish: nothing };
 }
 
 export interface StageInfo {
@@ -127,6 +133,7 @@ export async function createStage(browser: Browser, info: StageInfo): Promise<St
       await chip(label);
     },
     async step(text, label) {
+      logTiming(text);
       if (label) await this.show(label);
       await stage.evaluate((value) => (document.getElementById("step")!.textContent = value), text);
       await pause();

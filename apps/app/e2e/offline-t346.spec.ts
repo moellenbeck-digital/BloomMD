@@ -1,9 +1,9 @@
-import { test } from "@playwright/test";
+import { test, type Page } from "@playwright/test";
 import {
-  addChild, conflictCopy, countOf, expectQueued, exportMarkdown, exportedHeadings, expect, fingerprint, finish, labels, node, openDocument,
+  addChild, alphaMarkdown, apiUrl, conflictCopy, countOf, expectQueued, exportMarkdown, exportedHeadings, expect, fingerprint, finish, labels, node, openDocument,
   openClient, readHistory, readLocalSnapshots, rename, restoreVersion, serverTitles, startRun, unique, waitForEmptyRoom, type Run,
 } from "./offline-helpers";
-import { createStage, gitSha, STAGE_CLIENT_VIEWPORT } from "./offline-t346-stage";
+import { createStage, gitSha, logTiming, STAGE_CLIENT_VIEWPORT } from "./offline-t346-stage";
 
 // @t346 — W1: reproducible acceptance proof (with video) for the offline conflict (#261, rule A, version history)
 // and the sync persistence (#46). Two browser contexts (devices A and B, same account, own browser storage) edit the
@@ -14,6 +14,23 @@ import { createStage, gitSha, STAGE_CLIENT_VIEWPORT } from "./offline-t346-stage
 //
 // With `T346_VIDEO=1` (config `playwright.offline-t346.video.config.ts`) a third, recorded browser context shows the
 // active device and the current step (see `offline-t346-stage.ts`); without it the same steps run without pauses.
+
+/** Restores the n-th entry of the open version-history dialog (newest first); retries while the sync room is still occupied. */
+async function restoreViaUi(page: Page, index: number): Promise<void> {
+  const success = page.getByTestId("note-history-success");
+  const failure = page.getByTestId("note-history-error");
+  await expect
+    .poll(
+      async () => {
+        await page.getByTestId("note-history-restore").nth(index).click();
+        await page.getByTestId("note-history-confirm-restore").click();
+        await expect(success.or(failure)).toBeVisible();
+        return success.isVisible();
+      },
+      { timeout: 60_000, intervals: [1_500, 2_500, 3_500] },
+    )
+    .toBe(true);
+}
 
 test("@t346 offline conflict end to end: conflict, resolution, export, restore, error cases, repetition", async ({ browser }, testInfo) => {
   let run: Run | undefined;
@@ -244,4 +261,74 @@ test("@t346 offline conflict end to end: conflict, resolution, export, restore, 
     await finish(run, testInfo);
   }
 
+});
+
+// Finding (product defect, not fixed in this ticket): restoring a version through the history dialog while the tab stays open.
+// The dialog reports success, but the stored file keeps the old state and the open node does not show the restored version
+// (the live sync room still holds, and later persists, the old state). The main test above restores with the room empty and
+// opens the file anew; this test takes the way a user takes and is marked `test.fail()`: it stays green while the defect exists
+// and turns red ("expected to fail, but passed") once it is fixed, so the marker has to be removed together with the fix.
+// Description, observed behaviour and evidence: docs/nachweise/t346.md, section "Abweichungen".
+test("@t346 @t346-befund restore from the history dialog with the tab open (known defect)", async ({ browser }, testInfo) => {
+  let run: Run | undefined;
+  try {
+    const started = await startRun(browser, testInfo, { viewport: STAGE_CLIENT_VIEWPORT });
+    run = started.run;
+    await started.a.close();
+    await started.b.close();
+    await waitForEmptyRoom(run);
+
+    // Setup (a failure here is a real failure of the test, not the defect): overwrite the file through the API so that the
+    // original becomes an entry of the history, then open the changed file on A, which stays connected from here on.
+    const changed = alphaMarkdown(run).replace(/^## Alpha </m, "## Alpha-X <");
+    expect(changed).not.toBe(alphaMarkdown(run));
+    const saved = await run.api.request.put(apiUrl(run.alphaFile), { headers: { Origin: run.origin }, data: { markdown: changed, overwrite: true } });
+    expect(saved.ok(), `overwrite ${run.alphaFile}: ${saved.status()}`).toBe(true);
+    const history = await readHistory(run, run.alphaFile);
+    expect(history.revisions.length, "the overwrite created a history entry").toBeGreaterThanOrEqual(1);
+    const oldest = history.revisions.length - 1;
+    const original = [run.rootTitle, "Alpha", "Beta", "Gamma"].sort();
+    const a = await openClient(browser, run, "A", STAGE_CLIENT_VIEWPORT);
+    await openDocument(a.page, run, { requireSync: true, titles: ["Alpha-X", "Beta", "Gamma"] });
+
+    // From here the known defect counts: `test.fail()` keeps the test green while it exists and turns it red
+    // ("expected to fail, but passed") once it is fixed; the marker is to be removed together with the fix.
+    test.fail(true, "Known defect: the restore through the open tab is not persisted (docs/nachweise/t346.md, Abweichungen)");
+
+    // Steps of the defect: open the history in the open tab, restore the oldest entry (the original) through the dialog.
+    const apiCalls: Array<{ method: string; path: string; status: number; body: string }> = [];
+    const consoleMessages: string[] = [];
+    a.page.on("console", (message) => { if (["error", "warning"].includes(message.type())) consoleMessages.push(`${message.type()}: ${message.text().slice(0, 200)}`); });
+    a.page.on("response", async (response) => {
+      const url = new URL(response.url());
+      if (!url.pathname.startsWith("/api/")) return;
+      apiCalls.push({ method: response.request().method(), path: url.pathname, status: response.status(), body: (await response.text().catch(() => "")).slice(0, 200) });
+    });
+    await a.page.getByTestId("toolbar-history").click();
+    await expect(a.page.getByTestId("note-history-entry")).toHaveCount(history.revisions.length);
+    await restoreViaUi(a.page, oldest);
+    const dialogMessage = (await a.page.getByTestId("note-history-success").innerText().catch(() => "")).trim();
+    await a.page.getByTestId("note-history-close").click();
+
+    // Observation (attached as evidence): what the dialog said, what the node shows, what the stored file contains.
+    await new Promise((done) => setTimeout(done, 8_000));
+    const observed = {
+      expected: original,
+      dialogMessage,
+      apiCallsDuringRestore: apiCalls,
+      consoleMessages,
+      historyEntriesBefore: history.revisions.length,
+      historyEntriesAfter: (await readHistory(run, run.alphaFile)).revisions.length,
+      nodeLabels: await labels(a.page),
+      storedFile: unique(await serverTitles(run)),
+    };
+    console.log(`T346-BEFUND ${JSON.stringify(observed)}`);
+    await testInfo.attach("befund-wiederherstellen-offener-tab.json", { body: JSON.stringify(observed, null, 2), contentType: "application/json" });
+
+    // Expected behaviour (fails today): the stored file and the open node show the restored original.
+    expect(observed.storedFile, "stored file after the restore").toEqual(original);
+    expect(observed.nodeLabels, "open node after the restore").toEqual(original);
+  } finally {
+    await finish(run, testInfo);
+  }
 });

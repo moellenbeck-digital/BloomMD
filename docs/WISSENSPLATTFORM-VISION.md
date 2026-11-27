@@ -39,6 +39,10 @@ Der Pilot verwendet die Bausteine für [Trust-Felder und Suche #110](https://git
 
 SSO/SCIM, Ende-zu-Ende-Verschlüsselung, DLP und breit föderierte Suche sind mögliche spätere Themen. Ihre Aufnahme in diese Vision ist keine Entscheidung über Architektur, Termin oder Release. Der aktive [Fokusmeilenstein W0/W1](https://github.com/moellenbeck-digital/BloomMD/milestone/8) und [Lieferauftrag #415](https://github.com/moellenbeck-digital/BloomMD/issues/415) begrenzen die nächste Lieferung auf den Learnings-Nachweis, einen Offline-Konfliktfall und eine lesende Nextcloud-Quelle im Desktop. Diese Vision erweitert den dort beschlossenen Umfang nicht. Größere Ausbaustufen bleiben Backlog bis zu einer eigenen Scope- und Kapazitätsentscheidung.
 
+### Wissen und Können
+
+Skills (Methode, „wie“) ergänzen das Wissen in BloomMD (Kontext, „was gilt hier“). Die Ergänzung ordnet Skill-Map, Lernvorschläge im Review und Skill-Gesundheit ein. Sie ist Backlog und keine Zusage. Siehe [Wissen und Können](WISSENSPLATTFORM-SKILLS.md).
+
 ## English
 
 ### Direction and boundaries
@@ -73,3 +77,7 @@ The pilot builds on work for [trust fields and search #110](https://github.com/m
 8. Consider broader organizational functions when earlier stages establish a need.
 
 SSO/SCIM, end-to-end encryption, DLP, and broad federated search remain possible later directions, not architecture or release commitments. The active [W0/W1 focus milestone](https://github.com/moellenbeck-digital/BloomMD/milestone/8) and [delivery contract #415](https://github.com/moellenbeck-digital/BloomMD/issues/415) limit the next delivery to learning evidence, one offline conflict scenario, and a read-only Nextcloud source in Desktop. This vision does not expand that approved scope. Larger stages remain in the backlog until a separate scope and capacity decision.
+
+### Knowledge and skills
+
+Skills (method, "how") complement knowledge in BloomMD (context, "what applies here"). The addendum frames the skill map, learning proposals in review, and skill health. It is backlog, not a commitment. See [Knowledge and skills](WISSENSPLATTFORM-SKILLS.md).

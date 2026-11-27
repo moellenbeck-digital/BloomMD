@@ -1,0 +1,56 @@
+{
+  "expected": [
+    "Alpha",
+    "Beta",
+    "Gamma",
+    "Offline Alpha mwze000atgop"
+  ],
+  "dialogMessage": "Version restored.",
+  "apiCallsDuringRestore": [
+    {
+      "method": "GET",
+      "path": "/api/mindmaps/offline-alpha-mwze000atgop.md/history",
+      "status": 200,
+      "body": "{\"source\":\"local\",\"canRestore\":true,\"version\":null,\"revisions\":[{\"id\":\"offline-alpha-mwze000atgop.md.2026-11-27T19-42-16-786Z.bak\",\"source\":\"local\",\"replacedAt\":\"2026-11-27T19:42:16.786Z\",\"size\":413}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/mindmaps/offline-alpha-mwze000atgop.md/history",
+      "status": 200,
+      "body": "{\"source\":\"local\",\"canRestore\":true,\"version\":null,\"revisions\":[{\"id\":\"offline-alpha-mwze000atgop.md.2026-11-27T19-42-16-786Z.bak\",\"source\":\"local\",\"replacedAt\":\"2026-11-27T19:42:16.786Z\",\"size\":413}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/mindmaps/offline-alpha-mwze000atgop.md",
+      "status": 200,
+      "body": "{\"filePath\":\"/home/node/.openclaw/workspace-dev-team-coder/worktrees/346/.qa/playwright-offline-workspace/offline-alpha-mwze000atgop.md\",\"frontmatter\":{\"title\":\"Offline Alpha mwze000atgop\",\"id\":\"offli"
+    },
+    {
+      "method": "GET",
+      "path": "/api/mindmaps/offline-alpha-mwze000atgop.md/history",
+      "status": 200,
+      "body": "{\"source\":\"local\",\"canRestore\":true,\"version\":null,\"revisions\":[{\"id\":\"offline-alpha-mwze000atgop.md.2026-11-27T19-42-25-244Z.bak\",\"source\":\"local\",\"replacedAt\":\"2026-11-27T19:42:25.244Z\",\"size\":415},"
+    }
+  ],
+  "consoleMessages": [],
+  "historyEntriesBefore": 1,
+  "historyEntriesAfter": 2,
+  "nodeLabels": [
+    "Alpha-X",
+    "Beta",
+    "Gamma",
+    "Offline Alpha mwze000atgop"
+  ],
+  "storedFile": [
+    "Alpha-X",
+    "Beta",
+    "Gamma",
+    "Offline Alpha mwze000atgop"
+  ],
+  "playwrightError": [
+    "Error: stored file after the restore",
+    "expect(received).toEqual(expected) // deep equality",
+    "- Expected  - 1\n+ Received  + 1"
+  ],
+  "runner": "bun run --cwd apps/app test:e2e:offline-t346 --grep t346-befund (Test mit test.fail: Status \"expected\")"
+}

@@ -16,6 +16,13 @@ export interface OfflineRoomState {
   /** Who last changed which node (memory only: a restarted server names the device "unbekannt"). */
   authors: Map<string, ConflictAuthor>;
   snapshots: SnapshotStore | null;
+  /**
+   * Puts the two starting versions of a merge with a conflict (server first, then device) into the
+   * file's version history; none in cloud mode.
+   */
+  history?: ((filename: string, versions: readonly string[], at: number) => Promise<void>) | null;
+  /** The history write of the latest merge; it never fails (an error is reported as telemetry). */
+  historyPending?: Promise<void>;
   now: () => number;
   /** Connections that sent an offline reconcile (also a failed one); their ordinary sync is not held back. */
   reconciled?: WeakSet<object>;

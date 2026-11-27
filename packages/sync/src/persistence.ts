@@ -97,6 +97,11 @@ export interface DocumentPersistence {
   create?(descriptor: RoomDescriptor, document: MindMapDocument): Promise<MindMapDocument>;
   rename?(descriptor: RoomDescriptor, newFilename: string, expectedVersion?: number): Promise<DocumentRenameResult>;
   delete?(descriptor: RoomDescriptor, expectedVersion?: number): Promise<void>;
+  /**
+   * Puts versions into the note's version history (#261). Only the folder persistence has one that
+   * is written here; cloud documents keep their revisions in the database and offer none.
+   */
+  addHistory?(descriptor: RoomDescriptor, versions: readonly string[], at: number): Promise<void>;
 }
 
 export function createFilePersistence(config: SyncServerConfig): DocumentPersistence {
@@ -108,6 +113,7 @@ export function createFilePersistence(config: SyncServerConfig): DocumentPersist
       await store.write(document);
       return document;
     },
+    addHistory: (descriptor, versions, at) => store.addBackups(descriptor.filename, versions, at),
   };
 }
 

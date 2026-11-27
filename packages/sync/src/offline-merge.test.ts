@@ -6,6 +6,7 @@ import * as Y from "yjs";
 import { Awareness } from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import {
+  FileStore,
   documentToYDoc,
   listConflictCopies,
   parseFile,
@@ -17,6 +18,7 @@ import {
 import { handleSyncMessage, isReadOnlyMessageAllowed, releaseAwarenessClients } from "./sync-handler";
 import { MSG_DEVICE, MSG_RECONCILE, sanitizeDeviceLabel, trackNodeAuthors } from "./offline-merge";
 import { createFileSnapshotStore, restoreSnapshot } from "./snapshots";
+import { createSyncTelemetry, type SyncTelemetry } from "./observability";
 import type { SyncRoom, WebSocketData } from "./types";
 
 const MARKDOWN = `---
@@ -273,6 +275,96 @@ describe("offline merge on the server", () => {
     // Restoring twice never overwrites a file.
     expect(() => restoreSnapshot(store, "offline.md", conflictSnapshot.id, dir, "offline.md")).toThrow();
     expect(() => restoreSnapshot(store, "offline.md", "../etc", dir, "offline.md")).toThrow();
+  });
+
+  describe("version history of the file (#261)", () => {
+    function withHistory(telemetry?: SyncTelemetry) {
+      const s = scenario();
+      const files = new FileStore({ baseDir: join(dir, "notes"), backupsEnabled: false });
+      s.room.offline!.history = (filename, versions, at) => files.addBackups(filename, versions, at);
+      const merge = (device: string, ws: Ws, base: Uint8Array | null, doc: Y.Doc) => {
+        handleSyncMessage(s.server, reconcileMessage(device, base, Y.encodeStateAsUpdate(doc)), ws, s.room, telemetry);
+      };
+      const settle = () => s.room.offline!.historyPending ?? Promise.resolve();
+      return { ...s, files, merge, settle };
+    }
+    const titlesOf = (markdown: string) => [...parseFile("offline.md", markdown).nodes.values()].map((node) => node.title);
+
+    test("a merge with a conflict adds two entries: the server's version, then the device's as the newer one", async () => {
+      const { base, files, merge, settle, wsA, wsB, a, b } = withHistory();
+      merge("Gerät A", wsA, base, a);
+      await settle();
+      // The first merge has no conflict: nothing in the history.
+      expect(await files.listBackups("offline.md")).toHaveLength(0);
+      merge("Gerät B", wsB, base, b);
+      await settle();
+
+      const revisions = await files.listBackups("offline.md");
+      expect(revisions).toHaveLength(2);
+      expect(revisions.every((revision) => revision.source === "local")).toBe(true);
+      const [device, server] = await Promise.all(revisions.map((revision) => files.readBackup("offline.md", revision.id)));
+      expect(titlesOf(server!)).toEqual(expect.arrayContaining(["Alpha-A", "Delta"]));
+      expect(titlesOf(server!)).not.toContain("Alpha-B");
+      expect(titlesOf(device!)).toContain("Alpha-B");
+      expect(titlesOf(device!)).not.toContain("Delta");
+    });
+
+    test("an entry can be restored and the replaced version lands in the history", async () => {
+      const { base, files, merge, settle, wsA, wsB, a, b } = withHistory();
+      const { writeFileSync, mkdirSync } = await import("node:fs");
+      mkdirSync(join(dir, "notes"), { recursive: true });
+      writeFileSync(join(dir, "notes", "offline.md"), serializeToMarkdown(yDocToDocument(replica(a))));
+      merge("Gerät A", wsA, base, a);
+      merge("Gerät B", wsB, base, b);
+      await settle();
+      const [device] = await files.listBackups("offline.md");
+      await files.restoreBackup("offline.md", device!.id);
+      expect(titlesOf(readFileSync(join(dir, "notes", "offline.md"), "utf8"))).toContain("Alpha-B");
+      expect(await files.listBackups("offline.md")).toHaveLength(3);
+    });
+
+    test("no base or no change: no entry; repeated delivery: no further entries", async () => {
+      const { server, base, files, merge, settle, room, wsA, wsB, a, b } = withHistory();
+      // No base: the client brings its whole state, nothing was to be compared.
+      merge("Gerät A", wsA, null, a);
+      // No change: a client that only brings what the room already has.
+      merge("Gerät C", mockWs(), base, replica(server));
+      await settle();
+      expect(await files.listBackups("offline.md")).toHaveLength(0);
+
+      merge("Gerät B", wsB, base, b);
+      await settle();
+      const afterConflict = await files.listBackups("offline.md");
+      expect(afterConflict).toHaveLength(2);
+      for (const device of ["Gerät B", "Gerät A", "Gerät B"]) merge(device, device === "Gerät A" ? wsA : wsB, base, device === "Gerät A" ? a : b);
+      await settle();
+      expect(await files.listBackups("offline.md")).toEqual(afterConflict);
+      expect(room.offline!.historyPending).toBeDefined();
+    });
+
+    test("a failing history write does not stop the merge; it is reported as telemetry", async () => {
+      const events: string[] = [];
+      const telemetry = createSyncTelemetry({ write: (line: string) => events.push(line) });
+      const { server, base, room, merge, settle, wsA, wsB, a, b } = withHistory(telemetry);
+      room.offline!.history = async () => {
+        throw new Error("EACCES");
+      };
+      merge("Gerät A", wsA, base, a);
+      merge("Gerät B", wsB, base, b);
+      await settle();
+      expect(yDocToDocument(server).nodes.get("alpha")!.title).toBe("Alpha-B");
+      expect(listConflictCopies(yDocToDocument(server))).toHaveLength(1);
+      expect(events.join("\n")).toContain("offline.history");
+    });
+
+    test("a room without history writer (cloud) merges as before", async () => {
+      const { server, base, room, wsA, wsB, a, b } = scenario();
+      expect(room.offline!.history ?? null).toBeNull();
+      handleSyncMessage(server, reconcileMessage("Gerät A", base, Y.encodeStateAsUpdate(a)), wsA, room);
+      handleSyncMessage(server, reconcileMessage("Gerät B", base, Y.encodeStateAsUpdate(b)), wsB, room);
+      expect(listConflictCopies(yDocToDocument(server))).toHaveLength(1);
+      expect(room.offline!.historyPending).toBeUndefined();
+    });
   });
 
   test("a broken offline message does not break the room; ordinary sync still merges", () => {

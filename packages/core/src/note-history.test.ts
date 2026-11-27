@@ -186,6 +186,60 @@ describe("local note history", () => {
   });
 });
 
+describe("versions added to the history from outside (#261)", () => {
+  test("addBackups lists them like any backup, later one newer, even with automatic backups off", async () => {
+    const store = new FileStore({ baseDir: dir, backupsEnabled: false });
+
+    await store.addBackups("test.md", [note("Server"), note("Gerät")], Date.UTC(2026, 10, 20, 16, 25));
+
+    const history = await store.listBackups("test.md");
+    expect(history).toHaveLength(2);
+    expect(history.map((entry) => entry.replacedAt)).toEqual(["2026-11-20T16:25:00.001Z", "2026-11-20T16:25:00.000Z"]);
+    expect(await store.readBackup("test.md", history[0]!.id)).toContain("Gerät");
+    expect(await store.readBackup("test.md", history[1]!.id)).toContain("Server");
+    // The note itself is untouched.
+    expect(await readFile(join(dir, "test.md"), "utf-8")).toContain("Version 0");
+  });
+
+  test("the limit applies: the oldest entries go, the newest device version stays on top", async () => {
+    const store = new FileStore({ baseDir: dir });
+    const runs = NOTE_HISTORY_LIMIT; // two entries per run, so twice the limit
+    for (let run = 0; run < runs; run += 1) await store.addBackups("test.md", [note(`s${run}`), note(`c${run}`)], 1_000 + run * 10);
+
+    const history = await store.listBackups("test.md");
+    expect(history).toHaveLength(NOTE_HISTORY_LIMIT);
+    expect(await store.readBackup("test.md", history[0]!.id)).toContain(`c${runs - 1}`);
+    expect(await store.readBackup("test.md", history[1]!.id)).toContain(`s${runs - 1}`);
+  });
+
+  test("two merges in the same millisecond keep all four entries", async () => {
+    const store = new FileStore({ baseDir: dir });
+    await store.addBackups("test.md", [note("s1"), note("c1")], 5_000);
+    await store.addBackups("test.md", [note("s2"), note("c2")], 5_000);
+    expect(await store.listBackups("test.md")).toHaveLength(4);
+  });
+
+  test("restoring such an entry replaces the note and keeps the replaced version", async () => {
+    const store = new FileStore({ baseDir: dir });
+    await store.addBackups("test.md", [note("Server"), note("Gerät")]);
+    const [device] = await store.listBackups("test.md");
+
+    await store.restoreBackup("test.md", device!.id);
+
+    expect(await readFile(join(dir, "test.md"), "utf-8")).toContain("Gerät");
+    expect(await store.listBackups("test.md")).toHaveLength(3);
+  });
+
+  test("folders keep their own history", async () => {
+    await mkdir(join(dir, "team"));
+    await writeFile(join(dir, "team", "test.md"), note("x"), "utf-8");
+    const store = new FileStore({ baseDir: dir });
+    await store.addBackups("team/test.md", [note("a"), note("b")]);
+    expect(await store.listBackups("team/test.md")).toHaveLength(2);
+    expect(await store.listBackups("test.md")).toHaveLength(0);
+  });
+});
+
 describe("sortRevisionsNewestFirst", () => {
   test("orders by time, newest first, without changing the input", () => {
     const input = [{ replacedAt: "2026-01-01T00:00:00.000Z" }, { replacedAt: "2026-03-01T00:00:00.000Z" }, { replacedAt: "2026-02-01T00:00:00.000Z" }];

@@ -1,7 +1,7 @@
-import { test, type Page } from "@playwright/test";
+import { test } from "@playwright/test";
 import {
   addChild, conflictCopy, countOf, expectQueued, exportMarkdown, exportedHeadings, expect, fingerprint, finish, labels, node, openDocument,
-  readHistory, readLocalSnapshots, rename, serverTitles, startRun, unique, type Run,
+  openClient, readHistory, readLocalSnapshots, rename, restoreVersion, serverTitles, startRun, unique, waitForEmptyRoom, type Run,
 } from "./offline-helpers";
 import { createStage, gitSha, STAGE_CLIENT_VIEWPORT } from "./offline-t346-stage";
 
@@ -14,23 +14,6 @@ import { createStage, gitSha, STAGE_CLIENT_VIEWPORT } from "./offline-t346-stage
 //
 // With `T346_VIDEO=1` (config `playwright.offline-t346.video.config.ts`) a third, recorded browser context shows the
 // active device and the current step (see `offline-t346-stage.ts`); without it the same steps run without pauses.
-
-/** Restores the n-th entry of the open version-history dialog (newest first); retries while the sync room is still occupied. */
-async function restoreViaUi(page: Page, index: number): Promise<void> {
-  const success = page.getByTestId("note-history-success");
-  const failure = page.getByTestId("note-history-error");
-  await expect
-    .poll(
-      async () => {
-        await page.getByTestId("note-history-restore").nth(index).click();
-        await page.getByTestId("note-history-confirm-restore").click();
-        await expect(success.or(failure)).toBeVisible();
-        return success.isVisible();
-      },
-      { timeout: 60_000, intervals: [1_500, 2_500, 3_500] },
-    )
-    .toBe(true);
-}
 
 test("@t346 offline conflict end to end: conflict, resolution, export, restore, error cases, repetition", async ({ browser }, testInfo) => {
   let run: Run | undefined;
@@ -208,8 +191,10 @@ test("@t346 offline conflict end to end: conflict, resolution, export, restore, 
     await stage.step("8 · Nach der Erholung: Gerät B zeigt Gamma-B und Epsilon, genau einmal", "B");
     await stage.step("8 · Gerät A sieht dieselben Änderungen, ohne Konflikt", "A");
 
-    // 9 — Restore through the version history of the UI. Only A stays connected (the room refuses a restore while another client is in it; the restore is retried until the room has let go of B).
-    await b.close();
+    // 9 — Version history: the dialog of the UI lists the entries (both starting versions among them). Restoring writes the
+    // stored file; a sync room that is still alive would keep and later persist its old state, so both clients are closed,
+    // the room is given time to go away, the version is restored through the app API (the call behind the dialog) and the
+    // file is opened anew. See docs/nachweise/t346.md, finding "Wiederherstellen bei geöffnetem Tab".
     await a.page.getByTestId("toolbar-history").click();
     await expect(a.page.getByTestId("note-history-dialog")).toBeVisible();
     await expect(a.page.getByTestId("note-history-entry").first()).toBeVisible();
@@ -218,28 +203,35 @@ test("@t346 offline conflict end to end: conflict, resolution, export, restore, 
     const deviceIndex = historyBeforeRestore.revisions.findIndex((revision) => revision.id === deviceVersionId);
     expect(deviceIndex, "the starting version of device B is still in the history").toBeGreaterThanOrEqual(0);
     await stage.step("9 · Versionshistorie der Datei: die beiden Ausgangsfassungen (Server, Gerät B) und die Speicherstände danach", "A");
-    await restoreViaUi(a.page, deviceIndex);
-    await stage.step("9 · Fassung von Gerät B (Alpha-B, ohne Delta) wiederhergestellt", "A");
     await a.page.getByTestId("note-history-close").click();
+    await a.close();
+    await b.close();
+    await waitForEmptyRoom(run);
     const restoredState = [run.rootTitle, "Alpha-B", "Beta", "Gamma"].sort();
-    await expect.poll(async () => labels(a.page), { timeout: 30_000 }).toEqual(restoredState);
-    await expect(a.page.locator('[data-node-label^="Konflikt:"]')).toHaveCount(0);
-    expect(unique(await serverTitles(run))).toEqual(restoredState);
+    expect(unique(await restoreVersion(run, run.alphaFile, deviceVersionId))).toEqual(restoredState);
     const historyAfterRestore = await readHistory(run, run.alphaFile);
     // Nothing is overwritten: the replaced state is an entry of its own; the older ones are still there.
     expect(historyAfterRestore.revisions).toHaveLength(historyBeforeRestore.revisions.length + 1);
     expect(historyAfterRestore.revisions.slice(1).map((revision) => revision.id)).toEqual(historyBeforeRestore.revisions.map((revision) => revision.id));
+    await waitForEmptyRoom(run);
+    const reopened = await openClient(browser, run, "A", STAGE_CLIENT_VIEWPORT);
+    stage.attach("A", reopened.page);
+    await openDocument(reopened.page, run, { requireSync: true, titles: ["Alpha-B", "Beta", "Gamma"] });
+    expect(await labels(reopened.page)).toEqual(restoredState);
+    await expect(reopened.page.locator('[data-node-label^="Konflikt:"]')).toHaveCount(0);
     expect(await fingerprint(run, run.compareFile)).toBe(compareBefore);
-    await stage.step("9 · Im Knoten sichtbar: Alpha-B; der ersetzte Stand steht als neuer Eintrag in der Historie", "A");
+    await stage.step("9 · Fassung von Gerät B wiederhergestellt: im Knoten sichtbar ist Alpha-B (ohne Delta); der ersetzte Stand steht als neuer Eintrag in der Historie", "A");
 
     // 10 — Restoring the newest entry (the state that was replaced) brings the last end state back: nothing was lost.
-    await a.page.getByTestId("toolbar-history").click();
-    await expect(a.page.getByTestId("note-history-entry")).toHaveCount(historyAfterRestore.revisions.length);
-    await restoreViaUi(a.page, 0);
-    await a.page.getByTestId("note-history-close").click();
-    await expect.poll(async () => labels(a.page), { timeout: 30_000 }).toEqual(finalState);
-    expect(unique(await serverTitles(run))).toEqual(finalState);
+    await reopened.close();
+    await waitForEmptyRoom(run);
+    expect(unique(await restoreVersion(run, run.alphaFile, historyAfterRestore.revisions[0]!.id))).toEqual(finalState);
     expect((await readHistory(run, run.alphaFile)).revisions).toHaveLength(historyAfterRestore.revisions.length + 1);
+    await waitForEmptyRoom(run);
+    const again = await openClient(browser, run, "A", STAGE_CLIENT_VIEWPORT);
+    stage.attach("A", again.page);
+    await openDocument(again.page, run, { requireSync: true, titles: ["Alpha-A", "Beta", "Gamma-B"] });
+    expect(await labels(again.page)).toEqual(finalState);
     await stage.step("10 · Neuester Eintrag wiederhergestellt: der Endzustand von vorher ist wieder da, nichts ging verloren", "A");
 
     // 11 — The comparison file is unchanged: content and version as before, still no history entry.

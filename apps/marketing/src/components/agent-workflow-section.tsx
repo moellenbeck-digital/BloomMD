@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
+import { BloomAgentScene } from "./bloom-agent-scene";
 
 type Locale = "de" | "en";
 
@@ -61,10 +62,13 @@ export function AgentWorkflowSection({ locale }: { locale: Locale }) {
   return (
     <section id="agenten" aria-labelledby="agent-workflow-title" className="scroll-mt-24 bg-[#FFFDFB] text-[#1A1A1A]">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="max-w-4xl">
-          <p className="text-sm font-semibold text-[#B64A1F]">{copy.label}</p>
-          <h2 id="agent-workflow-title" className="mt-4 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">{copy.title}</h2>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-[#514C46] sm:text-lg">{copy.intro}</p>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_460px] lg:items-center lg:gap-12">
+          <div className="max-w-4xl">
+            <p className="text-sm font-semibold text-[#B64A1F]">{copy.label}</p>
+            <h2 id="agent-workflow-title" className="mt-4 max-w-3xl text-3xl font-semibold leading-tight sm:text-5xl">{copy.title}</h2>
+            <p className="mt-5 max-w-3xl text-base leading-8 text-[#514C46] sm:text-lg">{copy.intro}</p>
+          </div>
+          <BloomAgentScene locale={locale} />
         </div>
 
         <div className="mt-9 grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">

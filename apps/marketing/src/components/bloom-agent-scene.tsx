@@ -29,9 +29,10 @@ const copy = {
 
 /* Avatar layers: the same image, clipped into head, body and hands (geometry of the avatar, in percent).
    md-avatar-400.webp is the same crop as md-avatar-200.webp at twice the resolution, for the larger stage. */
-const AVATAR_SRC = "/agents/md-avatar-400.webp";
+const AVATAR_SRC = "/agents/md-avatar-200.webp";
 const AVATAR_SRCSET = "/agents/md-avatar-200.webp 200w, /agents/md-avatar-400.webp 400w";
-const AVATAR_SIZES = "(min-width: 720px) 240px, 130px";
+/* Phones take the 200 px file (as before); only the wide stage takes the 400 px file. */
+const AVATAR_SIZES = "(min-width: 720px) 240px, 110px";
 const clip = {
   head: "polygon(0% 0%, 100% 0%, 100% 49.04%, 80% 54.02%, 71% 55.75%, 56% 56.7%, 50% 57.28%, 43.5% 57.47%, 37.5% 57.66%, 31% 57.28%, 22.5% 54.79%, 0% 51.72%)",
   body: "polygon(31% 100%, 31% 71.26%, 36% 62.84%, 39.5% 59.39%, 43.5% 56.7%, 47% 55.56%, 50.5% 55.36%, 54% 55.75%, 56.5% 56.7%, 61% 59%, 65.5% 63.22%, 72.5% 72.8%, 72.5% 100%)",
@@ -191,8 +192,10 @@ function WateringCan() {
   );
 }
 
-/* Everything behind the agent: light, ground, stem, branches, nodes and their pollen. */
-function MapBack({ kind, locale }: { kind: "wide" | "tall"; locale: Locale }) {
+/* Everything behind the agent: light, ground, stem, branches, nodes and their pollen.
+   live: motion is allowed. Only then the parts that are invisible in the final image are rendered
+   (sparks, pollen, flow pulses, ripple, bud). The server render stays small, the final image is the same. */
+function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale; live: boolean }) {
   const layout = LAYOUTS[kind];
   const map = MAP[locale];
   const g = geometry(layout, locale);
@@ -278,26 +281,26 @@ function MapBack({ kind, locale }: { kind: "wide" | "tall"; locale: Locale }) {
       <ellipse cx={layout.avatar.x + layout.avatar.w * 0.52} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
       <ellipse cx={g.seed.x} cy={ground + 1} rx={24 * s} ry={4.5 * s} className={styles.soil} />
       <circle cx={g.seed.x} cy={g.seed.y - 3} r={30 * s} fill={`url(#${id("seedglow")})`} className={styles.seedGlow} />
-      <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} />
+      {live ? <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} /> : null}
 
       <path d={stem} pathLength={1} className={`${styles.stemHalo} ${styles.draw}`} />
       <path d={stem} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
       <path d={`M${r1(ax + 1)} ${r1(ay)} c${15 * s} ${-1 * s} ${23 * s} ${-9 * s} ${24 * s} ${-19 * s} c${-11 * s} ${-1 * s} ${-21 * s} ${6 * s} ${-24 * s} ${19 * s} z`} className={`${styles.leaf} ${styles.leafA}`} />
       <path d={`M${r1(bx - 1)} ${r1(by)} c${-13 * s} ${-7 * s} ${-25 * s} ${-6 * s} ${-30 * s} ${1 * s} c${9 * s} ${7 * s} ${22 * s} ${7 * s} ${30 * s} ${-1 * s} z`} className={`${styles.leaf} ${styles.leafB}`} />
-      <ellipse cx={root.cx} cy={rootBottom - 2} rx={9 * s} ry={11 * s} className={styles.bud} />
+      {live ? <ellipse cx={root.cx} cy={rootBottom - 2} rx={9 * s} ry={11 * s} className={styles.bud} /> : null}
 
       {edges.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.halo} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.draw}`} />
-          <path d={d} pathLength={1} className={styles.flow} />
+          {live ? <path d={d} pathLength={1} className={styles.flow} /> : null}
         </g>
       ))}
       {twigs.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.halo} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.draw}`} />
-          <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} />
+          {live ? <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} /> : null}
         </g>
       ))}
 
@@ -333,28 +336,31 @@ function MapBack({ kind, locale }: { kind: "wide" | "tall"; locale: Locale }) {
         </g>
       ))}
 
-      <Sparks x={root.cx} y={g.rootY} delay={2.72} count={10} rise={1.2} scale={spark} />
-      <Sparks x={child.cx[0]} y={g.childTop + 4} delay={3.36} scale={spark} />
-      <Sparks x={child.cx[1]} y={g.childTop + 4} delay={3.54} scale={spark} />
-      <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={3.96} count={6} rise={0.8} scale={spark} />
-      <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={4.1} count={6} rise={0.8} scale={spark} />
-
-      {/* Ambient pollen after the scene: a few motes drift up from the map. */}
-      {layout.motes.map(([x, y], k) => (
-        <circle key={k} cx={x} cy={y} r={(k % 2 ? 1.6 : 2.2) * s} className={styles.mote} style={{ "--k": k } as CSSProperties} />
-      ))}
+      {live ? (
+        <>
+          <Sparks x={root.cx} y={g.rootY} delay={2.72} count={10} rise={1.2} scale={spark} />
+          <Sparks x={child.cx[0]} y={g.childTop + 4} delay={3.36} scale={spark} />
+          <Sparks x={child.cx[1]} y={g.childTop + 4} delay={3.54} scale={spark} />
+          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={3.96} count={6} rise={0.8} scale={spark} />
+          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={4.1} count={6} rise={0.8} scale={spark} />
+          {/* Ambient pollen after the scene: a few motes drift up from the map. */}
+          {layout.motes.map(([x, y], k) => (
+            <circle key={k} cx={x} cy={y} r={(k % 2 ? 1.6 : 2.2) * s} className={styles.mote} style={{ "--k": k } as CSSProperties} />
+          ))}
+        </>
+      ) : null}
     </svg>
   );
 }
 
-/* In front of the agent: water drops, the seed and the cheer sparks. */
-function MapFront({ kind }: { kind: "wide" | "tall" }) {
+/* In front of the agent: water drops, the seed and the cheer sparks. Drops and sparks only with motion. */
+function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
   const layout = LAYOUTS[kind];
   const g = geometry(layout, "de");
   const s = kind === "wide" ? 1.6 : 1.05;
   return (
     <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u } as CSSProperties} aria-hidden="true" focusable="false">
-      {[0, 1, 2, 3, 4, 5].map((index) => (
+      {live && [0, 1, 2, 3, 4, 5].map((index) => (
         <g key={index} transform={`translate(${g.drop.x + (index % 3) * 1.5 * s} ${g.drop.y}) scale(${s})`}>
           <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" className={styles.drop} style={{ "--i": index } as CSSProperties} />
         </g>
@@ -365,7 +371,7 @@ function MapFront({ kind }: { kind: "wide" | "tall" }) {
         </g>
       </g>
       {/* Above the head at the top of the jump. */}
-      <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.12} delay={4.78} count={9} spread={2.2} rise={1.1} scale={layout.spark} />
+      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.12} delay={4.78} count={9} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
     </svg>
   );
 }
@@ -460,10 +466,10 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       </div>
 
       <div className={styles.stage} role="img" aria-label={t.label} data-testid="bloom-agent-stage">
-        <MapBack kind="wide" locale={locale} />
-        <MapBack kind="tall" locale={locale} />
+        <MapBack kind="wide" locale={locale} live={motion} />
+        <MapBack kind="tall" locale={locale} live={motion} />
 
-        <div className={styles.shine} aria-hidden="true" />
+        {motion ? <div className={styles.shine} aria-hidden="true" /> : null}
 
         <div className={styles.avatar} style={avatarVars} aria-hidden="true" data-testid="bloom-agent-avatar">
           <div className={styles.hop}>
@@ -496,16 +502,18 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
               </div>
               <div className={`${styles.part} ${styles.handR}`}>
                 <Layer part="handR" />
-                <div className={styles.canWrap}>
-                  <WateringCan />
-                </div>
+                {motion ? (
+                  <div className={styles.canWrap}>
+                    <WateringCan />
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
         </div>
 
-        <MapFront kind="wide" />
-        <MapFront kind="tall" />
+        <MapFront kind="wide" live={motion} />
+        <MapFront kind="tall" live={motion} />
       </div>
     </div>
   );

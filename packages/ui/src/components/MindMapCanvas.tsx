@@ -4,6 +4,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   Panel,
   useNodesState,
@@ -26,6 +27,7 @@ import {
   ClipboardPaste,
   Focus,
   ListTree,
+  Maximize,
   Network,
   Pencil,
   Presentation,
@@ -204,14 +206,14 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
   const [selectedViewId, setSelectedViewId] = useState("");
   const draggedNodeRef = useRef<string | null>(null);
   const pendingFocusRef = useRef<NodeFocusRequest | null>(null);
-  const { getNode, getViewport, setCenter, setViewport } = useReactFlow();
+  const { getNode, getViewport, getNodesBounds, fitBounds, setCenter, setViewport } = useReactFlow();
   // Node controls cancel the zoom on touch screens (see `CANVAS_ZOOM_VAR`), so the variable follows every viewport change.
   const publishZoom = useCallback((_event: unknown, viewport: Viewport) => {
     window.document.getElementById("mindmap-canvas")?.style.setProperty(CANVAS_ZOOM_VAR, String(viewport.zoom));
   }, []);
   const viewStorageKey = `bloommd:views:${document?.frontmatter.id || document?.filePath || "none"}`;
   const documentViewKey = document ? `${document.frontmatter.id}:${document.filePath}` : null;
-  const initialViewportReady = useInitialCanvasViewport(documentViewKey, canvasMode, isOverview, storeNodes, layoutPending);
+  const initialViewportReady = useInitialCanvasViewport(documentViewKey, canvasMode, isOverview, storeNodes, layoutPending, onlyRenderVisibleElements);
 
   useEffect(() => { setNodes(storeNodes); setEdges(storeEdges); }, [storeNodes, storeEdges, setNodes, setEdges]);
   useEffect(() => {
@@ -415,7 +417,7 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
       <div className="relative min-h-0 flex-1">
       {canvasMode === "outline" ? <OutlineView /> : canvasMode === "presentation" ? <PresentationView /> : (
         <ReactFlow
-            onlyRenderVisibleElements={onlyRenderVisibleElements && initialViewportReady && !exportRenderAll}
+            onlyRenderVisibleElements={onlyRenderVisibleElements && !exportRenderAll}
             nodes={styledNodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -475,7 +477,13 @@ function MindMapCanvasInner({ onRootRename, onAskAgent, agentActivity, onlyRende
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#D8D4CE" gap={24} size={1} />
-            <Controls fitViewOptions={isOverview && typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? { padding: 0.6 } : undefined} showInteractive={!isOverview} position="bottom-right" data-testid="react-flow-controls" />
+            <Controls showFitView={!onlyRenderVisibleElements} fitViewOptions={isOverview && typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches ? { padding: 0.6 } : undefined} showInteractive={!isOverview} position="bottom-right" data-testid="react-flow-controls">
+              {onlyRenderVisibleElements && <ControlButton title={t.canvasFitView} aria-label={t.canvasFitView} onClick={() => {
+                if (storeNodes.length === 0) return;
+                void fitBounds(getNodesBounds(storeNodes), { padding: isOverview && window.matchMedia?.("(pointer: coarse)").matches ? 0.6 : 0.3 })
+                  .catch((error: unknown) => console.error("[BloomMD] Canvas fit failed:", error));
+              }}><Maximize /></ControlButton>}
+            </Controls>
             <MiniMap data-testid="react-flow-minimap" className="hidden sm:block" position="bottom-left" nodeColor={(node) => (node.data as { metadata?: { kind?: string } }).metadata?.kind === "portal" ? "#2684FF" : "#FF6B35"} maskColor="rgba(26,26,26,0.06)" />
             {dropTarget && <Panel position="bottom-center"><div className="rounded-md border border-[#FF6B35] bg-[var(--color-surface-raised)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] shadow-md">{dropPositionLabel}</div></Panel>}
             {statusMessage && (

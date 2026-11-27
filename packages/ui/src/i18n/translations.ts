@@ -266,6 +266,7 @@ export interface Translations {
   layerBrokenLinksHint: string;
   workspaceMapEmpty: string;
   canvasModes: string;
+  canvasFitView: string;
   mindMap: string;
   outline: string;
   presentation: string;
@@ -849,6 +850,7 @@ export const translations: Record<Locale, Translations> = {
     layerBrokenLinksHint: "Links ohne eindeutiges Ziel",
     workspaceMapEmpty: "Dieser Workspace enthält noch keine Markdown-Dateien.",
     canvasModes: "Canvas-Modi",
+    canvasFitView: "Gesamtansicht",
     mindMap: "Mindmap",
     outline: "Gliederung",
     presentation: "Präsentation",
@@ -1426,6 +1428,7 @@ export const translations: Record<Locale, Translations> = {
     layerBrokenLinksHint: "Links without a unique target",
     workspaceMapEmpty: "This workspace does not contain any Markdown files yet.",
     canvasModes: "Canvas modes",
+    canvasFitView: "Fit view",
     mindMap: "Mind map",
     outline: "Outline",
     presentation: "Presentation",

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReactFlow, useStore, type Node, type Viewport } from "@xyflow/react";
 
-/** Fit once after the current document has reached React Flow and every node is measured. */
+/** Fit once after layout, using seeded sizes for offscreen nodes in a virtualized canvas. */
 export function useInitialCanvasViewport(
   documentKey: string | null,
   canvasMode: string,
   overview: boolean,
   nodes: Node[],
   layoutPending: boolean,
+  virtualized = false,
 ): boolean {
-  const { fitView, getViewport, setViewport } = useReactFlow();
+  const { fitView, fitBounds, getNodesBounds, getViewport, setViewport } = useReactFlow();
   // A -> B -> A is a new visit even if B was left before its first fit completed.
   const visit = useMemo(() => ({ documentKey, canvasMode }), [documentKey, canvasMode]);
   const [fittedVisit, setFittedVisit] = useState<typeof visit | null>(null);
@@ -22,10 +23,13 @@ export function useInitialCanvasViewport(
   const ready = paneReady && nodes.length > 0 && renderedNodes.length === nodes.length
     && nodes.every((expected) => {
       const actual = renderedById.get(expected.id);
-      return actual && actual.measured?.width && actual.measured?.height
+      const width = actual?.measured?.width ?? (virtualized ? actual?.initialWidth : undefined);
+      const height = actual?.measured?.height ?? (virtualized ? actual?.initialHeight : undefined);
+      return actual && width && height
         && actual.position.x === expected.position.x && actual.position.y === expected.position.y;
     });
   const fitted = fittedVisit === visit;
+
 
   useEffect(() => {
     if (!overview || !documentKey || canvasMode !== "map") return;
@@ -37,16 +41,20 @@ export function useInitialCanvasViewport(
     let cancelled = false;
     const frame = requestAnimationFrame(() => {
       const saved = overview ? overviewViewports.current.get(documentKey) : undefined;
+      const padding = overview && window.matchMedia?.("(pointer: coarse)").matches ? 0.6 : 0.3;
       const move = saved
         ? setViewport(saved, { duration: 0 })
-        : fitView({ padding: overview && window.matchMedia?.("(pointer: coarse)").matches ? 0.6 : 0.3, duration: 0, nodes: nodes.map(({ id }) => ({ id })) });
+        // fitView queues until React Flow measures nodes; offscreen nodes may never mount.
+        : virtualized
+          ? fitBounds(getNodesBounds(nodes), { padding, duration: 0 })
+          : fitView({ padding, duration: 0, nodes: nodes.map(({ id }) => ({ id })) });
       void move.then((applied) => {
         // Scheduling a frame is not a completed fit: a new layout may cancel it before it runs.
         if (applied && !cancelled) setFittedVisit(visit);
       }).catch((error: unknown) => console.error("[BloomMD] Initial canvas view failed:", error));
     });
     return () => { cancelled = true; cancelAnimationFrame(frame); };
-  }, [canvasMode, documentKey, fitView, fitted, layoutPending, nodes, overview, ready, setViewport, visit]);
+  }, [canvasMode, documentKey, fitBounds, fitView, fitted, getNodesBounds, layoutPending, nodes, overview, ready, setViewport, virtualized, visit]);
 
   return fitted;
 }

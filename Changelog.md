@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Wiki-Ansicht (Ticket 432): Nach `agent decide` zeigt der Artikel auf `/wiki` die internen Kommentare `<!-- bloommd:id=… -->` nicht mehr im Text. Die Datei im Vault behält sie unverändert.
+- Wiki view (ticket 432): After `agent decide`, the article on `/wiki` no longer shows the internal `<!-- bloommd:id=… -->` comments in the text. The file in the vault keeps them unchanged.
+
 
 
 ## [Web-App 0.7.0-develop.6, Marketing 0.7.0-develop.6, Sync 0.7.0-develop.6] - 2026-11-27

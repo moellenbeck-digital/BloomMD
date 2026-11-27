@@ -54,6 +54,16 @@ Vor dem Mischen legt der Server unter `<BLOOMMD_DIR>/.snapshots/<raum>/<id>/` ab
 `restoreSnapshot()` (`packages/sync/src/snapshots.ts`) schreibt beide Fassungen als
 „<Name> (Snapshot <id> Server).md“ / „… Client).md“ neben die Datei und überschreibt nichts.
 
+**Versionshistorie (Datei-Modus):** Bei einem Offline-Merge mit Konflikt schreibt der Server beide Ausgangsfassungen
+zusätzlich in die vorhandene Versionshistorie der Datei (`.bloommd/backups/…`, Endung `.bak`, Grenze
+`NOTE_HISTORY_LIMIT`, gleiche Logik wie beim Überschreiben einer Datei im FileStore). Es entstehen zwei Einträge:
+zuerst der Stand des Servers, danach (neuer) der Stand des wiederverbindenden Geräts. Die Historie ist über
+`GET`/`POST /api/mindmaps/<datei>/history` und die Versionshistorie der Oberfläche erreichbar und wird dort
+wiederhergestellt. Ohne Basis oder ohne Änderung entsteht kein Eintrag; erneute Zustellung erzeugt keine weiteren.
+Scheitert das Schreiben, geht der Merge nicht verloren (Telemetrie-Event `offline.history`). Im Cloud-/DB-Modus
+gilt das nicht (dort eigene Revisionen). Das Wiederherstellen schreibt die Datei; ein noch offener Sync-Raum würde den
+alten Stand behalten, daher vorher alle Clients schließen und warten, bis der Raum leer ist.
+
 ## Testbefehle
 
 ```bash
@@ -71,7 +81,7 @@ PLAYWRIGHT_BASE_URL=<URL des Systems> bunx playwright test -c playwright.testsys
 bunx playwright test -c playwright.testsystem.config.ts --grep @t261 --list   # muss > 0 Tests melden
 ```
 
-Dieselbe Spec läuft in beiden Modi. Unterschiede: Lokal werden die Snapshots des Sync-Servers aus dem
+Dieselbe Spec läuft in beiden Modi und stellt über die Versionshistorie wieder her. Unterschiede: Lokal werden zusätzlich die Snapshots des Sync-Servers aus dem
 Arbeitsordner gelesen. Am Testsystem sind Platte und Snapshots des Sync-Servers nicht erreichbar; dort
 zeigen Inhalt, Vergleichsdatei, Markdown-Export (UI) und Wiederherstellung über die App-API
 (`GET`/`POST /api/mindmaps/<datei>/history`, Versionsverlauf): Der Test stellt nach dem Lauf alle gespeicherten
@@ -91,9 +101,9 @@ des Testers wird dabei nicht angefasst. Ein Neustart des Sync-Servers ist nicht 
 (Platte des Sync-Servers, `SYNC_SNAPSHOT_DIR`).
 
 **Lokal (`test:e2e:offline`):** Der Lauf setzt sich selbst zurück (`apps/app/playwright-offline-setup.ts` löscht den
-Arbeitsordner samt `.snapshots`; die Ausgangsdateien legt der Test per API neu an). Manuell:
+Arbeitsordner samt `.snapshots` und `.bloommd/backups`; die Ausgangsdateien legt der Test per API neu an). Manuell:
 
-1. Testraum und Snapshots löschen: `rm -rf .qa/playwright-offline-workspace` (enthält `.snapshots`).
+1. Testraum, Snapshots und Backups (`.bloommd/backups`, Versionshistorie) löschen: `rm -rf .qa/playwright-offline-workspace` (enthält beides).
 2. Nichts kopieren: Ausgangs- und Vergleichsdatei erzeugt der Test.
 3. Browser-Speicher der Clients leeren (IndexedDB-Warteschlange), sonst werden alte Offline-Änderungen
    erneut zugestellt. Die Testkontexte starten leer; nur bei manueller Prüfung im eigenen Browser nötig.

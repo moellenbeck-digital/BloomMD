@@ -127,7 +127,9 @@ async function openClient(browser: Browser, run: Run, label: "A" | "B"): Promise
   // The sync status is only shown from the 2xl breakpoint (1536px).
   const viewport = { width: 1600, height: 900 };
   let context: BrowserContext;
-  if (label === "A") {
+  // The first client signs the account up; a client that opens later (after a restore) uses the account.
+  const signup = label === "A" && !run.api;
+  if (signup) {
     context = await browser.newContext({ viewport });
   } else {
     // Same account, own browser storage (own offline queue).
@@ -167,7 +169,7 @@ async function openClient(browser: Browser, run: Run, label: "A" | "B"): Promise
     }
   }, `Gerät ${label}`);
 
-  if (label === "A") {
+  if (signup) {
     await page.goto(`/signup?next=%2Fapp%3Flang%3Den&lang=en`);
     await page.getByLabel("Name").fill("Offline Test");
     await page.getByLabel("Email").fill(run.email);
@@ -337,25 +339,52 @@ async function readLocalSnapshots(run: Run): Promise<Snapshot[]> {
   return result;
 }
 
-// --- test system mode: restore through the version history API -------------------------------------
+// --- restore through the version history API ---------------------------------------------------------
+
+interface HistoryResponse { source: "local" | "cloud"; canRestore: boolean; revisions: Array<{ id: string; replacedAt: string }> }
+
+/** The version history of a file as the app reports it (the list the UI shows), newest first. */
+async function readHistory(run: Run, filename: string): Promise<HistoryResponse> {
+  const response = await run.api.request.get(apiUrl(filename, "/history"), { headers: { Origin: run.origin } });
+  expect(response.ok(), `history ${filename}: ${response.status()}`).toBe(true);
+  return (await response.json()) as HistoryResponse;
+}
+
+/** Restores one version of the history through the app API; retries while the room is still occupied. */
+async function restoreVersion(run: Run, filename: string, revisionId: string): Promise<string[]> {
+  await expect
+    .poll(async () => (await run.api.request.post(apiUrl(filename, "/history"), { headers: { Origin: run.origin }, data: { revisionId } })).status(), { timeout: 60_000, intervals: [1_000, 2_000, 3_000] })
+    .toBe(200);
+  return serverTitles(run, filename);
+}
+
+/**
+ * Restoring a note of a folder writes its file. A sync room that is still alive would keep (and later
+ * persist) the old state, so the clients are closed first and the room is given time to go away:
+ * locally the health endpoint of the sync server tells, on a running system its idle time
+ * (`SYNC_DESTROY_DELAY`, 30 s by default) is waited out.
+ */
+async function waitForEmptyRoom(run: Run) {
+  if (!run.local) {
+    await new Promise((done) => setTimeout(done, Number(process.env.PLAYWRIGHT_SYNC_ROOM_IDLE_MS ?? 35_000)));
+    return;
+  }
+  const syncPort = process.env.PLAYWRIGHT_OFFLINE_SYNC_PORT ?? "4612";
+  await expect
+    .poll(async () => ((await (await fetch(`http://localhost:${syncPort}/health`)).json()) as { rooms: number }).rooms, { timeout: 30_000, intervals: [500, 1_000] })
+    .toBe(0);
+}
 
 /**
  * Restores every stored version of the file one after the other (version history API) and returns the
  * node titles each of them yields. Needs the room to be empty, so the clients are closed first.
  */
 async function restoreAllVersions(run: Run, filename: string): Promise<string[][]> {
-  const history = await run.api.request.get(apiUrl(filename, "/history"), { headers: { Origin: run.origin } });
-  expect(history.ok(), `history: ${history.status()}`).toBe(true);
-  const { revisions, canRestore } = (await history.json()) as { revisions: Array<{ id: string }>; canRestore: boolean };
+  const { revisions, canRestore } = await readHistory(run, filename);
   expect(canRestore).toBe(true);
   expect(revisions.length).toBeGreaterThanOrEqual(2);
   const results: string[][] = [];
-  for (const revision of revisions) {
-    await expect
-      .poll(async () => (await run.api.request.post(apiUrl(filename, "/history"), { headers: { Origin: run.origin }, data: { revisionId: revision.id } })).status(), { timeout: 60_000, intervals: [1_000, 2_000, 3_000] })
-      .toBe(200);
-    results.push(await serverTitles(run, filename));
-  }
+  for (const revision of revisions) results.push(await restoreVersion(run, filename, revision.id));
   return results;
 }
 
@@ -458,6 +487,15 @@ test("@t261 two clients edit offline, conflict is visible and resolvable, nothin
       }, { timeout: 20_000 })
       .toBe(true);
 
+    // Both starting versions are in the file's version history (the list the UI shows): the server's
+    // version and the device's, the device's as the newer entry. The comparison file has none.
+    await expect.poll(async () => (await readHistory(run!, run!.alphaFile)).revisions.length, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+    const historyAfterMerge = (await readHistory(run, run.alphaFile)).revisions.map((revision) => revision.id);
+    // Folders: exactly the two starting versions (cloud documents keep their own revisions, not checked here).
+    const folderHistory = (await readHistory(run, run.alphaFile)).source === "local";
+    if (folderHistory) expect(historyAfterMerge).toHaveLength(2);
+    expect((await readHistory(run, run.compareFile)).revisions).toHaveLength(0);
+
     // Local mode: both starting versions are in a snapshot of the sync server taken before the merge.
     if (run.local) {
       await expect.poll(async () => (await readLocalSnapshots(run!)).length, { timeout: 10_000 }).toBe(2);
@@ -482,6 +520,7 @@ test("@t261 two clients edit offline, conflict is visible and resolvable, nothin
     expect(await labels(a.page)).toEqual(before);
     expect(await labels(b.page)).toEqual(before);
     if (run.local) expect((await readLocalSnapshots(run)).length).toBe(2);
+    if (folderHistory) expect((await readHistory(run, run.alphaFile)).revisions.map((revision) => revision.id)).toEqual(historyAfterMerge);
     const afterRetries = await serverTitles(run);
     expect(countOf(afterRetries, (title) => title === "Delta")).toBe(1);
     expect(countOf(afterRetries, (title) => title.startsWith("Konflikt: Alpha-A"))).toBe(1);
@@ -525,21 +564,45 @@ test("@t261 two clients edit offline, conflict is visible and resolvable, nothin
     // The comparison file was never touched.
     expect(await fingerprint(run, run.compareFile)).toBe(compareBefore);
 
-    // Restore: both starting versions can be brought back.
-    if (!run.local) {
-      await a.close();
-      await b.close();
-      const versions = await restoreAllVersions(run, run.alphaFile);
-      // The state the server had before B's edits arrived (A's version, no copy) ...
-      expect(
-        versions.some((titles) => titles.includes("Alpha-A") && titles.includes("Delta") && !titles.includes("Alpha-B") && !titles.some((title) => title.startsWith("Konflikt"))),
-        `server version in ${JSON.stringify(versions)}`,
-      ).toBe(true);
+    // Restore through the version history: both starting versions can be brought back.
+    await a.close();
+    await b.close();
+    const source = (await readHistory(run, run.alphaFile)).source;
+    await waitForEmptyRoom(run);
+    const versions = await restoreAllVersions(run, run.alphaFile);
+    const hasConflictCopy = (titles: string[]) => titles.some((title) => title.startsWith("Konflikt"));
+    // The state the server had before B's edits arrived (A's version, no copy) ...
+    expect(
+      versions.some((titles) => titles.includes("Alpha-A") && titles.includes("Delta") && !titles.includes("Alpha-B") && !hasConflictCopy(titles)),
+      `server version in ${JSON.stringify(versions)}`,
+    ).toBe(true);
+    if (source === "cloud") {
       // ... and the state with B's version in the node and A's version kept as the conflict copy.
       expect(
         versions.some((titles) => titles.includes("Alpha-B") && titles.some((title) => title.startsWith("Konflikt: Alpha-A (Gerät A, "))),
         `client version in ${JSON.stringify(versions)}`,
       ).toBe(true);
+    } else {
+      // ... and the state the reconnecting device (B) brought: its own edit only.
+      const deviceVersion = versions.find((titles) => titles.includes("Alpha-B") && !titles.includes("Alpha-A") && !titles.includes("Delta") && !hasConflictCopy(titles));
+      expect(deviceVersion, `device version in ${JSON.stringify(versions)}`).toBeDefined();
+      // Every restore put the version it replaced into the history: 2 + 2 entries now. The newest one is
+      // the state the last restore replaced, the device's version; restoring it brings that state back.
+      const history = await readHistory(run, run.alphaFile);
+      expect(history.revisions).toHaveLength(4);
+      expect(await restoreVersion(run, run.alphaFile, history.revisions[0]!.id)).toEqual(deviceVersion);
+      expect((await readHistory(run, run.alphaFile)).revisions).toHaveLength(5);
+      // Both clients, opened anew, show exactly that content.
+      await waitForEmptyRoom(run);
+      for (const label of ["A", "B"] as const) {
+        const client = await openClient(browser, run, label);
+        await openDocument(client.page, run, { requireSync: true, titles: ["Alpha-B", "Beta", "Gamma"] });
+        expect(await labels(client.page), `restored content at ${label}`).toEqual(unique(deviceVersion!));
+        await expect(client.page.locator('[data-node-label^="Konflikt:"]')).toHaveCount(0);
+      }
+      // The comparison file still has no history and is unchanged.
+      expect((await readHistory(run, run.compareFile)).revisions).toHaveLength(0);
+      expect(await fingerprint(run, run.compareFile)).toBe(compareBefore);
     }
   } finally {
     await finish(run, testInfo);

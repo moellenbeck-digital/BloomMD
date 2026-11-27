@@ -2,6 +2,11 @@
 
 ## In Entwicklung
 
+## [Web-App 0.7.0-develop.1, Marketing 0.7.0-develop.1, Sync 0.7.0-develop.1] - 2026-11-27
+
+- Offline bearbeiten und Konflikte auflösen (Ticket 261): Der Nachweis für zwei offline arbeitende Clients, Konflikt und Wiederherstellung läuft jetzt gegen das Testsystem. Am Verhalten für Anwender ändert sich nichts.
+- Offline editing and conflict resolution (ticket 261): The proof for two offline clients, conflict and restoration now runs against the test system. No change in user-visible behavior.
+
 ## [Desktop 0.6.0] - 2026-11-24
 
 Technischer Quellstand / technical source: `255c646e` (Ordner-UI, Plattform-Übergänge, Layout-/Fokus-Laufzeittests; #438, #440).

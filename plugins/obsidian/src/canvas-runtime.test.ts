@@ -11,7 +11,7 @@ import { installCanvasDom, resizePane, resetPane, setPane } from "./canvas-test-
  * what a person sees after `Visualize current note`, and that every failure leaves a way back.
  */
 
-const demoPath = new URL("../../../test-vault/Aufnahmen/Obsidian Demo.md", import.meta.url);
+const demoPath = new URL("./fixtures/Obsidian Demo.md", import.meta.url);
 
 function toHeadings(nodes: MarkdownHeadingNode[]): CanvasHeading[] {
   const result: CanvasHeading[] = [];

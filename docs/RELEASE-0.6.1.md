@@ -12,8 +12,22 @@ Local validation (2026-11-27):
 - Obsidian: 386 unit/runtime tests passed; all 59 real-Obsidian clean-vault smoke steps passed with mobile emulation at source 5cc38db5. Screenshots and report: `artifacts/obsidian-ink-smoke/`.
 - Desktop, Mobile, UI and Obsidian typechecks passed. The standalone mirror is checked separately before publication.
 
-Physical iPad/Pencil confirmation is pending and must not be inferred from emulation. The owner received `BloomMD-iPad-Test-0.8.0.zip`, including a neutral vault, instructions, the manual matrix and SHA-256 hashes of the four plugin files. The plugin remains unpublished until the manual result is recorded.
+Physical iPad/Pencil confirmation was supplied by the owner on 2026-11-27: checklist passed on iPad Pro 11-inch with Obsidian 1.15. The owner received `BloomMD-iPad-Test-0.8.0.zip`, including a neutral vault, instructions, the manual matrix and SHA-256 hashes of the four plugin files. The manual result and exact tested package hashes are recorded in `plugins/obsidian/MOBILE-MATRIX.md`.
 
-Native CI, signing, uploads and publication remain in progress. PR #462 and release issue #459 collect final run URLs and artifacts. Public news remains a draft until the described releases are available.
+Native CI and Desktop/iOS signing and uploads passed; see the evidence below. PR #462 and release issue #459 collect final run URLs and artifacts. News publication follows through the separate Marketing workflow and GitOps rollout.
 
 Simplest solution: Desktop and Mobile share the existing search, canvas and load notice; the Obsidian host adapts its existing search and Vault preview flow.
+
+## CI and delivery evidence
+
+- Source PR [#462](https://github.com/moellenbeck-digital/BloomMD/pull/462), merged as `890f18a2aae79d2092caaa1d382868763af62984`; tags `v0.6.1` and `mobile-v1.1.0` point to that commit.
+- [CI](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46011161292): verify and full E2E passed.
+- [Desktop matrix](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46011161315): macOS arm64, Linux ARM64/x86_64 and Pacman passed.
+- [iOS](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46011161415): device Release build and native iPad-simulator self-test passed. The same ad-hoc-signed simulator self-test passed locally in 84 seconds.
+- [Android](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46011161556): build, app/Kotlin tests and native tablet-emulator self-test passed.
+- [Mobile touch](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46011161299): all three viewport profiles passed.
+- The isolated Obsidian mirror passed typecheck, build, QA package contract and all 386 tests. The owner confirmed the physical iPad/Pencil checklist on iPad Pro 11-inch, Obsidian 1.15.
+- [Desktop release workflow](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46014226110) and [iOS upload workflow](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46014227131) passed. Desktop 0.6.1 is public; the production update endpoint returns 0.6.1. iOS 1.1.0 was uploaded to App Store Connect and awaits Apple processing for TestFlight.
+- [Android release workflow](https://github.com/moellenbeck-digital/BloomMD/actions/runs/46014227145): signed AAB, version 1.1.0 / versionCode 228, artifact `android-release-228`. Google Play upload was skipped because `PLAY_SERVICE_ACCOUNT_JSON` is absent; this is not a completed Play rollout.
+
+The release issue #459 records final publication and live-site verification. No physical iPad success or store rollout is inferred from a green build.

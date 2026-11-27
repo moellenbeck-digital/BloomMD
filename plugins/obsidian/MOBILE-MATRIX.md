@@ -66,7 +66,16 @@ behaviour) passed all 58 automated steps again; the manual iPad matrix confirmed
 On 2026-11-27, plugin 0.8.0 (source 5cc38db5) passed all 59 automated clean-vault
 steps in real Obsidian with mobile emulation. This includes title/path search in a folded branch,
 centering the selection, 44 px touch targets, finger pan/drag, drawing tools, Pencil and palm flows.
-The owner is testing the identical packaged build on a physical iPad; the manual result is pending.
-This automated result alone does not authorize a public mobile-enabled 0.8.0 release.
+On 2026-11-27 the owner, Max Möllenbeck, confirmed that the full manual checklist passed on an
+iPad Pro 11-inch with Obsidian 1.15, including search, navigation and Pencil interaction. The tested
+package was `BloomMD-iPad-Test-0.8.0.zip`, built from source 5cc38db5. iPadOS version and Pencil
+model were not reported. Later changes only adjust test fixtures, test timeouts and documentation;
+the four packaged plugin files are unchanged.
 
-Verified plugin version: 0.7.1
+Tested package SHA-256:
+- main.js: ec8af5c15d0271465be14077428d18d3247f3d510d3996d987f257285d3a4d75
+- shared-runtime.js: 45666c8370e68655ecc3cc29e34ba1c8f73d86393f3368361a257285757535a6
+- styles.css: fc7669bff60fd03fc290ca797d831b329e6960df6628d8731b8506ec4aaf7974
+- manifest.json: 116e16f360a3d4cd92540d993e77fd0a3b0823747b21c4f7fe4f023245662983
+
+Verified plugin version: 0.8.0

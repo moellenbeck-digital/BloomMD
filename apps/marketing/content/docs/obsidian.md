@@ -197,3 +197,13 @@ zum nächsten.
 - Eine **Erkennung bereits gezeichneter Tinte** gibt es noch nicht; für Text nutzt du Textfelder mit Scribble.
 - Wählst du beim Umbenennen einer Notiz in Obsidian „Nicht aktualisieren“, zeigt die Zeichnung auf die
   neue Notiz, das `[[…]]` im Knoten bleibt aber alt.
+
+## Knoten wiederfinden (ab 0.8.0)
+
+Die Lupe **Knoten suchen** bleibt auch in schmalen Ansichten erreichbar. Suche nach Titel oder Dateipfad und wähle einen Treffer: Seine übergeordneten Zweige klappen auf und der Knoten erscheint im sichtbaren Bereich. **Ausgewählten Knoten zeigen** zentriert die Auswahl nach dem Verschieben erneut. Noch nicht geladene Dateivorschauen werden nicht durchsucht.
+
+Schlägt eine Dateivorschau fehl, bleibt die Datei in der Übersicht sichtbar. Der kompakte Hinweis lässt sich ausblenden, wieder öffnen und erneut prüfen; die Details erklären die Ursache. In schmalen Ansichten wird die Minimap ausgeblendet, damit sie keine Knotenaktionen verdeckt.
+
+![Obsidian mit mobiler Emulation: Der gesuchte Knoten Projekt ist aufgeklappt, ausgewählt und zentriert](/releases/obsidian-0.8.0-node-search.png)
+
+Aufnahme aus der nativen Obsidian-App mit mobiler Emulation; der zusätzliche echte iPad-Test wurde separat bestätigt.

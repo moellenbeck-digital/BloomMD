@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { stripBloomMdComments } from "@bloommd/core/browser";
 import type { AppLocale } from "../../lib/locale";
 
 function wikiCopy(locale: AppLocale) {
@@ -379,7 +380,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
                   ))}
                 </div>
 
-                <pre className="mt-6 whitespace-pre-wrap font-sans text-[15px] leading-7 text-neutral-700">{selected.content}</pre>
+                <pre className="mt-6 whitespace-pre-wrap font-sans text-[15px] leading-7 text-neutral-700">{stripBloomMdComments(selected.content)}</pre>
 
                 <section className="mt-8 border-t border-neutral-200 pt-5" data-testid="wiki-citations">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">

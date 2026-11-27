@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Learnings-Suche (Ticket 431): Eine Suche mit mehreren Wörtern findet eine Karte, wenn jedes Wort irgendwo in ihr vorkommt (Titel, Abschnitte oder Frontmatter, in beliebiger Reihenfolge). Einzelwort-Suche und Filter bleiben unverändert.
+- Learnings search (ticket 431): A multi-word search finds a card when every word occurs somewhere in it (title, sections or frontmatter, in any order). Single-word search and filters are unchanged.
+
 ## [Web-App 0.7.0-develop.5, Marketing 0.7.0-develop.5, Sync 0.7.0-develop.5] - 2026-11-27
 
 ## [Marketing 0.7.0-develop.4] - 2026-11-27

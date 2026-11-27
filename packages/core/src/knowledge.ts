@@ -499,17 +499,60 @@ function flattenWithTrail(list: MarkdownHeadingNode[], trail: string[] = []): Ar
   return list.flatMap((node) => [{ node, trail }, ...flattenWithTrail(node.children, [...trail, node.title])]);
 }
 
-/** Case-insensitive search over titles and content; returns matching node ids with a snippet. */
+/**
+ * The words of a search query: split at whitespace, lower-cased, without duplicates.
+ * A card matches only if every word occurs somewhere in it (see `knowledgeMatchesQuery`).
+ */
+export function knowledgeSearchTerms(query: string): string[] {
+  return [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+}
+
+/** Frontmatter fields (besides tags) the search looks into, in the order of their hits. */
+const FRONTMATTER_SEARCH_FIELDS = ["scope", "source", "status", "title"] as const;
+
+/**
+ * Whether a card (map) matches a query: every word of the query occurs somewhere in it, in a node
+ * (title or content) or in the frontmatter (tags, scope, source, status, title), in any order and
+ * regardless of case. An empty query matches nothing.
+ */
+export function knowledgeMatchesQuery(markdown: string, query: string): boolean {
+  const terms = knowledgeSearchTerms(query);
+  if (terms.length === 0) return false;
+  const frontmatter = readKnowledgeFrontmatter(markdown);
+  const text = [
+    ...frontmatter.tags,
+    ...FRONTMATTER_SEARCH_FIELDS.flatMap((field) => frontmatter[field] ?? []),
+    ...flattenHeadings(parseHeadingTree(markdown)).map((node) => `${node.title}\n${node.content}`),
+  ]
+    .join("\n")
+    .toLowerCase();
+  return terms.every((term) => text.includes(term));
+}
+
+/**
+ * Case-insensitive search over titles and content; returns the nodes that contain at least one
+ * word of the query, with a snippet. Only cards in which every word occurs somewhere (nodes or
+ * frontmatter) are searched at all. A one-word query behaves like a plain substring search.
+ */
 export function searchKnowledge(markdown: string, query: string, limit = 20): Array<{ nodeId: string; title: string; snippet: string }> {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return [];
+  const terms = knowledgeSearchTerms(query);
+  if (terms.length === 0 || !knowledgeMatchesQuery(markdown, query)) return [];
   const hits: Array<{ nodeId: string; title: string; snippet: string }> = [];
   for (const node of flattenHeadings(parseHeadingTree(markdown))) {
     const haystack = `${node.title}\n${node.content}`;
-    const index = haystack.toLowerCase().indexOf(needle);
+    const lower = haystack.toLowerCase();
+    let index = -1;
+    let length = 0;
+    for (const term of terms) {
+      const at = lower.indexOf(term);
+      if (at >= 0 && (index < 0 || at < index)) {
+        index = at;
+        length = term.length;
+      }
+    }
     if (index < 0) continue;
     const start = Math.max(0, index - 60);
-    hits.push({ nodeId: node.id, title: node.title, snippet: haystack.slice(start, index + needle.length + 60).replace(/\s+/g, " ").trim() });
+    hits.push({ nodeId: node.id, title: node.title, snippet: haystack.slice(start, index + length + 60).replace(/\s+/g, " ").trim() });
     if (hits.length >= limit) break;
   }
   return hits;
@@ -709,15 +752,21 @@ export function readKnowledgeFrontmatter(markdown: string): KnowledgeFrontmatter
   };
 }
 
-/** Where a query matches in the frontmatter (tags, scope, source, status, title), or null. */
-export function searchKnowledgeFrontmatter(frontmatter: KnowledgeFrontmatter, query: string): { field: "tags" | "scope" | "source" | "status" | "title"; snippet: string } | null {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return null;
-  const tag = frontmatter.tags.find((entry) => entry.toLowerCase().includes(needle));
+/**
+ * Where a query matches in the frontmatter (tags, scope, source, status, title), or null: the
+ * first field that contains at least one word of the query. With `markdown` (the whole map) the
+ * map must in addition contain every word of the query somewhere (`knowledgeMatchesQuery`).
+ */
+export function searchKnowledgeFrontmatter(frontmatter: KnowledgeFrontmatter, query: string, markdown?: string): { field: "tags" | "scope" | "source" | "status" | "title"; snippet: string } | null {
+  const terms = knowledgeSearchTerms(query);
+  if (terms.length === 0) return null;
+  if (markdown !== undefined && !knowledgeMatchesQuery(markdown, query)) return null;
+  const has = (value: string) => terms.some((term) => value.toLowerCase().includes(term));
+  const tag = frontmatter.tags.find(has);
   if (tag) return { field: "tags", snippet: `tags: ${tag}` };
-  for (const field of ["scope", "source", "status", "title"] as const) {
+  for (const field of FRONTMATTER_SEARCH_FIELDS) {
     const value = frontmatter[field];
-    if (value?.toLowerCase().includes(needle)) return { field, snippet: `${field}: ${value}`.slice(0, 160) };
+    if (value && has(value)) return { field, snippet: `${field}: ${value}`.slice(0, 160) };
   }
   return null;
 }

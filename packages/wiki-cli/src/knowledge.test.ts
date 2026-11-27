@@ -939,6 +939,60 @@ describe("search with frontmatter, filters and expiry", () => {
     expect(paths((await service.search("läuft heute", { now: new Date("2026-10-28T08:00:00Z") })).hits)).toEqual([]);
   });
 
+  describe("several words", () => {
+    // "CSP", "Login" and "Testsystem" stand in different sections of one card, like in the tester learning.
+    const card = (title: string, status: string, staleAfter: string, extra = "") =>
+      `---\ntitle: "${title}"\nstatus: "${status}"\nscope: "BloomMD, tester"\nstale_after: "${staleAfter}"\ntags: ["tester"]\n---\n\n# ${title}\n\n## Symptom\n\nDer Login schlägt fehl.${extra}\n\n## Ursache\n\nDie CSP blockiert das Formular.\n\n## Gilt für\n\nJedes Testsystem ohne HTTPS.\n`;
+    async function withCsp() {
+      const { root, service } = await learnings();
+      await writeFile(join(root, "Learnings", "Csp-Neu.md"), card("Csp-Neu", "neu", "2027-01-01"), "utf8");
+      await writeFile(join(root, "Learnings", "Csp-Bestätigt.md"), card("Csp-Bestätigt", "bestätigt", "2027-01-01"), "utf8");
+      await writeFile(join(root, "Learnings", "Csp-Abgelaufen.md"), card("Csp-Abgelaufen", "bestätigt", "2026-10-01"), "utf8");
+      await writeFile(join(root, "Learnings", "Csp-Veraltet.md"), card("Csp-Veraltet", "veraltet", "2027-01-01"), "utf8");
+      return service;
+    }
+
+    test("words in different nodes find the card, in any order", async () => {
+      const service = await withCsp();
+      for (const query of ["CSP Login Testsystem", "Testsystem CSP", "login CSP"]) {
+        expect(paths((await service.search(query, { now: NOW })).hits)).toEqual(["Csp-Bestätigt", "Csp-Neu"]);
+      }
+      const hits = (await service.search("CSP Login Testsystem", { now: NOW, area: "Learnings" })).hits.filter((hit) => hit.path === "Learnings/Csp-Neu.md" && hit.kind === "node");
+      // The root heading "Csp-Neu" contains "csp" too; every hit node contains at least one word.
+      expect(hits.map((hit) => hit.title)).toEqual(["Csp-Neu", "Symptom", "Ursache", "Gilt für"]);
+    });
+
+    test("words spread over frontmatter and content find the card", async () => {
+      const service = await withCsp();
+      const { hits } = await service.search("tester CSP neu", { now: NOW });
+      expect(paths(hits)).toEqual(["Csp-Neu"]);
+      expect(hits.some((hit) => hit.kind === "frontmatter" && hit.field === "tags")).toBe(true);
+      expect(hits.some((hit) => hit.kind === "node" && hit.title === "Ursache")).toBe(true);
+    });
+
+    test("one missing word means no hit", async () => {
+      const service = await withCsp();
+      expect((await service.search("CSP Kubernetesxyz", { now: NOW, includeStale: true })).hits).toEqual([]);
+      expect((await service.search("tester Kubernetesxyz", { now: NOW, includeStale: true })).hits).toEqual([]);
+    });
+
+    test("a one-word query finds the same maps as before", async () => {
+      const service = await withCsp();
+      expect(paths((await service.search("CSP", { now: NOW })).hits)).toEqual(["Csp-Bestätigt", "Csp-Neu"]);
+      expect(paths((await service.search("lockfile", { now: NOW })).hits)).toEqual(["Bun-Lockfile", "Ohne-Felder"]);
+      expect((await service.search("festgelegter version", { now: NOW })).hits).toEqual([expect.objectContaining({ path: "Learnings/Bun-Lockfile.md", kind: "node", title: "Regel" })]);
+    });
+
+    test("the filters still apply: status bestätigt, and expired or veraltet maps need includeStale", async () => {
+      const service = await withCsp();
+      expect(paths((await service.search("CSP Login Testsystem", { now: NOW, status: "bestätigt" })).hits)).toEqual(["Csp-Abgelaufen", "Csp-Bestätigt"]);
+      expect(paths((await service.search("CSP Login Testsystem", { now: NOW, status: "neu" })).hits)).toEqual(["Csp-Neu"]);
+      expect(paths((await service.search("CSP Login Testsystem", { now: NOW, includeStale: true })).hits)).toEqual(["Csp-Abgelaufen", "Csp-Bestätigt", "Csp-Neu", "Csp-Veraltet"]);
+      expect(paths((await service.search("CSP Login Testsystem", { now: NOW, status: "bestätigt", tag: "tester", scope: "bloommd" })).hits)).toEqual(["Csp-Abgelaufen", "Csp-Bestätigt"]);
+      expect(paths((await service.search("CSP Kubernetesxyz", { now: NOW, status: "bestätigt" })).hits)).toEqual([]);
+    });
+  });
+
   test("unbestätigt is no retirement: the default search finds it and the hit names the status", async () => {
     const { root, service } = await learnings();
     await writeFile(join(root, "Learnings", "Abgeleitet.md"), '---\ntitle: "Abgeleitet"\nstatus: "unbestätigt"\nscope: "BloomMD, coder"\nstale_after: "2027-01-01"\ntags: ["coder"]\n---\n\n# Abgeleitet\n\n## Ursache\n\nLockfile abgeleitet, Beleg fehlt.\n', "utf8");

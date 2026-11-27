@@ -31,6 +31,8 @@
     "test:e2e:trial-reminders": "playwright test --config playwright.trial-reminders.config.ts",
     "test:e2e:collaboration": "playwright test --config playwright.collaboration.config.ts",
     "test:e2e:offline": "playwright test --config playwright.offline.config.ts",
+    "test:e2e:offline-t346": "playwright test --config playwright.offline-t346.config.ts",
+    "test:e2e:offline-t346:video": "playwright test --config playwright.offline-t346.video.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "typecheck": "tsc --noEmit",

@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+## [Web-App 0.7.0-develop.2, Marketing 0.7.0-develop.2, Sync 0.7.0-develop.2] - 2026-11-27
+
 - Offline-Konflikt (Ticket 261): Nach einem Offline-Merge mit Konflikt stehen beide Ausgangsfassungen (Stand des Servers und Stand des wiederverbindenden Geräts) in der Versionshistorie der Datei und lassen sich dort wiederherstellen.
 - Offline conflict (ticket 261): After an offline merge with a conflict, both starting versions (the server's and the reconnecting device's) appear in the file's version history and can be restored there.
 

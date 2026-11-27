@@ -328,7 +328,7 @@ async function main(): Promise<void> {
     const cdp = await context.newCDPSession(page);
     const consoleErrors: string[] = [];
     page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
+      if (message.type() === "error") { consoleErrors.push(message.text()); console.error(`[Obsidian console] ${message.text()}`); }
     });
     await page.waitForFunction(() => Boolean((window as unknown as { app?: Partial<ObsidianApp> }).app?.workspace?.layoutReady), undefined, { timeout: 30_000 });
 
@@ -339,19 +339,20 @@ async function main(): Promise<void> {
         const obsidian = (window as unknown as { app: ObsidianApp & { vault: { setConfig(key: string, value: unknown): void } } }).app;
         // macOS uses native OS menus by default, which the DOM cannot see; iPad always uses DOM menus.
         obsidian.vault.setConfig("nativeMenus", false);
-        await obsidian.plugins.setEnable(true);
         // Obsidian may still be loading the plugin from community-plugins.json; enabling it again in
         // parallel would register the view twice. Wait for that load before enabling explicitly.
         for (let attempt = 0; attempt < 40 && !obsidian.plugins.plugins.bloommd; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
-        if (!obsidian.plugins.plugins.bloommd) await obsidian.plugins.enablePlugin("bloommd");
+        if (!obsidian.plugins.plugins.bloommd) await obsidian.plugins.setEnable(true);
         return obsidian.plugins.plugins.bloommd?.manifest.version;
       });
       expect(Boolean(version), "BloomMD did not load.");
       await openDemoMap(page!);
       return `BloomMD ${version}, map rendered`;
     });
+
+    if (!results[0]?.ok) throw new Error(`Plugin startup failed: ${consoleErrors.join(" | ")}`);
 
     await step("Inspector full screen", page, async () => {
       await page!.locator(".bloommd-open-inspector").click();
@@ -700,7 +701,7 @@ async function main(): Promise<void> {
     const focusOn = async (title: string) => {
       await nodeByTitle(title).locator(".bloommd-node-label").click();
       // Work at a readable zoom like a user would; at the fitted overview handles and action bars overlap.
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
       await page!.waitForTimeout(400);
     };
 
@@ -793,11 +794,17 @@ async function main(): Promise<void> {
       await page!.keyboard.press("Escape").catch(() => undefined);
       if ((await studyButton().getAttribute("aria-pressed")) === "true") await studyButton().click();
     };
-    /** Selects a node without hit-testing (the study bar may cover it) and centres it like a user would. */
+    /** Find and centre a node through the same search used in a narrow/mobile pane. */
     const showNode = async (title: string) => {
-      await nodeByTitle(title).locator(".bloommd-node-label").dispatchEvent("click");
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
+      const close = page!.getByRole("button", { name: "Close inspector", exact: true });
+      if (await close.isVisible()) await close.click();
+      const toggle = page!.getByRole("button", { name: /^(Find node|Knoten suchen)$/ });
+      const search = page!.getByRole("textbox", { name: /^(Find node|Knoten suchen)$/ });
+      if (!(await search.isVisible()) && await toggle.isVisible()) await toggle.click();
+      await search.fill(title);
+      await page!.locator(".bloommd-search-results button").filter({ hasText: title }).first().click();
       await page!.waitForTimeout(400);
+      expect((await nodeByTitle(title).getAttribute("class"))?.includes("selected"), `${title} was not selected by search.`);
     };
 
     await step("Learning: rate revealed nodes by pen, mouse and keys", page, async () => { try {
@@ -1303,6 +1310,31 @@ async function main(): Promise<void> {
       return "all map toolbar targets ≥ 44 px, no horizontal overflow, no Open app on mobile";
     });
 
+    await step("Mobile: search reveals a collapsed node and shows its source", page, async () => {
+      await openDemoMap(page!);
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
+      await page!.waitForTimeout(250);
+      const root = page!.locator(".react-flow__node").filter({ hasText: "Obsidian Demo" }).first();
+      const collapse = root.getByRole("button", { name: "Collapse branch", exact: true });
+      if (await collapse.count()) await collapse.click();
+      const toggle = page!.getByRole("button", { name: /^(Find node|Knoten suchen)$/ });
+      if (await toggle.isVisible()) await toggle.click();
+      const search = page!.getByRole("textbox", { name: /^(Find node|Knoten suchen)$/ });
+      await search.fill("Projekt");
+      const match = page!.locator(".bloommd-search-results button").filter({ hasText: "Projekt" }).first();
+      expect((await match.textContent())?.includes(DEMO_NOTE), "Search result lacks the note path");
+      await match.click();
+      await page!.locator(".react-flow__node.selected").filter({ hasText: "Projekt" }).waitFor();
+      await page!.getByRole("button", { name: /^(Focus selected node|Ausgewählten Knoten zeigen)$/ }).click();
+      const box = await page!.locator(".react-flow__node.selected").filter({ hasText: "Projekt" }).boundingBox();
+      expect(Boolean(box && box.x >= 0 && box.y >= 0 && box.x < 1180 && box.y < 820), "Search target is outside the viewport");
+      await page!.screenshot({ path: path.join(artifacts, "mobile-node-search.png") });
+      await openDemoMap(page!);
+      await page!.getByRole("button", { name: "Fit view", exact: true }).first().click();
+      await page!.waitForTimeout(400);
+      return "folded node found by title, source path visible, selected node centered";
+    });
+
     await step("Mobile: study bar and rating buttons are touch-sized", page, async () => { try {
       await page!.getByRole("button", { name: "Study mode" }).click();
       await showNode("Quellen");
@@ -1348,6 +1380,7 @@ async function main(): Promise<void> {
     });
 
     await step("Mobile: drag a node by touch, position survives reload", page, async () => {
+      await showNode("Struktur");
       const label = nodeByTitle("Struktur").locator(".bloommd-node-label");
       const before = (await nodeByTitle("Struktur").boundingBox())!;
       const grip = (await label.boundingBox())!;
@@ -1437,6 +1470,7 @@ async function main(): Promise<void> {
     });
 
     await step("Mobile: long press opens the node menu", page, async () => {
+      await showNode("Quellen");
       expect((await page!.locator(".bloommd-node-actions:visible").count()) === 0, "The floating action bar is shown on touch.");
       const label = (await nodeByTitle("Quellen").locator(".bloommd-node-label").boundingBox())!;
       const point = { x: label.x + label.width / 2, y: label.y + label.height / 2, id: 1 };
@@ -1466,6 +1500,7 @@ async function main(): Promise<void> {
     });
 
     await step("Mobile: handwriting with pen, finger pans", page, async () => {
+      await showNode("Obsidian Demo");
       await tap(cdp, page!, ".react-flow__node .bloommd-level-1 .bloommd-node-label");
       const openInspector = page!.locator(".bloommd-open-inspector");
       if (await openInspector.count()) await tap(cdp, page!, ".bloommd-open-inspector");
@@ -1530,14 +1565,8 @@ async function main(): Promise<void> {
       // Writing happens in focus mode on the iPad: the whole screen is paper.
       if (!(await page!.locator(".bloommd-react-shell.is-focus").count())) await tap(cdp, page!, 'button[aria-label="Focus mode"]');
       await page!.waitForTimeout(300);
-      // Earlier steps pan the map; every gesture test starts with its node centred at reading size.
-      await page!.getByRole("button", { name: "Fit view" }).first().click();
-      await page!.waitForTimeout(300);
-      const label = (await nodeByTitle(focus).locator(".bloommd-node-label").boundingBox())!;
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: label.x + label.width / 2, y: label.y + label.height / 2, id: 1 }] });
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await page!.getByRole("button", { name: "Focus selected node" }).click();
-      await page!.waitForTimeout(500);
+      // Earlier steps pan the map; locate the node through search before sending coordinates.
+      await showNode(focus);
       await tap(cdp, page!, 'button[aria-label="Draw on map"]');
       await page!.getByRole("toolbar", { name: "Map drawing tools" }).waitFor();
       await tap(cdp, page!, '.bloommd-map-ink-bar button[aria-label="Pen"]');

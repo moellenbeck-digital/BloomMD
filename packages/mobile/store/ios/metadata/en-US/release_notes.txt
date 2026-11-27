@@ -1,5 +1,6 @@
-The first version of BloomMD for iPad and iPhone:
-- Open a folder from the Files app, such as your Obsidian vault in iCloud Drive, and edit it in place
-- Handwriting with Apple Pencil inside a node, saved as SVG in your vault
-- Mind map, outline and presentation views
-- No overwriting when another device changed the same note
+New in BloomMD 1.1.0:
+- Find nodes by title or file path and bring them into view
+- Center the selected node again
+- Large folder overviews start compact
+- Loading notices with reasons, details and retry
+- Improved folder navigation and focus

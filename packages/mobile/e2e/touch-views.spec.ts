@@ -184,3 +184,23 @@ test("folder preview opens the exact section, saves it and returns; new files us
   await expect(page.locator('[data-workspace-kind="file"]')).toHaveCount(2);
   await expect(page.locator('[data-workspace-kind="file"]').filter({ hasText: "Mobil erstellt" })).toBeVisible();
 });
+
+
+test("node search reveals a collapsed branch and brings the selection back", async ({ page }) => {
+  await openDemoMap(page);
+  const root = page.getByTestId("mindmap-node").first();
+  const collapse = root.getByRole("button", { name: /einklappen|Collapse/i });
+  if (await collapse.count()) await collapse.first().tap();
+  await page.getByRole("button", { name: "Knoten suchen", exact: true }).tap();
+  const dialog = page.getByRole("dialog", { name: "Knoten suchen" });
+  await expectTargetsAndFit(page, "node search");
+  await dialog.getByRole("combobox").fill("Transfer");
+  await dialog.getByRole("option").filter({ hasText: "Transfer" }).tap();
+  await expect(dialog).toBeHidden();
+  const target = page.getByTestId("mindmap-node").filter({ hasText: "Transfer" }).first();
+  await expect(target).toBeInViewport();
+  await expect(page.getByTestId("mobile-node-editor")).toBeHidden();
+  await page.getByRole("button", { name: "Ausgewählten Knoten zeigen" }).tap();
+  await expect(target).toBeInViewport();
+  await page.screenshot({ path: test.info().outputPath("node-search-result.png") });
+});

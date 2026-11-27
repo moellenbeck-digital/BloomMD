@@ -11,7 +11,7 @@ import { installCanvasDom, resizePane, resetPane, setPane } from "./canvas-test-
  * what a person sees after `Visualize current note`, and that every failure leaves a way back.
  */
 
-const demoPath = new URL("../../../test-vault/Aufnahmen/Obsidian Demo.md", import.meta.url);
+const demoPath = new URL("./fixtures/Obsidian Demo.md", import.meta.url);
 
 function toHeadings(nodes: MarkdownHeadingNode[]): CanvasHeading[] {
   const result: CanvasHeading[] = [];
@@ -249,4 +249,29 @@ describe("folder previews stay read-only in the canvas", () => {
     act(() => button("Edit section")!.click());
     expect(observed).toContainEqual(["openOverviewSource", "Team/Plan.md", "source-section"]);
   });
+});
+
+
+test("node search reveals a folded heading by file path without opening the inspector", async () => {
+  const headings: CanvasHeading[] = [
+    { id: "root", parentId: null, level: 1, title: "Root", content: "", children: ["branch"], kind: "heading" },
+    { id: "branch", parentId: "root", level: 2, title: "Branch", content: "", children: ["target"], kind: "heading" },
+    { id: "target", parentId: "branch", level: 3, title: "Target", content: "", children: [], kind: "heading", filePath: "Team/Plan.md" },
+  ];
+  await show(props({ headings, rootId: "root", layout: { positions: {}, collapsed: ["branch"] } }));
+  expect(container.querySelector('[data-id="target"]')).toBeNull();
+  const input = container.querySelector('input[aria-label="Find node"]') as HTMLInputElement;
+  await act(async () => {
+    input.value = "Team/Plan.md";
+    input.dispatchEvent(new window.Event("input", { bubbles: true }));
+    await wait();
+  });
+  const match = container.querySelector(".bloommd-search-results button") as HTMLButtonElement;
+  expect(match.textContent).toContain("Target");
+  await act(async () => { match.click(); await wait(100); });
+  await act(() => wait(100));
+  await act(() => wait(100));
+  expect(container.querySelector('[data-id="target"]')).not.toBeNull();
+  expect(container.querySelector('[data-id="target"]')?.classList.contains("selected")).toBe(true);
+  expect(container.querySelector(".bloommd-inspector")).toBeNull();
 });

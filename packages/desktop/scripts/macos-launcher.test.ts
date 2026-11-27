@@ -3,6 +3,7 @@ import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+// A fresh macOS runner may spend several seconds initializing the compiler toolchain.
 test.skipIf(process.platform !== "darwin")("native guard preserves arguments and exit status in paths with spaces", () => {
   const directory = mkdtempSync(join(tmpdir(), "bloommd launcher "));
   const bin = join(directory, "BloomMD.app/Contents/MacOS");
@@ -20,4 +21,4 @@ test.skipIf(process.platform !== "darwin")("native guard preserves arguments and
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
-});
+}, 30_000);

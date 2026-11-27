@@ -75,6 +75,7 @@ import {
   Redo2,
   Scaling,
   Search,
+  X,
   Scale,
   Sparkles,
   Trash2,
@@ -103,6 +104,7 @@ export interface CanvasHeading {
   kind: "heading" | "file" | "folder";
   filePath?: string;
   sourceHeadingId?: string;
+  previewError?: string;
   previewState?: "unloaded" | "loading" | "loaded" | "error";
   metadata?: MarkdownNodeMetadata;
   /** Changed by the agent since the map was last opened. */
@@ -390,6 +392,7 @@ function sameCanvasNodeSync(left: BloomFlowNode[], right: BloomFlowNode[]): bool
       && heading.filePath === nextHeading.filePath
       && heading.sourceHeadingId === nextHeading.sourceHeadingId
       && heading.previewState === nextHeading.previewState
+      && heading.previewError === nextHeading.previewError
       && heading.agentChanged === nextHeading.agentChanged
       && heading.children.join("\u0000") === nextHeading.children.join("\u0000")
       && metadataValue(heading.metadata) === metadataValue(nextHeading.metadata)
@@ -1833,6 +1836,10 @@ function CanvasInner(props: CanvasProps) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [mode, setMode] = useState<"map" | "outline" | "presentation">(props.layout.mode ?? "map");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [pendingReveal, setPendingReveal] = useState<string | null>(null);
+  const [dismissedPreviewErrors, setDismissedPreviewErrors] = useState("");
   const [collapsed, setCollapsed] = useState(() => new Set(props.layout.collapsed));
   const [showBacklinks, setShowBacklinks] = useState(Boolean(props.layout.backlinks));
   const [saveState, setSaveState] = useState<"saved" | "saving" | "conflict">("saved");
@@ -2369,6 +2376,8 @@ function CanvasInner(props: CanvasProps) {
     setHelpOpen(false);
     setMode(props.layout.mode ?? "map");
     setSearch("");
+    setSearchOpen(false);
+    setPendingReveal(null);
     setDrawOnMap(false);
     setStudy(false);
     setRevealed(new Set());
@@ -2407,13 +2416,37 @@ function CanvasInner(props: CanvasProps) {
   const nextCard = session.find((id) => !revealed.has(id) && id !== selectedId) ?? null;
 
   const focusNode = useCallback((id: string) => {
-    const node = reactFlow.getNode(id);
-    selectNode(id);
-    requestNodeFocus(id);
-    if (mode === "map" && node) {
-      void reactFlow.fitView({ nodes: [node], padding: 1.3, duration: 240, maxZoom: 1.15 });
+    if (!headingsById.has(id)) return;
+    const next = new Set(collapsed);
+    const visited = new Set<string>();
+    let parent = headingsById.get(id)?.parentId;
+    while (parent && !visited.has(parent)) {
+      visited.add(parent); next.delete(parent); parent = headingsById.get(parent)?.parentId;
     }
-  }, [mode, reactFlow, selectNode]);
+    fitPending.current = false;
+    setCollapsed(next);
+    persist({ collapsed: [...next], mode: "map" });
+    setMode("map");
+    selectNode(id);
+    setPendingReveal(id);
+  }, [collapsed, headingsById, persist, selectNode]);
+
+  useEffect(() => {
+    if (!pendingReveal || mode !== "map" || !flowSized || !nodesInitialized) return;
+    const rendered = reactFlow.getNodes();
+    if (rendered.length !== visibleIds.size || rendered.some((node) => !visibleIds.has(node.id))) return;
+    const node = reactFlow.getNode(pendingReveal);
+    if (!node?.measured?.width || !node.measured.height) return;
+    const timer = window.setTimeout(() => {
+      void reactFlow.setCenter(node.position.x + node.measured!.width! / 2, node.position.y + node.measured!.height! / 2,
+        { zoom: Math.max(0.8, reactFlow.getZoom()), duration: 0 }).then(() => requestNodeFocus(pendingReveal))
+        .catch((error: unknown) => console.error("BloomMD: node reveal failed", error));
+      setNodes((current) => current.map((item) => ({ ...item, selected: item.id === pendingReveal })));
+      selectNode(pendingReveal);
+      setPendingReveal(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pendingReveal, mode, flowSized, nodesInitialized, nodes, reactFlow, visibleIds, selectNode, setNodes]);
 
   const openInspector = useCallback((id: string) => {
     const heading = headingsById.get(id);
@@ -2734,9 +2767,12 @@ function CanvasInner(props: CanvasProps) {
   }, [persist, props.headings, reactFlow, setNodes, visibleIds]);
 
   const searchMatches = search.trim()
-    ? props.headings.filter((heading) => heading.title.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 8)
+    ? props.headings.filter((heading) => `${heading.title} ${heading.filePath ?? props.filePath}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 8)
     : [];
 
+  const previewErrors = props.headings.filter((heading) => heading.previewError);
+  const previewErrorKey = JSON.stringify(previewErrors.map(({ id, previewError }) => [id, previewError]));
+  const de = props.locale?.startsWith("de");
   return (
     <div
       ref={shellRef}
@@ -2745,6 +2781,14 @@ function CanvasInner(props: CanvasProps) {
     >
       {(props.overview || props.actions.backToOverview) && <div className="bloommd-overview-bar">
         {props.overview ? <><strong>{props.locale?.startsWith("de") ? "Ordnerübersicht" : "Folder overview"}</strong><span>{props.locale?.startsWith("de") ? "Öffne eine Datei, um Inhalte zu bearbeiten." : "Open a file to edit its contents."}</span></> : <button type="button" onClick={props.actions.backToOverview}><ArrowLeft size={16} />{props.locale?.startsWith("de") ? "Zur Ordnerübersicht" : "Back to folder overview"}</button>}
+      </div>}
+      {previewErrors.length > 0 && <div className="bloommd-preview-errors">
+        {dismissedPreviewErrors === previewErrorKey
+          ? <button type="button" onClick={() => setDismissedPreviewErrors("")}>{de ? "Ladehinweise anzeigen" : "Show loading issues"} ({previewErrors.length})</button>
+          : <><details><summary>{previewErrors.length} {de ? "Inhaltsvorschauen nicht geladen" : "content previews unavailable"}</summary>
+              <p>{de ? "Die Dateiknoten bleiben sichtbar. Prüfe die Datei in Obsidian und lade ihre Vorschau erneut." : "File nodes remain visible. Check the note in Obsidian and retry its preview."}</p>
+              {previewErrors.map((heading) => <p key={heading.id}><strong>{heading.filePath}</strong>: {heading.previewError} <button type="button" onClick={() => void props.actions.loadFolderPreview?.(heading.filePath!)}>{de ? "Erneut prüfen" : "Retry"}</button></p>)}
+            </details><button type="button" aria-label={de ? "Ladehinweise ausblenden" : "Dismiss loading issues"} onClick={() => setDismissedPreviewErrors(previewErrorKey)}><X size={16} /></button></>}
       </div>}
       <div className="bloommd-app-toolbar">
         <div className="bloommd-toolbar-group" aria-label="File navigation">
@@ -2755,24 +2799,28 @@ function CanvasInner(props: CanvasProps) {
               {props.files.map((file) => <option key={file.path} value={file.path}>{file.title}</option>)}
             </select>
           </div>
-          <div className="bloommd-search">
+          <button type="button" className="bloommd-icon-control bloommd-search-toggle" aria-label={de ? "Knoten suchen" : "Find node"} onClick={() => { setSearchOpen(true); window.setTimeout(() => searchRef.current?.focus(), 0); }}><Search size={17} /></button>
+          <div className={`bloommd-search${searchOpen ? " is-open" : ""}`}>
             <Search size={15} />
             <input
+              ref={searchRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && searchMatches[0]) {
                   event.preventDefault();
                   focusNode(searchMatches[0].id);
-                  setSearch("");
+                  setSearch(""); setSearchOpen(false);
                 }
               }}
-              placeholder="Find node"
-              aria-label="Find node"
+              placeholder={de ? "Knoten oder Dateipfad suchen" : "Find node or file path"}
+              aria-label={de ? "Knoten suchen" : "Find node"}
             />
+            {searchOpen && <button type="button" className="bloommd-icon-control" aria-label={de ? "Suche schließen" : "Close search"} onClick={() => { setSearchOpen(false); setSearch(""); }}><X size={16} /></button>}
+            {search.trim() && searchMatches.length === 0 && <div className="bloommd-search-results">{de ? "Keine geladenen Knoten gefunden" : "No loaded nodes found"}</div>}
             {searchMatches.length > 0 && (
               <div className="bloommd-search-results">
-                {searchMatches.map((heading) => <button key={heading.id} type="button" onClick={() => { focusNode(heading.id); setSearch(""); }}>{heading.title}</button>)}
+                {searchMatches.map((heading) => <button key={heading.id} type="button" onClick={() => { focusNode(heading.id); setSearch(""); setSearchOpen(false); }}>{heading.title}<small>{heading.filePath ?? props.filePath}</small></button>)}
               </div>
             )}
           </div>
@@ -2804,7 +2852,7 @@ function CanvasInner(props: CanvasProps) {
         <div className="bloommd-toolbar-group" aria-label="Canvas tools">
           {mode === "map" && <button type="button" className="bloommd-icon-control" title="Auto layout" aria-label="Auto layout" onClick={performAutoLayout}><Sparkles size={17} /></button>}
           {mode === "map" && <button type="button" className="bloommd-icon-control" title="Fit view" aria-label="Fit view" onClick={() => void reactFlow.fitView({ padding: 0.25, duration: 240 })}><LocateFixed size={17} /></button>}
-          {selectedId && <button type="button" className="bloommd-icon-control" title="Focus selected node" aria-label="Focus selected node" onClick={() => focusNode(selectedId)}><Focus size={17} /></button>}
+          {selectedId && <button type="button" className="bloommd-icon-control" title={de ? "Ausgewählten Knoten zeigen" : "Focus selected node"} aria-label={de ? "Ausgewählten Knoten zeigen" : "Focus selected node"} onClick={() => focusNode(selectedId)}><Focus size={17} /></button>}
           {!props.overview && mode === "map" && (
             <button
               type="button"
@@ -2887,6 +2935,7 @@ function CanvasInner(props: CanvasProps) {
               setSelectedIds((current) => current.size === 0 ? current : next);
             }}
             onSelectionChange={({ nodes: selectedNodes }) => {
+              if (pendingReveal) return;
               const ids = new Set(selectedNodes.map((node) => node.id).filter((id) => headingsById.has(id)));
               // React Flow can report the previous document while controlled nodes are replaced.
               // Only an explicit pane click clears selection.
@@ -3012,7 +3061,7 @@ function CanvasInner(props: CanvasProps) {
             </div>
           )}
           {/* In study mode the editor would show covered content, and the study bar needs the room. */}
-          {!inspectorOpen && !study && mode === "map" && selectedHeading && isEditableHeading(selectedHeading) && (
+          {!inspectorOpen && !study && !drawOnMap && mode === "map" && selectedHeading && isEditableHeading(selectedHeading) && (
             <button type="button" className="bloommd-open-inspector" onClick={() => setInspectorOpen(true)} title="Open content editor">
               <PanelRightOpen size={16} />
               Edit content

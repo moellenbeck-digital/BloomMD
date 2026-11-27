@@ -1,6 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import { buildWorkspaceMindMap, headingNodeId, parseFile } from "@bloommd/core/browser";
+import { getNodesBounds } from "@xyflow/react";
 import { layoutMindMap } from "./useMindMapLayout";
+
+test("offscreen nodes contribute their full bounds before DOM measurement", () => {
+  const doc = parseFile("large.md", "# Root\n\n## First\n\n## Last\n");
+  const { nodes } = layoutMindMap(doc);
+  expect(nodes.every((node) => node.measured === undefined)).toBe(true);
+  for (const node of nodes) {
+    const bounds = getNodesBounds([node]);
+    expect(bounds.width).toBeGreaterThan(0);
+    expect(bounds.height).toBeGreaterThan(0);
+    // Intrinsic estimates must not fix the rendered size: visible nodes can still resize.
+    expect(node.width).toBeUndefined();
+    expect(node.height).toBeUndefined();
+  }
+  const bounds = getNodesBounds(nodes);
+  expect(bounds.height).toBeGreaterThan(getNodesBounds([nodes[0]!]).height);
+});
 
 describe("layoutMindMap workspace references", () => {
   test("renders derived workspace references as relation edges", () => {

@@ -42,6 +42,11 @@ export interface Translations {
   commandPlaceholder: string;
   categoryCommands: string;
   categoryNodes: string;
+  searchNodes: string;
+  showSelectedNode: string;
+  searchEverything: string;
+  searchResults: string;
+  searchRefine: string;
   // Node editor
   children: string;
   level: string;
@@ -266,6 +271,7 @@ export interface Translations {
   layerBrokenLinksHint: string;
   workspaceMapEmpty: string;
   canvasModes: string;
+  canvasFitView: string;
   mindMap: string;
   outline: string;
   presentation: string;
@@ -626,7 +632,12 @@ export const translations: Record<Locale, Translations> = {
     commandPalette: "Command Palette",
     commandPlaceholder: "Mindmap, Node oder Aktion suchen...",
     categoryCommands: "Aktionen",
-    categoryNodes: "Nodes",
+    categoryNodes: "Knoten",
+    searchNodes: "Knoten suchen",
+    showSelectedNode: "Ausgewählten Knoten zeigen",
+    searchEverything: "Alles",
+    searchResults: "Treffer",
+    searchRefine: "Die ersten 100 Treffer werden angezeigt. Grenze die Suche mit Titel oder Dateipfad ein.",
     children: "Kinder",
     level: "Level",
     nodeType: "Typ",
@@ -849,6 +860,7 @@ export const translations: Record<Locale, Translations> = {
     layerBrokenLinksHint: "Links ohne eindeutiges Ziel",
     workspaceMapEmpty: "Dieser Workspace enthält noch keine Markdown-Dateien.",
     canvasModes: "Canvas-Modi",
+    canvasFitView: "Gesamtansicht",
     mindMap: "Mindmap",
     outline: "Gliederung",
     presentation: "Präsentation",
@@ -1204,6 +1216,11 @@ export const translations: Record<Locale, Translations> = {
     commandPlaceholder: "Search mindmap, node, or action...",
     categoryCommands: "Actions",
     categoryNodes: "Nodes",
+    searchNodes: "Find nodes",
+    showSelectedNode: "Show selected node",
+    searchEverything: "All",
+    searchResults: "results",
+    searchRefine: "Showing the first 100 results. Narrow your search by title or file path.",
     children: "children",
     level: "Level",
     nodeType: "Type",
@@ -1426,6 +1443,7 @@ export const translations: Record<Locale, Translations> = {
     layerBrokenLinksHint: "Links without a unique target",
     workspaceMapEmpty: "This workspace does not contain any Markdown files yet.",
     canvasModes: "Canvas modes",
+    canvasFitView: "Fit view",
     mindMap: "Mind map",
     outline: "Outline",
     presentation: "Presentation",

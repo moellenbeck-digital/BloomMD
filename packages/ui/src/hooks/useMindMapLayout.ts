@@ -69,6 +69,9 @@ export function layoutMindMap(doc: MindMapDocument, edgeMode: EdgeMode = "hierar
         id: node.id,
         type: "mindmap",
         position: { x: pos.x - pos.width / 2, y: pos.y - pos.height / 2 },
+        // Seed viewport culling before offscreen nodes mount; ResizeObserver refines visible nodes.
+        initialWidth: pos.width,
+        initialHeight: pos.height,
         data: {
           label: node.title,
           level: node.level,

@@ -1,3 +1,5 @@
+import { WorkspaceLoadNotice } from "./WorkspaceLoadNotice";
+import type { WorkspaceLoadIssue } from "../shared/workspace-load-issue";
 import { FileChangeQueue } from "./file-change-queue";
 import { LatestRequest } from "./latest-request";
 import { documentContentKey } from "./document-content";
@@ -213,6 +215,7 @@ export function App() {
   const [feedbackDraft, setFeedbackDraft] = useState<DesktopFeedbackDraft>(readFeedbackDraft);
   const feedbackDraftPersistenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [commandPaletteScope, setCommandPaletteScope] = useState<"all" | "nodes">("all");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyCanRestore, setHistoryCanRestore] = useState(true);
   const drawerListRef = useRef<HTMLDivElement>(null);
@@ -391,7 +394,7 @@ export function App() {
   const [activeRemoteWorkspace, setActiveRemoteWorkspace] = useState<DesktopWorkspaceInfo | null>(null);
   const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [localLoadError, setLocalLoadError] = useState(false);
-  const [unreadablePaths, setUnreadablePaths] = useState<string[]>([]);
+  const [loadIssues, setLoadIssues] = useState<WorkspaceLoadIssue[]>([]);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
 
   const connectionProfileErrorMessage = useCallback((error: string | undefined, fallback: string): string => {
@@ -633,7 +636,7 @@ export function App() {
       const isCurrent = documentRequests.current.begin();
       const data = await openWorkspace();
       if (!isCurrent()) return;
-      setUnreadablePaths(data.unreadablePaths ?? []);
+      setLoadIssues(data.loadIssues ?? (data.unreadablePaths ?? []).map((path) => ({ path, kind: "unknown" as const })));
       setLocalLoadError(false);
       // Only leave the active file room after the workspace overview was loaded successfully.
       // This keeps the current document available if a remote workspace read fails.
@@ -822,7 +825,7 @@ export function App() {
     const result = await listMindmaps();
     if (!isCurrent()) return result.files;
     setFiles(result.files);
-    setUnreadablePaths(result.unreadablePaths ?? []);
+    setLoadIssues(result.loadIssues ?? (result.unreadablePaths ?? []).map((path) => ({ path, kind: "unknown" as const })));
     setLocalLoadError(false);
     return result.files;
   }, []);
@@ -1691,7 +1694,7 @@ export function App() {
     onSave: () => toolbarRef.current?.triggerSave(),
     onReload: reload,
     onToggleFileBrowser: () => setDrawerOpen((o) => !o),
-    onToggleCommandPalette: () => setCommandPaletteOpen((open) => !open),
+    onToggleCommandPalette: () => { setCommandPaletteScope("all"); setCommandPaletteOpen((open) => !open); },
     onToggleHelp: () => setHelpOpen((o) => !o),
     onBackToWorkspace: () => {
       const current = useMindMapStore.getState().document;
@@ -1861,12 +1864,7 @@ export function App() {
   return (
     <PlatformProvider adapter={platform}>
     <div className="h-screen flex flex-col bg-[var(--color-surface)]" data-testid="app-shell">
-      {connectionMode === "local" && (localLoadError || unreadablePaths.length > 0) && (
-        <div role="alert" data-testid="local-workspace-load-error" className="shrink-0 max-h-36 overflow-auto border-b border-orange-500 p-3 text-sm">
-          <p>{localLoadError ? t.filesLoadFailed : t.workspaceEntriesSkipped}</p>
-          {unreadablePaths.length > 0 && <ul>{unreadablePaths.map((path) => <li key={path}>{path}</li>)}</ul>}
-        </div>
-      )}
+      {connectionMode === "local" && <WorkspaceLoadNotice issues={loadIssues} failed={localLoadError} locale={locale} onRetry={async () => { await refreshFileList(); if (!currentFileRef.current) await loadWorkspace("retryWorkspace"); }} />}
       {/* Header */}
       <header className="h-13 border-b border-[var(--color-border)] bg-[var(--color-surface-raised)] flex items-center px-4 shrink-0" data-testid="desktop-header">
         <button
@@ -1953,7 +1951,7 @@ export function App() {
             onReload={reload}
             onToggleHelp={() => setHelpOpen((o) => !o)}
             onOpenAbout={() => setAboutOpen(true)}
-            onToggleCommandPalette={() => setCommandPaletteOpen((open) => !open)}
+            onToggleCommandPalette={() => { setCommandPaletteScope("all"); setCommandPaletteOpen((open) => !open); }}
             onOpenFeedback={openFeedbackDialog}
             feedbackTestId="desktop-open-feedback"
             onCreateFolder={connectionMode === "local" ? () => openCreateEntry("folder", workspaceCreationFolder(document, selectedNodeId)) : undefined}
@@ -2014,6 +2012,7 @@ export function App() {
         onClose={() => setFeedbackOpen(false)}
       />
       <CommandPalette
+        initialScope={commandPaletteScope}
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         onNew={() => toolbarRef.current?.triggerNew()}
@@ -2335,7 +2334,7 @@ export function App() {
           )}
           <div className={showConflictBanner ? "min-h-0 flex-1" : "h-full"}>
           {document ? (
-            <MindMapCanvas onlyRenderVisibleElements onRootRename={handleRootRename} />
+            <MindMapCanvas onlyRenderVisibleElements onRootRename={handleRootRename} onSearchNodes={() => { setCommandPaletteScope("nodes"); setCommandPaletteOpen(true); }} />
           ) : (
             <div className="flex h-full items-center justify-center bg-[var(--color-surface)] px-6" data-testid="empty-workspace">
               <div className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-6 text-center shadow-sm">

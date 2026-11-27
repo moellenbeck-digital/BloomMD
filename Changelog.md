@@ -7,6 +7,17 @@
 - Offline-Konflikt (Ticket 261): Nach einem Offline-Merge mit Konflikt stehen beide Ausgangsfassungen (Stand des Servers und Stand des wiederverbindenden Geräts) in der Versionshistorie der Datei und lassen sich dort wiederherstellen.
 - Offline conflict (ticket 261): After an offline merge with a conflict, both starting versions (the server's and the reconnecting device's) appear in the file's version history and can be restored there.
 
+## [Desktop 0.6.1 / Mobile 1.1.0 / Obsidian 0.8.0] - 2026-11-27
+
+- Große Ordnerübersichten starten kompakt. Die Knotensuche findet Titel und Dateipfade, klappt notwendige Zweige auf und bringt den Treffer ins Bild. Die Auswahl lässt sich jederzeit wieder zentrieren.
+- Desktop und Mobile erklären übersprungene Dateien mit Ursache und gegebenenfalls Zeile/Spalte im YAML-Block. Hinweise lassen sich ausblenden, wieder öffnen und erneut prüfen. Quelldateien werden dabei nicht verändert.
+- Obsidian bietet die Suche auch in schmalen Ansichten. Fehler beim Laden einer Inhaltsvorschau lassen den Dateiknoten sichtbar und bieten Hinweise sowie einen erneuten Versuch. Noch nicht geladene Vorschau-Inhalte werden nicht durchsucht.
+- Die mobile Veröffentlichung erfolgt zunächst über TestFlight und den internen Android-Testkanal, soweit die jeweiligen Signierungs- und Store-Zugänge verfügbar sind. Native Gerätefreigaben werden separat dokumentiert.
+- Large folder overviews start compact. Node search matches titles and file paths, expands the required branches and brings the result into view. The selected node can be centered again at any time.
+- Desktop and Mobile explain skipped files with a reason and, where available, YAML-block line/column. Loading notices can be dismissed, reopened and retried without changing source files.
+- Obsidian keeps search available in narrow panes. Failed previews keep their file node visible with guidance and retry. Preview contents that have not been loaded are not searched.
+- Mobile distribution starts with TestFlight and Android internal testing, subject to signing and store credentials. Native device sign-off is recorded separately.
+
 ## [Web-App 0.7.0-develop.1, Marketing 0.7.0-develop.1, Sync 0.7.0-develop.1] - 2026-11-27
 
 - Offline bearbeiten und Konflikte auflösen (Ticket 261): Der Nachweis für zwei offline arbeitende Clients, Konflikt und Wiederherstellung läuft jetzt gegen das Testsystem. Am Verhalten für Anwender ändert sich nichts.

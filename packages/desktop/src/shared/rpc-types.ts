@@ -1,3 +1,4 @@
+import type { WorkspaceLoadIssue } from "./workspace-load-issue";
 import type { RPCSchema } from "electrobun/bun";
 import type { CustomNoteTemplate, MindMapDocument, MindMapListEntry, MindMapNode, MindMapFrontmatter, NoteRevision, SharedDocumentBinding, SharedFolderBlockReason, SharedFolderConflictStrategy, SharedFolderPlanItem, SharedFolderPlanTotals } from "@bloommd/core";
 
@@ -267,7 +268,7 @@ export type BloomMDRPC = {
     requests: {
       listMindmaps: {
         params: Record<string, never>;
-        response: { files: MindMapListEntry[]; unreadablePaths?: string[] };
+        response: { files: MindMapListEntry[]; unreadablePaths?: string[]; loadIssues?: WorkspaceLoadIssue[] };
       };
       openMindmap: {
         params: { filename: string };
@@ -275,7 +276,7 @@ export type BloomMDRPC = {
       };
       openWorkspace: {
         params: Record<string, never>;
-        response: SerializedDocument & { unreadablePaths?: string[] };
+        response: SerializedDocument & { unreadablePaths?: string[]; loadIssues?: WorkspaceLoadIssue[] };
       };
       saveMindmap: {
         params: { filePath: string; markdown: string; storage?: MindMapDocument["storage"] };

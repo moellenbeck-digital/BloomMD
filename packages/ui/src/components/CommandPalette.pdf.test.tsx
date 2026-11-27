@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "happy-dom";
 import type { Root } from "react-dom/client";
-import { extractPdfCitations, parseFile } from "@bloommd/core/browser";
+import { buildWorkspaceMindMap, extractPdfCitations, parseFile } from "@bloommd/core/browser";
 
 const actEnvironment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
 
@@ -17,6 +17,7 @@ globalThis.HTMLElement = win.HTMLElement as unknown as typeof HTMLElement;
 globalThis.HTMLInputElement = win.HTMLInputElement as unknown as typeof HTMLInputElement;
 globalThis.HTMLTextAreaElement = win.HTMLTextAreaElement as unknown as typeof HTMLTextAreaElement;
 globalThis.KeyboardEvent = win.KeyboardEvent as unknown as typeof KeyboardEvent;
+globalThis.CustomEvent = win.CustomEvent as unknown as typeof CustomEvent;
 globalThis.localStorage = win.localStorage as unknown as Storage;
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0) as unknown as number) as typeof requestAnimationFrame;
 
@@ -87,11 +88,12 @@ describe("command palette: PDF citation and bibliography", () => {
     actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
   });
 
-  async function open() {
+  async function open(initialScope: "all" | "nodes" = "all") {
     await act(async () => {
       root!.render(
         <LocaleProvider initialLocale="de">
           <CommandPalette
+            initialScope={initialScope}
             open
             onClose={() => { closed += 1; }}
             onNew={() => undefined}
@@ -107,6 +109,22 @@ describe("command palette: PDF citation and bibliography", () => {
   }
 
   const query = <T extends HTMLElement>(testId: string) => container.querySelector<T>(`[data-testid='${testId}']`);
+
+  test("node search finds a folded workspace heading and reveals it without opening an editor", async () => {
+    const doc = buildWorkspaceMindMap([{ path: "Team/plan.md", markdown: "# Plan\n## Hidden target\nText" }]);
+    useMindMapStore.getState().setDocument(doc);
+    const target = [...doc.nodes.values()].find((node) => node.title === "Hidden target")!;
+    useMindMapStore.getState().toggleCollapse(target.parentId!);
+    await open("nodes");
+    expect(container.querySelector('[data-testid="command-palette-item-action"]')).toBeNull();
+    await setValue(query<HTMLInputElement>("command-palette-input")!, "Hidden target");
+    expect(container.querySelectorAll('[role="option"]').length).toBe(1);
+    await act(async () => { container.querySelector<HTMLButtonElement>('[role="option"]')!.click(); });
+    expect(closed).toBe(1);
+    expect(useMindMapStore.getState().selectedNodeId).toBe(target.id);
+    expect(useMindMapStore.getState().nodes.some((node) => node.id === target.id)).toBe(true);
+    expect(useMindMapStore.getState().editorVisible).toBe(false);
+  });
   const action = (id: string) => container.querySelector<HTMLButtonElement>(`[data-command-id='${id}']`);
 
   async function setValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {

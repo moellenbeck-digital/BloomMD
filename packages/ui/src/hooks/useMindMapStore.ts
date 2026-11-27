@@ -108,6 +108,7 @@ interface MindMapState {
   retrySync: () => void;
   disconnectSync: () => Promise<void>;
   setSelectedNodeId: (id: string | null) => void;
+  revealNode: (id: string) => void;
   setSelectedNodeIds: (ids: string[]) => void;
   setAutoEditNodeId: (id: string | null) => void;
   /** Request inline rename after React Flow has mounted a newly-created node. */
@@ -726,6 +727,22 @@ export const useMindMapStore = create<MindMapState>((set, get) => ({
       };
       editWhenVisible();
     });
+  },
+  revealNode: (id) => {
+    const { document: doc, collapsedIds, edgeMode } = get();
+    if (!doc?.nodes.has(id)) return;
+    const next = new Set(collapsedIds);
+    const seen = new Set<string>();
+    let parent = doc.nodes.get(id)?.parentId;
+    while (parent && !seen.has(parent)) {
+      seen.add(parent);
+      next.delete(parent);
+      parent = doc.nodes.get(parent)?.parentId;
+    }
+    const layout = computeLayout(doc, next, null, edgeMode);
+    set({ ...layout, collapsedIds: next, focusNodeId: null, canvasMode: "map", editorVisible: false });
+    get().setSelectedNodeId(id);
+    requestNodeFocus(id, true, true);
   },
   setEditorVisible: (visible) => set({ editorVisible: visible }),
   toggleEditor: () => {

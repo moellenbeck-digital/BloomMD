@@ -138,3 +138,10 @@ under [Account](https://bloommd.app/account), open **Connect to server** in the 
 
 Windows is intentionally outside this beta. A separate release follows after installer, OS
 handoff, keyboard, and platform testing.
+
+
+## Find nodes and loading notices — Desktop 0.6.1
+
+Use **Find node** (magnifying glass above the map) to search titles or file paths. Selecting a result expands folded ancestors and centers it. The crosshair brings the selected node back into view. Search covers nodes in the current map or loaded folder overview.
+
+Open **Details** in a loading notice for the cause. For YAML errors, line and column refer to the YAML block, not the entire file. Dismiss with ×, reopen via **Show loading issues**, and use **Retry** after correcting the file in a text editor. Files that failed to load have no node yet.

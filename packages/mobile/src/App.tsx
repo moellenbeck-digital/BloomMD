@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Menu, Network, ArrowLeft, RefreshCw, FilePlus, FileText, ListTree, FileDown, ImageDown, Shapes, Save, Check, Share2, CircleHelp, Upload, Trash2, X, AlertTriangle, Cloud, CloudOff, LogIn, LogOut, FolderOpen, Tablet, CloudDownload, Search, Folder, FolderPlus, ChevronRight, CornerLeftUp } from "lucide-react";
 import {
+  CommandPalette,
+  WorkspaceLoadNotice,
   ConflictCopyBadge,
   ConflictCopyBanner,
   CreateEntryDialog,
@@ -23,7 +25,7 @@ import {
   MapExportError,
   type ExportFormat,
 } from "@bloommd/ui";
-import { findConflictCopyOriginal, importOpml, isWorkspaceMindMap, normalizeFolderPath, OpmlError, parseConflictCopy, parseFile, serializeToMarkdown, titleFromPath } from "@bloommd/core/browser";
+import { type WorkspaceLoadIssue, findConflictCopyOriginal, importOpml, isWorkspaceMindMap, normalizeFolderPath, OpmlError, parseConflictCopy, parseFile, serializeToMarkdown, titleFromPath } from "@bloommd/core/browser";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { BloomFolder } from "@bloommd/capacitor-folder";
 import { BloomKeychain } from "@bloommd/capacitor-keychain";
@@ -174,6 +176,8 @@ export function App() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadIssues, setLoadIssues] = useState<WorkspaceLoadIssue[]>([]);
+  const [nodeSearchOpen, setNodeSearchOpen] = useState(false);
   const [remoteUrl, setRemoteUrl] = useState(DEFAULT_SERVER);
   const [account, setAccount] = useState<MobileSession | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -261,7 +265,7 @@ export function App() {
     setFiles(result.entries);
     setFolders(result.folders);
     setTruncated(Boolean(result.truncated));
-    if (result.unreadable.length > 0) setError(textRef.current.errors.unreadable(result.unreadable.length));
+    setLoadIssues(result.loadIssues ?? result.unreadable.map((path) => ({ path, kind: "unknown" })));
     return result.entries;
   }, [remoteClient]);
 
@@ -286,7 +290,7 @@ export function App() {
       setDocument(result.document);
       if (!(previous?.store === source && previous.folder === folder)) {
         const state = useMindMapStore.getState();
-        state.applyViewState({ collapsedIds: [...result.document.nodes.values()].filter((node) => node.metadata?.kind === "file" && node.children.length > 0).map((node) => node.id), focusNodeId: null, edgeMode: state.edgeMode });
+        state.applyViewState({ collapsedIds: [...new Set([...state.collapsedIds, ...[...result.document.nodes.values()].filter((node) => node.metadata?.kind === "file" && node.children.length > 0).map((node) => node.id)])], focusNodeId: null, edgeMode: state.edgeMode });
       }
       if (previous?.store === source && previous.folder === folder) {
         const state = useMindMapStore.getState();
@@ -295,7 +299,7 @@ export function App() {
       }
       overviewVisit.current = { store: source, folder, selection: useMindMapStore.getState().selectedNodeId, collapsedIds: [...useMindMapStore.getState().collapsedIds] };
       setFiles(result.listing.entries); setFolders(result.listing.folders); setTruncated(Boolean(result.listing.truncated));
-      if (result.unreadable.length) setError(textRef.current.errors.unreadable(result.unreadable.length));
+      setLoadIssues(result.loadIssues);
       setFolderPath(folder); setDrawerOpen(false);
     } catch (error) { console.error("[BloomMD] Folder overview failed:", error); setError(textRef.current.errors.folderFailed); }
     finally { if (revision === navigationRevision.current) setOverviewLoading(false); }
@@ -1050,6 +1054,8 @@ export function App() {
         </>
       )}
 
+      <CommandPalette open={nodeSearchOpen} nodesOnly initialScope="nodes" onClose={() => setNodeSearchOpen(false)} onNew={() => handleNew("file")} onSave={() => void flushSave()} onImport={() => fileInputRef.current?.click()} onExport={() => setExportOpen(true)} onReload={() => void refreshFiles()} />
+      {!remoteClient && <WorkspaceLoadNotice issues={loadIssues} failed={false} locale={locale} onRetry={async () => { if (isOverview) await openOverview(); else await refreshFiles(); }} />}
       {/* Help */}
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
 
@@ -1084,7 +1090,7 @@ export function App() {
           />
         )}
         <div className={showConflictBanner ? "relative min-h-0 flex-1" : "relative h-full"}>
-        {document ? <MindMapCanvas /> : (
+        {document ? <MindMapCanvas onlyRenderVisibleElements onSearchNodes={() => setNodeSearchOpen(true)} /> : (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>
               <h2 className="text-lg font-semibold text-[#1A1A1A]">{text.noMapOpen}</h2>

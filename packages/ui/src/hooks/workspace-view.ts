@@ -1,16 +1,19 @@
 import type { MindMapDocument, MindMapReference } from "@bloommd/core/browser";
 
 export const COMPACT_WORKSPACE_FILE_THRESHOLD = 100;
+export const COMPACT_WORKSPACE_NODE_THRESHOLD = 200;
 
-/** Collapse file headings for the initial overview, without discarding document structure. */
+/** Start large overviews at the top directory level without discarding document structure. */
 export function initialWorkspaceCollapse(doc: MindMapDocument, previous: MindMapDocument | null, current: Set<string>): Set<string> {
   const collapsed = new Set([...current].filter((id) => doc.nodes.has(id)));
   if (doc.derived?.kind !== "workspace") return collapsed;
   const sameWorkspace = previous?.derived?.kind === "workspace" && previous.filePath === doc.filePath;
   if (!sameWorkspace) collapsed.clear();
   const files = [...doc.nodes.values()].filter((node) => node.metadata?.kind === "file");
-  if (files.length >= COMPACT_WORKSPACE_FILE_THRESHOLD) {
-    for (const node of files) {
+  // A handful of long documents can be more expensive than hundreds of short files.
+  if (files.length >= COMPACT_WORKSPACE_FILE_THRESHOLD || doc.nodes.size >= COMPACT_WORKSPACE_NODE_THRESHOLD) {
+    for (const node of doc.nodes.values()) {
+      if (node.id === doc.rootId || (node.metadata?.kind !== "file" && node.metadata?.kind !== "folder")) continue;
       if (node.children.length > 0 && (!sameWorkspace || !previous.nodes.has(node.id))) collapsed.add(node.id);
     }
   }

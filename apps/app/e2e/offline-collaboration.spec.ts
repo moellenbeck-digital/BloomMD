@@ -209,8 +209,11 @@ async function openClient(browser: Browser, run: Run, label: "A" | "B"): Promise
  * Opens the run's file through the file browser unless it is already shown (a reload may reopen it).
  * Without `requireSync` (reload while the sync server is unreachable) it does not wait for "Synced".
  */
-async function openDocument(page: Page, run: Run, options: { requireSync: boolean } = { requireSync: true }) {
-  if (!(await node(page, run.rootTitle).isVisible().catch(() => false))) {
+async function openDocument(page: Page, run: Run, options: { requireSync: boolean; titles?: string[] } = { requireSync: true }) {
+  // After a reload the app restores the open tab itself; opening the file again would replace the restored
+  // (offline) state with the server version. Only open it when the tab does not come back.
+  const restored = await node(page, run.rootTitle).waitFor({ state: "visible", timeout: 10_000 }).then(() => true, () => false);
+  if (!restored) {
     await page.getByTitle(/Open file browser|Datei-Browser/).click();
     await page.getByTestId("file-browser-search").fill(run.rootTitle);
     await page.locator(`[data-testid="file-drawer-open-file"][data-filename="${run.alphaFile}"]`).click();
@@ -218,7 +221,7 @@ async function openDocument(page: Page, run: Run, options: { requireSync: boolea
     if (await page.getByTestId("file-drawer").isVisible().catch(() => false)) await page.keyboard.press("Escape");
   }
   if (!options.requireSync) return;
-  for (const title of ["Alpha", "Beta", "Gamma"]) await expect(node(page, title)).toBeVisible();
+  for (const title of options.titles ?? ["Alpha", "Beta", "Gamma"]) await expect(node(page, title)).toBeVisible();
   const status = page.getByTestId("sync-status");
   await expect(status, `sync status: ${await status.innerText().catch(() => "n/a")}`).toContainText("Synced", { timeout: 30_000 });
 }
@@ -484,7 +487,7 @@ test("@t261 two clients edit offline, conflict is visible and resolvable, nothin
     await a.page.reload();
     await b.page.reload();
     for (const client of [a, b]) {
-      await openDocument(client.page, run);
+      await openDocument(client.page, run, { requireSync: true, titles: ["Alpha-A", "Beta", "Gamma"] });
       await expect(node(client.page, "Alpha-A")).toBeVisible();
       await expect(node(client.page, "Delta")).toBeVisible();
       await expect(client.page.locator('[data-node-label^="Konflikt:"]')).toHaveCount(0);

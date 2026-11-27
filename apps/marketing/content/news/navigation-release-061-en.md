@@ -8,7 +8,7 @@ tags:
   - Desktop
   - Mobile
 version: "0.6.1"
-draft: true
+draft: false
 sourceUrl: "https://github.com/moellenbeck-digital/BloomMD/releases/tag/v0.6.1"
 ---
 

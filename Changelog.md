@@ -2,6 +2,11 @@
 
 ## In Entwicklung
 
+## [Marketing 0.7.0-develop.4] - 2026-11-27
+
+- Öffentliche DE/EN-Navigationshilfe für Desktop, Mobile und Obsidian; News verlinken die veröffentlichte Anleitung statt verborgener Entwürfe (#467).
+- Public DE/EN navigation guide for Desktop, Mobile and Obsidian; news links now lead to published help instead of hidden drafts (#467).
+
 ## [Marketing 0.7.0-develop.3] - 2026-11-27
 
 - DE/EN-News und Hilfe zu Desktop 0.6.1: Knotensuche, große Ordner und verständliche Ladehinweise. Mobile-Testkanäle und der separate Obsidian-Freigabestatus werden ausdrücklich unterschieden.

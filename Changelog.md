@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+## [Web-App 0.7.0-develop.5, Marketing 0.7.0-develop.5, Sync 0.7.0-develop.5] - 2026-11-27
+
 ## [Marketing 0.7.0-develop.4] - 2026-11-27
 
 - Öffentliche DE/EN-Navigationshilfe für Desktop, Mobile und Obsidian; News verlinken die veröffentlichte Anleitung statt verborgener Entwürfe (#467).

@@ -151,6 +151,20 @@ async function openClient(browser: Browser, run: Run, label: "A" | "B"): Promise
     window.localStorage.setItem("bloommd-theme", "light");
     window.localStorage.setItem("bloommd_onboarding_seen", "1");
     window.localStorage.setItem("bloommd-device-label", deviceLabel);
+    // Das Testsystem läuft über HTTP (kein sicherer Kontext): `crypto.randomUUID` fehlt dort, neue Knoten scheitern.
+    // Die Shim gleicht nur diese Umgebung aus; wo die Funktion existiert (lokal, HTTPS), bleibt sie unberührt.
+    if (typeof window.crypto.randomUUID !== "function") {
+      Object.defineProperty(window.crypto, "randomUUID", {
+        configurable: true,
+        value: () => {
+          const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+          bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+          bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+          const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+          return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        },
+      });
+    }
   }, `Gerät ${label}`);
 
   if (label === "A") {

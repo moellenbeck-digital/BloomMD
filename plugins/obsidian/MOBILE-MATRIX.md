@@ -63,4 +63,10 @@ confirmed the manual matrix on a real iPad for 0.7.0.
 On 2026-10-25, plugin 0.7.1 (0.7.0 plus code quality fixes from the Obsidian review, no change in
 behaviour) passed all 58 automated steps again; the manual iPad matrix confirmed for 0.7.0 applies.
 
+On 2026-11-27, plugin 0.8.0 (source 5cc38db5) passed all 59 automated clean-vault
+steps in real Obsidian with mobile emulation. This includes title/path search in a folded branch,
+centering the selection, 44 px touch targets, finger pan/drag, drawing tools, Pencil and palm flows.
+The owner is testing the identical packaged build on a physical iPad; the manual result is pending.
+This automated result alone does not authorize a public mobile-enabled 0.8.0 release.
+
 Verified plugin version: 0.7.1

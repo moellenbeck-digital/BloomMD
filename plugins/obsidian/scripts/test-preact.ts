@@ -23,7 +23,7 @@ for (const entry of ["@bloommd/ui/workspace-nodes", "@bloommd/ink/ink-editor"]) 
     directory = dirname(Bun.resolveSync(entry, import.meta.dir));
   } catch (error) {
     // Generated standalone mirrors intentionally have no workspace dependencies.
-    if (error instanceof Error && "code" in error && error.code === "MODULE_NOT_FOUND") continue;
+    if (error instanceof Error && "code" in error && (error.code === "MODULE_NOT_FOUND" || error.code === "ERR_MODULE_NOT_FOUND")) continue;
     throw error;
   }
   mock.module(Bun.resolveSync("react", directory), () => ({ ...compat, default: compat, act }));

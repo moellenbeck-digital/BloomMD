@@ -19,9 +19,9 @@ export interface LandingPath {
 /* Wide: one fork. All three branches leave the same point; each ends at its own height, so the columns
    step up from the first way to the last. The farther branches stay above the nearer titles. */
 const forkShapes: TriebShape[] = [
-  { from: [-30, 4], at: [44, 148], length: 290, w: [16, 9, 1.5], bend: "v" },
-  { from: [-30, 4], at: [444, 100], length: 270, w: [11, 6, 1] },
-  { from: [-30, 4], at: [844, 52], length: 250, w: [8, 4, 0.6] },
+  { from: [0, 4], at: [44, 148], length: 290, w: [16, 9, 1.5], bend: "v" },
+  { from: [0, 4], at: [444, 100], length: 270, w: [11, 6, 1] },
+  { from: [0, 4], at: [844, 52], length: 250, w: [8, 4, 0.6] },
 ];
 
 /* Three ways in, one origin. Narrow: the shoot runs down the left edge (CSS) and thins with each way. */

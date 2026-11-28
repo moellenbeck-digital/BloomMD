@@ -438,6 +438,7 @@ jobs:
           e2e/release-contracts.spec.ts
           e2e/waitlist-noindex.spec.ts
           e2e/mobile-smoke.spec.ts
+          e2e/bloom-agent-scene.spec.ts
       # Separate run: the default E2E server keeps the beta gate off for local development.
       # This run turns it on and proves the invitation boundary itself.
       - name: Build app production server for closed-beta end-to-end tests

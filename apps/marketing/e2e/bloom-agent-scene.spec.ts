@@ -22,8 +22,10 @@ const locales = [
 ] as const;
 
 type Box = { x: number; y: number; width: number; height: number };
-/* Two stages, one is displayed: "wide" (viewBox 1000 × 440) from 720 px, "tall" (360 × 470) below. */
-const stageRatio = (width: number) => (width >= 720 ? 1000 / 440 : 360 / 470);
+/* Two stages, one is displayed: "wide" (viewBox 1000 × 440) from 720 px and on every landscape viewport,
+   "tall" (360 × 470) on narrower portrait viewports. */
+const isWide = (width: number, height: number) => width >= 720 || width >= height;
+const stageRatio = (width: number, height: number) => (isWide(width, height) ? 1000 / 440 : 360 / 470);
 /* Only the nodes of the displayed stage count. */
 const visibleNodes = (page: Page, selector = "[data-bloom-node]") => page.getByTestId("bloom-agent-scene").locator(selector).filter({ visible: true });
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -45,7 +47,7 @@ for (const locale of locales) {
     const scene = page.getByTestId("bloom-agent-scene");
     await expect(scene.getByRole("img", { name: locale.label })).toBeAttached();
     const stage = await page.getByTestId("bloom-agent-stage").boundingBox();
-    expect(stage && stage.width / stage.height).toBeCloseTo(stageRatio(page.viewportSize()!.width), 1);
+    expect(stage && stage.width / stage.height).toBeCloseTo(stageRatio(page.viewportSize()!.width, page.viewportSize()!.height), 1);
 
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -148,7 +150,7 @@ for (const locale of locales) {
       // The button sits in the tab bar above the stage, so it can never cover the map.
       expect(toggle.y + toggle.height).toBeLessThanOrEqual(stage.y + 0.5);
 
-      expect(stage.width / stage.height).toBeCloseTo(stageRatio(width), 1);
+      expect(stage.width / stage.height).toBeCloseTo(stageRatio(width, 900), 1);
       const nodes = visibleNodes(page);
       expect(await nodes.count()).toBe(5);
       const boxes: Box[] = [];
@@ -216,6 +218,74 @@ for (const [width, height] of [[667, 375], [640, 360], [568, 320]] as const) {
       .poll(() => nodes.evaluateAll((groups) => groups.map((group) => Number(getComputedStyle(group).opacity))), { timeout: 10_000 })
       .toEqual([1, 1, 1, 1, 1]);
     for (const title of locales[0].titles) await expect(nodes.locator("[data-bloom-title]", { hasText: title })).toBeVisible();
+  });
+}
+
+/* Phones held sideways take the wide layout, like the desktop: no portrait stage taller than the screen. */
+for (const [width, height] of [[667, 375], [844, 390]] as const) {
+  test(`at ${width}×${height} (landscape) the wide layout starts, every node is in sight and the pause button is free`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const scene = page.getByTestId("bloom-agent-scene");
+    await expect(scene.locator('svg[data-bloom-stage="wide"]')).toBeVisible();
+    await expect(scene.locator('svg[data-bloom-stage="tall"]')).toBeHidden();
+    await scene.evaluate((node) => node.scrollIntoView({ block: "center" }));
+    await expect(scene).toHaveAttribute("data-state", "play");
+    await finishScene(page);
+
+    const sceneBox = (await scene.boundingBox())!;
+    const stage = (await page.getByTestId("bloom-agent-stage").boundingBox())!;
+    expect(stage.width / stage.height).toBeCloseTo(1000 / 440, 1);
+    // The whole card fits into the viewport and the page does not scroll sideways.
+    expect(sceneBox.height).toBeLessThanOrEqual(height);
+    expect(sceneBox.x).toBeGreaterThanOrEqual(0);
+    expect(sceneBox.x + sceneBox.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+
+    const toggle = (await page.getByTestId("bloom-agent-scene-toggle").boundingBox())!;
+    const nodes = visibleNodes(page);
+    await expect(nodes).toHaveCount(5);
+    for (const title of locales[0].titles) await expect(nodes.locator("[data-bloom-title]", { hasText: title })).toBeVisible();
+    for (let index = 0; index < 5; index += 1) {
+      const box = (await nodes.nth(index).locator("rect").first().boundingBox())!;
+      expect(overlaps(box, toggle), `node ${index} overlaps the pause button`).toBe(false);
+      expect(box.x).toBeGreaterThanOrEqual(stage.x);
+      expect(box.y).toBeGreaterThanOrEqual(stage.y);
+      expect(box.x + box.width).toBeLessThanOrEqual(stage.x + stage.width);
+      expect(box.y + box.height).toBeLessThanOrEqual(stage.y + stage.height);
+    }
+  });
+}
+
+/* The watering can stays clear of the head (the box around its silhouette turns with the head) at every
+   moment of the scene in which the can is shown. Samples every 20 ms through the whole watering act. */
+for (const [width, height] of [[1440, 900], [768, 900], [390, 844], [667, 375]] as const) {
+  test(`at ${width}×${height} the watering can never touches the face of the agent`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const scene = page.getByTestId("bloom-agent-scene");
+    await scene.evaluate((node) => node.scrollIntoView({ block: "center" }));
+    await expect(scene).toHaveAttribute("data-state", "play");
+    const result = await scene.evaluate((node) => {
+      const touches: number[] = [];
+      let shown = 0;
+      for (let ms = 0; ms <= 3000; ms += 20) {
+        for (const animation of node.getAnimations({ subtree: true })) {
+          animation.pause();
+          animation.currentTime = ms;
+        }
+        const can = node.querySelector("[data-bloom-can]")!;
+        if (Number(getComputedStyle(can).opacity) < 0.01) continue;
+        shown += 1;
+        const a = can.querySelector("svg")!.getBoundingClientRect();
+        const b = node.querySelector("[data-bloom-head]")!.getBoundingClientRect();
+        if (a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom) touches.push(ms);
+      }
+      return { shown, touches };
+    });
+    // The can is shown for about 1.4 s, so the samples really cover the watering.
+    expect(result.shown).toBeGreaterThan(50);
+    expect(result.touches).toEqual([]);
   });
 }
 

@@ -32,8 +32,9 @@ const copy = {
    md-avatar-400.webp is the same crop as md-avatar-200.webp at twice the resolution, for the larger stage. */
 const AVATAR_SRC = "/agents/md-avatar-200.webp";
 const AVATAR_SRCSET = "/agents/md-avatar-200.webp 200w, /agents/md-avatar-400.webp 400w";
-/* Phones take the 200 px file (as before); only the wide stage takes the 400 px file. */
-const AVATAR_SIZES = "(min-width: 720px) 240px, 110px";
+/* Phones in portrait take the 200 px file (as before); only the wide stage takes the 400 px file.
+   The wide stage shows from 720 px and on every landscape viewport (same query as the CSS module). */
+const AVATAR_SIZES = "(min-width: 720px) 240px, (min-aspect-ratio: 1/1) 240px, 110px";
 const clip = {
   head: "polygon(0% 0%, 100% 0%, 100% 49.04%, 80% 54.02%, 71% 55.75%, 56% 56.7%, 50% 57.28%, 43.5% 57.47%, 37.5% 57.66%, 31% 57.28%, 22.5% 54.79%, 0% 51.72%)",
   body: "polygon(31% 100%, 31% 71.26%, 36% 62.84%, 39.5% 59.39%, 43.5% 56.7%, 47% 55.56%, 50.5% 55.36%, 54% 55.75%, 56.5% 56.7%, 61% 59%, 65.5% 63.22%, 72.5% 72.8%, 72.5% 100%)",
@@ -57,8 +58,8 @@ const MAP = {
   en: { file: "strategy.md", root: "Product Strategy", children: ["Goals", "Initiatives"], leaves: ["Retention", "Launch risk"] },
 } as const;
 
-/* Two stages with the same story. "wide" from 720 px: a broad stage, the map spreads to the right of the
-   agent. "tall" below 720 px: a portrait stage, the root at the top and the stem grows the full height.
+/* Two stages with the same story. "wide" from 720 px and on every landscape viewport: a broad stage, the
+   map spreads to the right of the agent. "tall" on narrower portrait viewports: a portrait stage, the root at the top and the stem grows the full height.
    Only one of them is displayed (CSS media query), so there is no layout shift and no JS decision.
    The avatar box is in viewBox units; seed, can drops and the toss follow from it.
    Keep .stage aspect ratios and the avatar vars in the CSS module in sync with W and H. */
@@ -119,7 +120,7 @@ const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--
 
 /* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
 const AV_RATIO = 261 / 200;
-const SPOUT = { x: 1.32, y: 0.715 };
+const SPOUT = { x: 1.285, y: 0.86 };
 const SEED_AT = 1.29;
 /* Old card scale: the CSS keyframes of the seed toss are written for an avatar 118.8 units wide. */
 const BASE_AVATAR_W = 118.8;
@@ -531,6 +532,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
               <div className={`${styles.part} ${styles.headAct}`}>
                 <div className={`${styles.part} ${styles.headIdle}`}>
                   <Layer part="head" near={near} />
+                  <span className={styles.headBox} data-bloom-head />
                   <span className={styles.screen} style={{ left: "39.5%", top: "29.5%", width: "13%", height: "14.6%" }} />
                   <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
                   <span className={styles.screen} style={{ left: "52.5%", top: "43.6%", width: "13%", height: "5%" }} />
@@ -554,7 +556,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
               <div className={`${styles.part} ${styles.handR}`}>
                 <Layer part="handR" near={near} />
                 {live ? (
-                  <div className={styles.canWrap}>
+                  <div className={styles.canWrap} data-bloom-can>
                     <WateringCan />
                   </div>
                 ) : null}

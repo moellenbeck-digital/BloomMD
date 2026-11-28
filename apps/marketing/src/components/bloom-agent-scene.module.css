@@ -38,6 +38,11 @@
 @media (min-width: 720px) {
   .scene { max-width: none; border-radius: 32px; }
 }
+/* Landscape phones (844 × 390): the wide card is as tall as the screen allows. Its width follows from the
+   viewport height (tab bar plus a margin of 80 px, stage 1000 × 440), so the whole card stays in sight. */
+@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
+  .scene { max-width: min(100%, calc((100svh - 80px) * 1000 / 440)); }
+}
 
 /* ── Tab bar: file name and the pause button, outside the map ── */
 .bar {
@@ -90,7 +95,9 @@
   overflow: visible;
 }
 .wide { display: none; }
-@media (min-width: 720px) {
+/* Wide layout from 720 px and on every landscape viewport (phones held sideways, 667 × 375): a portrait
+   stage would be taller than the screen there. Keep this query in sync with WIDE_QUERY in the component. */
+@media (min-width: 720px), (min-aspect-ratio: 1/1) {
   /* Wide layout: viewBox 1000 × 440 (LAYOUTS.wide in the component). */
   .stage { aspect-ratio: 1000 / 440; }
   .stage::before { background-size: 26px 26px; }
@@ -196,7 +203,7 @@
   width: var(--tall-width);
   aspect-ratio: 200 / 261;
 }
-@media (min-width: 720px) {
+@media (min-width: 720px), (min-aspect-ratio: 1/1) {
   .avatar { left: var(--wide-left); top: var(--wide-top); width: var(--wide-width); }
 }
 .avatar::before {
@@ -224,12 +231,14 @@
 .handR { transform-origin: 82.75% 72%; }
 .handL { transform-origin: 20.5% 76%; }
 
-/* The can is large and light-rimmed, so it reads clearly against the dark card. */
+/* The can is large and light-rimmed, so it reads clearly against the dark card. It hangs from the right
+   hand below the chin line of the head (57 % of the avatar) and reaches out to the right, so neither the
+   tilt of the hand nor the nod of the head can bring it to the face. */
 .canWrap {
   position: absolute;
-  left: 65%;
-  top: 50%;
-  width: 56%;
+  left: 80%;
+  top: 67%;
+  width: 50%;
   aspect-ratio: 42 / 28;
   opacity: 0;
   transform-origin: 10% 55%;
@@ -263,6 +272,9 @@
   filter: drop-shadow(0 0 2px var(--led-glow));
 }
 .mouth { border-radius: 999px; background: var(--led); box-shadow: 0 0 2px var(--led-glow); }
+/* Invisible box around the head silhouette (avatar geometry, without the antenna). It turns with the head,
+   so the e2e test can check that the can never touches it. */
+.headBox { position: absolute; left: 3%; top: 11%; width: 92%; height: 45%; pointer-events: none; }
 
 /* ── Pause/play ── */
 .toggle {
@@ -523,7 +535,8 @@
   0% { transform: rotate(0deg); animation-timing-function: var(--in-out); }
   5% { transform: rotate(6deg); animation-timing-function: var(--in-out); }
   10% { transform: rotate(-3deg); animation-timing-function: var(--in-out); }
-  15%, 32% { transform: rotate(8deg); animation-timing-function: var(--in-out); }
+  /* While watering the head nods only a little towards the seed, so it stays clear of the can. */
+  15%, 32% { transform: rotate(4deg); animation-timing-function: var(--in-out); }
   38% { transform: rotate(-4deg); animation-timing-function: var(--in-out); }
   47% { transform: rotate(-6deg); animation-timing-function: var(--in-out); }
   57% { transform: rotate(5deg); animation-timing-function: var(--in-out); }

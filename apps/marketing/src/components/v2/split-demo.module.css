@@ -1,0 +1,77 @@
+.section { padding-block: 2.5rem 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); }
+
+.title {
+  margin-top: 0.25rem;
+  font-family: var(--bmd-display);
+  font-weight: 500;
+  font-size: clamp(2.25rem, 1.6rem + 1.6vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.016em;
+  text-wrap: balance;
+}
+
+.lede { max-width: 40rem; margin-top: 0.75rem; }
+
+.board { display: grid; gap: 2rem; margin-top: 2.5rem; align-items: start; }
+
+/* The source file: a typeset column like in the hero. */
+.file { min-width: 0; font-family: var(--bmd-mono); font-size: 0.8125rem; line-height: 1.7; color: var(--bmd-ink-3); }
+.filename { display: flex; align-items: baseline; gap: 0.75rem; font-weight: 700; color: var(--bmd-ink); }
+.filename span { font-family: var(--bmd-display); font-style: italic; font-weight: 400; font-size: 1rem; color: var(--bmd-ink-3); }
+.file pre { margin-top: 0.5rem; font: inherit; white-space: pre-wrap; overflow-wrap: break-word; }
+.file [data-heading] { color: var(--bmd-ink); }
+
+.recording { min-width: 0; }
+.video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--bmd-radius); background: var(--bmd-deep); }
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--bmd-ink);
+  cursor: pointer;
+  transition: color 150ms ease, transform 100ms ease-out;
+}
+.control:active { transform: scale(0.96); }
+
+/* Three proofs resting on one shoot. Narrow: the shoot runs down the left edge. */
+.proof { position: relative; display: grid; gap: 1rem; margin-top: 2rem; padding-left: 2.25rem; list-style: none; }
+.proof::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 12px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%); transform-origin: top; }
+.proof li { position: relative; font-family: var(--bmd-display); font-weight: 500; font-size: 1.375rem; line-height: 1.2; color: var(--bmd-ink); }
+.proof li::before { content: ""; position: absolute; right: calc(100% + 0.5rem); top: calc(0.6em - 2px); width: 1.375rem; height: 4px; background: var(--bmd-bark-hi); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); }
+
+@media (min-width: 640px) {
+  .proof { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; padding: 0 0 1.75rem; }
+  .proof::before { top: auto; bottom: 0; width: 100%; height: 14px; clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); transform-origin: left; }
+  .proof li::before { right: auto; left: 0; top: calc(100% + 0.25rem); width: 4px; height: 1.25rem; clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); }
+}
+
+@media (min-width: 1180px) {
+  /* The title stays inside a 900 px high first screen, below the hero. */
+  .section { padding-block: 0.75rem 4.5rem; }
+  .title { white-space: nowrap; }
+  .board { grid-template-columns: 22rem minmax(0, 1fr); gap: 3rem; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .control:hover { color: var(--bmd-bloom-hi); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .proof:global([data-grow="ready"])::before { transform: scale(0); }
+  .proof:global([data-grow="ready"]) li { opacity: 0; }
+  .proof:global([data-grow="play"])::before { animation: shoot 560ms var(--bmd-grow) both; }
+  .proof:global([data-grow="play"]) li { animation: arrive 320ms var(--bmd-grow) 300ms both; }
+  .proof:global([data-grow="play"]) li:nth-child(2) { animation-delay: 370ms; }
+  .proof:global([data-grow="play"]) li:nth-child(3) { animation-delay: 440ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control:active { transform: none; }
+}
+
+@keyframes shoot { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes arrive { from { opacity: 0; translate: -8px 0; } to { opacity: 1; translate: 0 0; } }

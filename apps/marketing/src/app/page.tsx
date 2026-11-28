@@ -11,6 +11,7 @@ import { bmdFonts } from "../components/v2/fonts";
 import headerStyles from "../components/v2/header.module.css";
 import { HeroIntro } from "../components/v2/hero-intro";
 import { HeroTrieb } from "../components/v2/hero-trieb";
+import { SplitDemo } from "../components/v2/split-demo";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
@@ -19,7 +20,6 @@ import { trackPlausibleEvent } from "../lib/plausible";
 import {
   ArrowRight,
   Bot,
-  Check,
   ChevronDown,
   CloudOff,
   Code2,
@@ -496,69 +496,6 @@ function WhatIsNewSection() {
         <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
           <Link href="/docs/openclaw-agent" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
           <Link href="/blog/openclaw-lokale-workspace-agenten" className="inline-flex h-10 items-center justify-center rounded-md border border-white/18 px-4 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">Was daran neu ist</Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SplitDemo() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20 xl:pt-10">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Aus Text wird Raum</p>
-          <h2 className="text-3xl font-semibold tracking-normal sm:text-4xl">Aus Markdown wird ein navigierbarer Wissensraum.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Markdown bleibt die Quelle. BloomMD ist die visuelle Ebene, in der du Struktur erkennst und ohne Formatwechsel weiterarbeitest.
-          </p>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-lg border border-[#E8E4DF] bg-[#1F1D1B] p-5 text-white shadow-sm">
-            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3 text-sm">
-              <span className="font-semibold">research-plan.md</span>
-              <span className="rounded border border-white/10 px-2 py-1 text-xs text-white/60">Markdown</span>
-            </div>
-            <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">
-{`# Research Plan
-
-## Core Question
-How do local-first tools help writers keep control?
-
-## Sources
-- Interviews
-- Product notes
-- Architecture decisions
-
-## Findings
-### Portability
-Open files reduce migration pressure.
-
-### Structure
-Visual maps reveal relationships faster.`}
-            </pre>
-          </div>
-          <div className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4 shadow-sm">
-            <video
-              className="aspect-video w-full rounded-md border border-[#E8E4DF] bg-white object-cover"
-              src="/demo-branch-drag-markdown.webm"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              aria-label="Echte BloomMD-Aufnahme: ein Branch wird gezogen und die Markdown-Struktur aktualisiert sich."
-              data-testid="branch-drag-demo-video"
-            />
-            <div className="mt-4 grid gap-3 text-sm text-[#666666] sm:grid-cols-3">
-              {["Echte Aufnahme", "Branch gezogen", "Markdown aktualisiert"].map((item) => (
-                <div key={item} className="flex items-center gap-2 rounded-md border border-[#E8E4DF] bg-white px-3 py-2">
-                  <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </section>

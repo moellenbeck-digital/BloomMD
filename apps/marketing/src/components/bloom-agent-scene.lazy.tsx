@@ -16,10 +16,14 @@ let loadedScene: Scene | null = null;
    small shell module, so the card has the final size and the swap shifts no layout. The scene (markup, SVG
    and its large CSS module) is an own chunk and loads only when the card comes within 800 px of the viewport.
    So it is not part of the HTML and the critical CSS of the first load (LCP). Without JavaScript the card
-   shows the finished map as an image. Reduced motion: the scene itself shows its static final image. */
+   shows the finished map as an image. Reduced motion: the scene itself shows its static final image.
+   Until the scene is there, the stage is one image with the scene label (role="img"); the noscript image in it
+   has an empty alt, so it is not announced a second time. If the chunk fails to load, the stage
+   shows the same end image (with its alt text) in the same box: no layout shift, no unhandled rejection. */
 export function BloomAgentSceneLazy({ locale }: { locale: SceneLocale }) {
   const ref = useRef<HTMLDivElement>(null);
   const [Scene, setScene] = useState<Scene | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (loadedScene) {
@@ -30,10 +34,16 @@ export function BloomAgentSceneLazy({ locale }: { locale: SceneLocale }) {
     if (!node) return;
     let cancelled = false;
     const load = () => {
-      void import("./bloom-agent-scene").then((module) => {
-        loadedScene = module.BloomAgentScene;
-        if (!cancelled) setScene(() => module.BloomAgentScene);
-      });
+      import("./bloom-agent-scene").then(
+        (module) => {
+          loadedScene = module.BloomAgentScene;
+          if (!cancelled) setScene(() => module.BloomAgentScene);
+        },
+        () => {
+          // Offline or a stale deployment: keep the card and show the finished map as an image.
+          if (!cancelled) setFailed(true);
+        },
+      );
     };
     if (!("IntersectionObserver" in window)) {
       load();
@@ -65,23 +75,36 @@ export function BloomAgentSceneLazy({ locale }: { locale: SceneLocale }) {
           {SCENE_FILE[locale]}
         </span>
       </div>
-      <div className={shell.stage}>
-        <noscript>
-          <picture>
-            <source media={WIDE_MEDIA} srcSet={SCENE_END_IMAGE.wide[locale]} width={SCENE_END_IMAGE.wide.width} height={SCENE_END_IMAGE.wide.height} />
-            <img
-              src={SCENE_END_IMAGE.tall[locale]}
-              alt={SCENE_LABEL[locale]}
-              width={SCENE_END_IMAGE.tall.width}
-              height={SCENE_END_IMAGE.tall.height}
-              loading="lazy"
-              decoding="async"
-              className={shell.endImage}
-              data-testid="bloom-agent-scene-end-image"
-            />
-          </picture>
-        </noscript>
-      </div>
+      {failed ? (
+        <div className={shell.stage}>
+          <EndImage locale={locale} alt={SCENE_LABEL[locale]} />
+        </div>
+      ) : (
+        <div className={shell.stage} role="img" aria-label={SCENE_LABEL[locale]}>
+          <noscript>
+            <EndImage locale={locale} alt="" />
+          </noscript>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* The finished map: the wide or the tall end image, it fills the stage. */
+function EndImage({ locale, alt }: { locale: SceneLocale; alt: string }) {
+  return (
+    <picture>
+      <source media={WIDE_MEDIA} srcSet={SCENE_END_IMAGE.wide[locale]} width={SCENE_END_IMAGE.wide.width} height={SCENE_END_IMAGE.wide.height} />
+      <img
+        src={SCENE_END_IMAGE.tall[locale]}
+        alt={alt}
+        width={SCENE_END_IMAGE.tall.width}
+        height={SCENE_END_IMAGE.tall.height}
+        loading="lazy"
+        decoding="async"
+        className={shell.endImage}
+        data-testid="bloom-agent-scene-end-image"
+      />
+    </picture>
   );
 }

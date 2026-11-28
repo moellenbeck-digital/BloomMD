@@ -434,14 +434,70 @@ test("without JavaScript the card shows the finished map as an image", async ({ 
     await expect(card.getByText(locale.file)).toBeVisible();
     await expect(page.getByTestId("bloom-agent-scene-toggle")).toHaveCount(0);
     // The scene loads with JavaScript only; without it, a prerendered end image fills the stage.
+    // The stage carries the label (role=img), so the image inside has an empty alt: one announcement.
+    await expect(card.getByRole("img", { name: locale.label })).toHaveCount(1);
     const image = page.getByTestId("bloom-agent-scene-end-image");
-    await expect(image).toHaveAttribute("alt", locale.label);
+    await expect(image).toHaveAttribute("alt", "");
     await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0 && node.currentSrc)).toContain(file);
     const [stage, picture] = await Promise.all([card.locator("> div").nth(1).boundingBox(), image.boundingBox()]);
     expect(Math.abs(stage!.width - picture!.width)).toBeLessThan(1);
     expect(Math.abs(stage!.height - picture!.height)).toBeLessThan(1);
     await context.close();
   }
+});
+
+test("before the scene loads the stage is one image with the scene label, without JavaScript it is announced once", async ({ browser }) => {
+  for (const javaScriptEnabled of [true, false]) {
+    const context = await browser.newContext({ javaScriptEnabled, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await page.goto("/", { waitUntil: "load" });
+    const card = page.locator("[data-testid=bloom-agent-scene][data-card]");
+    await expect(card).toHaveCount(1);
+    await expect(card.getByRole("img", { name: locales[0].label })).toHaveCount(1);
+    // Without JavaScript the noscript image sits in the labelled stage with an empty alt: one announcement.
+    const snapshot = await card.ariaSnapshot();
+    expect(snapshot.match(/MD-Agent pflanzt einen Samen/g)).toHaveLength(1);
+    await context.close();
+  }
+});
+
+test("if the scene chunk fails to load, the stage shows the end image without a rejection or a layout shift", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    // The aborted request itself logs "Failed to load resource"; anything else is an error of the page.
+    if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) errors.push(message.text());
+  });
+  // Only the script chunk of the scene fails: it is the one that carries the agent markup.
+  const aborted: string[] = [];
+  await page.route("**/_next/static/chunks/**/*.js", async (route) => {
+    const response = await route.fetch();
+    if (!(await response.text()).includes("bloom-agent-avatar")) return route.fulfill({ response });
+    aborted.push(route.request().url());
+    return route.abort();
+  });
+  await page.goto("/", { waitUntil: "load" });
+  await expect(page.locator("[data-testid=bloom-agent-scene][data-card]")).toHaveCount(1);
+  const card = await page.getByTestId("bloom-agent-scene").boundingBox();
+  await page.evaluate(() => {
+    (window as unknown as { shift: number }).shift = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) (window as unknown as { shift: number }).shift += (entry as unknown as { value: number }).value;
+    }).observe({ type: "layout-shift", buffered: false });
+  });
+  await page.getByTestId("bloom-agent-scene").scrollIntoViewIfNeeded();
+  const image = page.getByTestId("bloom-agent-scene-end-image");
+  await expect(image).toHaveAttribute("alt", locales[0].label);
+  await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0 && node.currentSrc)).toContain("bloom-scene-end-tall-de.webp");
+  await expect(page.getByRole("img", { name: locales[0].label })).toHaveCount(1);
+  await expect(page.getByTestId("bloom-agent-avatar")).toHaveCount(0);
+  expect(aborted).toHaveLength(1);
+  const after = await page.getByTestId("bloom-agent-scene").boundingBox();
+  expect(Math.abs(after!.height - card!.height)).toBeLessThan(1);
+  expect(Math.abs(after!.width - card!.width)).toBeLessThan(1);
+  expect(await page.evaluate(() => (window as unknown as { shift: number }).shift)).toBe(0);
+  expect(errors).toEqual([]);
 });
 
 test("the scene is not in the server HTML and loads near the viewport without a layout shift", async ({ page, request }) => {
@@ -720,8 +776,14 @@ test("the pause stops the parallax and the scroll pose", async ({ page }) => {
    the scene, so checks that wait for all finite animations to end (mobile accessibility scan) can finish. */
 test("the scroll animations run only while the scene is near the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openScene(page, "/");
-  await page.waitForLoadState("load");
+  await page.goto("/", { waitUntil: "load" });
+  await loadScene(page);
+  // loadScene leaves the card 200 px below the viewport, inside the in-view margin (25 % = 225 px here).
+  // 400 px below: the scene is loaded (800 px), but not in view.
+  await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="bloom-agent-scene"]')!;
+    window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - window.innerHeight - 400));
+  });
   const scene = page.getByTestId("bloom-agent-scene");
   const scrollAnimations = () => page.evaluate(() => document.getAnimations().filter((animation) => animation.timeline !== document.timeline).length);
   await expect.poll(scrollAnimations).toBe(0);

@@ -3,6 +3,8 @@
 ## In Entwicklung
 
 
+## [Web-App 0.7.0-develop.8, Marketing 0.7.0-develop.8, Sync 0.7.0-develop.8] - 2026-11-28
+
 ## [Web-App 0.7.0-develop.7, Marketing 0.7.0-develop.7, Sync 0.7.0-develop.7] - 2026-11-28
 
 - Wiki-Ansicht (Ticket 432): Nach `agent decide` zeigt der Artikel auf `/wiki` die internen Kommentare `<!-- bloommd:id=… -->` nicht mehr im Text. Die Datei im Vault behält sie unverändert.

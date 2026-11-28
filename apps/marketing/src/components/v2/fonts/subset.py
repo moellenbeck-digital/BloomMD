@@ -6,7 +6,8 @@ Sources: alegreya-latin-wght-{normal,italic}.woff2, alegreya-sans-latin-{400,700
 (as committed in "hero ... (self-hosted Alegreya)").
 
 Scope: German and English text. A character outside CHARS falls back per glyph to the next family.
-A new weight or style in the v2 CSS needs a new entry here and in ../fonts.ts.
+A new weight or style in the v2 CSS needs a new entry here and in ../fonts.ts
+(preloaded faces) or ../fonts-faces.css (all others).
 """
 import io
 import os

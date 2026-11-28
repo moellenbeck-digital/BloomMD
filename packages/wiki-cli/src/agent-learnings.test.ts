@@ -58,12 +58,13 @@ async function agent(args: string[], deps?: LearningDeps): Promise<Run> {
 const create = (root: string, title: string, extra: string[] = [], ticket = "113") =>
   agent(["create", "--vault", root, "--name", "coder", "--ticket", ticket, "--titel", title, "--rolle", "coder", "--beleg", "https://github.com/moellenbeck-digital/BloomMD/issues/113", "--inhalt", `Regel zu ${title}`, ...extra]);
 
-async function learningFile(root: string, path: string, options: { title: string; status?: string; tags?: string[]; scope?: string; staleAfter?: string; text?: string; created?: string; beleg?: string }) {
+async function learningFile(root: string, path: string, options: { title: string; status?: string; tags?: string[]; scope?: string; staleAfter?: string; text?: string; created?: string; beleg?: string; replacedBy?: string }) {
   await mkdir(join(root, path, ".."), { recursive: true });
   const lines = ["---", "type: learning", `title: "${options.title}"`, `status: ${options.status ?? "neu"}`, `tags: [${(options.tags ?? ["coder"]).map((tag) => `"${tag}"`).join(", ")}]`];
   if (options.scope) lines.push(`scope: "${options.scope}"`);
   if (options.staleAfter) lines.push(`stale_after: ${options.staleAfter}`);
   if (options.created) lines.push(`created: ${options.created}`);
+  if (options.replacedBy) lines.push(`replaced_by: ${options.replacedBy}`);
   lines.push("---", "", `# ${options.title}`, "", "## Symptom", "", options.text ?? "Der Lockfile-Fehler tritt auf.", "", "## Ursache", "", "## Regel", "", "Version festhalten.", "", "## Beleg", "", ...(options.beleg ? [`- ${options.beleg}`, ""] : []), "## Gilt für", "");
   await writeFile(join(root, path), lines.join("\n"), "utf8");
 }
@@ -106,6 +107,20 @@ describe("agent search", () => {
     expect(paths).toContain("Learnings/coder/Lockfile veraltet.md");
     expect(paths.some((path: string) => path.startsWith("Schule/"))).toBe(false);
     expect(run.json.treffer.find((hit: { pfad: string }) => hit.pfad.endsWith("abgelaufen.md")).abgelaufen).toBe(true);
+  });
+
+  test("a replaced learning shows replaced_by in the hit with --include-stale; hits without it have no such field", async () => {
+    const root = await seeded();
+    await learningFile(root, "Learnings/coder/Lockfile ersetzt.md", { title: "Lockfile ersetzt", tags: ["coder"], staleAfter: FUTURE, status: "ersetzt", replacedBy: "Lockfile aktuell.md" });
+    const run = await agent(["search", "Lockfile", "--vault", root, "--include-stale"]);
+    expect(run.code).toBe(EXIT.ok);
+    const hits: Array<Record<string, unknown> & { pfad: string }> = run.json.treffer;
+    const replaced = hits.find((hit) => hit.pfad.endsWith("ersetzt.md"));
+    expect(replaced).toMatchObject({ status: "ersetzt", replaced_by: "Lockfile aktuell.md" });
+    for (const hit of hits.filter((entry) => !entry.pfad.endsWith("ersetzt.md"))) expect("replaced_by" in hit).toBe(false);
+    // Without --include-stale the replaced learning stays out.
+    const standard = await agent(["search", "Lockfile", "--vault", root]);
+    expect(standard.json.treffer.map((hit: { pfad: string }) => hit.pfad)).not.toContain("Learnings/coder/Lockfile ersetzt.md");
   });
 
   test("filters by role, tag and component (all must match) and limits the hits", async () => {

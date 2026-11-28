@@ -42,6 +42,7 @@ interface Treffer {
   pfad: string;
   titel: string;
   status: string | null;
+  replaced_by?: string;
 }
 
 interface Run {
@@ -270,7 +271,8 @@ test.describe("@t345 Learnings W0 end to end", () => {
       const staleSearch = searchShown("Bun", "--include-stale");
       expect(staleSearch.treffer.find((hit) => hit.pfad === "Learnings/korrigiert.md")?.status).toBe("ersetzt");
 
-      // Die Trefferliste nennt replaced_by nicht; `agent read` liefert es.
+      // Seit #434 nennt die Trefferliste replaced_by; `agent read` liefert es weiterhin.
+      expect(staleSearch.treffer.find((hit) => hit.pfad === "Learnings/korrigiert.md")?.replaced_by).toBe("gueltig.md");
       const readRun = wiki("agent", "read", "Learnings/korrigiert.md", "--vault", LEARNINGS_W0_VAULT);
       expect(readRun.status, readRun.stdout + readRun.stderr).toBe(0);
       const read = JSON.parse(readRun.stdout) as { frontmatter: { status: string; replaced_by?: string; stale_after?: string }; inhalt: string };

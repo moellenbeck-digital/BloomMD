@@ -1,17 +1,19 @@
 /* BloomMD design language v2 "Der Trieb". Source of truth: .ulpi/design/DESIGN.md */
 .ground {
-  --bmd-ground: #1e150f;
-  --bmd-deep: #160e0a;
-  --bmd-raised: #2c2018;
-  --bmd-ink: #f2ece3;
-  --bmd-ink-2: #dbcfc2;
-  --bmd-ink-3: #c3b3a4;
-  --bmd-bark: #8c6d58;
-  --bmd-bark-hi: #b9977a;
-  --bmd-soil: #45352c;
-  --bmd-bloom: #f98751;
-  --bmd-bloom-hi: #fda975;
-  --bmd-on-bloom: #1f0f08;
+  --bmd-ground: #fcf9f7;
+  --bmd-deep: #f5efea;
+  --bmd-raised: #ffffff;
+  --bmd-ink: #291a12;
+  --bmd-ink-2: #4c382d;
+  --bmd-ink-3: #6c5547;
+  --bmd-bark: #8f6c53;
+  --bmd-bark-hi: #7c573d;
+  --bmd-soil: #e0d3c9;
+  --bmd-bloom: #b94314;
+  --bmd-bloom-hi: #99350d;
+  --bmd-on-bloom: #fef9f5;
+  --bmd-veil: rgb(252 249 247 / 0.9);
+  --bmd-glow: rgb(185 120 80 / 0.1);
 
   --bmd-display: var(--font-bmd-display), "Iowan Old Style", Georgia, serif;
   --bmd-text: var(--font-bmd-text), "Segoe UI", sans-serif;
@@ -27,6 +29,24 @@
   font-synthesis-style: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark system theme. Same switch as the rest of the site: html.dark, set before first paint. */
+:global(html.dark) .ground {
+  --bmd-ground: #1e150f;
+  --bmd-deep: #160e0a;
+  --bmd-raised: #2c2018;
+  --bmd-ink: #f2ece3;
+  --bmd-ink-2: #dbcfc2;
+  --bmd-ink-3: #c3b3a4;
+  --bmd-bark: #8c6d58;
+  --bmd-bark-hi: #b9977a;
+  --bmd-soil: #45352c;
+  --bmd-bloom: #f98751;
+  --bmd-bloom-hi: #fda975;
+  --bmd-on-bloom: #1f0f08;
+  --bmd-veil: rgb(30 21 15 / 0.9);
+  --bmd-glow: rgb(185 120 80 / 0.16);
 }
 
 .ground ::selection { background: var(--bmd-bloom); color: var(--bmd-on-bloom); }

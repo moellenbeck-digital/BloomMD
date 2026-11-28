@@ -39,7 +39,9 @@ Code: `apps/marketing/src/components/v2/trieb.ts` (Geometrie), `branch.tsx` (Tri
 
 ## Color (locked)
 
-Neutrale Töne sind zur Markenfarbe getönt (Rinde, Hue 48–75). Ein Akzent. Dunkel in beiden Systemthemen.
+Neutrale Töne sind zur Markenfarbe getönt (Rinde, Hue 48–75). Ein Akzent. Hell und dunkel folgen dem Systemthema (`html.dark`), gleiche Rollen in beiden.
+
+### Dunkel (`html.dark`)
 
 | Rolle | Token | OKLCH | Hex | Einsatz |
 |---|---|---|---|---|
@@ -72,6 +74,39 @@ Statusfarben: keine. Status wird durch Wort, Dicke und Knospenform getragen.
 | bloom-hi / ground | 9,50 | 66 | ok (Nicht-Fließtext) |
 | on-bloom / bloom | 7,62 | 56 | ok (Button, 17 px fett) |
 | bark / ground | 3,80 | 28 | ≥ 3:1 Grafik |
+
+### Hell (Standard)
+
+Warmes Fast-Weiß (Chroma ≤ 0,009, kein Creme-Grund). Rinde und Akzent werden dunkler statt heller: „hi“ heißt in beiden Themen „mehr Kontrast zur Fläche“.
+
+| Rolle | Token | OKLCH | Hex |
+|---|---|---|---|
+| Fläche | `--bmd-ground` | 0.985 0.004 62 | #fcf9f7 |
+| Fläche tief | `--bmd-deep` | 0.955 0.009 62 | #f5efea |
+| Fläche erhöht | `--bmd-raised` | 1 0 0 | #ffffff |
+| Text | `--bmd-ink` | 0.235 0.028 50 | #291a12 |
+| Text zweit | `--bmd-ink-2` | 0.36 0.034 52 | #4c382d |
+| Text dritt | `--bmd-ink-3` | 0.47 0.038 55 | #6c5547 |
+| Trieb | `--bmd-bark` | 0.56 0.058 56 | #8f6c53 |
+| Trieb hell | `--bmd-bark-hi` | 0.49 0.062 56 | #7c573d |
+| Trennlinie | `--bmd-soil` | 0.875 0.02 60 | #e0d3c9 |
+| Akzent | `--bmd-bloom` | 0.54 0.162 39 | #b94314 |
+| Akzent hell | `--bmd-bloom-hi` | 0.47 0.142 39 | #99350d |
+| Auf Akzent | `--bmd-on-bloom` | 0.985 0.008 60 | #fef9f5 |
+
+Dazu in beiden Themen: `--bmd-veil` (Header, Fläche mit 0,9 Deckkraft), `--bmd-glow` (Lichtfleck im Hero, hell 0,1 · dunkel 0,16).
+
+| Paar (hell) | WCAG | Lc |
+|---|---|---|
+| ink / ground · deep | 16,02 · 14,72 | 100 · 95 |
+| ink-2 / ground · deep | 10,48 · 9,64 | 92 · 86 |
+| ink-3 / ground · deep | 6,62 · 6,08 | 81 · 75 |
+| bloom / ground · deep | 5,17 · 4,75 | 73 · 67 |
+| bloom-hi / ground · deep | 6,98 · 6,42 | 81 · 76 |
+| on-bloom / bloom | 5,18 | 78 |
+| on-bloom / bloom-hi | 7,00 | 86 |
+| bark / ground · deep | 4,51 · 4,15 | 70 · 64 |
+| bark-hi / ground · deep | 6,09 · 5,60 | 78 · 73 |
 
 ## Type (locked)
 
@@ -140,5 +175,4 @@ Bestehende Texte unverändert. Du-Form, sachlich. Aktionsverben bleiben („Demo
 |---|---|
 | Abschnitte Demo, Agenten, Pfade, Vorlagen, Verfügbarkeit, FAQ, Footer, `/en`-Hero | noch alte Sprache |
 | Agenten-Szene | Sperrzone, unverändert |
-| Heller Modus | nicht entworfen. Frage an Max |
 | Gedankenstrich im Hero-Absatz | Text unverändert (Inhaltsregel) |

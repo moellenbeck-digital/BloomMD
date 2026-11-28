@@ -24,6 +24,7 @@ let storedName = "synced.md";
 let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 let proposals: Array<Record<string, unknown>> = [];
 let changes: Array<Record<string, unknown>> = [];
+let renamedTo: string[] = [];
 
 mock.module("../../../../lib/auth", () => ({
   getApiRequestIdentity: async () => agent
@@ -88,7 +89,7 @@ mock.module("../../../../lib/sync-room-status", () => ({
     }
     return syncMutationResult;
   },
-  renameThroughSyncServer: async () => ({ success: true, newFilePath: "renamed.md", newFilename: "renamed.md", version: 8 }),
+  renameThroughSyncServer: async (_documentId: string, input: { newFilename: string }) => { renamedTo.push(input.newFilename); return { success: true, newFilePath: "renamed.md", newFilename: "renamed.md", version: 8 }; },
   deleteThroughSyncServer: async () => ({ deleted: "synced.md" }),
   // Bun shares module mocks across test files; every export a route imports must exist here.
   createThroughSyncServer: async () => { throw new Error("createThroughSyncServer is not used in this test."); },
@@ -137,6 +138,7 @@ describe("mindmap save route", () => {
     rights = { access: "write", areas: {} };
     proposals = [];
     changes = [];
+    renamedTo = [];
     console.warn = () => undefined;
   });
 
@@ -362,5 +364,21 @@ describe("mindmap save route", () => {
       { tokenId: "tok-1", agentName: "OpenClaw", event: "deleted", tool: "api:delete" },
     ]);
     expect(changes[2]?.source).toBeUndefined();
+  });
+
+  test("a rename to a name with / lands in the area and the rights check sees the converted name (#446)", async () => {
+    expect((await send("PATCH", { newFilename: "Team/ops/Neu.md" })).status).toBe(200);
+    expect((await send("PATCH", { newFilename: "Team/Neu.md" })).status).toBe(200);
+    expect((await send("PATCH", { newFilename: "Notiz.md" })).status).toBe(200);
+    expect(renamedTo).toEqual(["Team › ops – Neu.md", "Team – Neu.md", "Notiz.md"]);
+    agent = true;
+    storedName = "Team › ops – Alt.md";
+    rights = { access: "read", areas: { "Team/ops": "write", Andere: "read" } };
+    renamedTo = [];
+    expect((await send("PATCH", { newFilename: "Team/ops/Neu.md" })).status).toBe(200);
+    const blocked = await send("PATCH", { newFilename: "Andere/x.md" });
+    expect(blocked.status).toBe(403);
+    expect(((await blocked.json()) as { area: string }).area).toBe("Andere");
+    expect(renamedTo).toEqual(["Team › ops – Neu.md"]);
   });
 });

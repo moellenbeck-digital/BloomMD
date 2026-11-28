@@ -6,6 +6,7 @@ import {
   areaCovers,
   areaKey,
   cloudAreaOf,
+  cloudFilenameFromPath,
   normalizeAreaPath,
   vaultAreaPath,
   isVaultNotePath,

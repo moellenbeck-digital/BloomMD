@@ -1,4 +1,5 @@
 import { parseFile } from "@bloommd/core/parser";
+import { cloudFilenameFromPath } from "@bloommd/core/agent-ledger";
 import { sanitizeMarkdownFilename } from "@bloommd/core/paths";
 import type { MindMapDocument, MindMapNode } from "@bloommd/core/types";
 import { NextResponse } from "next/server";
@@ -80,7 +81,8 @@ export async function POST(request: Request) {
     if (!filename || !markdown) {
       return NextResponse.json({ error: "filename and markdown are required" }, { status: 400 });
     }
-    let safeName = sanitizeMarkdownFilename(filename);
+    // In the cloud a "/" in the name is an area ("Team/ops/x.md" becomes "Team › ops – x.md"), not a character to drop (#446).
+    let safeName = sanitizeMarkdownFilename(store.mode === "database" ? cloudFilenameFromPath(filename) : filename);
     const existing = await store.list();
     if (existing.some((entry) => entry.filename.toLowerCase() === safeName.toLowerCase())) {
       const extension = safeName.toLowerCase().endsWith(".markdown") ? ".markdown" : ".md";

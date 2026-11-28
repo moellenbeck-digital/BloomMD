@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Cloud-API (Ticket 446): Ein Dateiname mit `/` beim Anlegen (`POST /api/mindmaps`) und Umbenennen wird auf die Bereichs-Schreibweise `Bereich › Unterbereich – Titel` abgebildet, statt still zu `-` zu werden. `Team/ops/Übersicht.md` liegt damit im Bereich `Team/ops`, und Bereichsrechte von Agenten gelten auch für solche Namen. Namen ohne `/` und bestehende Karten bleiben unverändert; die Schreibweise steht in `docs/RECHTE-UND-DELEGATION.md`.
+- Cloud API (ticket 446): A file name with `/` on create (`POST /api/mindmaps`) and rename is mapped to the area spelling `Area › Sub-area – Title` instead of silently becoming `-`. `Team/ops/Overview.md` now lives in the area `Team/ops`, and agent area rights apply to such names too. Names without `/` and existing maps are unchanged; the spelling is documented in `docs/RECHTE-UND-DELEGATION.md`.
+
 ## [Web-App 0.7.0-develop.12, Marketing 0.7.0-develop.12, Sync 0.7.0-develop.12] - 2026-11-28
 
 - Keine Änderungen für Anwender in diesem Release: Dokumentation zu Rechten und Agenten-Delegation (Ticket 262) sowie Tests.

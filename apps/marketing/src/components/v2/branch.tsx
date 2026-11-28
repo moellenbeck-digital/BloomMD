@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { centerline, outline, petal, type Point, type TriebShape } from "./trieb";
+import { bud, centerline, outline, petal, type Point, type TriebShape } from "./trieb";
 import styles from "./branch.module.css";
 
 export interface Timing {
@@ -35,12 +35,12 @@ export function Bloom({ at, size = 17, timing }: { at: Point; size?: number; tim
 
 /* A closed bud: planned further than "exploring", not yet open. */
 export function Bud({ at, size = 22, angle = 90, timing }: { at: Point; size?: number; angle?: number; timing: Timing }) {
+  const shape = bud(size);
   return (
     <g transform={`translate(${at[0]} ${at[1]}) rotate(${angle})`}>
       <g className={styles.open} style={ms(timing)}>
-        <path d={petal(size)} className={styles.budBody} />
-        <path d={petal(size * 0.72)} transform="rotate(-24)" className={styles.sepal} />
-        <path d={petal(size * 0.72)} transform="rotate(24)" className={styles.sepal} />
+        <path d={shape.body} className={styles.budBody} />
+        <path d={shape.sepals} className={styles.sepal} />
       </g>
     </g>
   );

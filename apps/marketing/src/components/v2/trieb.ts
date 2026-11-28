@@ -70,6 +70,15 @@ export function outline(shape: TriebShape, scale = 1): string {
   return `M${left.join(" L")} L${right.reverse().join(" L")} Z`;
 }
 
+/* A closed bud pointing up before rotation: pointed teardrop, held by one sepal on each side. */
+export function bud(size: number): { body: string; sepals: string } {
+  const s = (k: number) => round(size * k);
+  return {
+    body: `M0 0 C${s(-0.46)} ${s(-0.12)} ${s(-0.4)} ${s(-0.62)} 0 ${s(-1)} C${s(0.4)} ${s(-0.62)} ${s(0.46)} ${s(-0.12)} 0 0 Z`,
+    sepals: `M0 ${s(0.06)} C${s(-0.52)} 0 ${s(-0.52)} ${s(-0.34)} ${s(-0.34)} ${s(-0.66)} C${s(-0.3)} ${s(-0.3)} ${s(-0.16)} ${s(-0.14)} 0 ${s(-0.12)} C${s(0.16)} ${s(-0.14)} ${s(0.3)} ${s(-0.3)} ${s(0.34)} ${s(-0.66)} C${s(0.52)} ${s(-0.34)} ${s(0.52)} 0 0 ${s(0.06)} Z`,
+  };
+}
+
 /* One petal of the bloom: a short, wide shoot, pointing up before rotation. */
 export function petal(size: number): string {
   const s = size;

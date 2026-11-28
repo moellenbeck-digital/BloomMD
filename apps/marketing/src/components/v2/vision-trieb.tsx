@@ -72,7 +72,7 @@ export function VisionTrieb({ copy, roadmapHref }: { copy: VisionCopy; roadmapHr
   const [ref, state] = useGrowOnView<HTMLDivElement>();
 
   return (
-    <section id="vision" aria-labelledby="vision-title" className={`${t.ground} ${t.deep} ${bmdFonts} ${styles.section}`}>
+    <section id="vision" aria-labelledby="vision-title" className={`${t.ground} ${t.deep} ${t.night} ${bmdFonts} ${styles.section}`}>
       <div className={t.wrap}>
         <header className={styles.head}>
           <div>

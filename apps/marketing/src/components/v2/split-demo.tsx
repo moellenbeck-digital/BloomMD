@@ -144,7 +144,7 @@ export function SplitDemo({ locale = "de" }: { locale?: MarketingLocale }) {
         <p className={`${t.lede} ${styles.lede}`}>{c.lede}</p>
         <div className={styles.board} data-solo={!c.sourceFile || undefined}>
           {c.sourceFile && (
-            <div className={styles.file}>
+            <div className={`${t.night} ${styles.file}`}>
               <p className={styles.filename}>research-plan.md <span>Markdown</span></p>
               <pre>
                 {source.split("\n").map((line, index) => (

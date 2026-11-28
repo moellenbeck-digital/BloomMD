@@ -14,8 +14,8 @@
 
 .board { display: grid; gap: 2rem; margin-top: 2.5rem; align-items: start; }
 
-/* The source file: a typeset column like in the hero. */
-.file { min-width: 0; font-family: var(--bmd-mono); font-size: 0.8125rem; line-height: 1.7; color: var(--bmd-ink-3); }
+/* The source file: a typeset column like in the hero, on a dark leaf in both themes. */
+.file { min-width: 0; padding: 1.25rem; border-radius: var(--bmd-radius); background: var(--bmd-deep); font-family: var(--bmd-mono); font-size: 0.8125rem; line-height: 1.7; color: var(--bmd-ink-3); }
 .filename { display: flex; align-items: baseline; gap: 0.75rem; font-weight: 700; color: var(--bmd-ink); }
 .filename span { font-family: var(--bmd-display); font-style: italic; font-weight: 400; font-size: 1rem; color: var(--bmd-ink-3); }
 .file pre { margin-top: 0.5rem; font: inherit; white-space: pre-wrap; overflow-wrap: break-word; }

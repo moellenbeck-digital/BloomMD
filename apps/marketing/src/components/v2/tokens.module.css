@@ -31,8 +31,10 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Dark system theme. Same switch as the rest of the site: html.dark, set before first paint. */
-:global(html.dark) .ground {
+/* Dark system theme. Same switch as the rest of the site: html.dark, set before first paint.
+   `.night` keeps an area dark in both themes (vision section, demo source file), as before v2. */
+:global(html.dark) .ground,
+.night {
   --bmd-ground: #1e150f;
   --bmd-deep: #160e0a;
   --bmd-raised: #2c2018;

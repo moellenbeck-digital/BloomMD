@@ -6,7 +6,7 @@ import motion from "./branch.module.css";
 import { bmdFonts } from "./fonts";
 import { branchOf, headingTree, type TreeNode } from "./markdown-tree";
 import t from "./tokens.module.css";
-import type { TriebShape } from "./trieb";
+import type { Point, TriebShape } from "./trieb";
 import styles from "./hero-trieb.module.css";
 import type { MarketingLocale } from "@/lib/locale";
 
@@ -81,10 +81,9 @@ function timings(nodes: TreeNode[]): Timing[] {
   return result;
 }
 
-function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children, locale }: {
+/* One map for both widths: the words exist once, CSS picks the drawing and the word positions. */
+function TriebMap({ nodes, branch, pinned, onActive, onPin, children, locale }: {
   locale: MarketingLocale;
-  id: string;
-  layout: Layout;
   nodes: TreeNode[];
   branch: Set<number>;
   pinned: number | null;
@@ -93,48 +92,55 @@ function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children
   children?: ReactNode;
 }) {
   const time = timings(nodes);
-  const focus = layout.shapes[FOCUS]!;
-  const focusLine = nodes[FOCUS]?.line;
-  const pos = (x: number, y: number) => ({ left: `${(x / layout.w) * 100}%`, top: `${(y / layout.h) * 100}%` }) as CSSProperties;
+  const pos = (layout: Layout, [x, y]: Point) => [`${(x / layout.w) * 100}%`, `${(y / layout.h) * 100}%`] as const;
+  const size = { "--wn": narrow.w, "--an": `${narrow.w} / ${narrow.h}`, "--ww": wide.w, "--aw": `${wide.w} / ${wide.h}` } as CSSProperties;
 
   return (
-    <div className={styles.map} data-layout={id} style={{ "--w": layout.w, aspectRatio: `${layout.w} / ${layout.h}` } as CSSProperties} role="group" aria-label="BloomMD Product Strategy Markdown mind map preview">
-      <svg viewBox={`0 0 ${layout.w} ${layout.h}`} aria-hidden="true" focusable="false">
-        {nodes.map((node, i) => {
-          const shape = layout.shapes[i];
-          if (!shape) return null;
-          return <Branch key={node.line} id={`hero-${id}-${node.line}`} shape={shape} timing={time[i]!} lit={branch.has(node.line)} />;
+    <div className={styles.mapwrap}>
+      <div className={styles.map} style={size} role="group" aria-label="BloomMD Product Strategy Markdown mind map preview">
+        {([["wide", wide], ["narrow", narrow]] as const).map(([id, layout]) => {
+          const focus = layout.shapes[FOCUS]!;
+          return (
+            <svg key={id} data-layout={id} viewBox={`0 0 ${layout.w} ${layout.h}`} aria-hidden="true" focusable="false">
+              {nodes.map((node, i) => {
+                const shape = layout.shapes[i];
+                if (!shape) return null;
+                return <Branch key={node.line} id={`hero-${id}-${node.line}`} shape={shape} timing={time[i]!} lit={branch.has(node.line)} />;
+              })}
+              <Bloom at={[focus.at[0] + focus.length + 3, focus.at[1]]} timing={{ delay: time[FOCUS]!.delay + time[FOCUS]!.duration - 80, duration: 460 }} />
+            </svg>
+          );
         })}
-        <Bloom at={[focus.at[0] + focus.length + 3, focus.at[1]]} timing={{ delay: time[FOCUS]!.delay + time[FOCUS]!.duration - 80, duration: 460 }} />
-      </svg>
-      {nodes.map((node, i) => {
-        const shape = layout.shapes[i];
-        if (!shape) return null;
-        const arrive = { "--d": `${Math.round(time[i]!.delay + time[i]!.duration * 0.6)}ms` } as CSSProperties;
-        return (
-          <div key={node.line} className={`${styles.node} ${motion.arrive}`} data-depth={node.depth} style={{ ...pos(shape.at[0], shape.at[1]), ...arrive }}>
-            <button
-              type="button"
-              className={styles.word}
-              data-lit={branch.has(node.line) || undefined}
-              aria-pressed={pinned === node.line}
-              aria-label={copy[locale].highlight(node.title)}
-              onMouseEnter={() => onActive(node.line)}
-              onMouseLeave={() => onActive(null)}
-              onFocus={() => onActive(node.line)}
-              onBlur={() => onActive(null)}
-              onClick={() => onPin(node.line)}
-            >
-              {node.title}
-            </button>
-            {node.notes.length > 0 && (
-              <ul className={styles.notes} data-focus={node.line === focusLine || undefined}>
-                {node.notes.map((note) => <li key={note}>{note}</li>)}
-              </ul>
-            )}
-          </div>
-        );
-      })}
+        {nodes.map((node, i) => {
+          if (!wide.shapes[i] || !narrow.shapes[i]) return null;
+          const [xw, yw] = pos(wide, wide.shapes[i].at);
+          const [xn, yn] = pos(narrow, narrow.shapes[i].at);
+          const place = { "--xw": xw, "--yw": yw, "--xn": xn, "--yn": yn, "--d": `${Math.round(time[i]!.delay + time[i]!.duration * 0.6)}ms` } as CSSProperties;
+          return (
+            <div key={node.line} className={`${styles.node} ${motion.arrive}`} data-depth={node.depth} style={place}>
+              <button
+                type="button"
+                className={styles.word}
+                data-lit={branch.has(node.line) || undefined}
+                aria-pressed={pinned === node.line}
+                aria-label={copy[locale].highlight(node.title)}
+                onMouseEnter={() => onActive(node.line)}
+                onMouseLeave={() => onActive(null)}
+                onFocus={() => onActive(node.line)}
+                onBlur={() => onActive(null)}
+                onClick={() => onPin(node.line)}
+              >
+                {node.title}
+              </button>
+              {node.notes.length > 0 && (
+                <ul className={styles.notes} data-focus={node.line === nodes[FOCUS]?.line || undefined}>
+                  {node.notes.map((note) => <li key={note}>{note}</li>)}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
       {children}
     </div>
   );
@@ -183,13 +189,7 @@ export function HeroTrieb({ markdown, intro, locale = "de" }: { markdown: string
             </pre>
             <p className={styles.status}><span>?</span> <span>⌘S</span> <span>{c.saved}</span></p>
           </div>
-          <div className={styles.wide}>
-            <TriebMap id="wide" layout={wide} {...map}>{inspector}</TriebMap>
-          </div>
-          <div className={styles.narrow}>
-            <TriebMap id="narrow" layout={narrow} {...map} />
-            {inspector}
-          </div>
+          <TriebMap {...map}>{inspector}</TriebMap>
         </div>
       </div>
     </section>

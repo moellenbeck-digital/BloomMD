@@ -40,14 +40,13 @@
 .line[data-lit] { color: var(--bmd-bloom-hi); }
 .status { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: 0.75rem; font-size: 0.8125rem; }
 
-.wide { display: none; }
-
-.map { position: relative; container-type: inline-size; }
+.mapwrap { position: relative; min-width: 0; }
+.map { position: relative; container-type: inline-size; max-width: 28rem; aspect-ratio: var(--an); }
 .map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.narrow .map { max-width: 28rem; }
+.map svg[data-layout="wide"] { display: none; }
 
 /* A word rests on its branch. No box. */
-.node { position: absolute; width: 0; height: 0; --u: calc(100cqw / var(--w)); }
+.node { position: absolute; left: var(--xn); top: var(--yn); width: 0; height: 0; --u: calc(100cqw / var(--wn)); }
 
 .word {
   position: absolute;
@@ -114,18 +113,20 @@
   .lede { font-size: 1.1875rem; }
   .stage { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; margin-top: 0.75rem; align-items: start; }
   .file { padding-top: 0.25rem; }
-  .wide { display: block; }
-  .wide .map { max-width: max(53rem, calc((100svh - 29rem) * 968 / 466)); }
-  .narrow { display: none; }
+  .mapwrap { max-width: max(53rem, calc((100svh - 29rem) * 968 / 466)); }
+  .map { max-width: none; aspect-ratio: var(--aw); }
+  .map svg[data-layout="wide"] { display: block; }
+  .map svg[data-layout="narrow"] { display: none; }
+  .node { left: var(--xw); top: var(--yw); --u: calc(100cqw / var(--ww)); }
   .inspector { max-width: 22rem; }
-  .map .inspector { position: absolute; left: 64%; top: 16%; width: 36%; line-height: 1.38; }
+  .mapwrap .inspector { position: absolute; left: 64%; top: 16%; width: 36%; line-height: 1.38; }
   /* Clear of the node below also on the smaller map of a 900 px high screen. */
-  .map .inspector ul { margin-top: 0.25rem; }
-  .map .inspector::before { content: ""; position: absolute; right: calc(100% + 0.5rem); top: 2.25rem; width: 1.5rem; height: 1px; background: var(--bmd-bark); }
+  .mapwrap .inspector ul { margin-top: 0.25rem; }
+  .mapwrap .inspector::before { content: ""; position: absolute; right: calc(100% + 0.5rem); top: 2.25rem; width: 1.5rem; height: 1px; background: var(--bmd-bark); }
 }
 
 @media (min-width: 1180px) and (max-width: 1319.98px) {
-  .map .inspector { top: 14%; font-size: 0.875rem; }
+  .mapwrap .inspector { top: 14%; font-size: 0.875rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

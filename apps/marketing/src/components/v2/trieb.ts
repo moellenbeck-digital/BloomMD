@@ -13,7 +13,7 @@ export interface TriebShape {
   bend?: "h" | "v";
 }
 
-const STEPS = 28;
+const EPS = 1e-4;
 const round = (value: number) => Math.round(value * 10) / 10;
 
 export function controlPoints({ from, at, bend = "h" }: Pick<TriebShape, "from" | "at" | "bend">): [Point, Point] {
@@ -38,36 +38,37 @@ export function centerline(shape: TriebShape): string {
   return `M${from[0]} ${from[1]} C${round(c1[0])} ${round(c1[1])} ${round(c2[0])} ${round(c2[1])} ${at[0]} ${at[1]}${tail}`;
 }
 
-/* Filled outline with a width that falls from origin to tip. */
+/* Filled outline with a width that falls from origin to tip. Each side of the bent part is two cubic
+   Béziers that follow the offset curve (position and direction at t = 0, 0.5, 1), the baseline part is
+   one straight line: about a quarter of the markup of a sampled polygon. */
 export function outline(shape: TriebShape, scale = 1): string {
   const [c1, c2] = controlPoints(shape);
   const { from, at, length, w } = shape;
-  const points: { p: Point; w: number }[] = [];
-  for (let i = 0; i <= STEPS; i += 1) {
-    const t = i / STEPS;
-    points.push({ p: cubic(from, c1, c2, at, t), w: w[0] + (w[1] - w[0]) * (1 - (1 - t) * (1 - t)) });
-  }
-  if (length > 0) {
-    for (let i = 1; i <= STEPS / 2; i += 1) {
-      const t = i / (STEPS / 2);
-      points.push({ p: [at[0] + length * t, at[1]], w: w[1] + (w[2] - w[1]) * t });
-    }
-  }
-  const left: string[] = [];
-  const right: string[] = [];
-  points.forEach(({ p, w: width }, i) => {
-    const prev = points[Math.max(0, i - 1)]!.p;
-    const next = points[Math.min(points.length - 1, i + 1)]!.p;
-    const dx = next[0] - prev[0];
-    const dy = next[1] - prev[1];
-    const norm = Math.hypot(dx, dy) || 1;
-    const half = (width * scale) / 2;
-    const nx = (-dy / norm) * half;
-    const ny = (dx / norm) * half;
-    left.push(`${round(p[0] + nx)} ${round(p[1] + ny)}`);
-    right.push(`${round(p[0] - nx)} ${round(p[1] - ny)}`);
-  });
-  return `M${left.join(" L")} L${right.reverse().join(" L")} Z`;
+  /* Point on one side (+1 or -1) of the bend: centerline plus the normal times half the width there. */
+  const side = (t: number, sign: 1 | -1): Point => {
+    const p = cubic(from, c1, c2, at, t);
+    const a = cubic(from, c1, c2, at, t - EPS);
+    const b = cubic(from, c1, c2, at, t + EPS);
+    const norm = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const half = (sign * scale * (w[0] + (w[1] - w[0]) * (1 - (1 - t) * (1 - t)))) / 2;
+    return [p[0] - ((b[1] - a[1]) / norm) * half, p[1] + ((b[0] - a[0]) / norm) * half];
+  };
+  const xy = (p: Point) => `${round(p[0])} ${round(p[1])}`;
+  /* Hermite segment from t0 to t1 as a cubic; the derivative stays inside [0, 1]. */
+  const segment = (t0: number, t1: number, sign: 1 | -1) => {
+    const handle = (t: number, towards: number): Point => {
+      const p = side(t, sign);
+      const inner = side(t + Math.sign(towards - t) * EPS, sign);
+      const k = Math.abs(towards - t) / 3 / EPS;
+      return [p[0] + (inner[0] - p[0]) * k, p[1] + (inner[1] - p[1]) * k];
+    };
+    return `C${xy(handle(t0, t1))} ${xy(handle(t1, t0))} ${xy(side(t1, sign))}`;
+  };
+  const tip = at[0] + length;
+  const half = (width: number) => (width * scale) / 2;
+  const out = length > 0 ? ` L${tip} ${round(at[1] + half(w[2]))}` : "";
+  const back = length > 0 ? ` L${tip} ${round(at[1] - half(w[2]))} L${xy(side(1, -1))}` : ` L${xy(side(1, -1))}`;
+  return `M${xy(side(0, 1))} ${segment(0, 0.5, 1)} ${segment(0.5, 1, 1)}${out}${back} ${segment(1, 0.5, -1)} ${segment(0.5, 0, -1)} Z`;
 }
 
 /* A closed bud pointing up before rotation: pointed teardrop, held by one sepal on each side. */

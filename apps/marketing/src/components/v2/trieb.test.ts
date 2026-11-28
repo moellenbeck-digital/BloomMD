@@ -27,14 +27,17 @@ describe("trieb geometry", () => {
   });
 
   test("tapers: wide at the origin, thin at the tip", () => {
-    const points = outline(shape).slice(1, -2).split(" L").map((pair) => pair.split(" ").map(Number));
-    const half = points.length / 2;
-    const width = (i: number) => {
-      const a = points[i]!;
-      const b = points[points.length - 1 - i]!;
-      return Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!);
-    };
-    expect(width(0)).toBeCloseTo(12, 0);
-    expect(width(half - 1)).toBeCloseTo(1, 0);
+    const path = outline(shape);
+    const numbers = path.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    const first = numbers.slice(0, 2);
+    const last = numbers.slice(-2);
+    expect(Math.hypot(first[0]! - last[0]!, first[1]! - last[1]!)).toBeCloseTo(12, 0);
+    // The two points at the end of the word: x = 180, 0.5 above and below the baseline.
+    expect(path).toContain("L180 40.5 L180 39.5");
+  });
+
+  test("is a smooth Bezier outline, not a sampled polygon", () => {
+    expect(outline(shape).match(/C/g)).toHaveLength(4);
+    expect(outline(shape).length).toBeLessThan(260);
   });
 });

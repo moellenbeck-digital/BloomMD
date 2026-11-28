@@ -162,6 +162,7 @@ Diese Specs ersetzen eine API per `page.route` durch eine feste Antwort, weil da
 | --- | --- | --- |
 | `wiki-sources-t87.spec.ts` | `@t87` | `GET /api/wiki` mit Quellenstatus `ok`/`changed`/`missing`/`unmonitored`; prüft nur die Darstellung (K1–K5). K4 (Englisch) ist `test.fixme`: `/wiki` hat keinen `LocaleProvider`. Das echte Erkennen geänderter oder gelöschter Quelldateien im Pod ist nicht geprüft (`route.test.ts`, `wiki-sources.test.ts`, `watch.test.ts`) |
 | `wiki-comments-t432.spec.ts` | `@t432` | `GET /api/wiki` mit Markdown im Format nach `agent decide` (Überschrift mit `bloommd:id`, `bloommd:meta`, „Entscheid: bestätigt“, „Wer: …“); prüft nur, dass die Artikelansicht die Kommentare ausblendet. Nicht geprüft: dass `agent decide` echt in eine Datei im Pod schreibt und `/api/wiki` sie liefert, und dass die Datei unverändert bleibt. Das deckt lokal `learnings-w0-t432.spec.ts` ab (echter Vault, eigene Config; am Testsystem per `testIgnore` ausgeschlossen) |
+| `wiki-badge-t435.spec.ts` | `@t435` | `GET /api/wiki` mit einem ersetzten Learning (`deprecated`, Vertrauensstufe `verified`) und einem bestätigten; prüft nur die Darstellung (Artikel und Knowledge Map: kein Vertrauens-Badge bei `deprecated`, Regression `verified` bei `stable`). Nicht geprüft: Frontmatter und `trustTier` aus echter Berechnung; das deckt lokal `learnings-w0-t435.spec.ts` ab (echter Vault, eigene Config; am Testsystem per `testIgnore` ausgeschlossen) |
 
 ## Wiki-Demo als Video / Wiki demo video
 

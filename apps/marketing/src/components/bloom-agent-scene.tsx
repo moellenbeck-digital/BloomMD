@@ -51,8 +51,16 @@ const clip = {
 /* near: the scene is close to the viewport. Only then the avatar image is requested, so it never competes
    with the LCP element of the page (native lazy loading starts far earlier). Without JS the image comes
    from <noscript>, so the server render stays the complete final image. */
-function Layer({ part, near }: { part: keyof typeof clip; near: boolean }) {
-  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} />;
+/* onReady: called once per layer when its image is loaded and decoded (or failed), so the agent shows
+   only as a whole: the face never floats without its body on a slow network. */
+function Layer({ part, near, onReady }: { part: keyof typeof clip; near: boolean; onReady?: () => void }) {
+  const done = (event: { currentTarget: HTMLImageElement }) => {
+    const img = event.currentTarget;
+    if (!onReady) return;
+    if (!img.complete || !img.naturalWidth) return onReady();
+    img.decode().catch(() => undefined).then(onReady);
+  };
+  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} onLoad={near ? done : undefined} onError={near ? onReady : undefined} />;
   return near ? image : <noscript>{image}</noscript>;
 }
 
@@ -486,6 +494,16 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   const [near, setNear] = useState(false);
   /* The buttons work only with JS: the server render keeps the avatar button disabled and has no node buttons. */
   const [hydrated, setHydrated] = useState(false);
+  /* The avatar image (4 layers of one file) is loaded and decoded. Until then the agent (face included) is
+     hidden and the scene does not start, so face and body appear together. */
+  const [pictured, setPictured] = useState(false);
+  /* The scene was half in view while "ready": it plays as soon as the agent is pictured. */
+  const [seen, setSeen] = useState(false);
+  const layersLeft = useRef(4);
+  const onLayerReady = useCallback(() => {
+    layersLeft.current -= 1;
+    if (layersLeft.current === 0) setPictured(true);
+  }, []);
 
   useEffect(() => {
     setHydrated(true);
@@ -518,11 +536,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         setOffscreen(!entry.isIntersecting);
         const viewport = entry.rootBounds?.height ?? window.innerHeight;
         if (!entry.isIntersecting || entry.intersectionRect.height < 0.5 * Math.min(entry.boundingClientRect.height, viewport) - 1) continue;
-        setState((current) => {
-          if (current !== "ready") return current;
-          playedInThisPageView = true;
-          return "play";
-        });
+        setSeen(true);
       }
     }, { threshold: [0, 0.25, 0.5] });
     observer.observe(node);
@@ -537,6 +551,15 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       reduce.removeEventListener("change", onReduce);
     };
   }, []);
+
+  useEffect(() => {
+    if (!seen || !pictured) return;
+    setState((current) => {
+      if (current !== "ready") return current;
+      playedInThisPageView = true;
+      return "play";
+    });
+  }, [seen, pictured]);
 
   /* Scroll coupling: where the scene crosses the viewport, in page pixels, for the CSS scroll timeline
      (animation-range). Measured on layout changes (ResizeObserver), never on scroll. */
@@ -708,6 +731,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       style={timeline}
       data-state={state}
       data-offscreen={offscreen || undefined}
+      data-avatar-wait={(hydrated && !pictured) || undefined}
       data-testid="bloom-agent-scene"
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
@@ -742,12 +766,12 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
             <span className={styles.poke}>
               <span className={styles.float}>
                 <span className={`${styles.part} ${styles.body}`}>
-                  <Layer part="body" near={near} />
+                  <Layer part="body" near={near} onReady={onLayerReady} />
                 </span>
                 <span className={`${styles.part} ${styles.headAct}`}>
                   <span ref={lookRef} className={`${styles.part} ${styles.look}`} data-bloom-look>
                     <span className={`${styles.part} ${styles.headIdle}`}>
-                      <Layer part="head" near={near} />
+                      <Layer part="head" near={near} onReady={onLayerReady} />
                       <span className={styles.headBox} data-bloom-head />
                       <span className={styles.screen} style={{ left: "39.5%", top: "29.5%", width: "13%", height: "14.6%" }} />
                       <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
@@ -779,10 +803,10 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                   </span>
                 </span>
                 <span className={`${styles.part} ${styles.handL}`}>
-                  <Layer part="handL" near={near} />
+                  <Layer part="handL" near={near} onReady={onLayerReady} />
                 </span>
                 <span className={`${styles.part} ${styles.handR}`}>
-                  <Layer part="handR" near={near} />
+                  <Layer part="handR" near={near} onReady={onLayerReady} />
                   {live ? (
                     <span className={styles.canWrap} data-bloom-can>
                       <WateringCan />

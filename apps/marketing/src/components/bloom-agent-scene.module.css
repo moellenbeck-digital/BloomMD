@@ -190,6 +190,8 @@
   touch-action: manipulation;
 }
 .avatar:disabled { cursor: default; }
+/* With JS the agent waits for its image: face, body and can appear together (no layout change, opacity only). */
+.scene[data-avatar-wait] .avatar { opacity: 0; }
 .avatar:focus-visible { outline: 3px solid rgba(255, 138, 92, 0.85); outline-offset: -3px; }
 @media (min-width: 720px), (min-aspect-ratio: 1/1) {
   .avatar { left: var(--wide-left); top: var(--wide-top); width: var(--wide-width); }

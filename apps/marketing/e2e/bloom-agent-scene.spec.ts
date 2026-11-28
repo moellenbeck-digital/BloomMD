@@ -599,6 +599,53 @@ test("the agent image is requested only when the scene comes close, not during t
   expect(requests.every((url) => url.includes("md-avatar-200.webp"))).toBe(true);
 });
 
+test("on a slow network the face waits for the body: the agent shows and the scene starts only once the image is decoded", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  /* Fast 4G for everything, and the avatar image held back until the test releases it. */
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 165, downloadThroughput: (9 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 });
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let requested = 0;
+  await page.route("**/agents/md-avatar-*", async (route) => {
+    requested += 1;
+    await held;
+    await route.continue();
+  });
+  await page.goto("/");
+  const scene = page.locator('[data-testid="bloom-agent-scene"]:not([data-card])');
+  await page.getByTestId("bloom-agent-scene").scrollIntoViewIfNeeded();
+  await expect(scene).toHaveCount(1);
+  await expect.poll(() => requested).toBeGreaterThan(0);
+  const look = () =>
+    scene.evaluate((node) => {
+      const avatar = node.querySelector<HTMLElement>('[data-testid="bloom-agent-avatar"]')!;
+      const eyes = node.querySelector<HTMLElement>("[data-bloom-eyes]")!;
+      const images = [...avatar.querySelectorAll("img")];
+      return {
+        state: node.getAttribute("data-state"),
+        avatar: Number(getComputedStyle(avatar).opacity),
+        eyesInAvatar: avatar.contains(eyes),
+        loaded: images.length > 0 && images.every((img) => img.complete && img.naturalWidth > 0),
+        box: avatar.getBoundingClientRect().toJSON() as { width: number; height: number },
+      };
+    });
+  /* In view, image not there: eyes and mouth (inside the agent) are invisible, the scene waits. */
+  await page.waitForTimeout(600);
+  const before = await look();
+  expect(before).toMatchObject({ state: "ready", avatar: 0, eyesInAvatar: true, loaded: false });
+  release();
+  await expect.poll(async () => (await look()).loaded).toBe(true);
+  const after = await look();
+  expect(after.avatar).toBe(1);
+  await expect(scene).toHaveAttribute("data-state", "play");
+  /* Opacity only: the agent keeps its box. */
+  expect(after.box.width).toBeCloseTo(before.box.width, 1);
+  expect(after.box.height).toBeCloseTo(before.box.height, 1);
+  await cdp.detach();
+});
+
 /* Step A: the agent and the nodes of the grown map are buttons. A click, Enter or Space starts a short
    reaction; the reaction attribute restarts the CSS animation on every press. */
 const reactionAnimations = (page: Page) =>

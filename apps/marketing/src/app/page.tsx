@@ -15,6 +15,7 @@ import { LandingPaths } from "../components/v2/landing-paths";
 import { SplitDemo } from "../components/v2/split-demo";
 import { TemplatesTrieb } from "../components/v2/templates-trieb";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
+import { AgentHull } from "../components/v2/agent-hull";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
@@ -825,7 +826,9 @@ export default function LandingPage() {
         <SplitDemo />
       </section>
 
-      <AgentWorkflowSection locale="de" />
+      <AgentHull>
+        <AgentWorkflowSection locale="de" />
+      </AgentHull>
       <KnowledgeVisionSection locale="de" />
       <LandingPaths items={audiencePaths} />
       <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />

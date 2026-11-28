@@ -86,6 +86,7 @@ abgebildet:
   dort als `invalid-status`. Auf jeder anderen Seite meldet er `neu` & Co. als `invalid-status`.
 - `stale_after` ist ein Datum. Ist es überschritten, meldet der Lint `expired-page`, auch bei Learnings.
 - `verified` bleibt die Liste aus `by` und `at`.
+- **Anzeige:** Der Lebenszyklus `deprecated` hat Vorrang. Eine ausgemusterte Seite (`veraltet`, `ersetzt`, `verworfen`) zeigt in der Wiki-Ansicht, in der Knotenliste und im statischen Export keinen Vertrauens-Badge (verified, generated, unattributed), nur „deprecated“. `verified` im Frontmatter und das abgeleitete `trustTier` in Daten, API und Suche bleiben unverändert; die Regel gilt nur für die Anzeige.
 
 ## Lebenszyklus
 

@@ -172,7 +172,7 @@ function KnowledgeMap({ graph, onSelect, locale }: { graph: KnowledgeGraphData; 
                 <Badge className={node.kind === "concept" ? "border-[#FF6B35] bg-[#FFF4EE] text-[#B84218]" : "border-neutral-300 bg-neutral-50 text-neutral-600"}>
                   {node.kind}
                 </Badge>
-                <Badge className={TRUST_STYLE[node.trustTier] ?? ""}>{node.trustTier}</Badge>
+                {node.status !== "deprecated" && <Badge className={TRUST_STYLE[node.trustTier] ?? ""}>{node.trustTier}</Badge>}
                 {node.missingProvenance && (
                   <Badge className="border-amber-300 bg-amber-50 text-amber-900">{copy.withoutSource}</Badge>
                 )}
@@ -360,7 +360,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de" }: 
                 <p className="font-mono text-xs text-neutral-500">{selected.path}</p>
                 <h2 className="mt-2 text-3xl font-semibold">{selected.title}</h2>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {selected.trustTier && <Badge className={TRUST_STYLE[selected.trustTier] ?? ""}>{selected.trustTier}</Badge>}
+                  {selected.trustTier && selected.lifecycle !== "deprecated" && <Badge className={TRUST_STYLE[selected.trustTier] ?? ""}>{selected.trustTier}</Badge>}
                   {selected.lifecycle && selected.lifecycle !== "stable" && (
                     <Badge className="border-neutral-300 bg-neutral-50 text-neutral-700">{selected.lifecycle}</Badge>
                   )}

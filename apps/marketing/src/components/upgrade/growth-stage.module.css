@@ -1,0 +1,138 @@
+/* Warm dark stage: same light direction as the agent scene (from the top left). */
+.stage {
+  --out: cubic-bezier(0.23, 1, 0.32, 1);
+  --pop: linear(0, 0.18, 0.55, 0.86, 1.03, 1.08, 1.06, 1.03, 1.005, 0.995, 0.996, 1);
+  container-type: inline-size;
+  display: grid;
+  overflow: hidden;
+  color: #f3e9e2;
+  background:
+    radial-gradient(60% 70% at 62% 40%, rgba(255, 107, 53, 0.16), rgba(255, 107, 53, 0) 100%),
+    radial-gradient(50% 60% at 0% 0%, rgba(255, 236, 220, 0.06), rgba(255, 236, 220, 0) 100%),
+    linear-gradient(180deg, #262220 0%, #1c1a18 100%);
+}
+
+.source {
+  padding: 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+}
+.sourceHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font-weight: 500;
+  color: rgba(243, 233, 226, 0.72);
+}
+.lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 20px;
+}
+.plain { padding-inline: 8px; color: rgba(243, 233, 226, 0.62); overflow-wrap: anywhere; }
+.line {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-align: left;
+  color: #f3e9e2;
+  cursor: pointer;
+}
+/* The sweep that marks the heading while its node grows, and the persistent highlight. */
+.line::before,
+.line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: rgba(255, 138, 80, 0.22);
+  opacity: 0;
+}
+.line::before { transform-origin: left center; }
+.line::after { transition: opacity 150ms ease; }
+.line[data-focus="on"]::after { opacity: 1; }
+.line:focus-visible { outline: 2px solid #ffb38a; outline-offset: 1px; }
+
+.canvas {
+  position: relative;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  min-width: 0;
+  padding: 10px;
+  background-image: radial-gradient(rgba(255, 236, 220, 0.1) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+.wide { display: none; width: 100%; height: auto; max-height: 420px; }
+.narrow { display: block; width: 100%; max-width: 380px; height: auto; }
+
+@container (min-width: 600px) {
+  .stage > .source { border-bottom: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); }
+}
+/* The grid itself cannot be styled by its own container query, so the columns follow the viewport. */
+@media (min-width: 640px) {
+  .stage { grid-template-columns: minmax(190px, 0.42fr) minmax(0, 1fr); }
+  .source { border-bottom: 0; border-right: 1px solid rgba(255, 255, 255, 0.08); }
+  .wide { display: block; }
+  .narrow { display: none; }
+}
+
+.branch {
+  fill: none;
+  stroke: #c9764f;
+  stroke-linecap: round;
+  stroke-width: 3;
+  stroke-dasharray: 1;
+  transition: opacity 150ms ease, stroke 150ms ease;
+}
+.branch[data-depth="3"] { stroke: #96624a; stroke-width: 2; }
+.branch[data-focus="on"] { stroke: #ffab7d; }
+.branch[data-focus="off"] { opacity: 0.35; }
+
+.node { cursor: pointer; transition: opacity 150ms ease; }
+.node[data-focus="off"] { opacity: 0.4; }
+.node text { font-size: 13px; font-weight: 600; letter-spacing: 0.005em; fill: #f3e9e2; }
+.node rect { fill: #342d29; stroke: rgba(255, 171, 125, 0.38); stroke-width: 1; transition: stroke 150ms ease; }
+.node[data-depth="1"] rect { fill: #fff4ee; stroke: #ff8a50; stroke-width: 1.5; }
+.node[data-depth="1"] text { font-size: 14.5px; fill: #1c1a18; }
+.node[data-depth="2"] rect { fill: #b94316; stroke: #d96232; }
+.node[data-depth="2"] text { fill: #fff; }
+.node[data-focus="on"] rect { stroke: #ffd2bc; stroke-width: 2; }
+.pop { transform-box: fill-box; transform-origin: left center; }
+.blossom { fill: #ffab7d; }
+.blossom circle { fill: #fff4ee; }
+
+.stage[data-grow="ready"] .branch,
+.stage[data-grow="ready"] .pop,
+.stage[data-grow="ready"] .blossom { opacity: 0; }
+.stage[data-grow="play"] .branch { animation: draw 460ms var(--out) var(--d) backwards; }
+.stage[data-grow="play"] .pop { animation: pop 520ms var(--pop) var(--d) backwards; }
+.stage[data-grow="play"] .blossom { animation: open 560ms var(--pop) var(--d) backwards; }
+.stage[data-grow="play"] .line::before { animation: sweep 900ms var(--out) var(--d) backwards; }
+
+@keyframes draw { from { stroke-dashoffset: 1; opacity: 0; } 1% { opacity: 1; } to { stroke-dashoffset: 0; } }
+@keyframes pop { from { transform: scale(0.82); opacity: 0; } 30% { opacity: 1; } to { transform: scale(1); } }
+@keyframes open { from { transform: scale(0.3) rotate(-70deg); opacity: 0; } to { transform: scale(1) rotate(0deg); opacity: 1; } }
+@keyframes sweep { from { transform: scaleX(0); opacity: 1; } 55% { transform: scaleX(1); opacity: 1; } to { transform: scaleX(1); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage .branch, .stage .pop, .stage .blossom, .stage .line::before { animation: none !important; }
+}

@@ -7,6 +7,7 @@ import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
+import { HeroGrowth } from "../components/upgrade/hero-growth";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -218,7 +219,6 @@ const useCases = [
   },
 ];
 
-const heroPreviewDocument = parseFile("strategy.md", markdownLines.join("\n"));
 const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
@@ -459,61 +459,6 @@ function Header() {
         </div>
       )}
     </header>
-  );
-}
-
-function HeroProduct() {
-  return (
-    <div className="relative" id="produkt">
-      <div className="overflow-hidden rounded-xl border border-[#E0D9D1] bg-white shadow-[0_30px_90px_rgba(26,26,26,0.12)]">
-        <div className="flex h-12 items-center justify-between border-b border-[#E8E4DF] bg-[#FFFDFB] px-4">
-          <div className="flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#FF6B35]" />
-            <span className="text-sm font-semibold">BloomMD Workspace</span>
-            <span className="hidden text-xs text-[#777777] sm:inline">/ files / strategy.md</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[#777777]">
-            <span className="rounded border border-[#E8E4DF] px-2 py-1">?</span>
-            <span className="hidden rounded border border-[#E8E4DF] px-2 py-1 sm:inline">⌘S</span>
-            <span className="hidden items-center gap-1 rounded-full border border-[#D8E7D3] bg-[#F4FAF1] px-2 py-1 text-[#467642] md:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#5EA552]" />
-              lokal gespeichert
-            </span>
-          </div>
-        </div>
-        <div className="grid lg:grid-cols-[190px_minmax(0,1fr)_250px]">
-          <div className="max-h-[136px] overflow-hidden border-b border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white lg:max-h-none lg:border-b-0 lg:border-r">
-            <div className="mb-3 flex items-center justify-between text-xs">
-              <span className="font-semibold">strategy.md</span>
-              <span className="rounded border border-white/12 px-2 py-0.5 text-white/54">Quelle</span>
-            </div>
-            <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-[11px] leading-5 text-white/76">
-              {markdownLines.join("\n")}
-            </pre>
-          </div>
-          <MindMapPreview
-            document={heroPreviewDocument}
-            className="!min-h-[230px] !rounded-none !border-0 sm:!min-h-[320px] lg:!min-h-[360px]"
-            ariaLabel="BloomMD Product Strategy Markdown mind map preview"
-          />
-          <aside className="hidden border-t border-[#E8E4DF] bg-white p-5 md:block lg:border-l lg:border-t-0">
-            <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#999999]">Inspector</div>
-            <h3 className="text-base font-semibold">North Star</h3>
-            <p className="mt-3 text-sm leading-6 text-[#666666]">
-              Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.
-            </p>
-            <div className="mt-5 grid gap-2 text-sm text-[#555555]">
-              {["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1100,7 +1045,7 @@ export default function LandingPage() {
             </div>
             <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
           </div>
-          <HeroProduct />
+          <HeroGrowth markdown={markdownLines.join("\n")} />
         </div>
       </section>
 

@@ -57,12 +57,15 @@ const copy = {
   },
 } as const;
 
-/* The recording loops, so it needs a pause control. Reduced motion: it stands on its last frame. */
+/* The recording loops, so it needs a pause control. Reduced motion: it stands on its last frame.
+   Without JavaScript the control could do nothing: the browser's own controls and autoplay take over. */
 function DemoVideo({ c }: { c: (typeof copy)[MarketingLocale] }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const video = ref.current;
     if (!video) return;
     if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -88,23 +91,34 @@ function DemoVideo({ c }: { c: (typeof copy)[MarketingLocale] }) {
 
   return (
     <div className={styles.recording}>
-      <video
-        ref={ref}
-        className={styles.video}
-        src="/demo-branch-drag-markdown.webm"
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        onPlay={() => setPlaying(true)}
-        onPause={() => setPlaying(false)}
-        aria-label={c.video}
-        data-testid={c.testId}
-      />
-      <button type="button" className={styles.control} onClick={toggle}>
-        {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-        {playing ? c.pause : c.play}
-      </button>
+      <noscript>
+        <style>{"[data-script-video]{display:none}"}</style>
+        <video className={styles.video} src="/demo-branch-drag-markdown.webm" autoPlay controls muted loop playsInline preload="metadata" aria-label={c.video} />
+      </noscript>
+      <div data-script-video="">
+        <video
+          ref={ref}
+          className={styles.video}
+          src="/demo-branch-drag-markdown.webm"
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          aria-label={c.video}
+          data-testid={c.testId}
+        />
+        {/* The row keeps its height, so the button appearing after mount moves nothing. */}
+        <div className={styles.controls}>
+          {mounted && (
+            <button type="button" className={styles.control} onClick={toggle}>
+              {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+              {playing ? c.pause : c.play}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

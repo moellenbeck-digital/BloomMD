@@ -11,7 +11,10 @@ describe("v2 demo section", () => {
   });
 
   test("the looping recording can be paused and does not autoplay under reduced motion", () => {
-    expect(component).not.toContain("autoPlay");
+    // Autoplay and native controls only in the copy for visitors without JavaScript.
+    expect(component.match(/autoPlay/g)).toHaveLength(1);
+    expect(component.slice(component.indexOf("<noscript>"), component.indexOf("</noscript>"))).toContain("autoPlay controls");
+    expect(component).toContain("{mounted && (");
     expect(component).toContain("prefers-reduced-motion: reduce");
     expect(component).toContain("Aufnahme anhalten");
   });

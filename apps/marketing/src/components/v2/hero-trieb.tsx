@@ -2,6 +2,7 @@
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Bloom, Branch, type Timing } from "./branch";
+import motion from "./branch.module.css";
 import { bmdFonts } from "./fonts";
 import { branchOf, headingTree, type TreeNode } from "./markdown-tree";
 import t from "./tokens.module.css";
@@ -89,7 +90,7 @@ function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children
         if (!shape) return null;
         const arrive = { "--d": `${Math.round(time[i]!.delay + time[i]!.duration * 0.6)}ms` } as CSSProperties;
         return (
-          <div key={node.line} className={styles.node} data-depth={node.depth} style={{ ...pos(shape.at[0], shape.at[1]), ...arrive }}>
+          <div key={node.line} className={`${styles.node} ${motion.arrive}`} data-depth={node.depth} style={{ ...pos(shape.at[0], shape.at[1]), ...arrive }}>
             <button
               type="button"
               className={styles.word}

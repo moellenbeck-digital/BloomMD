@@ -14,6 +14,14 @@
   :global([data-grow="play"]) .grow { animation: grow var(--t) var(--bmd-grow) var(--d) both; }
   :global([data-grow="ready"]) .open { opacity: 0; }
   :global([data-grow="play"]) .open { animation: open var(--t) var(--bmd-grow) var(--d) both; }
+  /* Words arrive where their branch ends. */
+  :global([data-grow="ready"]) .arrive { opacity: 0; }
+  :global([data-grow="play"]) .arrive { animation: arrive 320ms var(--bmd-grow) var(--d) both; }
+}
+
+@keyframes arrive {
+  from { opacity: 0; translate: -8px 0; }
+  to { opacity: 1; translate: 0 0; }
 }
 
 @keyframes grow {

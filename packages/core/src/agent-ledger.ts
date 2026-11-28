@@ -139,6 +139,20 @@ export function cloudAreaOf(filename: string): string {
   return prefix.split(CLOUD_AREA_SEPARATOR).map((segment) => segment.trim()).filter(Boolean).join("/");
 }
 
+/**
+ * A path-style name for the cloud ("Team/ops/Übersicht.md") in the stored spelling ("Team › ops – Übersicht.md"):
+ * the segments before the last "/" are the area, the last one is the title. Empty segments and edge whitespace drop out;
+ * a name without "/" stays as it is. Run it before sanitizeMarkdownFilename, which would turn "/" into "-" and lose the area.
+ */
+export function cloudFilenameFromPath(filename: string): string {
+  if (!filename.includes("/")) return filename;
+  const parts = filename.split("/").map((part) => part.trim());
+  const title = parts.pop() ?? "";
+  if (!title) return filename;
+  const area = parts.filter(Boolean);
+  return area.length ? `${area.join(CLOUD_AREA_SEPARATOR)}${CLOUD_TITLE_SEPARATOR}${title}` : title;
+}
+
 /** The parts of an area path ("Learnings/dev-team"), without empty parts. */
 export function areaSegments(area: string): string[] {
   return area.split("/").map((segment) => segment.trim()).filter(Boolean);

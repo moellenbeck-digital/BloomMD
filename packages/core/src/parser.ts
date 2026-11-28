@@ -30,6 +30,20 @@ function extractText(node: Heading): string {
 
 const BLOOMMD_COMMENT_RE = /\s*<!--\s*bloommd:(?:id|meta)=[\s\S]*?-->\s*/gi;
 
+// Same comment syntax as BLOOMMD_COMMENT_RE, but line-preserving: only spaces/tabs around the comment go,
+// never line breaks, so paragraphs and blank lines of body text stay as written.
+const BLOOMMD_COMMENT_IN_TEXT_RE = /[ \t]*<!--\s*bloommd:(?:id|meta)=[\s\S]*?-->(?:[ \t]*(?=\r?\n|$))?/gi;
+
+/**
+ * Removes BloomMD's own `<!-- bloommd:id=… -->` and `<!-- bloommd:meta=… -->` comments from display text.
+ *
+ * Display only: callers must keep the file, hashes and exports on the original text. Other HTML comments
+ * stay, and no trailing space is left where a comment ended a line.
+ */
+export function stripBloomMdComments(text: string): string {
+  return text.replace(BLOOMMD_COMMENT_IN_TEXT_RE, "");
+}
+
 /**
  * Returns the heading title as it is written in the file.
  *

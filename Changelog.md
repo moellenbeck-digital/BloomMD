@@ -2,6 +2,44 @@
 
 ## In Entwicklung
 
+- Cloud-API (Ticket 446): Ein Dateiname mit `/` beim Anlegen (`POST /api/mindmaps`) und Umbenennen wird auf die Bereichs-Schreibweise `Bereich › Unterbereich – Titel` abgebildet, statt still zu `-` zu werden. `Team/ops/Übersicht.md` liegt damit im Bereich `Team/ops`, und Bereichsrechte von Agenten gelten auch für solche Namen. Namen ohne `/` und bestehende Karten bleiben unverändert; die Schreibweise steht in `docs/RECHTE-UND-DELEGATION.md`.
+- Cloud API (ticket 446): A file name with `/` on create (`POST /api/mindmaps`) and rename is mapped to the area spelling `Area › Sub-area – Title` instead of silently becoming `-`. `Team/ops/Overview.md` now lives in the area `Team/ops`, and agent area rights apply to such names too. Names without `/` and existing maps are unchanged; the spelling is documented in `docs/RECHTE-UND-DELEGATION.md`.
+
+## [Web-App 0.7.0-develop.12, Marketing 0.7.0-develop.12, Sync 0.7.0-develop.12] - 2026-11-28
+
+- Keine Änderungen für Anwender in diesem Release: Dokumentation zu Rechten und Agenten-Delegation (Ticket 262) sowie Tests.
+- No user-facing changes in this release: documentation on rights and agent delegation (ticket 262) and tests.
+
+## [Web-App 0.7.0-develop.11, Marketing 0.7.0-develop.11, Sync 0.7.0-develop.11] - 2026-11-28
+
+- Wiki-Ansicht (Ticket 435): Eine ausgemusterte Seite (Lebenszyklus `deprecated`, z. B. ein ersetztes Learning) zeigt keinen Vertrauens-Badge mehr, nur noch „deprecated“. Das gilt in der Web-App, auf der Marketing-Seite und im statischen Export. `verified` im Frontmatter und die Vertrauensstufe in Daten, API und Suche bleiben unverändert.
+- Wiki view (ticket 435): A retired page (lifecycle `deprecated`, e.g. a replaced learning) no longer shows a trust badge, only "deprecated". This applies to the web app, the marketing site and the static export. `verified` in the frontmatter and the trust tier in data, API and search are unchanged.
+
+## [Web-App 0.7.0-develop.10, Marketing 0.7.0-develop.10, Sync 0.7.0-develop.10, Wiki-CLI 0.7.0-develop.10] - 2026-11-28
+
+- Learnings-Suche (Ticket 434): `agent search --include-stale` nennt bei einem ersetzten Learning (`status: ersetzt`) den Nachfolger direkt im Treffer (`replaced_by`). Treffer ohne Nachfolger haben das Feld nicht; `agent read` und die übrigen Felder bleiben unverändert.
+- Learnings search (ticket 434): `agent search --include-stale` now shows the successor of a replaced learning (`status: ersetzt`) in the hit itself (`replaced_by`). Hits without a successor have no such field; `agent read` and the other fields are unchanged.
+
+## [Web-App 0.7.0-develop.9, Marketing 0.7.0-develop.9, Sync 0.7.0-develop.9] - 2026-11-28
+
+- Wiki-Ansicht (Ticket 433): Ein Learning mit dem Frontmatter-Feld `source` (Text oder Liste) zeigt auf `/wiki` die Quelle als Zitat: „Zitate (1)“, kein „ohne Quelle“ in Seitenliste und Knowledge Map. Eine vorhandene Liste `sources:` hat Vorrang, ohne beide Felder bleibt es bei „Zitate (0)“.
+- Wiki view (ticket 433): A learning with the frontmatter field `source` (text or list) now shows its source as a citation on `/wiki`: "Citations (1)", no "without source" in the page list and knowledge map. An existing `sources:` list takes precedence; without either field it stays at "Citations (0)".
+
+
+## [Web-App 0.7.0-develop.8, Marketing 0.7.0-develop.8, Sync 0.7.0-develop.8] - 2026-11-28
+
+## [Web-App 0.7.0-develop.7, Marketing 0.7.0-develop.7, Sync 0.7.0-develop.7] - 2026-11-28
+
+- Wiki-Ansicht (Ticket 432): Nach `agent decide` zeigt der Artikel auf `/wiki` die internen Kommentare `<!-- bloommd:id=… -->` nicht mehr im Text. Die Datei im Vault behält sie unverändert.
+- Wiki view (ticket 432): After `agent decide`, the article on `/wiki` no longer shows the internal `<!-- bloommd:id=… -->` comments in the text. The file in the vault keeps them unchanged.
+
+
+
+## [Web-App 0.7.0-develop.6, Marketing 0.7.0-develop.6, Sync 0.7.0-develop.6] - 2026-11-27
+
+- Learnings-Suche (Ticket 431): Eine Suche mit mehreren Wörtern findet eine Karte, wenn jedes Wort irgendwo in ihr vorkommt (Titel, Abschnitte oder Frontmatter, in beliebiger Reihenfolge). Einzelwort-Suche und Filter bleiben unverändert.
+- Learnings search (ticket 431): A multi-word search finds a card when every word occurs somewhere in it (title, sections or frontmatter, in any order). Single-word search and filters are unchanged.
+
 ## [Web-App 0.7.0-develop.5, Marketing 0.7.0-develop.5, Sync 0.7.0-develop.5] - 2026-11-27
 
 ## [Marketing 0.7.0-develop.4] - 2026-11-27

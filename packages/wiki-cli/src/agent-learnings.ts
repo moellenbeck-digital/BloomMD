@@ -522,7 +522,7 @@ async function search(service: KnowledgeService, parsed: Parsed, deps: LearningD
     const frontmatter = readKnowledgeFrontmatter((await service.store.read(path)).markdown);
     const best = mapHits.find((hit) => hit.kind === "node") ?? mapHits[0]!;
     const view = frontmatterView(path, frontmatter, day);
-    treffer.push({ pfad: path, titel: view.titel ?? best.title, status: view.status, rolle: view.rolle, tags: view.tags, auszug: excerpt(best.snippet), stale_after: view.stale_after, abgelaufen: view.abgelaufen });
+    treffer.push({ pfad: path, titel: view.titel ?? best.title, status: view.status, rolle: view.rolle, tags: view.tags, auszug: excerpt(best.snippet), stale_after: view.stale_after, abgelaufen: view.abgelaufen, ...(view.replaced_by ? { replaced_by: view.replaced_by } : {}) });
   }
   return { treffer, anzahl: treffer.length, gesamt: ranked.length, limit };
 }

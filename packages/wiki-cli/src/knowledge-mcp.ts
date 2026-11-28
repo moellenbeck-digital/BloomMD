@@ -75,12 +75,12 @@ export const KNOWLEDGE_TOOLS: McpTool[] = [
     name: "bloommd_search",
     title: "Suchen",
     annotations: { readOnlyHint: true, openWorldHint: false },
-    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt/verworfen are left out unless includeStale is true (a status filter always applies as given).",
+    description: "Full-text search over node titles and content and over the frontmatter (tags, scope, source, status, title), to find where new information belongs or which learning applies to a role or component. A map matches when every word of the query occurs somewhere in it (nodes or frontmatter, any order, any case); hits are the nodes containing at least one word. Filters: status (exact), tag (exact, any case), scope (substring); query may be empty when a filter is set. Every hit shows status, stale_after, expired and ageDays when the map has them. Expired maps and maps with status veraltet/ersetzt/verworfen are left out unless includeStale is true (a status filter always applies as given).",
     inputSchema: {
       type: "object",
       additionalProperties: false,
       properties: {
-        query: { type: "string", description: "Text to find; may be empty when status, tag or scope is given." },
+        query: { type: "string", description: "Words to find, all of which must occur somewhere in the map; may be empty when status, tag or scope is given." },
         area: { type: "string" },
         status: { type: "string", enum: [...KNOWLEDGE_STATUSES], description: "Only maps with this status (also finds veraltet/ersetzt/verworfen)." },
         tag: { type: "string", description: "Only maps with this tag (exact, case-insensitive), e.g. a role like coder." },

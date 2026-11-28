@@ -499,10 +499,10 @@ const WIKI_BROWSER_JS = String.raw`
   function renderPage(page) {
     var t = T();
     if (!page) return h("p", { "data-testid": "wiki-no-page" }, t.noPage);
-    var badges = [
-      badge(t.trust[page.trustTier] || page.trustTier, "b-" + page.trustTier, "wiki-badge-trust"),
-      badge(t.lifecycle[page.lifecycle] || page.lifecycle, "b-" + page.lifecycle, "wiki-badge-lifecycle")
-    ];
+    // A deprecated page shows no trust badge: the lifecycle takes precedence (docs/LEARNINGS.md).
+    var badges = [];
+    if (page.lifecycle !== "deprecated") badges.push(badge(t.trust[page.trustTier] || page.trustTier, "b-" + page.trustTier, "wiki-badge-trust"));
+    badges.push(badge(t.lifecycle[page.lifecycle] || page.lifecycle, "b-" + page.lifecycle, "wiki-badge-lifecycle"));
     if (isExpired(page)) badges.push(badge(t.expired, "b-expired", "wiki-badge-expired"));
     badges.push(badge(page.type));
     (page.tags || []).forEach(function (tag) { badges.push(badge("#" + tag)); });
@@ -607,7 +607,7 @@ const WIKI_BROWSER_JS = String.raw`
       return h("li", null, [
         h("div", { class: "badges" }, [
           h("a", { class: "linkbtn", href: pageHash(node.path) }, node.title),
-          badge(node.kind), badge(t.trust[node.trustTier] || node.trustTier, "b-" + node.trustTier),
+          badge(node.kind), node.status === "deprecated" ? null : badge(t.trust[node.trustTier] || node.trustTier, "b-" + node.trustTier),
           node.missingProvenance ? badge(t.withoutSource, "b-warn") : null
         ]),
         h("dl", null, [

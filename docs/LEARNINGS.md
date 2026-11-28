@@ -86,6 +86,7 @@ abgebildet:
   dort als `invalid-status`. Auf jeder anderen Seite meldet er `neu` & Co. als `invalid-status`.
 - `stale_after` ist ein Datum. Ist es überschritten, meldet der Lint `expired-page`, auch bei Learnings.
 - `verified` bleibt die Liste aus `by` und `at`.
+- **Anzeige:** Der Lebenszyklus `deprecated` hat Vorrang. Eine ausgemusterte Seite (`veraltet`, `ersetzt`, `verworfen`) zeigt in der Wiki-Ansicht, in der Knotenliste und im statischen Export keinen Vertrauens-Badge (verified, generated, unattributed), nur „deprecated“. `verified` im Frontmatter und das abgeleitete `trustTier` in Daten, API und Suche bleiben unverändert; die Regel gilt nur für die Anzeige.
 
 ## Lebenszyklus
 
@@ -158,6 +159,11 @@ und Undo.
   Beachtung der Groß-/Kleinschreibung) und `scope` (Teilstring); mit Filter darf `query` leer sein. Jeder Treffer
   nennt `status`, `stale_after`, `expired` und `ageDays` (ab `created`, sonst ab dem letzten `verified.at`), soweit
   die Map sie hat.
+- **Mehrwortsuche:** Eine Anfrage mit mehreren Wörtern trifft eine Karte, wenn jedes Wort irgendwo in ihr vorkommt
+  (Titel, Knoten oder Frontmatter), in beliebiger Reihenfolge und ohne Beachtung der Groß-/Kleinschreibung (UND
+  über die Karte, nicht über einen Knoten). Treffer-Knoten sind die Knoten, die mindestens ein Suchwort enthalten.
+  Ein einzelnes Wort verhält sich wie bisher; `status`, `tag`, `scope` und `includeStale` gelten unverändert. Das
+  gilt für `bloommd_search` und `bloommd-wiki agent search`/`wissen suchen` gleichermaßen.
 - **Abgelaufenes:** Die Suche liefert Maps mit überschrittenem `stale_after` und Status `veraltet`, `ersetzt` oder `verworfen`
   nur mit `includeStale: true`; ein `status`-Filter hat Vorrang. `bloommd_stale` (nur lesend) listet Maps mit
   `stale_after` bis heute, mit `days` auch die der nächsten n Tage (ohne Treffer ist der Text genau `NO_REPLY`,

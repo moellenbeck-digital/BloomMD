@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseFile, serializeToMarkdown } from "./parser";
+import { parseFile, serializeToMarkdown, stripBloomMdComments } from "./parser";
 import { addNode, deleteNode, moveNode, renameNode } from "./operations";
 
 const SAMPLE_MD = `---
@@ -543,5 +543,39 @@ describe("concept map metadata", () => {
     const again = parseFile("map.md", serializeToMarkdown(parseFile("map.md", markdown)));
     expect(again.nodes.get("w")?.metadata?.note).toBe("Wirtschaft");
     expect(again.nodes.get("w")?.metadata?.relations).toEqual([{ target: "a", label: "braucht" }, { target: "u" }]);
+  });
+});
+
+describe("stripBloomMdComments", () => {
+  test("removes a bloommd:id comment together with the space before it", () => {
+    expect(stripBloomMdComments("## Entscheidung <!-- bloommd:id=abc123 -->\n\n- Entscheid: bestätigt")).toBe(
+      "## Entscheidung\n\n- Entscheid: bestätigt",
+    );
+  });
+
+  test("removes a bloommd:meta comment", () => {
+    expect(stripBloomMdComments('## Aufgabe <!-- bloommd:meta={"kind":"task","status":"open"} -->\ntext')).toBe("## Aufgabe\ntext");
+  });
+
+  test("removes several comments in one line and leaves no trailing space", () => {
+    expect(stripBloomMdComments('## Titel <!-- bloommd:id=a1 --> <!-- bloommd:meta={"kind":"topic"} -->\nrest')).toBe("## Titel\nrest");
+  });
+
+  test("keeps the text after a comment that sits mid-line", () => {
+    expect(stripBloomMdComments("vorher <!-- bloommd:id=a1 --> nachher")).toBe("vorher nachher");
+  });
+
+  test("keeps ordinary HTML comments", () => {
+    const text = "## Titel <!-- TODO: prüfen -->\n<!-- bloommd ohne Schlüssel -->";
+    expect(stripBloomMdComments(text)).toBe(text);
+  });
+
+  test("keeps blank lines and CRLF line breaks", () => {
+    expect(stripBloomMdComments("# A <!-- bloommd:id=a -->\r\n\r\nText\r\n")).toBe("# A\r\n\r\nText\r\n");
+  });
+
+  test("returns text without BloomMD comments unchanged", () => {
+    const text = "# Titel  \n\n- Punkt mit zwei Leerzeichen  \n";
+    expect(stripBloomMdComments(text)).toBe(text);
   });
 });

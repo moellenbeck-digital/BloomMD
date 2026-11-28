@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { stripBloomMdComments } from "@bloommd/core/browser";
 import type { AppLocale } from "../../lib/locale";
 
 function wikiCopy(locale: AppLocale) {
@@ -174,7 +175,7 @@ function KnowledgeMap({ graph, onSelect, locale }: { graph: KnowledgeGraphData; 
                 <Badge className={node.kind === "concept" ? "border-[#FF6B35] bg-[#FFF4EE] text-[#B84218]" : "border-neutral-300 bg-neutral-50 text-neutral-600"}>
                   {node.kind}
                 </Badge>
-                <Badge className={TRUST_STYLE[node.trustTier] ?? ""}>{node.trustTier}</Badge>
+                {node.status !== "deprecated" && <Badge className={TRUST_STYLE[node.trustTier] ?? ""}>{node.trustTier}</Badge>}
                 {node.missingProvenance && (
                   <Badge className="border-amber-300 bg-amber-50 text-amber-900">{copy.withoutSource}</Badge>
                 )}
@@ -370,7 +371,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
                 <p className="font-mono text-xs text-neutral-500">{selected.path}</p>
                 <h2 className="mt-2 text-3xl font-semibold">{selected.title}</h2>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {selected.trustTier && <Badge className={TRUST_STYLE[selected.trustTier] ?? ""}>{selected.trustTier}</Badge>}
+                  {selected.trustTier && selected.lifecycle !== "deprecated" && <Badge className={TRUST_STYLE[selected.trustTier] ?? ""}>{selected.trustTier}</Badge>}
                   {selected.lifecycle && selected.lifecycle !== "stable" && (
                     <Badge className="border-neutral-300 bg-neutral-50 text-neutral-700">{selected.lifecycle}</Badge>
                   )}
@@ -379,7 +380,7 @@ export function WikiExplorer({ pages, graph, graphHealth, log, locale = "de", pr
                   ))}
                 </div>
 
-                <pre className="mt-6 whitespace-pre-wrap font-sans text-[15px] leading-7 text-neutral-700">{selected.content}</pre>
+                <pre className="mt-6 whitespace-pre-wrap font-sans text-[15px] leading-7 text-neutral-700">{stripBloomMdComments(selected.content)}</pre>
 
                 <section className="mt-8 border-t border-neutral-200 pt-5" data-testid="wiki-citations">
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">

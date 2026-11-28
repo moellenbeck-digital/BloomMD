@@ -447,7 +447,8 @@ export class KnowledgeService {
 
   /**
    * Search over node titles and content and, additionally, tags, scope, source, status and title
-   * of the frontmatter. `status`, `tag` and `scope` filter maps (the query may then be empty:
+   * of the frontmatter. A map matches when every word of the query occurs somewhere in it (nodes or
+   * frontmatter, any order, any case); its hits are the nodes and fields containing at least one word. `status`, `tag` and `scope` filter maps (the query may then be empty:
    * one `map` hit per matching map). Expired maps and maps marked veraltet/ersetzt are left out
    * unless `includeStale` is set or a `status` filter is given.
    */
@@ -474,7 +475,7 @@ export class KnowledgeService {
         hits.push({ path: map.path, nodeId: "", kind: "map", title: frontmatter.title ?? map.title, snippet, ...trust });
         continue;
       }
-      const inFrontmatter = searchKnowledgeFrontmatter(frontmatter, query);
+      const inFrontmatter = searchKnowledgeFrontmatter(frontmatter, query, document.markdown);
       if (inFrontmatter) hits.push({ path: map.path, nodeId: "", kind: "frontmatter", title: frontmatter.title ?? map.title, snippet: inFrontmatter.snippet, field: inFrontmatter.field, ...trust });
       for (const hit of searchKnowledge(document.markdown, query, Math.max(0, limit - hits.length))) hits.push({ path: map.path, kind: "node", ...hit, ...trust });
     }

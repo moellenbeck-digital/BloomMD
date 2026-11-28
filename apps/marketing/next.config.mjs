@@ -47,6 +47,21 @@ const nextConfig = {
   // raw HTML head then miss title, canonical and hreflang. Blocking metadata for all agents keeps
   // them in <head>; the marketing pages resolve metadata from local files, so the delay is small.
   htmlLimitedBots: /.*/,
+  // Render-blocking CSS on the landing pages: the global sheet plus one page sheet. Next's default
+  // chunking splits the page CSS at 30 KB, which costs a round trip before first paint on mobile.
+  experimental: { cssChunking: false },
+  webpack(config, { isServer, dev }) {
+    if (!isServer && !dev) {
+      config.optimization.splitChunks.cacheGroups.landingCss = {
+        name: "landing-css",
+        type: "css/mini-extract",
+        chunks: (chunk) => chunk.name === "app/page" || chunk.name === "app/en/page",
+        enforce: true,
+        priority: 50,
+      };
+    }
+    return config;
+  },
   async headers() {
     return [
       {

@@ -468,8 +468,8 @@ const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit,
 /* Cursor gaze only on devices with a real hover and a fine pointer (desktop). Head turn at most ±6°. */
 const FINE_POINTER = "(hover: hover) and (pointer: fine)";
 const LOOK_DEG = 6;
-/* Durations of the click reactions (CSS: bloom-poke 0.56 s, bloom-pop 0.6 s). */
-const REACT_MS = 600;
+/* Durations of the click reactions (CSS: bloom-poke 0.56 s, bloom-pop 0.6 s) plus a margin, so the attribute never cuts the end. */
+const REACT_MS = 700;
 const LOOK_HOLD_MS = 900;
 
 export function BloomAgentScene({ locale }: { locale: Locale }) {
@@ -542,7 +542,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
      (animation-range). Measured on layout changes (ResizeObserver), never on scroll. */
   useEffect(() => {
     const node = ref.current;
-    if (!node || !motion || !CSS.supports("animation-timeline: scroll()")) return;
+    if (!node || !motion || !CSS.supports("animation-timeline: scroll()") || !CSS.supports("animation-range: 0px 1px")) return;
     let frame = 0;
     const measure = () => {
       cancelAnimationFrame(frame);
@@ -559,11 +559,19 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     observer.observe(document.documentElement);
     observer.observe(node);
     window.addEventListener("resize", measure, { passive: true });
+    /* The scroll animations exist only near the viewport. Outside the range they would only hold their end
+       values, but they would still count as running animations of the page. */
+    const inview = new IntersectionObserver((entries) => {
+      for (const entry of entries) node.toggleAttribute("data-inview", entry.isIntersecting);
+    }, { rootMargin: "25% 0px" });
+    inview.observe(node);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      inview.disconnect();
       window.removeEventListener("resize", measure);
       node.removeAttribute("data-scroll");
+      node.removeAttribute("data-inview");
     };
   }, [motion]);
 
@@ -624,7 +632,10 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     Object.assign(gaze, { x: 0, y: 0, tx: 0, ty: 0, frame: 0 });
     paint();
   }, [lookable, paint]);
-  useEffect(() => () => cancelAnimationFrame(look.current.frame), []);
+  useEffect(() => () => {
+    cancelAnimationFrame(look.current.frame);
+    window.clearTimeout(look.current.hold);
+  }, []);
 
   /* Click reactions: the attribute is set again on every click, so the CSS animation restarts. */
   const timers = useRef(new Map<Element, number>());
@@ -809,6 +820,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                       aria-label={t.node(titles[index]!)}
                       onClick={(event) => bloomNode(kind, index, event.currentTarget)}
                       onFocus={onNodeFocus}
+                      onBlur={aimHome}
                       data-bloom-hit={index}
                     />
                   ))}

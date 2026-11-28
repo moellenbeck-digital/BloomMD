@@ -623,3 +623,70 @@ test("the pause stops the parallax and the scroll pose", async ({ page }) => {
   await page.waitForTimeout(400);
   expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none" });
 });
+
+/* The scroll animations exist only near the viewport. Far away the page has no running animation from
+   the scene, so checks that wait for all finite animations to end (mobile accessibility scan) can finish. */
+test("the scroll animations run only while the scene is near the viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.waitForLoadState("load");
+  const scene = page.getByTestId("bloom-agent-scene");
+  const scrollAnimations = () => page.evaluate(() => document.getAnimations().filter((animation) => animation.timeline !== document.timeline).length);
+  await expect.poll(scrollAnimations).toBe(0);
+  await expect(scene).not.toHaveAttribute("data-inview");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-inview", "");
+  await expect.poll(scrollAnimations).toBe(3);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await expect(scene).not.toHaveAttribute("data-inview");
+  await expect.poll(scrollAnimations).toBe(0);
+});
+
+/* Chrome does not resolve var() in animation-timing-function inside @keyframes (falls back to linear).
+   The keyframes carry literal easings, so the springs of the hop and the node pop really overshoot. */
+test("the keyframes use literal easings, the springs of the hop and the node pop work", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  await scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(1).click();
+  const easings = await scene.evaluate((node) => Object.fromEntries(
+    node.getAnimations({ subtree: true })
+      .filter((animation): animation is CSSAnimation => animation instanceof CSSAnimation)
+      .map((animation) => [
+        /* CSS module names: "bloom-agent-scene_bloom-hop__hash" (production) or "bloom-hop". */
+        animation.animationName.match(/(?:^|_)(bloom-(?!agent-scene)[a-z-]+?)(?:__|$)/)?.[1] ?? animation.animationName,
+        (animation.effect as KeyframeEffect).getKeyframes().map((frame) => ({ offset: frame.computedOffset, easing: frame.easing })),
+      ]),
+  ));
+  expect(Object.keys(easings)).toEqual(expect.arrayContaining(["bloom-hop", "bloom-head", "bloom-pop"]));
+  for (const frames of Object.values(easings)) for (const frame of frames) expect(frame.easing).not.toContain("var(");
+  const at = (name: string, offset: number) => easings[name]!.find((frame) => Math.abs(frame.offset - offset) < 0.0005)?.easing ?? "";
+  // Landing of the hop (84 %) and the node pop (14 %) settle with springs, the head snaps into its poses.
+  expect(at("bloom-hop", 0.84)).toMatch(/^linear\(0 0%, 0\.113 /);
+  expect(at("bloom-pop", 0.14)).toMatch(/^linear\(0 0%, 0\.134 /);
+  expect(at("bloom-head", 0.05)).toBe("cubic-bezier(0.12, 0.9, 0.2, 1)");
+});
+
+test("the press feedback of the agent works while the scene runs, not in the pause", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  const avatar = page.getByTestId("bloom-agent-avatar");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  const pressed = async () => {
+    const box = (await avatar.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    const transform = await avatar.evaluate((node) => getComputedStyle(node.querySelector("[class*='poke']")!).transform);
+    await page.mouse.up();
+    return transform;
+  };
+  expect(await pressed()).not.toBe("none");
+  await page.getByTestId("bloom-agent-scene-toggle").click();
+  await expect(scene).toHaveAttribute("data-state", "stopped");
+  await page.waitForTimeout(800);
+  expect(await pressed()).toBe("none");
+});

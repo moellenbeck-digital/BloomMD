@@ -15,11 +15,11 @@ export interface LandingPath {
 }
 
 /* Three ways in, each leaving the same shoot. The shoot is CSS only and thins from the first way to the last. */
-export function LandingPaths({ items }: { items: LandingPath[] }) {
+export function LandingPaths({ items, testId = "landing-paths" }: { items: readonly LandingPath[]; testId?: string }) {
   const [view, grow] = useGrowOnView<HTMLUListElement>();
 
   return (
-    <section className={`${t.ground} ${bmdFonts} ${styles.section}`} data-testid="landing-paths">
+    <section className={`${t.ground} ${bmdFonts} ${styles.section}`} data-testid={testId}>
       <div className={t.wrap}>
         <ul ref={view} className={styles.fork} data-grow={grow}>
           {items.map((item) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
@@ -28,6 +28,9 @@ import { SiteHeader } from "../../components/v2/site-header";
 import { HeroIntro } from "../../components/v2/hero-intro";
 import { HeroTrieb } from "../../components/v2/hero-trieb";
 import { SplitDemo } from "../../components/v2/split-demo";
+import { LandingPaths } from "../../components/v2/landing-paths";
+import { UseCaseTrieb } from "../../components/v2/use-case-trieb";
+import { TemplatesTrieb } from "../../components/v2/templates-trieb";
 import { getBuildInfo } from "../../lib/build-info";
 import { publicAppUrl } from "../../lib/deployment";
 import { trackPlausibleEvent } from "../../lib/plausible";
@@ -112,6 +115,7 @@ const workflowSteps = [
 
 const useCases = [
   {
+    id: "strategy",
     label: "Product strategy",
     file: "strategy.md",
     heading: "Connect goals, initiatives and open risks",
@@ -125,6 +129,7 @@ const useCases = [
     ].join("\n"),
   },
   {
+    id: "research",
     label: "Research",
     file: "literature-review.md",
     heading: "Make sources and arguments visible",
@@ -138,6 +143,7 @@ const useCases = [
     ].join("\n"),
   },
   {
+    id: "architecture",
     label: "Software architecture",
     file: "architecture.md",
     heading: "Keep ADRs, modules and constraints together",
@@ -150,7 +156,7 @@ const useCases = [
       "### Storage",
     ].join("\n"),
   },
-] as const;
+];
 
 const heroMarkdown = [
   "# Product Strategy",
@@ -210,39 +216,6 @@ const faqItems = [
     answer: "Yes. Signed-in testers can send feedback from the app. Screenshots and videos are planned for the beta feedback workflow.",
   },
 ] as const;
-
-function AudiencePaths() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]" data-testid="english-landing-paths">
-      <div className="mx-auto max-w-7xl px-5 py-8 lg:py-10">
-        <div className="grid gap-3 md:grid-cols-3">
-          {audiencePaths.map((path) => {
-            const Icon = path.icon;
-            return (
-              <a
-                key={path.title}
-                href={path.href}
-                className="group grid min-h-[178px] gap-4 rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#FFD4BF] hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-[#FFF4EE] text-[#B64A1F]">
-                    <Icon size={19} aria-hidden="true" />
-                  </span>
-                  <h2 className="text-base font-semibold text-[#1A1A1A]">{path.title}</h2>
-                </div>
-                <p className="text-sm leading-6 text-[#666666]">{path.text}</p>
-                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-[#B64A1F]">
-                  {path.cta}
-                  <ArrowRight size={15} className="transition group-hover:translate-x-0.5" aria-hidden="true" />
-                </span>
-              </a>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function WhatIsNewSection() {
   return (
@@ -323,94 +296,11 @@ function WorkflowSection() {
   );
 }
 
-function UseCasesSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const active = useCases[activeIndex] ?? useCases[0]!;
-  const previewDocument = useMemo(() => parseFile(active.file, active.markdown), [active.file, active.markdown]);
-
-  return (
-    <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Use cases</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">For knowledge that has outgrown a linear list.</h2>
-        </div>
-        <div className="space-y-5">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Use cases">
-            {useCases.map((item, index) => (
-              <button
-                key={item.label}
-                id={`usecase-tab-en-${index}`}
-                type="button"
-                role="tab"
-                aria-selected={activeIndex === index}
-                aria-controls="usecase-panel-en"
-                onClick={() => setActiveIndex(index)}
-                className={`min-h-11 rounded-md border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
-                  activeIndex === index ? "border-[#FF6B35] bg-[#FFF4EE] text-[#1A1A1A]" : "border-[#E8E4DF] bg-[#FCFBFA] text-[#666666] hover:bg-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div id="usecase-panel-en" role="tabpanel" aria-labelledby={`usecase-tab-en-${activeIndex}`} className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4">
-            <h3 className="text-xl font-semibold">{active.heading}</h3>
-            <p className="mt-2 max-w-3xl leading-7 text-[#555555]">{active.text}</p>
-            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
-                <div className="mb-3 text-sm font-semibold">{active.file}</div>
-                <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
-              </div>
-              <MindMapPreview
-                document={previewDocument}
-                className="min-h-[250px]"
-                ariaLabel={`${active.label} Markdown mind map preview`}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const templateHighlights = [
   { title: "Software Architecture Map", category: "Development", slug: "software-architecture", text: "Plan components, integrations, security and the roadmap in one Markdown map." },
   { title: "Startup Operating System", category: "Business", slug: "startup-operating-system", text: "Connect vision, customers, decisions and metrics in one editable file." },
   { title: "Obsidian Vault Starter", category: "Knowledge", slug: "obsidian-vault-starter", text: "Start with a Markdown structure for projects, resources and notes." },
 ] as const;
-
-function TemplatesSection() {
-  return (
-    <section id="templates" className="bg-[#FFFDFB]">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-semibold text-[#A33D17]">Templates</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Start with a real Markdown file.</h2>
-            <p className="mt-4 text-lg leading-8 text-[#555555]">Open a template as a map, then replace the example with your own content.</p>
-          </div>
-          <Link href="/templates?lang=en" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
-            Browse all templates <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {templateHighlights.map((template) => (
-            <article key={template.slug} className="rounded-lg border border-[#E8E4DF] bg-white p-5">
-              <p className="text-xs font-semibold text-[#A33D17]">{template.category}</p>
-              <h3 className="mt-3 text-lg font-semibold">{template.title}</h3>
-              <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#555555]">{template.text}</p>
-              <Link href={`/demo?template=${template.slug}&lang=en`} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
-                Open in the demo <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function FeatureSection() {
   return (
@@ -759,9 +649,9 @@ export function EnglishLandingPage() {
       <AgentWorkflowSection locale="en" />
       <KnowledgeVisionSection locale="en" />
 
-      <AudiencePaths />
-      <UseCasesSection />
-      <TemplatesSection />
+      <LandingPaths items={audiencePaths} testId="english-landing-paths" />
+      <UseCaseTrieb items={useCases} kicker="Use cases" title="For knowledge that has outgrown a linear list." />
+      <TemplatesTrieb locale="en" items={templateHighlights.map((item) => ({ ...item, href: `/templates/${item.slug}` }))} />
       <AvailabilityOverview locale="en" />
       <BetaSection />
       <FAQSection />

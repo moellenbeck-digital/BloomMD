@@ -103,7 +103,7 @@ function DemoVideo({ c }: { c: (typeof copy)[MarketingLocale] }) {
     <div className={styles.recording}>
       <noscript>
         <style>{"[data-script-video]{display:none}"}</style>
-        <video className={styles.video} src="/demo-branch-drag-markdown.webm" controls muted loop playsInline preload="metadata" aria-label={c.video} />
+        <video className={styles.video} src="/demo-branch-drag-markdown.webm" poster="/demo-branch-drag-markdown-poster.webp" controls muted loop playsInline preload="metadata" aria-label={c.video} />
       </noscript>
       <div data-script-video="">
         <video

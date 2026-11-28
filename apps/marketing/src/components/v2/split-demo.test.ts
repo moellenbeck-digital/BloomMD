@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 
 const component = readFileSync(new URL("./split-demo.tsx", import.meta.url), "utf8");
 
@@ -17,5 +17,12 @@ describe("v2 demo section", () => {
     expect(component).toContain("{mounted && (");
     expect(component).toContain("prefers-reduced-motion: reduce");
     expect(component).toContain("Aufnahme anhalten");
+  });
+
+  test("only the video for visitors without JavaScript carries a poster, so nothing extra loads otherwise", () => {
+    const fallback = component.slice(component.indexOf("<noscript>"), component.indexOf("</noscript>"));
+    expect(fallback).toContain('poster="/demo-branch-drag-markdown-poster.webp"');
+    expect(component.split("poster=").length).toBe(2);
+    expect(statSync(new URL("../../../public/demo-branch-drag-markdown-poster.webp", import.meta.url)).size).toBeLessThanOrEqual(30 * 1024);
   });
 });

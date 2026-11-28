@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Learnings-Suche (Ticket 434): `agent search --include-stale` nennt bei einem ersetzten Learning (`status: ersetzt`) den Nachfolger direkt im Treffer (`replaced_by`). Treffer ohne Nachfolger haben das Feld nicht; `agent read` und die übrigen Felder bleiben unverändert.
+- Learnings search (ticket 434): `agent search --include-stale` now shows the successor of a replaced learning (`status: ersetzt`) in the hit itself (`replaced_by`). Hits without a successor have no such field; `agent read` and the other fields are unchanged.
+
 ## [Web-App 0.7.0-develop.9, Marketing 0.7.0-develop.9, Sync 0.7.0-develop.9] - 2026-11-28
 
 - Wiki-Ansicht (Ticket 433): Ein Learning mit dem Frontmatter-Feld `source` (Text oder Liste) zeigt auf `/wiki` die Quelle als Zitat: „Zitate (1)“, kein „ohne Quelle“ in Seitenliste und Knowledge Map. Eine vorhandene Liste `sources:` hat Vorrang, ohne beide Felder bleibt es bei „Zitate (0)“.

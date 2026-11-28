@@ -693,3 +693,41 @@ test("the press feedback of the agent works while the scene runs, not in the pau
   await page.waitForTimeout(800);
   expect(await pressed()).toBe("none");
 });
+
+/* Material without neon and without cost: no element of the scene carries a filter (drop-shadow, blur), and
+   no animation of the scene changes a shadow or a filter (static shadows only; the keyframes themselves are
+   checked in the unit test). Depth comes from painted shadow layers that move with their node.
+   One highlight: no sparks, also not on a click on the agent or a node. */
+const materialAudit = (page: Page) =>
+  page.getByTestId("bloom-agent-scene").evaluate((scene) => {
+    const all = [...scene.querySelectorAll("*")];
+    const animations = scene.getAnimations({ subtree: true });
+    const properties = new Set(
+      animations.flatMap((animation) => ((animation.effect as KeyframeEffect | null)?.getKeyframes() ?? []).flatMap((frame) => Object.keys(frame))),
+    );
+    return {
+      filters: all.filter((element) => getComputedStyle(element).filter !== "none").length,
+      shadowOrFilterAnimated: [...properties].filter((name) => /shadow|filter/i.test(name)).length,
+      moving: animations.length,
+      sparks: all.filter((element) => /spark|burst|pokeDot|ring(?:__|$)/i.test(element.getAttribute("class") ?? "")).length,
+    };
+  });
+
+test("the scene has no filter, animates no shadow and shows no sparks, also on a click", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  await page.waitForTimeout(1300);
+  const during = await materialAudit(page);
+  expect(during.moving).toBeGreaterThan(5);
+  expect(during).toMatchObject({ filters: 0, shadowOrFilterAnimated: 0, sparks: 0 });
+  await finishScene(page);
+  await page.getByTestId("bloom-agent-avatar").click();
+  await scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(0).click();
+  await expect(scene).toHaveAttribute("data-react", "");
+  const clicked = await materialAudit(page);
+  expect(clicked.moving).toBeGreaterThan(2);
+  expect(clicked).toMatchObject({ filters: 0, shadowOrFilterAnimated: 0, sparks: 0 });
+});

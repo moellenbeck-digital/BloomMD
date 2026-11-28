@@ -81,7 +81,6 @@ type Layout = {
   /* Stem from the seed to the root as cubic segments; leaves sit on [segment, t]. */
   stem: (seed: Point, rootBottom: Point) => Cubic[];
   stemLeaves: readonly [readonly [number, number], readonly [number, number]];
-  spark: number;
 };
 
 const LAYOUTS: Record<"wide" | "tall", Layout> = {
@@ -95,7 +94,6 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
     leaf: { x: 784, h: 48, cy: [270, 340], font: 17 },
     stem: ([sx, sy], [rx, ry]) => [[[sx, sy], [sx, sy - 70], [rx, ry + 80], [rx, ry]]],
     stemLeaves: [[0, 0.2], [0, 0.52]],
-    spark: 1.55,
   },
   tall: {
     W: 360,
@@ -113,12 +111,11 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
       [[170, 176], [170, 140], [rx, ry + 30], [rx, ry]],
     ],
     stemLeaves: [[0, 0.62], [1, 0.45]],
-    spark: 1,
   },
 };
 
-/* Beats of the scene in seconds. The CSS module reads them as custom properties (--t-*), so the sparks
-   in the markup and the keyframes in the CSS keep the same timeline. The agent tracks run 4.8 s: the scene
+/* Beats of the scene in seconds. The CSS module reads them as custom properties (--t-*), so the markup
+   and the keyframes in the CSS keep the same timeline. The agent tracks run 4.8 s: the scene
    is calm before 5 s. The phases overlap (the next one starts while the last one settles). */
 const T = { root: 1.72, child: 2.2, leaf: 2.68, flow: 3 } as const;
 const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--t-${key}`, `${value}s`])) as CSSProperties;
@@ -208,46 +205,36 @@ function bez([p0, p1, p2, p3]: Cubic, t: number): Point {
 const cubicPath = (segments: readonly Cubic[]) => `M${segments[0]![0].join(" ")}${segments.map(([, a, b, c]) => ` C${a.join(" ")} ${b.join(" ")} ${c.join(" ")}`).join("")}`;
 const r1 = (value: number) => Math.round(value * 10) / 10;
 
-/* Deterministic sparks: a fan that rises from a burst point. */
-function Sparks({ x, y, delay, count = 8, spread = 1, rise = 1, scale = 1, ring = false }: { x: number; y: number; delay: number; count?: number; spread?: number; rise?: number; scale?: number; ring?: boolean }) {
-  return (
-    <g className={styles.burst} style={{ "--d": `${delay}s` } as CSSProperties} aria-hidden="true">
-      {ring ? <circle cx={x} cy={y} r={14 * scale} className={styles.ring} /> : null}
-      {Array.from({ length: count }, (_, index) => {
-        const angle = ((-90 + (index - (count - 1) / 2) * (150 / count) * spread) * Math.PI) / 180;
-        const reach = (24 + (index % 3) * 9) * rise * scale;
-        const style = {
-          "--dx": `${Math.round(Math.cos(angle) * reach)}px`,
-          "--dy": `${Math.round(Math.sin(angle) * reach - 10 * rise * scale)}px`,
-          "--k": index % 4,
-        } as CSSProperties;
-        return <circle key={index} cx={x} cy={y} r={(index % 3 === 0 ? 2.6 : 1.8) * scale} className={styles.spark} style={style} />;
-      })}
-    </g>
-  );
-}
-
-/* A small watering can, drawn in the hand of the agent. Spout tip at (39, 4) of its 42 × 28 box. */
+/* A small watering can of brushed steel, in the hand of the agent. Spout tip at (39, 4) of its 42 × 28 box.
+   Material (apple-design §12): one light from the top left. One metal gradient in box units for every part:
+   bright at the top left, darker body at the bottom. A specular edge along the top of the body and a soft
+   streak on the left catch the light. No filter: the can moves (opacity, transform), so its depth is painted in. */
 function WateringCan() {
   return (
     <svg className={styles.can} viewBox="0 0 42 28" aria-hidden="true" focusable="false">
-      <path d="M4 9 C-1 9 -1 21 5 21" className={styles.canHandle} />
-      <path d="M26 16 L39 5" className={styles.canSpout} />
-      <path d="M37 2.5 l4.5 4.5" className={styles.canRose} />
-      <rect x="5" y="8" width="23" height="18" rx="5" className={styles.canBody} />
-      <rect x="9" y="12" width="15" height="3" rx="1.5" className={styles.canBand} />
+      <defs>
+        <linearGradient id="bloom-can-metal" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="20" y2="27">
+          <stop offset="0" stopColor="#F4F1EE" />
+          <stop offset="0.45" stopColor="#B7B2AE" />
+          <stop offset="1" stopColor="#5E5955" />
+        </linearGradient>
+      </defs>
+      <path d="M4 9 C-1 9 -1 21 5 21" stroke="url(#bloom-can-metal)" className={styles.canHandle} />
+      <path d="M26 16 L39 5 M37 2.5 l4.5 4.5" stroke="url(#bloom-can-metal)" className={styles.canSpout} />
+      <rect x="5" y="8" width="23" height="18" rx="5" fill="url(#bloom-can-metal)" className={styles.canBody} />
+      <path d="M8 9.6 Q16.5 7.8 25 9.6 M9.2 13 V21" className={styles.canSpecular} />
     </svg>
   );
 }
 
-/* Everything behind the agent: light, ground, stem, branches, nodes and their sparks.
+/* Everything behind the agent: ground, stem, branches and nodes, with their shadows.
    live: motion is allowed. Only then the parts that are invisible in the final image are rendered
-   (ghost outline, sparks, flow pulses, ripple, bud). The server render stays small, the final image is the same. */
+   (ghost outline, flow pulses, ripple, bud, petals). The server render stays small, the final image is the same. */
 function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale; live: boolean }) {
   const layout = LAYOUTS[kind];
   const map = MAP[locale];
   const g = geometry(layout, locale);
-  const { root, child, leaf, ground, spark } = layout;
+  const { root, child, leaf, ground } = layout;
   const id = (name: string) => `bloom-${kind}-${name}`;
   const s = kind === "wide" ? 1.6 : 1.05;
   const rootBottom = g.rootY + root.h;
@@ -290,19 +277,10 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
   return (
     <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u } as CSSProperties} aria-hidden="true" focusable="false" data-bloom-stage={kind}>
       <defs>
-        <radialGradient id={id("glow")}>
-          <stop offset="0" stopColor="#FF6B35" stopOpacity="0.3" />
-          <stop offset="0.55" stopColor="#FF6B35" stopOpacity="0.08" />
-          <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id={id("seedglow")}>
-          <stop offset="0" stopColor="#FFD27A" stopOpacity="0.9" />
-          <stop offset="0.45" stopColor="#FF8A5C" stopOpacity="0.35" />
-          <stop offset="1" stopColor="#FF6B35" stopOpacity="0" />
-        </radialGradient>
+        {/* Ground: a dark contact zone under the plant, no coloured glow. */}
         <radialGradient id={id("soil")} cy="0.2" r="0.6">
-          <stop offset="0" stopColor="#FF8A5C" stopOpacity="0.2" />
-          <stop offset="1" stopColor="#FF8A5C" stopOpacity="0" />
+          <stop offset="0" stopColor="#000" stopOpacity="0.28" />
+          <stop offset="1" stopColor="#000" stopOpacity="0" />
         </radialGradient>
         <linearGradient id={id("ground")} x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="#fff" stopOpacity="0" />
@@ -311,16 +289,11 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <stop offset="1" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
         {/* Material: one light from the top left (as on the card). A bright inner top edge where the light
-            catches the pill, fading out by the middle, and a faint sheen on the root only. */}
+            catches the pill, fading out by the middle. Shadows: see the shadow pills below. */}
         <linearGradient id={id("rim")} x1="0" x2="0.25" y1="0" y2="1">
           <stop offset="0" stopColor="#fff" stopOpacity="0.5" />
           <stop offset="0.42" stopColor="#fff" stopOpacity="0.06" />
           <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id={id("sheen")} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#fff" stopOpacity="0.16" />
-          <stop offset="0.5" stopColor="#fff" stopOpacity="0.03" />
-          <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
         <linearGradient id={id("root")} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor="#FF9364" />
@@ -335,13 +308,11 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <stop offset="1" stopColor="#222821" />
         </linearGradient>
       </defs>
-      <ellipse cx={root.cx} cy={root.cy} rx={kind === "wide" ? 420 : 230} ry={260} fill={`url(#${id("glow")})`} className={styles.glow} />
       <ellipse cx={g.W / 2} cy={ground + 4} rx={g.W * 0.48} ry={kind === "wide" ? 40 : 28} fill={`url(#${id("soil")})`} />
       <path d={`M${g.W * 0.03} ${ground + 0.5} H${g.W * 0.97}`} stroke={`url(#${id("ground")})`} className={styles.ground} />
 
       <ellipse cx={layout.avatar.x + layout.avatar.w * 0.6} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
       <ellipse cx={g.seed.x} cy={ground + 1} rx={24 * s} ry={4.5 * s} className={styles.soil} />
-      <circle cx={g.seed.x} cy={g.seed.y - 3} r={30 * s} fill={`url(#${id("seedglow")})`} className={styles.seedGlow} />
       {live ? <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} data-bloom-ripple /> : null}
 
       {/* Ghost outline of the map before it grows: the stage is never an empty card. Each part fades
@@ -360,7 +331,9 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         </g>
       ) : null}
 
-      <path d={stem} pathLength={1} className={`${styles.stemHalo} ${styles.draw}`} />
+      {/* Depth instead of neon: every branch casts a thin, dark copy of itself down and to the right (light from
+          the top left). It draws with the branch (stroke-dashoffset), no filter, no blur. */}
+      <path d={stem} pathLength={1} transform={`translate(${r1(1.2 * s)} ${r1(2.4 * s)})`} className={`${styles.stemShadow} ${styles.draw}`} />
       <path d={stem} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
       <path d={`M${r1(ax + 1)} ${r1(ay)} c${15 * s} ${-1 * s} ${23 * s} ${-9 * s} ${24 * s} ${-19 * s} c${-11 * s} ${-1 * s} ${-21 * s} ${6 * s} ${-24 * s} ${19 * s} z`} className={`${styles.leaf} ${styles.leafA}`} />
       <path d={`M${r1(bx - 1)} ${r1(by)} c${-13 * s} ${-7 * s} ${-25 * s} ${-6 * s} ${-30 * s} ${1 * s} c${9 * s} ${7 * s} ${22 * s} ${7 * s} ${30 * s} ${-1 * s} z`} className={`${styles.leaf} ${styles.leafB}`} />
@@ -381,28 +354,26 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
 
       {edges.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
-          <path d={d} pathLength={1} className={`${styles.edge} ${styles.halo} ${styles.draw}`} />
+          <path d={d} pathLength={1} transform={`translate(${r1(1.2 * s)} ${r1(2.4 * s)})`} className={`${styles.edge} ${styles.edgeShadow} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.draw}`} />
           {live ? <path d={d} pathLength={1} className={styles.flow} data-bloom-flow /> : null}
         </g>
       ))}
       {twigs.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
-          <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.halo} ${styles.draw}`} />
+          <path d={d} pathLength={1} transform={`translate(${r1(1.2 * s)} ${r1(2.4 * s)})`} className={`${styles.edge} ${styles.twig} ${styles.edgeShadow} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.draw}`} />
           {live ? <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} data-bloom-flow /> : null}
         </g>
       ))}
 
-      {/* The root opens with its ring and its petals (see Petals below), no confetti sparks. */}
-      {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={0} rise={1.2} scale={spark} ring /> : null}
-
       <g className={styles.nodeWrap} data-bloom-wrap={0}>
       <g className={styles.rootNode} data-bloom-node="root">
         <g className={styles.pop}>
+        {/* Shadow pill: a dark copy, offset away from the light, painted in. It scales and fades with the node. */}
+        <rect x={g.rootX + 3 * s} y={g.rootY + 6 * s} width={g.rootW} height={root.h} rx={root.h / 2} className={`${styles.nodeShadow} ${styles.shadowRoot}`} />
         <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
         <rect x={g.rootX + 1} y={g.rootY + 1} width={g.rootW - 2} height={root.h - 2} rx={root.h / 2 - 1} stroke={`url(#${id("rim")})`} className={styles.rootRim} />
-        <rect x={g.rootX + 3} y={g.rootY + 1.5} width={g.rootW - 6} height={root.h - 3} rx={root.h / 2 - 1.5} fill={`url(#${id("sheen")})`} className={styles.sheen} />
         <text x={root.cx} y={root.cy + root.font * 0.36} textAnchor="middle" className={styles.rootTitle} style={{ fontSize: root.font }}>
           <tspan className={styles.rootMark} style={{ fontSize: root.font * 0.78 }}>#</tspan>
           <tspan dx={g.markGap(root.font)} data-bloom-title>{map.root}</tspan>
@@ -418,6 +389,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <g key={`node-${cx}`} className={styles.nodeWrap} data-bloom-wrap={1 + index}>
           <g className={styles.childNode} style={{ "--i": index, "--o": kind === "wide" ? (index === 0 ? "100% 50%" : "0% 50%") : "50% 0%" } as CSSProperties} data-bloom-node="child">
             <g className={styles.pop}>
+            <rect x={cx - w / 2 + 2 * s} y={g.childTop + 4 * s} width={w} height={child.h} rx={child.h / 2} className={`${styles.nodeShadow} ${styles.shadowChild}`} />
             <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
             <rect x={cx - w / 2 + 1} y={g.childTop + 1} width={w - 2} height={child.h - 2} rx={child.h / 2 - 1} stroke={`url(#${id("rim")})`} className={styles.rim} />
             <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>
@@ -435,6 +407,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         <g key={`leaf-${cy}`} className={styles.nodeWrap} data-bloom-wrap={3 + index}>
         <g className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
           <g className={styles.pop}>
+          <rect x={leaf.x + 1.5 * s} y={cy - leaf.h / 2 + 3 * s} width={g.leafW} height={leaf.h} rx={leaf.h / 2} className={`${styles.nodeShadow} ${styles.shadowLeaf}`} />
           <rect x={leaf.x} y={cy - leaf.h / 2} width={g.leafW} height={leaf.h} rx={leaf.h / 2} fill={`url(#${id("leaf")})`} className={styles.leafRect} />
           <rect x={leaf.x + 1} y={cy - leaf.h / 2 + 1} width={g.leafW - 2} height={leaf.h - 2} rx={leaf.h / 2 - 1} stroke={`url(#${id("rim")})`} className={`${styles.rim} ${styles.rimLeaf}`} />
           <circle cx={leaf.x + g.dot.x} cy={cy} r={kind === "wide" ? 4.2 : 3.4} className={styles.leafDot} />
@@ -463,7 +436,6 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
     <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u, "--fall-x": `${r1(fall.dx)}px`, "--fall-y": `${r1(fall.dy)}px` } as CSSProperties} aria-hidden="true" focusable="false">
       {live ? (
         <g data-bloom-water>
-          <path d={stream} pathLength={1} className={styles.streamHalo} />
           <path d={stream} pathLength={1} className={styles.streamCore} />
           <path d={stream} pathLength={1} className={styles.stream} />
           {[0, 1, 2, 3, 4].map((index) => (
@@ -477,7 +449,6 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
         </g>
       ) : null}
       <g className={styles.seedFall}>
-        {live ? <circle cx={g.seed.x} cy={g.seed.y - 4.5 * s} r={16 * s} fill={`url(#bloom-${kind}-seedglow)`} className={styles.seedHalo} /> : null}
         <g className={styles.seedSquash}>
           <ellipse cx={g.seed.x} cy={g.seed.y - 4.5 * s} rx={6 * s} ry={7.2 * s} className={styles.seed} />
           <ellipse cx={g.seed.x - 1.6 * s} cy={g.seed.y - 7 * s} rx={1.6 * s} ry={2.2 * s} className={styles.seedShine} />
@@ -602,7 +573,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
 
   /* "ready" counts as running: the scene starts by itself, so the button offers to stop it. */
   const running = state === "ready" || state === "play" || state === "idle";
-  /* The moving parts (ghost, water, sparks, can, light) are built only near the viewport, like the agent
+  /* The moving parts (ghost, water, can, petals) are built only near the viewport, like the agent
      image, so they add no work to the page load. */
   const live = motion && near;
   /* The gaze may move only while the scene runs and is in view. Pause and reduced motion stop it. */
@@ -818,13 +789,6 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
             </span>
           </span>
           </span>
-          {live ? (
-            <span className={styles.pokeBurst} aria-hidden="true">
-              {[-60, -30, 0, 30, 60].map((deg, index) => (
-                <span key={deg} className={styles.pokeDot} style={{ "--dx": `${Math.round(Math.sin((deg * Math.PI) / 180) * 34)}px`, "--dy": `${Math.round(-Math.cos((deg * Math.PI) / 180) * 30 - 6)}px`, "--k": index % 3 } as CSSProperties} />
-              ))}
-            </span>
-          ) : null}
         </button>
 
         <MapFront kind="wide" live={live} />

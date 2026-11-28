@@ -26,6 +26,10 @@
   --led-top: #ffdccd;
   --led-bottom: #fcc8b3;
   --led-glow: rgba(255, 100, 30, 0.9);
+  /* One calm colour for every branch of the map (stem, branches, twigs), no mix, no gradient per branch. */
+  --branch: #c9b7a6;
+  /* Shadows fall away from the one light at the top left (down and to the right). */
+  --shade: rgba(8, 5, 3, 0.42);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -34,12 +38,10 @@
   margin-inline: auto;
   overflow: hidden;
   border-radius: 26px;
-  /* Depth: a soft vignette darkens the edges, the key light sits at the top left. */
+  /* Depth: a soft vignette darkens the edges, the one key light sits at the top left. No coloured glow. */
   background:
     radial-gradient(120% 110% at 38% 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.24) 100%),
-    radial-gradient(60% 55% at 10% 0%, rgba(255, 236, 220, 0.07), rgba(255, 236, 220, 0) 100%),
-    radial-gradient(70% 60% at 55% 42%, rgba(255, 107, 53, 0.14), rgba(255, 107, 53, 0) 100%),
-    radial-gradient(60% 50% at 12% 100%, rgba(255, 138, 92, 0.12), rgba(255, 138, 92, 0) 100%),
+    radial-gradient(70% 65% at 10% 0%, rgba(255, 236, 220, 0.08), rgba(255, 236, 220, 0) 100%),
     linear-gradient(180deg, #262220 0%, #1c1a18 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
@@ -129,19 +131,18 @@
 
 /* ── Map ── */
 .ground { stroke-width: 1.2; fill: none; }
-.soil { fill: rgba(255, 138, 92, 0.16); }
+.soil { fill: rgba(0, 0, 0, 0.3); }
 .shadow { fill: rgba(0, 0, 0, 0.42); }
-.ripple { fill: none; stroke: #ff8a5c; stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
-.glow,
-.seedGlow { transform-box: fill-box; transform-origin: center; }
-.seedGlow { opacity: 0.45; }
+.ripple { fill: none; stroke: rgba(201, 183, 166, 0.7); stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
 
 /* Dash 1, gap 1.1: at offset 1.05 no dash touches the path, so the round caps leave no dot before the draw. */
 .draw { stroke-dasharray: 1 1.1; stroke-dashoffset: 0; }
-.stem { fill: none; stroke: #74c869; stroke-width: 4; stroke-linecap: round; }
-.stemHalo { fill: none; stroke: rgba(116, 200, 105, 0.16); stroke-width: 12; stroke-linecap: round; }
-.wide .stem { stroke-width: 5.5; }
-.wide .stemHalo { stroke-width: 16; }
+.stem { fill: none; stroke: var(--branch); stroke-width: 4; stroke-linecap: round; }
+/* Depth instead of neon: a dark copy of each branch, offset away from the light (transform attribute in
+   the markup), drawn with the branch. Static colour, no filter, no blur. */
+.stemShadow { fill: none; stroke: var(--shade); stroke-width: 4; stroke-linecap: round; }
+.wide .stem,
+.wide .stemShadow { stroke-width: 5.5; }
 .leaf { fill: #6dbe63; transform-box: fill-box; }
 .leafA { transform-origin: 0% 100%; }
 .leafB { transform-origin: 100% 60%; fill: #85cf78; }
@@ -152,16 +153,14 @@
 .sepalL { transform-origin: 100% 100%; }
 .sepalR { transform-origin: 0% 100%; fill: #5fb055; }
 
-.edge { fill: none; stroke: rgba(255, 145, 100, 0.85); stroke-width: 2.6; stroke-linecap: round; }
-.twig { stroke: rgba(128, 206, 116, 0.75); stroke-width: 2.2; }
-.edge.halo { stroke: rgba(255, 120, 70, 0.14); stroke-width: 10; }
-.twig.halo { stroke: rgba(116, 200, 105, 0.12); stroke-width: 9; }
+.edge { fill: none; stroke: var(--branch); stroke-width: 2.6; stroke-linecap: round; }
+.twig { stroke-width: 2.2; }
+.edge.edgeShadow { stroke: var(--shade); }
 .wide .edge { stroke-width: 3.6; }
 .wide .twig { stroke-width: 3; }
-.wide .edge.halo { stroke-width: 14; }
-.wide .twig.halo { stroke-width: 12; }
-.flow { fill: none; stroke: #ffd2b8; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 0.12 1.3; stroke-dashoffset: 0.12; opacity: 0; }
-.flowTwig { stroke: #c9f0c0; stroke-width: 2.8; }
+/* The pulse is a lighter tint of the same branch colour. */
+.flow { fill: none; stroke: #f1e6dc; stroke-width: 3.2; stroke-linecap: round; stroke-dasharray: 0.12 1.3; stroke-dashoffset: 0.12; opacity: 0; }
+.flowTwig { stroke-width: 2.8; }
 
 /* Ghost outline of the map, only before and while it grows (live). Hidden in the final image. */
 .ghost { opacity: 0; }
@@ -180,21 +179,21 @@
 .rootNode { transform-origin: 50% 100%; }
 .childNode { transform-origin: var(--o, 50% 50%); }
 .leafNode { transform-origin: 0% 50%; }
-/* Material and depth (apple-design §12): the nodes are objects under one light from the top left. Each has
-   a tight contact shadow and a soft cast shadow; the bigger the node, the deeper the cast shadow (root >
-   child > leaf). A bright inner top edge (rim gradient) and, on the root, a faint sheen. */
-.rootNode { filter: drop-shadow(1px 2px 1.5px rgba(48, 16, 4, 0.38)) drop-shadow(6px 14px 22px rgba(150, 52, 16, 0.42)); }
+/* Material and depth (apple-design §12): the nodes are objects under one light from the top left. Each
+   casts a shadow pill down and to the right; the bigger the node, the further and darker the shadow (root >
+   child > leaf). The nodes move (transform, opacity), so the shadow is a painted layer that moves with them,
+   no filter. A bright inner top edge (rim gradient) catches the light. */
+.nodeShadow { fill: var(--shade); }
+.shadowRoot { fill: rgba(20, 6, 0, 0.5); }
+.shadowLeaf { fill: rgba(8, 5, 3, 0.34); }
 .rootRim { fill: none; stroke-width: 1.2; }
-.sheen { pointer-events: none; }
 .rim { fill: none; stroke-width: 1; opacity: 0.55; }
 .rimLeaf { opacity: 0.45; }
 .rootMark { fill: rgba(26, 26, 26, 0.55); font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
 .rootTitle { fill: #1a1a1a; font-weight: 700; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); letter-spacing: -0.01em; }
-.childNode { filter: drop-shadow(1px 1.5px 1px rgba(0, 0, 0, 0.4)) drop-shadow(3px 8px 14px rgba(0, 0, 0, 0.32)); }
 .childRect { stroke: rgba(255, 128, 80, 0.6); stroke-width: 1.4; }
 .childMark { fill: #ff8a5c; font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
 .childTitle { fill: #f6f0eb; font-weight: 600; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
-.leafNode { filter: drop-shadow(0.5px 1px 1px rgba(0, 0, 0, 0.36)) drop-shadow(2px 5px 9px rgba(0, 0, 0, 0.26)); }
 .leafRect { stroke: rgba(128, 206, 116, 0.55); stroke-width: 1.3; }
 .leafDot { fill: #80ce74; }
 .leafTitle { fill: rgba(246, 240, 235, 0.9); font-weight: 500; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
@@ -224,32 +223,20 @@
 .petalsLeaf .petal { fill: #9be08f; }
 .petalsLeaf .petal:nth-child(2n) { fill: #c9f0c0; }
 
-.burst,
 .drop,
-.splash,
-.seedHalo { opacity: 0; }
-/* Only the root has a ring: a soft, wide halo, not a thin marker line. */
-.ring { fill: none; stroke: rgba(255, 194, 168, 0.55); stroke-width: 3; transform-box: fill-box; transform-origin: center; }
-.spark { fill: #ffc2a8; transform-box: fill-box; transform-origin: center; }
-.spark:nth-child(4n + 2) { fill: #ffd27a; }
-.spark:nth-child(4n + 3) { fill: #9be08f; }
-.spark:nth-child(4n) { fill: #ff8a5c; }
+.splash { opacity: 0; }
 .drop { fill: #9adfff; transform-box: fill-box; transform-origin: center; }
-/* The water jet: a soft halo, a solid light-blue core and bright dashes that run down it. */
+/* The water jet: a solid light-blue core and bright dashes that run down it, no halo. */
 .stream,
-.streamCore,
-.streamHalo { fill: none; stroke-linecap: round; opacity: 0; stroke-dasharray: 1 1.1; }
+.streamCore { fill: none; stroke-linecap: round; opacity: 0; stroke-dasharray: 1 1.1; }
 .stream { stroke: #f2fbff; stroke-width: 2.2; stroke-dasharray: 0.08 0.06; }
 .streamCore { stroke: #7fd0ff; stroke-width: 6; }
-.streamHalo { stroke: rgba(127, 208, 255, 0.32); stroke-width: 16; }
 .wide .stream { stroke-width: 3.2; }
 .wide .streamCore { stroke-width: 9; }
-.wide .streamHalo { stroke-width: 24; }
 .splash { fill: none; stroke: #b5e8ff; stroke-width: 2; transform-box: fill-box; transform-origin: center; }
 
 .seed { fill: #d07a42; stroke: #ffb08a; stroke-width: 1.2; }
 .seedShine { fill: rgba(255, 236, 214, 0.75); }
-.seedHalo { transform-box: fill-box; transform-origin: center; }
 .seedFall { transform-box: fill-box; transform-origin: center; }
 .seedSquash { transform-box: fill-box; transform-origin: 50% 100%; }
 
@@ -297,10 +284,6 @@
 /* Cursor gaze: the component sets the transform per animation frame (head ±6°, eyes a few per cent). */
 .look { transform-origin: 50% 57.5%; }
 .pokeShow { opacity: 0; }
-.pokeBurst { position: absolute; left: 55%; top: -16%; width: 0; height: 0; }
-.pokeDot { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: #ffc2a8; opacity: 0; }
-.pokeDot:nth-child(3n + 1) { background: #ffd27a; }
-.pokeDot:nth-child(3n + 2) { background: #9be08f; }
 /* Reaction without motion (reduced motion, paused): only the glow behind the agent turns warmer. */
 .scene[data-react] .avatar::before { background: radial-gradient(closest-side, rgba(255, 138, 92, 0.55), rgba(255, 138, 92, 0)); }
 .layer {
@@ -329,12 +312,13 @@
   opacity: 0;
   transform-origin: 10% 55%;
 }
-.can { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(1.5px 2.5px 3px rgba(0, 0, 0, 0.4)); }
-.canBody { fill: #ff7a45; stroke: #ffd2b8; stroke-width: 1.1; }
-.canBand { fill: rgba(255, 255, 255, 0.45); }
+/* Brushed steel (gradient in the markup). No filter: the can moves. The dark outline at the bottom grounds
+   the body, the specular edge and streak on the top left catch the light. */
+.can { display: block; width: 100%; height: 100%; overflow: visible; }
+.canBody { stroke: rgba(40, 36, 33, 0.55); stroke-width: 0.8; }
+.canSpecular { fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.1; stroke-linecap: round; }
 .canHandle,
-.canSpout { fill: none; stroke: #ffa47e; stroke-width: 2.8; stroke-linecap: round; }
-.canRose { fill: none; stroke: #ffe1d2; stroke-width: 3; stroke-linecap: round; }
+.canSpout { fill: none; stroke-width: 2.8; stroke-linecap: round; }
 
 /* The LED face is redrawn so it can blink and smile: cover the pixels, then draw eyes and mouth. */
 .screen { position: absolute; border-radius: 30%; background: #030305; box-shadow: 0 0 2px 1px #030305; }
@@ -351,11 +335,9 @@
 .grin { opacity: 0; }
 .joy {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 60' preserveAspectRatio='none'%3E%3Cpath d='M13 48Q50-8 87 48' fill='none' stroke='%23ffd3c0' stroke-width='22' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
-  filter: drop-shadow(0 0 2px var(--led-glow));
 }
 .grin {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 50' preserveAspectRatio='none'%3E%3Cpath d='M10 12Q50 62 90 12' fill='none' stroke='%23ffd3c0' stroke-width='18' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
-  filter: drop-shadow(0 0 2px var(--led-glow));
 }
 .mouth { border-radius: 999px; background: var(--led); box-shadow: 0 0 2px var(--led-glow); }
 /* Invisible box around the head silhouette (avatar geometry, without the antenna). It turns with the head,
@@ -399,30 +381,27 @@
   .scene[data-offscreen] *,
   .scene[data-offscreen] *::before { animation-play-state: paused !important; }
 
-  /* Before the start: the seed glows in the hand, the agent is awake, a ghost outline shows what will grow. */
-  .scene[data-state="ready"] :is(.leaf, .rootNode, .childNode, .leafNode, .glow, .seedGlow) { opacity: 0; }
+  /* Before the start: the seed rests in the hand, the agent is awake, a ghost outline shows what will grow. */
+  .scene[data-state="ready"] :is(.leaf, .rootNode, .childNode, .leafNode) { opacity: 0; }
   .scene[data-state="ready"] .draw { stroke-dashoffset: 1.05; }
   .scene[data-state="ready"] .seedFall { transform: translate(calc(-55px * var(--u)), calc(-38px * var(--u))); }
-  .scene[data-state="ready"] .seedHalo { opacity: 1; animation: bloom-pulse 1.6s ease-in-out infinite; }
   .scene[data-state="ready"] .ghost { animation: bloom-breathe 3.2s ease-in-out infinite; }
   .scene[data-state="ready"] .eye { animation: bloom-blink 4.2s linear 0.8s infinite; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .float { animation: bloom-float 6s ease-in-out infinite; }
 
-  /* Act 1 (0–0.95 s): the agent winds up and tosses the seed, it bounces into the soil and glows. */
+  /* Act 1 (0–0.95 s): the agent winds up and tosses the seed, it bounces into the soil. */
   .scene[data-state="play"] .seedFall { animation: bloom-seed 0.95s linear both; }
-  .scene[data-state="play"] .seedHalo { animation: bloom-halo-out 0.95s linear both; }
   .scene[data-state="play"] .seedSquash { animation: bloom-squash 0.45s var(--spring-soft) 0.66s both; }
   .scene[data-state="play"] .ripple { animation: bloom-ripple 0.7s var(--out) 0.67s forwards; }
-  .scene[data-state="play"] .seedGlow { animation: bloom-seedglow 1s var(--out) 0.8s both; }
 
   /* Act 2 (0.7–1.85 s, over the landing): the agent leans back, then in, and waters; the jet hits the
      seed, the stem draws itself while the water still runs, leaves unfurl. */
   .scene[data-state="play"] .ghost { opacity: 1; }
   .scene[data-state="play"] .canWrap { animation: bloom-can 4.8s linear both; }
-  .scene[data-state="play"] :is(.stream, .streamCore, .streamHalo) { animation: bloom-stream 0.95s linear 0.86s both; }
+  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.86s both; }
   .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(0.92s + var(--i) * 0.11s) both; }
   .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.04s both; }
-  .scene[data-state="play"] :is(.stem, .stemHalo) { animation: bloom-draw 0.8s var(--out) 0.98s both; }
+  .scene[data-state="play"] :is(.stem, .stemShadow) { animation: bloom-draw 0.8s var(--out) 0.98s both; }
   .scene[data-state="play"] .ghostStem { animation: bloom-fade-out 0.4s var(--out) 1.25s forwards; }
   .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.55s var(--pop) 1.2s both; }
   .scene[data-state="play"] .leafB { animation: bloom-unfurl-b 0.55s var(--pop) 1.34s both; }
@@ -437,7 +416,6 @@
   .scene[data-state="play"] .rootNode { animation: bloom-root 0.7s var(--spring) var(--t-root) both; }
   /* The petals of the root fall away as it opens (the same petals as on a click). */
   .scene[data-state="play"] [data-bloom-wrap="0"] .petal { animation: bloom-open-petal 0.9s var(--out) calc(var(--t-root) + 0.08s) both; }
-  .scene[data-state="play"] .glow { animation: bloom-glow 1.3s var(--out) var(--t-root) both; }
   .scene[data-state="play"] .edge { animation: bloom-draw 0.38s var(--out) calc(var(--t-root) + 0.22s + var(--i) * 0.14s) both; }
   .scene[data-state="play"] .childNode { animation: bloom-node 0.55s var(--pop) calc(var(--t-child) + var(--i) * 0.14s) both; }
   .scene[data-state="play"] .twig { animation-delay: calc(var(--t-leaf) - 0.18s + var(--i) * 0.1s); }
@@ -446,9 +424,6 @@
   .scene[data-state="play"] .ghostChild { animation: bloom-fade-out 0.25s var(--out) calc(var(--t-child) + var(--i) * 0.14s) forwards; }
   .scene[data-state="play"] .ghostLeaf { animation: bloom-fade-out 0.25s var(--out) calc(var(--t-leaf) + var(--i) * 0.12s) forwards; }
   .scene[data-state="play"] .ghostLine:not(.ghostStem) { animation: bloom-fade-out 0.5s var(--out) calc(var(--t-root) + 0.22s) forwards; }
-  .scene[data-state="play"] .burst { animation: bloom-on 0.9s linear var(--d); }
-  .scene[data-state="play"] .ring { animation: bloom-ring 0.65s var(--out) var(--d) both; }
-  .scene[data-state="play"] .spark { animation: bloom-spark 0.9s var(--out) var(--d) both; }
 
   /* Act 4 (3–4.8 s): one highlight, then a look at the work. One pulse runs along the branches, the agent
      makes one small hop of joy, then turns calmly towards the map and stays there. Calm from 4.8 s.
@@ -468,7 +443,6 @@
   /* The eyes switch hard (step-end), no cross-fade between open and closed. */
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-react] .pokeHide { animation: bloom-poke-hide 0.6s step-end both; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-react] .pokeShow { animation: bloom-poke-show 0.6s step-end both; }
-  .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-react] .pokeDot { animation: bloom-poke-dot 0.5s var(--out) calc(0.12s + var(--k) * 0.03s) both; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .nodeWrap[data-pop] .pop { animation: bloom-pop 0.6s linear both; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .nodeWrap[data-pop] .petal { animation: bloom-petal 0.6s var(--out) both; }
   /* Press feedback only while the scene runs; the pause keeps the agent still. */
@@ -571,11 +545,6 @@
   from { opacity: 0.9; transform: scale(0.3); }
   to { opacity: 0; transform: scale(1.9); }
 }
-@keyframes bloom-seedglow {
-  0% { opacity: 0; transform: scale(0.3); }
-  35% { opacity: 1; transform: scale(1.3); }
-  100% { opacity: 0.45; transform: scale(1); }
-}
 @keyframes bloom-can {
   0%, 14.5% { opacity: 0; transform: scale(0.2) rotate(-20deg); }
   17% { opacity: 1; transform: scale(1.08) rotate(4deg); }
@@ -593,14 +562,6 @@
   0% { opacity: 0; transform: scale(0.4); }
   30% { opacity: 1; }
   100% { opacity: 0; transform: scale(2.2); }
-}
-@keyframes bloom-pulse {
-  0%, 100% { transform: scale(0.85); opacity: 0.75; }
-  50% { transform: scale(1.12); opacity: 1; }
-}
-@keyframes bloom-halo-out {
-  0%, 62% { opacity: 1; }
-  78%, 100% { opacity: 0; }
 }
 @keyframes bloom-breathe {
   0%, 100% { opacity: 0.7; }
@@ -669,21 +630,6 @@
   from { opacity: 0; transform: scale(0.35); }
   14% { opacity: 1; }
   to { opacity: 1; transform: scale(1); }
-}
-@keyframes bloom-glow {
-  0% { opacity: 0; transform: scale(0.5); }
-  40% { opacity: 1; transform: scale(1.08); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes bloom-on { 0%, 100% { opacity: 1; } }
-@keyframes bloom-ring {
-  from { opacity: 0.8; transform: scale(0.4); }
-  to { opacity: 0; transform: scale(2.4); }
-}
-@keyframes bloom-spark {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.3); }
-  12% { opacity: 1; transform: translate(calc(var(--dx) * 0.35), calc(var(--dy) * 0.35)) scale(1.2); }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.6); }
 }
 @keyframes bloom-flow {
   0% { opacity: 0; stroke-dashoffset: 0.14; }
@@ -786,11 +732,6 @@
   42% { transform: translateY(-15%) scale(0.92, 1.1); animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
   66% { transform: translateY(2%) scale(1.1, 0.9); animation-timing-function: linear(0, 0.113, 0.338, 0.569, 0.756, 0.887, 0.967, 1.009, 1.026, 1.028, 1.023, 1.017, 1.011, 1.006, 1.002, 1, 1, 0.999, 0.999, 0.999, 1, 1, 1); }
   100% { transform: translateY(0) scale(1); }
-}
-@keyframes bloom-poke-dot {
-  0% { opacity: 0; transform: translate(0, 0) scale(0.3); }
-  15% { opacity: 1; transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.4)) scale(1.2); }
-  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.5); }
 }
 /* Click on a node (0.6 s): a quick dip, then a spring pop past full size, settled after half the time. */
 @keyframes bloom-pop {

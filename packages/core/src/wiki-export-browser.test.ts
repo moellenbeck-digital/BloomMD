@@ -117,6 +117,14 @@ async function waitFor(window: Window, selector: string, timeoutMs = 2000): Prom
 
 const text = (document: Window["document"], selector: string): string => document.querySelector(selector)?.textContent ?? "";
 
+async function waitForText(document: Window["document"], selector: string, expected: string, timeoutMs = 2000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (text(document, selector) !== expected) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${selector} = ${expected}; got ${text(document, selector)}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 describe("page view", () => {
   test("lists the pages and shows the first one with trust, lifecycle and expiry badges", async () => {
     const { document } = await openBrowser({ url: "https://wiki.test/share/index.html?lang=en" });
@@ -138,6 +146,34 @@ describe("page view", () => {
     expect(text(document, '[data-testid="wiki-badge-trust"]')).toBe("unattributed");
     expect(text(document, '[data-testid="wiki-badge-lifecycle"]')).toBe("draft");
     expect(text(document, '[data-testid="wiki-no-source"]')).toContain("cannot be verified");
+  });
+
+  test("a deprecated page shows no trust badge, in the page view and the map; a stable verified one keeps it", async () => {
+    const bundle = join(sandbox, "bundle-deprecated");
+    await mkdir(bundle, { recursive: true });
+    const verified = `verified:\n  - by: alice\n    at: "2026-01-02"\n`;
+    await writeFile(join(bundle, "index.md"), `---\ntype: index\ntitle: Dep Wiki\nokf_version: "0.2"\n---\n# Dep Wiki\n`);
+    await writeFile(join(bundle, "old.md"), `---\ntype: concept\ntitle: Old\nstatus: deprecated\n${verified}---\n# Old\n\nReplaced.\n`);
+    await writeFile(join(bundle, "current.md"), `---\ntype: concept\ntitle: Current\nstatus: stable\n${verified}---\n# Current\n\nValid.\n`);
+    out = join(sandbox, "out-deprecated");
+    await exportWikiBundle(bundle, out, { now: NOW });
+
+    const { window, document } = await openBrowser({ url: "https://wiki.test/share/index.html?lang=en" });
+    window.location.hash = "#/page/" + encodeURIComponent("old.md");
+    await waitForText(document, '[data-testid="wiki-page"] h2', "Old");
+    expect(text(document, '[data-testid="wiki-badge-lifecycle"]')).toBe("deprecated");
+    expect(document.querySelectorAll('[data-testid="wiki-badge-trust"]')).toHaveLength(0);
+
+    window.location.hash = "#/page/" + encodeURIComponent("current.md");
+    await waitForText(document, '[data-testid="wiki-page"] h2', "Current");
+    expect(text(document, '[data-testid="wiki-badge-trust"]')).toBe("verified");
+    expect(text(document, '[data-testid="wiki-badge-lifecycle"]')).toBe("stable");
+
+    (document.querySelector('[data-testid="wiki-view-map"]') as unknown as HTMLElement).click();
+    await waitFor(window, '[data-testid="wiki-knowledge-map"]');
+    const items = [...document.querySelectorAll('[data-testid="wiki-knowledge-map"] li')].map((li) => li.textContent ?? "");
+    expect(items.find((item) => item.startsWith("Old"))).not.toContain("verified");
+    expect(items.find((item) => item.startsWith("Current"))).toContain("verified");
   });
 
   test("renders Markdown, wiki links between pages, and keeps broken ones visible", async () => {

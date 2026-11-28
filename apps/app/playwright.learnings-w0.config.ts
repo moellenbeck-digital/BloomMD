@@ -10,7 +10,7 @@ import { nextDevCommand } from "./playwright-server";
  * Eigener Port, damit der Lauf nicht an den Wiki-Server von `test:e2e:wiki` (3311) gerät; zwei `next dev` im selben
  * Projekt gleichzeitig verweigert Next.js, die beiden Läufe also nacheinander starten.
  *
- * Enthält auch @t432 (BloomMD-Kommentare in der Artikelansicht, `learnings-w0-t432.spec.ts`), @t433 (Zitate aus `source`, `learnings-w0-t433.spec.ts`) und @t434 (`replaced_by` in der Suche, `learnings-w0-t434.spec.ts`); die Specs laufen nacheinander (workers 1).
+ * Enthält auch @t432 (BloomMD-Kommentare in der Artikelansicht, `learnings-w0-t432.spec.ts`), @t433 (Zitate aus `source`, `learnings-w0-t433.spec.ts`), @t434 (`replaced_by` in der Suche, `learnings-w0-t434.spec.ts`) und @t435 (kein Vertrauens-Badge bei `deprecated`, `learnings-w0-t435.spec.ts`); die Specs laufen nacheinander (workers 1).
  *
  * Lauf: `bun run --cwd apps/app test:e2e:learnings-w0`
  */
@@ -19,7 +19,7 @@ const baseURL = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: /learnings-w0-t(?:345|432|433|434)\.spec\.ts/,
+  testMatch: /learnings-w0-t(?:345|432|433|434|435)\.spec\.ts/,
   timeout: 90_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

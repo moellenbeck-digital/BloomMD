@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Wiki-Ansicht (Ticket 435): Eine ausgemusterte Seite (Lebenszyklus `deprecated`, z. B. ein ersetztes Learning) zeigt keinen Vertrauens-Badge mehr, nur noch „deprecated“. Das gilt in der Web-App, auf der Marketing-Seite und im statischen Export. `verified` im Frontmatter und die Vertrauensstufe in Daten, API und Suche bleiben unverändert.
+- Wiki view (ticket 435): A retired page (lifecycle `deprecated`, e.g. a replaced learning) no longer shows a trust badge, only "deprecated". This applies to the web app, the marketing site and the static export. `verified` in the frontmatter and the trust tier in data, API and search are unchanged.
+
 ## [Web-App 0.7.0-develop.10, Marketing 0.7.0-develop.10, Sync 0.7.0-develop.10, Wiki-CLI 0.7.0-develop.10] - 2026-11-28
 
 - Learnings-Suche (Ticket 434): `agent search --include-stale` nennt bei einem ersetzten Learning (`status: ersetzt`) den Nachfolger direkt im Treffer (`replaced_by`). Treffer ohne Nachfolger haben das Feld nicht; `agent read` und die übrigen Felder bleiben unverändert.

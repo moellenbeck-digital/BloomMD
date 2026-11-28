@@ -1,11 +1,6 @@
-/* The wrapper sets no font and no text colour for its content: everything inside keeps its own look. */
-.hull { border-top: 1px solid var(--bmd-soil); font-family: inherit; }
-.hull > section { background-color: var(--bmd-ground) !important; }
-:global(html.dark) .hull > section { background-color: var(--bmd-ground) !important; }
-
-/* One shoot from the top edge, inside the section's top padding. */
-.shoot { position: absolute; left: 0; top: 0; z-index: 1; width: 4.5rem; height: 2.75rem; pointer-events: none; background: var(--bmd-bloom); clip-path: path("M8 0 C9 24 28 38 72 40 L72 42.5 C22 45 -4 27 -4 0 Z"); }
-
-@media (min-width: 73.75rem) {
-  .shoot { left: 1.5rem; width: 7rem; height: 3.5rem; clip-path: path("M12 0 C13 32 44 50 112 52 L112 54.5 C34 58 -3 36 -3 0 Z"); }
-}
+/* Only the two colours the shell needs (same values as tokens.module.css). The design class `.ground`
+   stays off: it would also reach focus rings, radius, font rendering and everything inside the scene. */
+.hull { --hull-ground: #fcf9f7; --hull-soil: #e0d3c9; border-top: 1px solid var(--hull-soil); background-color: var(--hull-ground); }
+:global(html.dark) .hull { --hull-ground: #1e150f; --hull-soil: #45352c; }
+.hull > section { background-color: var(--hull-ground) !important; }
+:global(html.dark) .hull > section { background-color: var(--hull-ground) !important; }

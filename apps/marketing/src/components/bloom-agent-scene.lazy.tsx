@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import shell from "./bloom-agent-scene.shell.module.css";
-import { SCENE_END_IMAGE, SCENE_FILE, SCENE_LABEL, type SceneLocale } from "./bloom-agent-scene.data";
+import { SCENE_FILE, SCENE_LABEL, type SceneLocale } from "./bloom-agent-scene.data";
+import { EndImage } from "./bloom-agent-scene.end-image";
 
 type Scene = ComponentType<{ locale: SceneLocale }>;
-
-/* Same query as the wide stage in the CSS modules. */
-const WIDE_MEDIA = "(min-width: 720px), (min-aspect-ratio: 1/1)";
 
 /* Loaded once per page view; on a client navigation back the scene renders at once. */
 let loadedScene: Scene | null = null;
@@ -91,24 +89,5 @@ export function BloomAgentSceneLazy({ locale }: { locale: SceneLocale }) {
         </div>
       )}
     </div>
-  );
-}
-
-/* The finished map: the wide or the tall end image, it fills the stage. */
-function EndImage({ locale, alt }: { locale: SceneLocale; alt: string }) {
-  return (
-    <picture>
-      <source media={WIDE_MEDIA} srcSet={SCENE_END_IMAGE.wide[locale]} width={SCENE_END_IMAGE.wide.width} height={SCENE_END_IMAGE.wide.height} />
-      <img
-        src={SCENE_END_IMAGE.tall[locale]}
-        alt={alt}
-        width={SCENE_END_IMAGE.tall.width}
-        height={SCENE_END_IMAGE.tall.height}
-        loading="lazy"
-        decoding="async"
-        className={shell.endImage}
-        data-testid="bloom-agent-scene-end-image"
-      />
-    </picture>
   );
 }

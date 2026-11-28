@@ -635,16 +635,72 @@ test("on a slow network the face waits for the body: the agent shows and the sce
   await page.waitForTimeout(600);
   const before = await look();
   expect(before).toMatchObject({ state: "ready", avatar: 0, eyesInAvatar: true, loaded: false });
+  /* The invisible agent is no button yet. */
+  await expect(page.getByTestId("bloom-agent-avatar")).toBeDisabled();
+  /* Pause and play while the image is missing: the scene keeps waiting, it does not start without the agent. */
+  await page.getByTestId("bloom-agent-scene-toggle").click();
+  await expect(scene).toHaveAttribute("data-state", "stopped");
+  await page.getByTestId("bloom-agent-scene-toggle").click();
+  await page.waitForTimeout(200);
+  await expect(scene).toHaveAttribute("data-state", "ready");
   release();
-  await expect.poll(async () => (await look()).loaded).toBe(true);
+  await expect.poll(async () => (await look()).avatar).toBe(1);
   const after = await look();
-  expect(after.avatar).toBe(1);
+  expect(after.loaded).toBe(true);
   await expect(scene).toHaveAttribute("data-state", "play");
+  await expect(page.getByTestId("bloom-agent-avatar")).toBeEnabled();
   /* Opacity only: the agent keeps its box. */
   expect(after.box.width).toBeCloseTo(before.box.width, 1);
   expect(after.box.height).toBeCloseTo(before.box.height, 1);
   await cdp.detach();
 });
+
+/* The avatar image hangs (the request never answers) or fails: after at most 5 s, or at once on an error, the
+   stage shows the finished map as an image with its alt text, in the same box. Never an empty stage, never a
+   face without a body. */
+for (const mode of ["hangs", "fails"] as const) {
+  test(`if the agent image ${mode}, the stage shows the end image without a layout shift`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    let requested = 0;
+    await page.route("**/agents/md-avatar-*", async (route) => {
+      requested += 1;
+      if (mode === "fails") return route.abort();
+      /* Never fulfilled. */
+    });
+    await page.goto("/", { waitUntil: "load" });
+    await expect(page.locator("[data-testid=bloom-agent-scene][data-card]")).toHaveCount(1);
+    const card = await page.getByTestId("bloom-agent-scene").boundingBox();
+    await page.evaluate(() => {
+      (window as unknown as { shift: number }).shift = 0;
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) (window as unknown as { shift: number }).shift += (entry as unknown as { value: number }).value;
+      }).observe({ type: "layout-shift", buffered: false });
+    });
+    await page.getByTestId("bloom-agent-scene").scrollIntoViewIfNeeded();
+    const scene = page.locator('[data-testid="bloom-agent-scene"]:not([data-card])');
+    await expect(scene).toHaveCount(1);
+    await expect.poll(() => requested).toBeGreaterThan(0);
+    const since = Date.now();
+    const image = page.getByTestId("bloom-agent-scene-end-image");
+    await expect(image).toBeVisible({ timeout: 6000 });
+    const waited = Date.now() - since;
+    console.log(`agent image ${mode}: end image after ${waited} ms`);
+    if (mode === "fails") expect(waited).toBeLessThan(2000);
+    await expect(image).toHaveAttribute("alt", locales[0].label);
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0 && node.currentSrc)).toContain("bloom-scene-end-tall-de.webp");
+    await expect(scene).toHaveAttribute("data-state", "end");
+    await expect(page.getByTestId("bloom-agent-avatar")).toHaveCount(0);
+    await expect(page.getByTestId("bloom-agent-scene-toggle")).toHaveCount(0);
+    await expect(page.getByRole("img", { name: locales[0].label })).toHaveCount(1);
+    const after = await scene.boundingBox();
+    expect(Math.abs(after!.height - card!.height)).toBeLessThan(1);
+    expect(Math.abs(after!.width - card!.width)).toBeLessThan(1);
+    expect(await page.evaluate(() => (window as unknown as { shift: number }).shift)).toBe(0);
+    expect(errors).toEqual([]);
+  });
+}
 
 /* Step A: the agent and the nodes of the grown map are buttons. A click, Enter or Space starts a short
    reaction; the reaction attribute restarts the CSS animation on every press. */

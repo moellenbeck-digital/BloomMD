@@ -5,6 +5,7 @@ import { Pause, Play } from "lucide-react";
 import styles from "./bloom-agent-scene.module.css";
 import shell from "./bloom-agent-scene.shell.module.css";
 import { SCENE_FILE, SCENE_LABEL } from "./bloom-agent-scene.data";
+import { EndImage } from "./bloom-agent-scene.end-image";
 
 type Locale = "de" | "en";
 
@@ -51,16 +52,16 @@ const clip = {
 /* near: the scene is close to the viewport. Only then the avatar image is requested, so it never competes
    with the LCP element of the page (native lazy loading starts far earlier). Without JS the image comes
    from <noscript>, so the server render stays the complete final image. */
-/* onReady: called once per layer when its image is loaded and decoded (or failed), so the agent shows
-   only as a whole: the face never floats without its body on a slow network. */
-function Layer({ part, near, onReady }: { part: keyof typeof clip; near: boolean; onReady?: () => void }) {
+/* onReady: called once per layer when its image is loaded and decoded (ok true) or failed (ok false), so the
+   agent shows only as a whole: the face never floats without its body on a slow network or on an error. */
+function Layer({ part, near, onReady }: { part: keyof typeof clip; near: boolean; onReady?: (ok: boolean) => void }) {
   const done = (event: { currentTarget: HTMLImageElement }) => {
     const img = event.currentTarget;
     if (!onReady) return;
-    if (!img.complete || !img.naturalWidth) return onReady();
-    img.decode().catch(() => undefined).then(onReady);
+    if (!img.complete || !img.naturalWidth) return onReady(false);
+    img.decode().then(() => onReady(true), () => onReady(false));
   };
-  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} onLoad={near ? done : undefined} onError={near ? onReady : undefined} />;
+  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} onLoad={near ? done : undefined} onError={near && onReady ? () => onReady(false) : undefined} />;
   return near ? image : <noscript>{image}</noscript>;
 }
 
@@ -476,6 +477,8 @@ const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit,
 /* Cursor gaze only on devices with a real hover and a fine pointer (desktop). Head turn at most ±6°. */
 const FINE_POINTER = "(hover: hover) and (pointer: fine)";
 const LOOK_DEG = 6;
+/* The avatar image must be there this long after it was requested (near), or the scene shows its end image. */
+const AVATAR_TIMEOUT_MS = 5000;
 /* Durations of the click reactions (CSS: bloom-poke 0.56 s, bloom-pop 0.6 s) plus a margin, so the attribute never cuts the end. */
 const REACT_MS = 700;
 const LOOK_HOLD_MS = 900;
@@ -499,11 +502,20 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   const [pictured, setPictured] = useState(false);
   /* The scene was half in view while "ready": it plays as soon as the agent is pictured. */
   const [seen, setSeen] = useState(false);
+  /* The avatar image failed or did not arrive in time: the stage shows the finished map as an image (with its
+     alt text) in the same box, instead of an empty stage or a face without a body. */
+  const [fallback, setFallback] = useState(false);
   const layersLeft = useRef(4);
-  const onLayerReady = useCallback(() => {
+  const onLayerReady = useCallback((ok: boolean) => {
+    if (!ok) return setFallback(true);
     layersLeft.current -= 1;
     if (layersLeft.current === 0) setPictured(true);
   }, []);
+  useEffect(() => {
+    if (!near || pictured || fallback) return;
+    const timer = window.setTimeout(() => setFallback(true), AVATAR_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [near, pictured, fallback]);
 
   useEffect(() => {
     setHydrated(true);
@@ -553,13 +565,19 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   }, []);
 
   useEffect(() => {
-    if (!seen || !pictured) return;
+    if (!fallback) return;
+    setMotion(false);
+    setState("end");
+  }, [fallback]);
+
+  useEffect(() => {
+    if (!seen || !pictured || fallback) return;
     setState((current) => {
       if (current !== "ready") return current;
       playedInThisPageView = true;
       return "play";
     });
-  }, [seen, pictured]);
+  }, [seen, pictured, fallback]);
 
   /* Scroll coupling: where the scene crosses the viewport, in page pixels, for the CSS scroll timeline
      (animation-range). Measured on layout changes (ResizeObserver), never on scroll. */
@@ -709,7 +727,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       return;
     }
     setState("ready");
-    requestAnimationFrame(() => requestAnimationFrame(() => setState("play")));
+    /* Without the image the scene waits in "ready"; the effect above starts it once the agent is pictured. */
+    if (pictured) requestAnimationFrame(() => requestAnimationFrame(() => setState("play")));
   };
 
   const avatarVars = Object.fromEntries(
@@ -731,7 +750,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       style={timeline}
       data-state={state}
       data-offscreen={offscreen || undefined}
-      data-avatar-wait={(hydrated && !pictured) || undefined}
+      data-avatar-wait={(!pictured && !fallback) || undefined}
+      data-avatar-fallback={fallback || undefined}
       data-testid="bloom-agent-scene"
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
@@ -750,6 +770,11 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         ) : null}
       </div>
 
+      {fallback ? (
+        <div className={shell.stage} data-testid="bloom-agent-stage">
+          <EndImage locale={locale} alt={t.label} />
+        </div>
+      ) : (
       <div className={`${shell.stage} ${styles.stage}`} data-testid="bloom-agent-stage">
         {/* Parallax layer: map, agent and node buttons move together (≤ 24 px, CSS scroll timeline only),
             so the buttons stay on their nodes and the agent stays on the ground. */}
@@ -759,7 +784,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
           <MapBack kind="tall" locale={locale} live={live} />
         </div>
 
-        <button type="button" className={styles.avatar} style={avatarVars} aria-label={t.agent} disabled={!hydrated} onClick={pokeAgent} data-testid="bloom-agent-avatar">
+        <button type="button" className={styles.avatar} style={avatarVars} aria-label={t.agent} disabled={!hydrated || !pictured} onClick={pokeAgent} data-testid="bloom-agent-avatar">
           {/* Scroll pose: the agent follows the scroll through the section (CSS scroll timeline only). */}
           <span className={`${styles.part} ${styles.scrollPose}`} data-bloom-scroll-pose>
           <span className={styles.hop}>
@@ -846,6 +871,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
           : null}
         </div>
       </div>
+      )}
     </div>
   );
 }

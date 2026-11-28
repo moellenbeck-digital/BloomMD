@@ -1,0 +1,57 @@
+.section { padding-block: 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); scroll-margin-top: 6rem; }
+
+.layout { display: grid; gap: 3rem; }
+.head { min-width: 0; }
+.head h2 { margin-top: 0.25rem; }
+.lede { max-width: 34rem; margin-top: 1rem; }
+.all { margin-top: 1.5rem; }
+
+.shoots { display: grid; list-style: none; }
+
+/* --a to --b: width of the trunk along this shoot. */
+.shoot { --a: 15px; --b: 11px; --c: var(--bmd-bloom); position: relative; isolation: isolate; padding: 0 0 2.75rem 4.5rem; }
+.shoot:nth-child(2) { --a: 11px; --b: 7px; --c: var(--bmd-bark); }
+.shoot:nth-child(3) { --a: 7px; --b: 3px; --c: var(--bmd-bark); padding-bottom: 0; }
+
+/* Trunk piece down to the next offshoot. */
+.shoot::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; z-index: -1; width: 15px; background: var(--bmd-bark); clip-path: polygon(calc(50% - var(--a) / 2) 0, calc(50% + var(--a) / 2) 0, calc(50% + var(--b) / 2) 100%, calc(50% - var(--b) / 2) 100%); transform-origin: top; }
+.shoot:last-child::before { bottom: auto; height: 3.25rem; clip-path: polygon(calc(50% - var(--a) / 2) 0, calc(50% + var(--a) / 2) 0, 55% 100%, 45% 100%); }
+/* The offshoot: one bend out of the trunk, thinning towards the category and title. */
+.shoot::after { content: ""; position: absolute; left: 7px; top: 0; z-index: -2; width: 3.5rem; height: 3.25rem; background: var(--c); clip-path: path("M-4 0 C-1 31 17 45 56 46.5 L56 49 C13 51 -5 33 -5 4 Z"); transform-origin: left top; }
+
+.body { padding-top: 2rem; }
+.category { font-family: var(--bmd-display); font-style: italic; font-size: 1.0625rem; line-height: 1.3; color: var(--bmd-ink-3); }
+.title { margin-top: 0.125rem; font-family: var(--bmd-display); font-weight: 500; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.008em; text-wrap: balance; }
+.text { max-width: 34rem; margin-top: 0.5rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); text-wrap: pretty; }
+.open { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; margin-top: 0.5rem; font-size: 1.0625rem; font-weight: 700; color: var(--bmd-bloom-hi); transition: color 150ms ease, transform 100ms ease-out; }
+.open::after { content: ""; position: absolute; inset-inline: 0; bottom: 0.25rem; height: 4px; background: var(--bmd-bark-hi); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); transition: background-color 150ms ease; }
+.open:active { transform: scale(0.96); }
+
+@media (hover: hover) and (pointer: fine) {
+  .open:hover { color: var(--bmd-ink); }
+  .open:hover::after { background: var(--bmd-bloom); }
+}
+
+@media (min-width: 1180px) {
+  .section { padding-block: 5.5rem; }
+  .layout { grid-template-columns: minmax(0, 38rem) minmax(0, 1fr); gap: 5rem; align-items: start; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .shoots:global([data-grow="ready"]) .shoot::before, .shoots:global([data-grow="ready"]) .shoot::after { transform: scale(0); }
+  .shoots:global([data-grow="ready"]) .body { opacity: 0; }
+  .shoots:global([data-grow="play"]) .shoot { --d: 0ms; }
+  .shoots:global([data-grow="play"]) .shoot:nth-child(2) { --d: 200ms; }
+  .shoots:global([data-grow="play"]) .shoot:nth-child(3) { --d: 400ms; }
+  .shoots:global([data-grow="play"]) .shoot::before { animation: trunk 370ms var(--bmd-grow) var(--d) both; }
+  .shoots:global([data-grow="play"]) .shoot::after { animation: offshoot 370ms var(--bmd-grow) calc(var(--d) + 100ms) both; }
+  .shoots:global([data-grow="play"]) .body { animation: arrive 320ms var(--bmd-grow) calc(var(--d) + 270ms) backwards; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .open:active { transform: none; }
+}
+
+@keyframes trunk { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes offshoot { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes arrive { from { opacity: 0; translate: -8px 0; } to { opacity: 1; translate: 0 0; } }

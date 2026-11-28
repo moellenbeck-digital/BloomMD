@@ -13,6 +13,7 @@ import { HeroIntro } from "../components/v2/hero-intro";
 import { HeroTrieb } from "../components/v2/hero-trieb";
 import { LandingPaths } from "../components/v2/landing-paths";
 import { SplitDemo } from "../components/v2/split-demo";
+import { TemplatesTrieb } from "../components/v2/templates-trieb";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
@@ -525,43 +526,6 @@ function WorkflowSection() {
   );
 }
 
-function TemplatesSection() {
-  return (
-    <section id="templates" className="bg-[#FFFDFB]">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Vorlagen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Nicht mit einer leeren Map starten.</h2>
-            <p className="mt-4 text-lg leading-8 text-[#666666]">
-              Jede Vorlage ist eine normale Markdown-Datei. Öffne sie als Map und ersetze die Beispielinhalte durch deine eigenen.
-            </p>
-          </div>
-          <Link href="/templates" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1A1A1A]/20">
-            Alle Templates
-            <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templateCards.slice(0, 3).map((template) => (
-            <article key={template.href} className="rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <span className="rounded-md border border-[#FFD4BF] bg-[#FFF4EE] px-2.5 py-1 text-xs font-semibold text-[#B64A1F]">{template.category}</span>
-                <LayoutTemplate size={18} className="text-[#FF6B35]" aria-hidden="true" />
-              </div>
-              <h3 className="text-lg font-semibold">{template.title}</h3>
-              <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#666666]">{template.text}</p>
-              <Link href={`/demo?template=${template.href.split("/").pop()}`} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
-                In der Demo öffnen <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function ObsidianSection() {
   return (
     <section id="obsidian" className="border-y border-[#E8E4DF] bg-white">
@@ -865,7 +829,7 @@ export default function LandingPage() {
       <KnowledgeVisionSection locale="de" />
       <LandingPaths items={audiencePaths} />
       <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />
-      <TemplatesSection />
+      <TemplatesTrieb items={templateCards.slice(0, 3)} />
       <AvailabilityOverview locale="de" />
       <FAQSection />
 

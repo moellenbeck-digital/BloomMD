@@ -2,6 +2,9 @@
 
 ## In Entwicklung
 
+- Wiki-Ansicht (Ticket 433): Ein Learning mit dem Frontmatter-Feld `source` (Text oder Liste) zeigt auf `/wiki` die Quelle als Zitat: „Zitate (1)“, kein „ohne Quelle“ in Seitenliste und Knowledge Map. Eine vorhandene Liste `sources:` hat Vorrang, ohne beide Felder bleibt es bei „Zitate (0)“.
+- Wiki view (ticket 433): A learning with the frontmatter field `source` (text or list) now shows its source as a citation on `/wiki`: "Citations (1)", no "without source" in the page list and knowledge map. An existing `sources:` list takes precedence; without either field it stays at "Citations (0)".
+
 
 ## [Web-App 0.7.0-develop.8, Marketing 0.7.0-develop.8, Sync 0.7.0-develop.8] - 2026-11-28
 

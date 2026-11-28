@@ -87,6 +87,18 @@
   .line[data-heading]:hover { cursor: default; }
 }
 
+/* The headline reads like its Markdown source also below the wide layout: a small hanging "#". */
+@media (max-width: 73.74rem) {
+  .h1 { position: relative; }
+  .h1::before { content: "#" / ""; position: absolute; right: calc(100% + 0.125rem); top: 0.35em; font-size: 1.5rem; font-weight: 400; line-height: 1; letter-spacing: 0; color: var(--bmd-bloom); }
+}
+
+/* Phone: the map comes before its source file, so the first branch is on the first screen. */
+@media (max-width: 39.99rem) {
+  .stage { margin-top: 1.5rem; }
+  .file { order: 2; }
+}
+
 @media (min-width: 640px) and (max-width: 73.74rem) {
   .stage { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; }
 }

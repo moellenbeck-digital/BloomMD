@@ -38,7 +38,7 @@
 | Tastatur | Tab durch H1-Aktionen, dann Wörter in Dateireihenfolge. Enter/Leertaste heftet an |
 | Fokus und Wachstum | Kommt der Tastaturfokus in einen Abschnitt, steht dort sofort das Endbild. Kein fokussiertes Element ist unsichtbar |
 | ARIA | Map `role="group"`, SVG `aria-hidden`. Inspector `aside` |
-| Responsive | Datei vollständig sichtbar, nie abgeschnitten. Inspector auf jeder Breite |
+| Responsive | Datei vollständig sichtbar, nie abgeschnitten. Unter 640 px steht die Map vor der Datei (erster Ast im ersten Bildschirm 390×844). Inspector auf jeder Breite |
 | LCP | H1 (breit), Absatz (Handy). Beide animieren nicht |
 
 ### `UseCaseTrieb`

@@ -32,7 +32,7 @@ Ein spitz zulaufender, warmer Ast wächst aus dem `#` einer Markdown-Zeile, trä
 | Blüte | höchstens eine pro Ansicht. Sie markiert den Fokus oder „heute nutzbar“. Fünf Blätter aus derselben Trieb-Form |
 | Knospe | geschlossen. Nur für „Pilot“ |
 | Offene Spitze | feinste Ranke ohne Abschluss. Nur für „in Prüfung“ |
-| Hängendes `#` | links vor der H1 (ab 1180 px), Farbe `bloom` |
+| Hängendes `#` | links vor der H1, Farbe `bloom`; ab 73.75rem groß, darunter klein (1,5rem) |
 | Kleine Ableger | Listenzeichen und Unterstreichung der Zweitaktion sind kurze Triebe |
 
 Code: `apps/marketing/src/components/v2/trieb.ts` (Geometrie), `branch.tsx` (Trieb, Blüte, Knospe).

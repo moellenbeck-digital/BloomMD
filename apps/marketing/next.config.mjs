@@ -49,7 +49,11 @@ const nextConfig = {
   htmlLimitedBots: /.*/,
   // Render-blocking CSS on the landing pages: the global sheet plus one page sheet. Next's default
   // chunking splits the page CSS at 30 KB, which costs a round trip before first paint on mobile.
-  experimental: { cssChunking: false },
+  // Turbopack rejects the option, so it is set for webpack only (Next sets TURBOPACK before it loads this file).
+  experimental: process.env.TURBOPACK ? {} : { cssChunking: false },
+  // The webpack rule below applies to `next build --webpack` only. Without this entry, Next refuses to
+  // start `next dev` (Turbopack by default) next to a webpack config; CI starts it without a bundler flag.
+  turbopack: {},
   webpack(config, { isServer, dev }) {
     if (!isServer && !dev) {
       config.optimization.splitChunks.cacheGroups.landingCss = {

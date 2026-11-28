@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { parseFile } from "@bloommd/core/browser";
-import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityTrieb } from "../components/v2/availability-trieb";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
@@ -42,6 +41,9 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+
+/* Loaded on demand: the map preview pulls in the UI package and the Markdown parser. */
+const RoadmapPreview = dynamic(() => import("./roadmap-preview").then((m) => m.RoadmapPreview));
 
 const headerNavItems = [
   { label: "Produkt", href: "#produkt" },
@@ -236,8 +238,6 @@ const useCases = [
     markdown: ["# Dokumentation", "## Anleitungen", "## Referenz", "### API", "### Beispiele"].join("\n"),
   },
 ];
-
-const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
   {
@@ -545,7 +545,7 @@ function FeatureBento() {
             <p className="mt-2 text-sm leading-6 text-[#666666]">{feature.text}</p>
             {feature.title === "Visuelle Markdown-Map" && (
               <div className="mt-6">
-                <MindMapPreview document={roadmapPreviewDocument} className="min-h-[250px]" ariaLabel="Roadmap Markdown mind map preview" />
+                <RoadmapPreview />
               </div>
             )}
           </article>

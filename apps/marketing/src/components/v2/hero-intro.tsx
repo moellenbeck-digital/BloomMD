@@ -17,7 +17,7 @@ export function HeroIntro({ onDemo }: { onDemo: () => void }) {
       <div className={styles.aside}>
         <p className={`${t.lede} ${styles.lede}`}>
           Öffne eine Markdown-Datei und erkenne ihre Struktur sofort. BloomMD ergänzt eine visuelle
-          Ebene — lokal, portabel und ohne neues Dateiformat.
+          Ebene: lokal, portabel und ohne neues Dateiformat.
         </p>
         <div className={styles.actions}>
           <Link href="/demo" onClick={onDemo} className={t.primary}>

@@ -113,7 +113,8 @@ for (const locale of locales) {
     expect(after.ghost).toBe(0);
     expect(after.water).toBe(0);
     expect(after.loops.length).toBeGreaterThan(0);
-    for (const name of after.loops) expect(name).toMatch(/bloom-float$/);
+    // Dev names the keyframes "…__bloom-float", production "…_bloom-float__<hash>".
+    for (const name of after.loops) expect(name).toMatch(/bloom-float(?:__|$)/);
   });
 
   test(`${locale.path} map nodes carry the titles of the landing page example map`, async ({ page }) => {

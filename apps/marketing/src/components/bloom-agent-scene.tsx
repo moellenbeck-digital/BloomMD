@@ -419,7 +419,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   const map = MAP[locale];
   const ref = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SceneState>("end");
-  const [offscreen, setOffscreen] = useState(false);
+  /* Paused until the observer reports the scene in view, so no loop runs during the page load. */
+  const [offscreen, setOffscreen] = useState(true);
   const [motion, setMotion] = useState(false);
   const [near, setNear] = useState(false);
 
@@ -475,6 +476,9 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
 
   /* "ready" counts as running: the scene starts by itself, so the button offers to stop it. */
   const running = state === "ready" || state === "play" || state === "idle";
+  /* The moving parts (ghost, water, sparks, can, light) are built only near the viewport, like the agent
+     image, so they add no work to the page load. */
+  const live = motion && near;
   const toggle = () => {
     if (running) {
       setState("stopped");
@@ -513,10 +517,10 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       </div>
 
       <div className={styles.stage} role="img" aria-label={t.label} data-testid="bloom-agent-stage">
-        <MapBack kind="wide" locale={locale} live={motion} />
-        <MapBack kind="tall" locale={locale} live={motion} />
+        <MapBack kind="wide" locale={locale} live={live} />
+        <MapBack kind="tall" locale={locale} live={live} />
 
-        {motion ? <div className={styles.shine} aria-hidden="true" /> : null}
+        {live ? <div className={styles.shine} aria-hidden="true" /> : null}
 
         <div className={styles.avatar} style={avatarVars} aria-hidden="true" data-testid="bloom-agent-avatar">
           <div className={styles.hop}>
@@ -549,7 +553,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
               </div>
               <div className={`${styles.part} ${styles.handR}`}>
                 <Layer part="handR" near={near} />
-                {motion ? (
+                {live ? (
                   <div className={styles.canWrap}>
                     <WateringCan />
                   </div>
@@ -559,8 +563,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
           </div>
         </div>
 
-        <MapFront kind="wide" live={motion} />
-        <MapFront kind="tall" live={motion} />
+        <MapFront kind="wide" live={live} />
+        <MapFront kind="tall" live={live} />
       </div>
     </div>
   );

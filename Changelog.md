@@ -2,6 +2,11 @@
 
 ## In Entwicklung
 
+## [Web-App 0.7.0-develop.12, Marketing 0.7.0-develop.12, Sync 0.7.0-develop.12] - 2026-11-28
+
+- Keine Änderungen für Anwender in diesem Release: Dokumentation zu Rechten und Agenten-Delegation (Ticket 262) sowie Tests.
+- No user-facing changes in this release: documentation on rights and agent delegation (ticket 262) and tests.
+
 ## [Web-App 0.7.0-develop.11, Marketing 0.7.0-develop.11, Sync 0.7.0-develop.11] - 2026-11-28
 
 - Wiki-Ansicht (Ticket 435): Eine ausgemusterte Seite (Lebenszyklus `deprecated`, z. B. ein ersetztes Learning) zeigt keinen Vertrauens-Badge mehr, nur noch „deprecated“. Das gilt in der Web-App, auf der Marketing-Seite und im statischen Export. `verified` im Frontmatter und die Vertrauensstufe in Daten, API und Suche bleiben unverändert.

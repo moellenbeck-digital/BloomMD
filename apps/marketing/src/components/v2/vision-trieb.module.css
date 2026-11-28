@@ -37,7 +37,7 @@
   .issues a:hover { text-decoration-color: var(--bmd-bloom); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .section { padding-block: 5rem 4rem; }
   .head { grid-template-columns: minmax(0, 1fr) 31rem; gap: 4rem; align-items: end; }
   .stage { position: relative; container-type: inline-size; aspect-ratio: 1224 / 712; margin-top: 2rem; }

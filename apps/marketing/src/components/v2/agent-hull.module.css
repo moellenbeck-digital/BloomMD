@@ -6,6 +6,6 @@
 /* One shoot from the top edge, inside the section's top padding. */
 .shoot { position: absolute; left: 0; top: 0; z-index: 1; width: 4.5rem; height: 2.75rem; pointer-events: none; background: var(--bmd-bloom); clip-path: path("M8 0 C9 24 28 38 72 40 L72 42.5 C22 45 -4 27 -4 0 Z"); }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .shoot { left: 1.5rem; width: 7rem; height: 3.5rem; clip-path: path("M12 0 C13 32 44 50 112 52 L112 54.5 C34 58 -3 36 -3 0 Z"); }
 }

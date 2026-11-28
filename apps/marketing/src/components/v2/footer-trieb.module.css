@@ -33,7 +33,7 @@
   .link { min-height: 2.25rem; }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .footer::before { left: 5rem; }
   .layout { grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); gap: 5rem; }
 }

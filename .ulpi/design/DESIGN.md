@@ -135,7 +135,7 @@ Dazu in beiden Themen: `--bmd-veil` (Header, Fläche mit 0,9 Deckkraft), `--bmd-
 | spacing | 4-px-Raster: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80 |
 | radius | **4 px**, einzig für die Primäraktion und den Fokusring. Sonst keine Flächen |
 | shadow | keine |
-| breakpoint | eine Layout-Schwelle: **1180 px** (breite Map ↔ Gliederungs-Map). 640 px: Datei neben Map |
+| breakpoint | eine Layout-Schwelle: **73.75rem** (1180 px bei 16 px Browser-Schrift, 1475 px bei 20 px) (breite Map ↔ Gliederungs-Map). 640 px: Datei neben Map |
 | container | 83rem, links 5rem Rinne für `#` und Stamm (ab 1180 px) |
 
 ## Raster (organisch statt Karten)

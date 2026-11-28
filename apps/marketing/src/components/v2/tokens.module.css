@@ -117,7 +117,7 @@
   .twig:hover::after { background: var(--bmd-bloom); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .wrap { padding-inline: 1.5rem; padding-inline-start: 5rem; }
 }
 

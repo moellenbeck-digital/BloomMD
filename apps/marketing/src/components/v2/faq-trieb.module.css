@@ -20,7 +20,7 @@
   .question:hover { color: var(--bmd-bloom-hi); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .section { padding-block: 5.5rem; }
   .layout { grid-template-columns: minmax(0, 30rem) minmax(0, 1fr); gap: 5rem; align-items: start; }
 }

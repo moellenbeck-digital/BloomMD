@@ -27,7 +27,7 @@
   .link:hover, .lang a:hover { color: var(--bmd-bloom-hi); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .bar { padding-inline: 1.5rem; }
   .nav, .tools { display: flex; }
   /* Fixed tracks: the font swap changes word widths by a few px and must not move the groups. */
@@ -37,7 +37,7 @@
   .toggle, .menu { display: none; }
 }
 
-@media (min-width: 1360px) {
+@media (min-width: 85rem) {
   .claim { display: inline-block; width: 7.75rem; white-space: nowrap; }
 }
 

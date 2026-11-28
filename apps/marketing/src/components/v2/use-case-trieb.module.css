@@ -49,7 +49,7 @@
   .tab:hover { color: var(--bmd-bloom-hi); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   .section { padding-block: 4.5rem; }
   .board { display: block; margin-top: 1.5rem; }
   .tabs { max-width: none; aspect-ratio: 1224 / 430; }

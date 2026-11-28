@@ -86,11 +86,11 @@
   .line[data-heading]:hover { cursor: default; }
 }
 
-@media (min-width: 640px) and (max-width: 1179.98px) {
+@media (min-width: 640px) and (max-width: 73.74rem) {
   .stage { grid-template-columns: 15rem minmax(0, 1fr); align-items: start; }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   /* The heading of the next section stays inside a 900 px high first screen. */
   .hero { padding-block: 0.75rem 0.5rem; }
   .intro { grid-template-columns: minmax(0, 1fr) 26rem; gap: 2rem; align-items: end; }
@@ -125,7 +125,7 @@
   .mapwrap .inspector::before { content: ""; position: absolute; right: calc(100% + 0.5rem); top: 2.25rem; width: 1.5rem; height: 1px; background: var(--bmd-bark); }
 }
 
-@media (min-width: 1180px) and (max-width: 1319.98px) {
+@media (min-width: 73.75rem) and (max-width: 82.49rem) {
   .mapwrap .inspector { top: 14%; font-size: 0.875rem; }
 }
 

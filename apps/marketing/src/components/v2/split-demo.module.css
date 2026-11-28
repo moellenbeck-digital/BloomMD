@@ -51,7 +51,7 @@
   .proof li::before { right: auto; left: 0; top: calc(100% + 0.25rem); width: 4px; height: 1.25rem; clip-path: polygon(40% 0, 60% 0, 100% 100%, 0 100%); }
 }
 
-@media (min-width: 1180px) {
+@media (min-width: 73.75rem) {
   /* The title stays inside a 900 px high first screen, below the hero. */
   .section { padding-block: 0.75rem 4.5rem; }
   .title { white-space: nowrap; }

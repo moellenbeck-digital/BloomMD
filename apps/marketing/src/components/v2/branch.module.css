@@ -1,0 +1,27 @@
+.shoot { fill: var(--bmd-bark); transition: fill 150ms ease; }
+.shoot[data-lit] { fill: var(--bmd-bloom); }
+.petal { fill: var(--bmd-bloom); }
+.heart { fill: var(--bmd-on-bloom); }
+.budBody { fill: var(--bmd-bloom-hi); }
+.sepal { fill: var(--bmd-bark-hi); }
+
+.grow { stroke-dasharray: 1 1; stroke-dashoffset: 0; }
+.open { transform-box: view-box; transform-origin: 0 0; }
+
+/* Motion signature: growth runs from origin to tip, once. Without it the end image is already there. */
+@media (prefers-reduced-motion: no-preference) {
+  :global([data-grow="ready"]) .grow { stroke-dashoffset: 1; }
+  :global([data-grow="play"]) .grow { animation: grow var(--t) var(--bmd-grow) var(--d) both; }
+  :global([data-grow="ready"]) .open { opacity: 0; }
+  :global([data-grow="play"]) .open { animation: open var(--t) var(--bmd-grow) var(--d) both; }
+}
+
+@keyframes grow {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes open {
+  from { opacity: 0; transform: scale(0.9) rotate(-14deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
+}

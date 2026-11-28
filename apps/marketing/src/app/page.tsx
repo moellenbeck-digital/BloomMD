@@ -7,6 +7,11 @@ import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityOverview } from "../components/availability-overview";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
+import { bmdFonts } from "../components/v2/fonts";
+import headerStyles from "../components/v2/header.module.css";
+import { HeroIntro } from "../components/v2/hero-intro";
+import { HeroTrieb } from "../components/v2/hero-trieb";
+import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -32,7 +37,6 @@ import {
   Presentation,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
   X,
 } from "lucide-react";
 
@@ -218,7 +222,6 @@ const useCases = [
   },
 ];
 
-const heroPreviewDocument = parseFile("strategy.md", markdownLines.join("\n"));
 const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
@@ -359,42 +362,39 @@ const productJsonLd = {
 
 function Header() {
   const [open, setOpen] = useState(false);
+  const language = (onClick?: () => void) => (
+    <div className={headerStyles.lang} aria-label="Sprache">
+      <span aria-current="page">DE</span>
+      <Link href="/en" hrefLang="en" onClick={onClick} aria-label="Switch to English">
+        EN
+      </Link>
+    </div>
+  );
 
   return (
-    <header className="sticky top-0 z-30 overflow-x-clip border-b border-[#E8E4DF]/70 bg-[#FFFDFB]/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5">
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25" aria-label="BloomMD Startseite">
+    <header className={`${tokens.ground} ${bmdFonts} ${headerStyles.header}`}>
+      <div className={headerStyles.bar}>
+        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3" aria-label="BloomMD Startseite">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <span className="block h-8 w-[144px]">
             <img src="/logo.svg" alt="BloomMD" className="bloommd-logo-light h-8 w-auto" />
             <img src="/logo-dark.svg" alt="" aria-hidden="true" className="bloommd-logo-dark h-8 w-auto" />
           </span>
-          <span className="hidden border-l border-[#D4CFC8] pl-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#514C46] xl:inline">
-            Markdown Maps
-          </span>
+          <span className={headerStyles.claim}>Markdown Maps</span>
         </Link>
-        <nav className="hidden items-center rounded-md border border-[#E8E4DF] bg-white/82 p-1 shadow-[0_12px_40px_rgba(26,26,26,0.05)] xl:flex" aria-label="Hauptnavigation">
+        <nav className={headerStyles.nav} aria-label="Hauptnavigation">
           {headerNavItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 xl:px-4"
-            >
+            <a key={item.href} href={item.href} className={headerStyles.link}>
               {item.label}
             </a>
           ))}
         </nav>
-        <div className="hidden shrink-0 items-center gap-3 xl:flex">
-          <div className="flex h-9 items-center rounded-md border border-[#E8E4DF] bg-white p-0.5 text-xs font-semibold text-[#68615C]" aria-label="Sprache">
-            <span className="rounded bg-[#1A1A1A] px-2.5 py-1.5 text-white" aria-current="page">DE</span>
-            <Link href="/en" hrefLang="en" className="rounded px-2.5 py-1.5 hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20" aria-label="Switch to English">
-              EN
-            </Link>
-          </div>
-          <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#F2F0ED] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+        <div className={headerStyles.tools}>
+          {language()}
+          <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className={headerStyles.link}>
             Login
           </a>
-          <a href={appSignupUrl} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+          <a href={appSignupUrl} className={tokens.primary}>
             Jetzt registrieren
             <ArrowRight size={16} aria-hidden="true" />
           </a>
@@ -402,55 +402,40 @@ function Header() {
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#E8E4DF] bg-white text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25 xl:hidden"
+          className={headerStyles.toggle}
           aria-expanded={open}
           aria-controls="mobile-navigation"
           aria-label={open ? "Navigation schließen" : "Navigation öffnen"}
         >
-          {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+          {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
         </button>
       </div>
       {open && (
-        <div id="mobile-navigation" className="border-t border-[#E8E4DF] bg-[#FFFDFB] px-5 py-5 shadow-[0_24px_60px_rgba(26,26,26,0.08)] xl:hidden">
-          <nav className="grid gap-5" aria-label="Mobile Navigation">
-            <div className="grid grid-cols-2 gap-2">
+        <div id="mobile-navigation" className={headerStyles.menu}>
+          <nav aria-label="Mobile Navigation">
+            <div className={headerStyles.menuMain}>
               {headerNavItems.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="rounded-md border border-[#E8E4DF] bg-white px-3 py-3 text-sm font-semibold text-[#1A1A1A] hover:bg-[#FFF4EE] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-                >
+                <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
                   {item.label}
                 </a>
               ))}
             </div>
-            <div className="grid gap-2 border-t border-[#E8E4DF] pt-4">
-              <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#999999]">Weitere Themen</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+            <div className={headerStyles.menuGroup}>
+              <p className={headerStyles.menuHead}>Weitere Themen</p>
+              <div className={headerStyles.menuTwo}>
                 {secondaryNavItems.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-                  >
+                  <a key={item.href} href={item.href} onClick={() => setOpen(false)} className={headerStyles.link}>
                     {item.label}
                   </a>
                 ))}
               </div>
             </div>
-            <div className="grid gap-2 border-t border-[#E8E4DF] pt-4">
-              <div className="flex h-11 items-center rounded-md border border-[#E8E4DF] bg-white p-1 text-xs font-semibold text-[#68615C]" aria-label="Sprache">
-                <span className="flex-1 rounded bg-[#1A1A1A] px-3 py-2 text-center text-white" aria-current="page">DE</span>
-                <Link href="/en" hrefLang="en" onClick={() => setOpen(false)} className="flex-1 rounded px-3 py-2 text-center hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20" aria-label="Switch to English">
-                  EN
-                </Link>
-              </div>
-              <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-3 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
+            <div className={headerStyles.menuGroup}>
+              {language(() => setOpen(false))}
+              <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className={headerStyles.link}>
                 Login
               </a>
-              <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
+              <a href={appSignupUrl} className={tokens.primary}>
                 Jetzt registrieren
                 <ArrowRight size={16} aria-hidden="true" />
               </a>
@@ -459,61 +444,6 @@ function Header() {
         </div>
       )}
     </header>
-  );
-}
-
-function HeroProduct() {
-  return (
-    <div className="relative" id="produkt">
-      <div className="overflow-hidden rounded-xl border border-[#E0D9D1] bg-white shadow-[0_30px_90px_rgba(26,26,26,0.12)]">
-        <div className="flex h-12 items-center justify-between border-b border-[#E8E4DF] bg-[#FFFDFB] px-4">
-          <div className="flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#FF6B35]" />
-            <span className="text-sm font-semibold">BloomMD Workspace</span>
-            <span className="hidden text-xs text-[#777777] sm:inline">/ files / strategy.md</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[#777777]">
-            <span className="rounded border border-[#E8E4DF] px-2 py-1">?</span>
-            <span className="hidden rounded border border-[#E8E4DF] px-2 py-1 sm:inline">⌘S</span>
-            <span className="hidden items-center gap-1 rounded-full border border-[#D8E7D3] bg-[#F4FAF1] px-2 py-1 text-[#467642] md:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#5EA552]" />
-              lokal gespeichert
-            </span>
-          </div>
-        </div>
-        <div className="grid lg:grid-cols-[190px_minmax(0,1fr)_250px]">
-          <div className="max-h-[136px] overflow-hidden border-b border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white lg:max-h-none lg:border-b-0 lg:border-r">
-            <div className="mb-3 flex items-center justify-between text-xs">
-              <span className="font-semibold">strategy.md</span>
-              <span className="rounded border border-white/12 px-2 py-0.5 text-white/54">Quelle</span>
-            </div>
-            <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-[11px] leading-5 text-white/76">
-              {markdownLines.join("\n")}
-            </pre>
-          </div>
-          <MindMapPreview
-            document={heroPreviewDocument}
-            className="!min-h-[230px] !rounded-none !border-0 sm:!min-h-[320px] lg:!min-h-[360px]"
-            ariaLabel="BloomMD Product Strategy Markdown mind map preview"
-          />
-          <aside className="hidden border-t border-[#E8E4DF] bg-white p-5 md:block lg:border-l lg:border-t-0">
-            <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#999999]">Inspector</div>
-            <h3 className="text-base font-semibold">North Star</h3>
-            <p className="mt-3 text-sm leading-6 text-[#666666]">
-              Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.
-            </p>
-            <div className="mt-5 grid gap-2 text-sm text-[#555555]">
-              {["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1075,34 +1005,7 @@ export default function LandingPage() {
     <main className="min-h-screen overflow-x-hidden bg-[#F8F5F0] text-[#1A1A1A]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
       <Header />
-      <section className="relative bg-[#FFFDFB] motion-safe:animate-[sectionIn_.45s_ease-out_both]">
-        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:py-16">
-          <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#FFD4BF] bg-[#FFF4EE] px-3 py-1 text-sm font-semibold text-[#B64A1F]">
-              <Sparkles size={15} aria-hidden="true" />
-              Markdown-Dateien · visuelle Maps
-            </div>
-            <h1 className="max-w-3xl text-4xl font-semibold leading-[1.04] tracking-normal text-[#1A1A1A] sm:text-6xl">
-              Markdown-Dateien. Als visuelle Maps.
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-[#555555] sm:text-lg sm:leading-8">
-              Öffne eine Markdown-Datei und erkenne ihre Struktur sofort. BloomMD ergänzt eine visuelle
-              Ebene — lokal, portabel und ohne neues Dateiformat.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Demo ohne Konto testen
-                <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <Link href="/download" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Desktop herunterladen
-              </Link>
-            </div>
-            <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
-          </div>
-          <HeroProduct />
-        </div>
-      </section>
+      <HeroTrieb markdown={markdownLines.join("\n")} intro={<HeroIntro onDemo={() => trackPlausibleEvent("demo_click")} />} />
 
       <section id="produkt-demo">
         <SplitDemo />

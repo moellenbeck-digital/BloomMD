@@ -18,8 +18,7 @@
   text-wrap: balance;
 }
 
-.h1 span { display: block; }
-.h1 span + span { font-style: italic; font-weight: 400; color: var(--bmd-bloom-hi); }
+.h1 span { font-style: italic; font-weight: 400; color: var(--bmd-bloom-hi); }
 
 .lede { max-width: 34rem; }
 
@@ -108,7 +107,7 @@
     color: var(--bmd-bloom);
   }
   .h1 { font-size: clamp(4.25rem, 6.4vw, 5.75rem); line-height: 0.98; }
-  .h1 span { white-space: nowrap; }
+  .h1 { white-space: nowrap; }
   .actions { column-gap: 1.25rem; }
   .file pre { max-width: 24ch; }
   .lede { font-size: 1.1875rem; }

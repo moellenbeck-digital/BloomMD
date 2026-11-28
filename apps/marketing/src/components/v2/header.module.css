@@ -32,11 +32,15 @@
 @media (min-width: 1180px) {
   .bar { padding-inline: 1.5rem; }
   .nav, .tools { display: flex; }
+  /* Fixed tracks: the font swap changes word widths by a few px and must not move the groups. */
+  .nav { width: 36.5rem; justify-content: space-between; }
+  .tools { width: 21.75rem; justify-content: space-between; }
+  .tools > a:last-child { min-width: 11.5rem; }
   .toggle, .menu { display: none; }
 }
 
 @media (min-width: 1360px) {
-  .claim { display: inline; }
+  .claim { display: inline-block; width: 7.75rem; white-space: nowrap; }
 }
 
 @media (prefers-reduced-transparency: reduce) {

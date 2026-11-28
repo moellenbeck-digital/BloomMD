@@ -1,6 +1,8 @@
 import localFont from "next/font/local";
 
-/* Self-hosted OFL files (see ./fonts/OFL-*.txt). Latin subset, no external request. */
+/* Self-hosted OFL files (see ./fonts/OFL-*.txt). Latin subset, no external request.
+   No preload: preloaded fonts compete with the CSS and doubled the first paint on a throttled line.
+   Text paints at once in a metric-matched fallback and swaps. */
 const display = localFont({
   src: [
     { path: "./fonts/alegreya-latin-wght-normal.woff2", weight: "400 900", style: "normal" },
@@ -8,6 +10,7 @@ const display = localFont({
   ],
   variable: "--font-bmd-display",
   display: "swap",
+  preload: false,
   adjustFontFallback: "Times New Roman",
 });
 
@@ -18,6 +21,7 @@ const text = localFont({
   ],
   variable: "--font-bmd-text",
   display: "swap",
+  preload: false,
   adjustFontFallback: "Arial",
 });
 

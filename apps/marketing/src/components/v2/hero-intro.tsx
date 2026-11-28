@@ -10,7 +10,9 @@ export function HeroIntro({ onDemo }: { onDemo: () => void }) {
       <div className={styles.headline}>
         <p className={t.kicker}>Markdown-Dateien · visuelle Maps</p>
         <h1 className={styles.h1}>
-          <span>Markdown-Dateien.</span> <span>Als visuelle Maps.</span>
+          {/* Inline lines keep the H1 itself the LCP element. */}
+          Markdown-Dateien. <br />
+          <span>Als visuelle Maps.</span>
         </h1>
       </div>
       <div className={styles.aside}>

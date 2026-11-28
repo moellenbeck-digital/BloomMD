@@ -1,0 +1,128 @@
+/* BloomMD design language v2 "Der Trieb". Source of truth: .ulpi/design/DESIGN.md */
+.ground {
+  --bmd-ground: #fcf9f7;
+  --bmd-deep: #f5efea;
+  --bmd-raised: #ffffff;
+  --bmd-ink: #291a12;
+  --bmd-ink-2: #4c382d;
+  --bmd-ink-3: #6c5547;
+  --bmd-bark: #8f6c53;
+  --bmd-bark-hi: #7c573d;
+  --bmd-soil: #e0d3c9;
+  --bmd-bloom: #b94314;
+  --bmd-bloom-hi: #99350d;
+  --bmd-on-bloom: #fef9f5;
+  --bmd-veil: rgb(252 249 247 / 0.9);
+  --bmd-glow: rgb(185 120 80 / 0.1);
+
+  --bmd-display: var(--font-bmd-display), "Iowan Old Style", Georgia, serif;
+  --bmd-text: var(--font-bmd-text), "Segoe UI", sans-serif;
+  --bmd-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --bmd-radius: 4px;
+  --bmd-grow: cubic-bezier(0.23, 1, 0.32, 1);
+
+  position: relative;
+  background-color: var(--bmd-ground);
+  color: var(--bmd-ink);
+  font-family: var(--bmd-text);
+  font-synthesis-style: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark system theme. Same switch as the rest of the site: html.dark, set before first paint.
+   `.night` keeps an area dark in both themes (vision section, demo source file), as before v2. */
+:global(html.dark) .ground,
+.night {
+  --bmd-ground: #1e150f;
+  --bmd-deep: #160e0a;
+  --bmd-raised: #2c2018;
+  --bmd-ink: #f2ece3;
+  --bmd-ink-2: #dbcfc2;
+  --bmd-ink-3: #c3b3a4;
+  --bmd-bark: #8c6d58;
+  --bmd-bark-hi: #b9977a;
+  --bmd-soil: #45352c;
+  --bmd-bloom: #f98751;
+  --bmd-bloom-hi: #fda975;
+  --bmd-on-bloom: #1f0f08;
+  --bmd-veil: rgb(30 21 15 / 0.9);
+  --bmd-glow: rgb(185 120 80 / 0.16);
+}
+
+.ground ::selection { background: var(--bmd-bloom); color: var(--bmd-on-bloom); }
+.ground :is(a, button):focus-visible { outline: 2px solid var(--bmd-bloom-hi); outline-offset: 3px; border-radius: var(--bmd-radius); }
+
+.deep { background-color: var(--bmd-deep); }
+
+.wrap { max-width: 83rem; margin-inline: auto; padding-inline: 1.25rem; }
+
+/* Marginal note instead of a pill or an uppercase eyebrow. */
+.kicker { font-family: var(--bmd-display); font-style: italic; font-size: 1.25rem; line-height: 1.3; color: var(--bmd-bloom-hi); }
+
+.title {
+  font-family: var(--bmd-display);
+  font-weight: 500;
+  font-size: clamp(2.25rem, 1.25rem + 3.4vw, 4.25rem);
+  line-height: 1.04;
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.lede { font-size: 1.1875rem; line-height: 1.55; color: var(--bmd-ink-2); text-wrap: pretty; }
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  padding-inline: 1.25rem;
+  border-radius: var(--bmd-radius);
+  background: var(--bmd-bloom);
+  color: var(--bmd-on-bloom);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  transition: background-color 150ms ease, transform 100ms ease-out;
+}
+
+/* Secondary action: text resting on a small branch. */
+.twig {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  font-weight: 700;
+  font-size: 1.0625rem;
+  color: var(--bmd-ink);
+  transition: color 150ms ease, transform 100ms ease-out;
+}
+
+.twig::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.5rem;
+  height: 4px;
+  background: var(--bmd-bark-hi);
+  clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%);
+  transition: background-color 150ms ease;
+}
+
+.primary:active, .twig:active { transform: scale(0.96); }
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover { background: var(--bmd-bloom-hi); }
+  .twig:hover { color: var(--bmd-bloom-hi); }
+  .twig:hover::after { background: var(--bmd-bloom); }
+}
+
+@media (min-width: 73.75rem) {
+  .wrap { padding-inline: 1.5rem; padding-inline-start: 5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary:active, .twig:active { transform: none; }
+}

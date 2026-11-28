@@ -1,0 +1,18 @@
+/* Italic and bold join the families of their preloaded siblings (see ./fonts.ts). Plain faces without
+   preload: the browser fetches them only when text on the page asks for that style. next/font drops
+   a call whose result nobody imports, so these two are declared here. */
+@font-face {
+  font-family: bmdDisplay;
+  src: url("./fonts/alegreya-subset-400-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: bmdText;
+  src: url("./fonts/alegreya-sans-subset-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

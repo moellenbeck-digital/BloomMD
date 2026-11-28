@@ -1,0 +1,90 @@
+.section { padding-block: 2.5rem 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); }
+
+.title {
+  margin-top: 0.25rem;
+  font-family: var(--bmd-display);
+  font-weight: 500;
+  font-size: clamp(2.25rem, 1.6rem + 1.6vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.016em;
+  text-wrap: balance;
+}
+
+.lede { max-width: 40rem; margin-top: 0.75rem; }
+
+.board { display: grid; gap: 2rem; margin-top: 2.5rem; align-items: start; }
+
+/* The source file: a typeset column like in the hero, on a dark leaf in both themes. */
+.file { min-width: 0; padding: 1.25rem; border-radius: var(--bmd-radius); background: var(--bmd-deep); font-family: var(--bmd-mono); font-size: 0.8125rem; line-height: 1.7; color: var(--bmd-ink-3); }
+.filename { display: flex; align-items: baseline; gap: 0.75rem; font-weight: 700; color: var(--bmd-ink); }
+.filename span { font-family: var(--bmd-display); font-style: italic; font-weight: 400; font-size: 1rem; color: var(--bmd-ink-3); }
+.file pre { margin-top: 0.5rem; font: inherit; white-space: pre-wrap; overflow-wrap: break-word; }
+.file [data-heading] { color: var(--bmd-ink); }
+
+.recording { min-width: 0; }
+/* Light theme: the light recording needs an edge against the light ground. */
+:global(html:not(.dark)) .video { border: 1px solid var(--bmd-soil); }
+.video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--bmd-radius); background: var(--bmd-deep); }
+.controls { min-height: 2.75rem; margin-top: 0.25rem; }
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--bmd-ink);
+  cursor: pointer;
+  transition: color 150ms ease, transform 100ms ease-out;
+}
+.control:active { transform: scale(0.96); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin-top: 1.5rem; }
+
+/* Three proofs on one shoot (shapes from trieb.ts). Narrow: it runs down the left edge. */
+.proofs { position: relative; margin-top: 2rem; }
+.shoot { display: none; }
+.proof { position: relative; display: grid; gap: 1rem; padding-left: 2.25rem; list-style: none; }
+.proof::before { --a: 12px; --b: 3px; content: ""; position: absolute; left: 6px; top: 0; bottom: 0; width: 22px; translate: -50% 0; background: var(--bmd-bloom); clip-path: polygon(calc(50% - var(--a) / 2) 0, calc(50% + var(--a) / 2) 0, calc(50% + 3px + (var(--a) * 3 + var(--b)) / 8) 25%, calc(50% + 4px + (var(--a) + var(--b)) / 4) 50%, calc(50% + 3px + (var(--a) + var(--b) * 3) / 8) 75%, calc(50% + var(--b) / 2) 100%, calc(50% - var(--b) / 2) 100%, calc(50% + 3px - (var(--a) + var(--b) * 3) / 8) 75%, calc(50% + 4px - (var(--a) + var(--b)) / 4) 50%, calc(50% + 3px - (var(--a) * 3 + var(--b)) / 8) 25%); transform-origin: top; }
+.proof li { position: relative; font-family: var(--bmd-display); font-weight: 500; font-size: 1.375rem; line-height: 1.2; color: var(--bmd-ink); }
+.proof li::before { content: ""; position: absolute; left: -2.25rem; top: calc(0.6em - 22px); width: 32px; height: 28px; background: var(--bmd-bark-hi); clip-path: path("M1.5 2.1 C2.5 9.5 3.7 15.1 6.9 18.9 C10.1 22.7 14.9 24 22 24 L31 22.4 L31 21.6 L22 20 C15.5 20 12.5 18.5 11.2 15.9 C9.9 13.3 9.8 8.9 10.5 1.9 Z"); }
+
+/* The twigs follow the bow of the stem. */
+.proof li:nth-child(2)::before { translate: 4px 0; }
+.proof li:nth-child(3)::before { translate: 2px 0; }
+
+@media (min-width: 640px) {
+  .proofs { padding-bottom: 2.75rem; }
+  .shoot { display: block; position: absolute; left: 0; bottom: 0; width: 100%; height: 2.75rem; overflow: visible; }
+  .proof { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 0; }
+  .proof::before, .proof li::before { display: none; }
+  .proof li { padding: 0 1.5rem 0 2.25rem; }
+}
+
+@media (min-width: 73.75rem) {
+  /* The title stays inside a 900 px high first screen, below the hero. */
+  .section { padding-block: 0.75rem 4.5rem; }
+  .title { white-space: nowrap; }
+  .board { grid-template-columns: 22rem minmax(0, 1fr); gap: 3rem; }
+  .board[data-solo] { grid-template-columns: minmax(0, 60rem); }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .control:hover { color: var(--bmd-bloom-hi); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .proofs:global([data-grow="ready"]) .proof::before { transform: scale(0); }
+  .proofs:global([data-grow="ready"]) li { opacity: 0; }
+  .proofs:global([data-grow="play"]) .proof::before { animation: shoot 560ms var(--bmd-grow) both; }
+  .proofs:global([data-grow="play"]) li { animation: arrive 320ms var(--bmd-grow) 300ms both; }
+  .proofs:global([data-grow="play"]) li:nth-child(2) { animation-delay: 370ms; }
+  .proofs:global([data-grow="play"]) li:nth-child(3) { animation-delay: 440ms; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control:active { transform: none; }
+}
+
+@keyframes shoot { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes arrive { from { opacity: 0; translate: -8px 0; } to { opacity: 1; translate: 0 0; } }

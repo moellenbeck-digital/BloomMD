@@ -1,20 +1,29 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { parseFile } from "@bloommd/core/browser";
-import { MindMapPreview } from "@bloommd/ui";
-import { AvailabilityOverview } from "../components/availability-overview";
+import { AvailabilityTrieb } from "../components/v2/availability-trieb";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
+import { SiteHeader } from "../components/v2/site-header";
+import { HeroIntro } from "../components/v2/hero-intro";
+import { HeroTrieb } from "../components/v2/hero-trieb";
+import { LandingPaths } from "../components/v2/landing-paths";
+import { SplitDemo } from "../components/v2/split-demo";
+import { TemplatesTrieb } from "../components/v2/templates-trieb";
+import { UseCaseTrieb } from "../components/v2/use-case-trieb";
+import { FaqTrieb } from "../components/v2/faq-trieb";
+import { RegisterTrieb } from "../components/v2/register-trieb";
+import { FooterTrieb } from "../components/v2/footer-trieb";
+import { AgentHull } from "../components/v2/agent-hull";
+import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
 import {
   ArrowRight,
   Bot,
-  Check,
-  ChevronDown,
   CloudOff,
   Code2,
   FileCode2,
@@ -25,16 +34,16 @@ import {
   Keyboard,
   Layers3,
   LayoutTemplate,
-  Menu,
   MonitorSmartphone,
   MoveRight,
   PenLine,
   Presentation,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
-  X,
 } from "lucide-react";
+
+/* Loaded on demand: the map preview pulls in the UI package and the Markdown parser. */
+const RoadmapPreview = dynamic(() => import("./roadmap-preview").then((m) => m.RoadmapPreview));
 
 const headerNavItems = [
   { label: "Produkt", href: "#produkt" },
@@ -53,6 +62,21 @@ const secondaryNavItems = [
   { label: "Obsidian", href: "/obsidian" },
   { label: "FAQ", href: "#faq" },
 ];
+
+const headerCopy = {
+  locale: "de",
+  homeHref: "/",
+  homeLabel: "BloomMD Startseite",
+  navLabel: "Hauptnavigation",
+  mobileNavLabel: "Mobile Navigation",
+  menuId: "mobile-navigation",
+  more: "Weitere Themen",
+  open: "Navigation öffnen",
+  close: "Navigation schließen",
+  signup: "Jetzt registrieren",
+  languageLabel: "Sprache",
+  otherLabel: "Switch to English",
+} as const;
 
 const legalLinks = [
   { label: "Impressum", href: "/impressum" },
@@ -119,21 +143,18 @@ const markdownLines = [
 
 const audiencePaths = [
   {
-    icon: FileText,
     title: "Lokal ausprobieren",
     text: "Teste eine Markdown-Datei im Browser. Die Desktop-Beta gibt es für macOS und Omarchy/Linux.",
     href: "/demo",
     cta: "Demo ohne Konto testen",
   },
   {
-    icon: MonitorSmartphone,
     title: "Web und Team nutzen",
     text: "Teste Web-Workspaces, Sync und Zusammenarbeit 30 Tage kostenlos ab E-Mail-Bestätigung.",
     href: "#beta",
     cta: "Testaccount erstellen",
   },
   {
-    icon: GitBranch,
     title: "Richtung mitgestalten",
     text: "Sieh dir den Stand der Wissensplattform-Roadmap an und teile deine Idee.",
     href: "/roadmap",
@@ -217,9 +238,6 @@ const useCases = [
     markdown: ["# Dokumentation", "## Anleitungen", "## Referenz", "### API", "### Beispiele"].join("\n"),
   },
 ];
-
-const heroPreviewDocument = parseFile("strategy.md", markdownLines.join("\n"));
-const roadmapPreviewDocument = parseFile("roadmap.md", ["# Roadmap", "## Produktkern", "## Zusammenarbeit", "## Sync", "## Dokumentation"].join("\n"));
 
 const templateCards = [
   {
@@ -357,199 +375,6 @@ const productJsonLd = {
   description: "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps, ohne ein neues Dateiformat einzuführen. Local-first, portabel und als Beta verfügbar.",
 };
 
-function Header() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <header className="sticky top-0 z-30 overflow-x-clip border-b border-[#E8E4DF]/70 bg-[#FFFDFB]/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-4 px-5">
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25" aria-label="BloomMD Startseite">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <span className="block h-8 w-[144px]">
-            <img src="/logo.svg" alt="BloomMD" className="bloommd-logo-light h-8 w-auto" />
-            <img src="/logo-dark.svg" alt="" aria-hidden="true" className="bloommd-logo-dark h-8 w-auto" />
-          </span>
-          <span className="hidden border-l border-[#D4CFC8] pl-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#514C46] xl:inline">
-            Markdown Maps
-          </span>
-        </Link>
-        <nav className="hidden items-center rounded-md border border-[#E8E4DF] bg-white/82 p-1 shadow-[0_12px_40px_rgba(26,26,26,0.05)] xl:flex" aria-label="Hauptnavigation">
-          {headerNavItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 xl:px-4"
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <div className="hidden shrink-0 items-center gap-3 xl:flex">
-          <div className="flex h-9 items-center rounded-md border border-[#E8E4DF] bg-white p-0.5 text-xs font-semibold text-[#68615C]" aria-label="Sprache">
-            <span className="rounded bg-[#1A1A1A] px-2.5 py-1.5 text-white" aria-current="page">DE</span>
-            <Link href="/en" hrefLang="en" className="rounded px-2.5 py-1.5 hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20" aria-label="Switch to English">
-              EN
-            </Link>
-          </div>
-          <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] transition hover:bg-[#F2F0ED] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-            Login
-          </a>
-          <a href={appSignupUrl} className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-            Jetzt registrieren
-            <ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#E8E4DF] bg-white text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25 xl:hidden"
-          aria-expanded={open}
-          aria-controls="mobile-navigation"
-          aria-label={open ? "Navigation schließen" : "Navigation öffnen"}
-        >
-          {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
-        </button>
-      </div>
-      {open && (
-        <div id="mobile-navigation" className="border-t border-[#E8E4DF] bg-[#FFFDFB] px-5 py-5 shadow-[0_24px_60px_rgba(26,26,26,0.08)] xl:hidden">
-          <nav className="grid gap-5" aria-label="Mobile Navigation">
-            <div className="grid grid-cols-2 gap-2">
-              {headerNavItems.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="rounded-md border border-[#E8E4DF] bg-white px-3 py-3 text-sm font-semibold text-[#1A1A1A] hover:bg-[#FFF4EE] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-                >
-                  {item.label}
-                </a>
-              ))}
-            </div>
-            <div className="grid gap-2 border-t border-[#E8E4DF] pt-4">
-              <p className="px-3 text-xs font-semibold uppercase tracking-[0.14em] text-[#999999]">Weitere Themen</p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {secondaryNavItems.map((item) => (
-                  <a
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setOpen(false)}
-                    className="rounded-md px-3 py-2 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-                  >
-                    {item.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className="grid gap-2 border-t border-[#E8E4DF] pt-4">
-              <div className="flex h-11 items-center rounded-md border border-[#E8E4DF] bg-white p-1 text-xs font-semibold text-[#68615C]" aria-label="Sprache">
-                <span className="flex-1 rounded bg-[#1A1A1A] px-3 py-2 text-center text-white" aria-current="page">DE</span>
-                <Link href="/en" hrefLang="en" onClick={() => setOpen(false)} className="flex-1 rounded px-3 py-2 text-center hover:bg-[#FFF4EE] hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20" aria-label="Switch to English">
-                  EN
-                </Link>
-              </div>
-              <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className="rounded-md px-3 py-3 text-sm font-semibold text-[#68615C] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Login
-              </a>
-              <a href={appSignupUrl} className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#C94317] px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Jetzt registrieren
-                <ArrowRight size={16} aria-hidden="true" />
-              </a>
-            </div>
-          </nav>
-        </div>
-      )}
-    </header>
-  );
-}
-
-function HeroProduct() {
-  return (
-    <div className="relative" id="produkt">
-      <div className="overflow-hidden rounded-xl border border-[#E0D9D1] bg-white shadow-[0_30px_90px_rgba(26,26,26,0.12)]">
-        <div className="flex h-12 items-center justify-between border-b border-[#E8E4DF] bg-[#FFFDFB] px-4">
-          <div className="flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#FF6B35]" />
-            <span className="text-sm font-semibold">BloomMD Workspace</span>
-            <span className="hidden text-xs text-[#777777] sm:inline">/ files / strategy.md</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-[#777777]">
-            <span className="rounded border border-[#E8E4DF] px-2 py-1">?</span>
-            <span className="hidden rounded border border-[#E8E4DF] px-2 py-1 sm:inline">⌘S</span>
-            <span className="hidden items-center gap-1 rounded-full border border-[#D8E7D3] bg-[#F4FAF1] px-2 py-1 text-[#467642] md:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#5EA552]" />
-              lokal gespeichert
-            </span>
-          </div>
-        </div>
-        <div className="grid lg:grid-cols-[190px_minmax(0,1fr)_250px]">
-          <div className="max-h-[136px] overflow-hidden border-b border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white lg:max-h-none lg:border-b-0 lg:border-r">
-            <div className="mb-3 flex items-center justify-between text-xs">
-              <span className="font-semibold">strategy.md</span>
-              <span className="rounded border border-white/12 px-2 py-0.5 text-white/54">Quelle</span>
-            </div>
-            <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-[11px] leading-5 text-white/76">
-              {markdownLines.join("\n")}
-            </pre>
-          </div>
-          <MindMapPreview
-            document={heroPreviewDocument}
-            className="!min-h-[230px] !rounded-none !border-0 sm:!min-h-[320px] lg:!min-h-[360px]"
-            ariaLabel="BloomMD Product Strategy Markdown mind map preview"
-          />
-          <aside className="hidden border-t border-[#E8E4DF] bg-white p-5 md:block lg:border-l lg:border-t-0">
-            <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#999999]">Inspector</div>
-            <h3 className="text-base font-semibold">North Star</h3>
-            <p className="mt-3 text-sm leading-6 text-[#666666]">
-              Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.
-            </p>
-            <div className="mt-5 grid gap-2 text-sm text-[#555555]">
-              {["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AudiencePathSection() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]" data-testid="landing-paths">
-      <div className="mx-auto max-w-7xl px-5 py-8 lg:py-10">
-        <div className="grid gap-3 md:grid-cols-3">
-          {audiencePaths.map((path) => {
-            const Icon = path.icon;
-            return (
-              <Link
-                key={path.title}
-                href={path.href}
-                className="group grid min-h-[178px] gap-4 rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#FFD4BF] hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-[#FFF4EE] text-[#B64A1F]">
-                    <Icon size={19} aria-hidden="true" />
-                  </span>
-                  <h2 className="text-base font-semibold text-[#1A1A1A]">{path.title}</h2>
-                </div>
-                <p className="text-sm leading-6 text-[#666666]">{path.text}</p>
-                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-[#B64A1F]">
-                  {path.cta}
-                  <ArrowRight size={15} className="transition group-hover:translate-x-0.5" aria-hidden="true" />
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function WhatIsNewSection() {
   return (
     <section className="border-y border-[#E8E4DF] bg-[#1F1D1B] text-white">
@@ -565,69 +390,6 @@ function WhatIsNewSection() {
         <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
           <Link href="/docs/openclaw-agent" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">Agenten-Anleitung <ArrowRight size={16} aria-hidden="true" /></Link>
           <Link href="/blog/openclaw-lokale-workspace-agenten" className="inline-flex h-10 items-center justify-center rounded-md border border-white/18 px-4 text-sm font-semibold text-white hover:bg-white/8 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20">Was daran neu ist</Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function SplitDemo() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Aus Text wird Raum</p>
-          <h2 className="text-3xl font-semibold tracking-normal sm:text-4xl">Aus Markdown wird ein navigierbarer Wissensraum.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            Markdown bleibt die Quelle. BloomMD ist die visuelle Ebene, in der du Struktur erkennst und ohne Formatwechsel weiterarbeitest.
-          </p>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-lg border border-[#E8E4DF] bg-[#1F1D1B] p-5 text-white shadow-sm">
-            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3 text-sm">
-              <span className="font-semibold">research-plan.md</span>
-              <span className="rounded border border-white/10 px-2 py-1 text-xs text-white/60">Markdown</span>
-            </div>
-            <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">
-{`# Research Plan
-
-## Core Question
-How do local-first tools help writers keep control?
-
-## Sources
-- Interviews
-- Product notes
-- Architecture decisions
-
-## Findings
-### Portability
-Open files reduce migration pressure.
-
-### Structure
-Visual maps reveal relationships faster.`}
-            </pre>
-          </div>
-          <div className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4 shadow-sm">
-            <video
-              className="aspect-video w-full rounded-md border border-[#E8E4DF] bg-white object-cover"
-              src="/demo-branch-drag-markdown.webm"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              aria-label="Echte BloomMD-Aufnahme: ein Branch wird gezogen und die Markdown-Struktur aktualisiert sich."
-              data-testid="branch-drag-demo-video"
-            />
-            <div className="mt-4 grid gap-3 text-sm text-[#666666] sm:grid-cols-3">
-              {["Echte Aufnahme", "Branch gezogen", "Markdown aktualisiert"].map((item) => (
-                <div key={item} className="flex items-center gap-2 rounded-md border border-[#E8E4DF] bg-white px-3 py-2">
-                  <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -686,96 +448,6 @@ function WorkflowSection() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function UseCasesSection() {
-  const [activeId, setActiveId] = useState(useCases[0]!.id);
-  const active = useCases.find((item) => item.id === activeId) ?? useCases[0]!;
-  const previewDocument = useMemo(() => parseFile(active.file, active.markdown), [active.file, active.markdown]);
-
-  return (
-    <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 max-w-3xl">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Anwendungsfälle</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Für Wissen, das zu komplex für eine lineare Liste wird.</h2>
-        </div>
-        <div className="space-y-5">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Anwendungsfälle">
-            {useCases.map((item) => (
-              <button
-                key={item.id}
-                id={`usecase-tab-${item.id}`}
-                type="button"
-                role="tab"
-                aria-selected={active.id === item.id}
-                aria-controls={`usecase-panel-${item.id}`}
-                onClick={() => setActiveId(item.id)}
-                className={`min-h-11 rounded-md border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
-                  active.id === item.id ? "border-[#FF6B35] bg-[#FFF4EE] text-[#1A1A1A]" : "border-[#E8E4DF] bg-[#FCFBFA] text-[#666666] hover:bg-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div
-            id={`usecase-panel-${active.id}`}
-            role="tabpanel"
-            aria-labelledby={`usecase-tab-${active.id}`}
-            className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4"
-          >
-            <h3 className="text-xl font-semibold">{active.heading}</h3>
-            <p className="mt-2 max-w-3xl leading-7 text-[#555555]">{active.text}</p>
-            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
-                <div className="mb-3 text-sm font-semibold">{active.file}</div>
-                <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
-              </div>
-              <MindMapPreview document={previewDocument} className="min-h-[250px]" ariaLabel={`${active.label} Markdown mind map preview`} />
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TemplatesSection() {
-  return (
-    <section id="templates" className="bg-[#FFFDFB]">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Vorlagen</p>
-            <h2 className="text-3xl font-semibold sm:text-4xl">Nicht mit einer leeren Map starten.</h2>
-            <p className="mt-4 text-lg leading-8 text-[#666666]">
-              Jede Vorlage ist eine normale Markdown-Datei. Öffne sie als Map und ersetze die Beispielinhalte durch deine eigenen.
-            </p>
-          </div>
-          <Link href="/templates" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#1A1A1A] px-4 text-sm font-semibold text-white hover:bg-[#333333] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1A1A1A]/20">
-            Alle Templates
-            <ArrowRight size={16} aria-hidden="true" />
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {templateCards.slice(0, 3).map((template) => (
-            <article key={template.href} className="rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <span className="rounded-md border border-[#FFD4BF] bg-[#FFF4EE] px-2.5 py-1 text-xs font-semibold text-[#B64A1F]">{template.category}</span>
-                <LayoutTemplate size={18} className="text-[#FF6B35]" aria-hidden="true" />
-              </div>
-              <h3 className="text-lg font-semibold">{template.title}</h3>
-              <p className="mt-2 min-h-[72px] text-sm leading-6 text-[#666666]">{template.text}</p>
-              <Link href={`/demo?template=${template.href.split("/").pop()}`} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#A33D17] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#A33D17]">
-                In der Demo öffnen <ArrowRight size={16} aria-hidden="true" />
-              </Link>
-            </article>
-          ))}
         </div>
       </div>
     </section>
@@ -873,7 +545,7 @@ function FeatureBento() {
             <p className="mt-2 text-sm leading-6 text-[#666666]">{feature.text}</p>
             {feature.title === "Visuelle Markdown-Map" && (
               <div className="mt-6">
-                <MindMapPreview document={roadmapPreviewDocument} className="min-h-[250px]" ariaLabel="Roadmap Markdown mind map preview" />
+                <RoadmapPreview />
               </div>
             )}
           </article>
@@ -1038,179 +710,51 @@ function WikiSection() {
   );
 }
 
-function FAQSection() {
-  const [openIndex, setOpenIndex] = useState(0);
-
-  return (
-    <section id="faq" className="mx-auto max-w-4xl px-5 py-16 lg:py-20">
-      <div className="mb-8 text-center">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">FAQ</p>
-        <h2 className="text-3xl font-semibold sm:text-4xl">Kurze Antworten zu Dateien, Sync und Lizenz.</h2>
-      </div>
-      <div className="divide-y divide-[#E8E4DF] rounded-xl border border-[#E8E4DF] bg-white">
-        {faqItems.map((item, index) => {
-          const open = openIndex === index;
-          return (
-            <div key={item.question}>
-              <button
-                type="button"
-                onClick={() => setOpenIndex(open ? -1 : index)}
-                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#FF6B35]/20"
-                aria-expanded={open}
-              >
-                {item.question}
-                <ChevronDown className={`shrink-0 text-[#999999] transition ${open ? "rotate-180" : ""}`} size={18} aria-hidden="true" />
-              </button>
-              {open && <p className="px-5 pb-5 leading-7 text-[#666666]">{item.answer}</p>}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F8F5F0] text-[#1A1A1A]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <Header />
-      <section className="relative bg-[#FFFDFB] motion-safe:animate-[sectionIn_.45s_ease-out_both]">
-        <div className="mx-auto grid max-w-7xl gap-8 px-5 py-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:py-16">
-          <div>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#FFD4BF] bg-[#FFF4EE] px-3 py-1 text-sm font-semibold text-[#B64A1F]">
-              <Sparkles size={15} aria-hidden="true" />
-              Markdown-Dateien · visuelle Maps
-            </div>
-            <h1 className="max-w-3xl text-4xl font-semibold leading-[1.04] tracking-normal text-[#1A1A1A] sm:text-6xl">
-              Markdown-Dateien. Als visuelle Maps.
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-[#555555] sm:text-lg sm:leading-8">
-              Öffne eine Markdown-Datei und erkenne ihre Struktur sofort. BloomMD ergänzt eine visuelle
-              Ebene — lokal, portabel und ohne neues Dateiformat.
-            </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/demo" onClick={() => trackPlausibleEvent("demo_click")} className="inline-flex h-12 items-center justify-center gap-2 rounded-md bg-[#B94316] px-5 text-sm font-semibold text-white transition hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35">
-                Demo ohne Konto testen
-                <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <Link href="/download" className="inline-flex h-12 items-center justify-center rounded-md border border-[#D4CFC8] bg-white px-5 text-sm font-semibold text-[#1A1A1A] transition hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-                Desktop herunterladen
-              </Link>
-            </div>
-            <p className="mt-5 text-sm font-medium text-[#666666]">Normales Markdown · lokale Dateien · macOS und Omarchy/Linux</p>
-          </div>
-          <HeroProduct />
-        </div>
-      </section>
+      <SiteHeader
+        navItems={headerNavItems}
+        secondaryItems={secondaryNavItems}
+        loginUrl={appLoginUrl}
+        signupUrl={appSignupUrl}
+        copy={headerCopy}
+      />
+      <HeroTrieb markdown={markdownLines.join("\n")} intro={<HeroIntro onDemo={() => trackPlausibleEvent("demo_click")} />} />
 
       <section id="produkt-demo">
         <SplitDemo />
       </section>
 
-      <AgentWorkflowSection locale="de" />
+      <AgentHull>
+        <AgentWorkflowSection locale="de" />
+      </AgentHull>
       <KnowledgeVisionSection locale="de" />
-      <AudiencePathSection />
-      <UseCasesSection />
-      <TemplatesSection />
-      <AvailabilityOverview locale="de" />
-      <FAQSection />
+      <LandingPaths items={audiencePaths} />
+      <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />
+      <TemplatesTrieb items={templateCards.slice(0, 3)} />
+      <AvailabilityTrieb locale="de" />
+      <FaqTrieb items={faqItems} kicker="FAQ" title="Kurze Antworten zu Dateien, Sync und Lizenz." />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}
-      <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">
-        <div className="mx-auto max-w-7xl px-5 py-14">
-          <h2 className="text-3xl font-semibold text-[#1A1A1A]">Jetzt registrieren</h2>
-          <p className="mt-3 max-w-2xl text-[#514C46]">
-            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an,
-            ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto
-            lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin
-            brauchen kein Konto.
-          </p>
-          <div className="mt-6">
-            <a
-              href={appSignupUrl}
-              data-testid="signup-cta"
-              onClick={() => trackPlausibleEvent("signup_click")}
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35"
-            >
-              Jetzt registrieren
-              <ArrowRight size={17} aria-hidden="true" />
-            </a>
-          </div>
-        </div>
-      </section>
+      <RegisterTrieb
+        title="Jetzt registrieren"
+        text="Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an, ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin brauchen kein Konto."
+        action="Jetzt registrieren"
+        href={appSignupUrl}
+        onSignup={() => trackPlausibleEvent("signup_click")}
+      />
 
-      <footer className="bg-[#171513] text-white">
-        <div className="mx-auto max-w-7xl border-t border-white/10 px-5 py-10">
-          <div className="grid gap-10 lg:grid-cols-[minmax(220px,0.9fr)_minmax(0,2.1fr)]">
-            <div className="max-w-xs">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-dark.svg" alt="BloomMD" className="h-8" />
-              <p className="mt-4 text-sm leading-6 text-white/56">Markdown-Dateien. Als visuelle Maps.</p>
-              <p className="mt-3 text-xs leading-5 text-white/48">
-                BloomMD wird von{" "}
-                <a href="https://moellenbeck-digital.io/" className="font-semibold text-white/72 hover:text-white hover:underline">
-                  moellenbeck-digital.io
-                </a>{" "}
-                zur Verfügung gestellt.
-              </p>
-              <p className="mt-5 inline-flex rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/58">
-                Beta · macOS + Omarchy/Linux
-              </p>
-            </div>
-
-            <nav className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4" aria-label="Footer Navigation">
-              {footerSections.map((section) => (
-                <div key={section.title}>
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/72">{section.title}</h2>
-                  <ul className="mt-4 space-y-2.5">
-                    {section.links.map((item) => {
-                      const className = "inline-flex rounded py-0.5 text-sm text-white/66 transition hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20";
-                      if (item.href.startsWith("http")) {
-                        return (
-                          <li key={item.href}>
-                            <a href={item.href} className={className}>
-                              {item.label}
-                            </a>
-                          </li>
-                        );
-                      }
-                      if (item.href.startsWith("#")) {
-                        return (
-                          <li key={item.href}>
-                            <a href={item.href} className={className}>
-                              {item.label}
-                            </a>
-                          </li>
-                        );
-                      }
-                      return (
-                        <li key={item.href}>
-                          <Link href={item.href} className={className}>
-                            {item.label}
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </nav>
-          </div>
-
-          <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-5 text-xs text-white/68 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              © 2026 BloomMD. Ein Produkt von{" "}
-              <a href="https://moellenbeck-digital.io/" className="font-semibold text-white/72 hover:text-white hover:underline">
-                moellenbeck-digital.io
-              </a>.
-            </p>
-            <p>
-              Marketing: bloommd.io · App: bloommd.app · <span data-testid="marketing-build-version">Marketing-Version: {marketingBuildInfo.version}{marketingBuildInfo.shortSha ? ` (${marketingBuildInfo.shortSha})` : ""}</span>
-            </p>
-          </div>
-        </div>
-      </footer>
+      <FooterTrieb
+        claim="Markdown-Dateien. Als visuelle Maps."
+        providedBy={["BloomMD wird von ", " zur Verfügung gestellt."]}
+        beta="Beta · macOS + Omarchy/Linux"
+        navLabel="Footer Navigation"
+        columns={footerSections}
+        copyright="© 2026 BloomMD. Ein Produkt von "
+        domains={<>Marketing: bloommd.io · App: bloommd.app · <span data-testid="marketing-build-version">Marketing-Version: {marketingBuildInfo.version}{marketingBuildInfo.shortSha ? ` (${marketingBuildInfo.shortSha})` : ""}</span></>}
+      />
     </main>
   );
 }

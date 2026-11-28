@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { VisionTrieb } from "./v2/vision-trieb";
 
 type Locale = "de" | "en";
 
@@ -45,51 +44,5 @@ const content = {
 export function KnowledgeVisionSection({ locale }: { locale: Locale }) {
   const copy = content[locale];
   const roadmapHref = locale === "de" ? "/roadmap" : "/en/roadmap";
-  return (
-    <section id="vision" aria-labelledby="vision-title" className="scroll-mt-24 border-y border-[#302B27] bg-[#1A1A1A] text-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16">
-          <div>
-            <p className="text-sm font-semibold text-[#FFAD88]">{copy.eyebrow}</p>
-            <h2 id="vision-title" className="mt-4 max-w-2xl text-4xl font-semibold leading-tight sm:text-5xl">{copy.title}</h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-[#E4DDD7]">{copy.intro}</p>
-            <Link href={roadmapHref} className="mt-7 inline-flex min-h-11 items-center gap-2 border-b-2 border-[#FF9869] text-sm font-semibold text-white hover:text-[#FFB899] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-              {copy.roadmap}<ArrowRight size={17} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="grid gap-3 self-end sm:grid-cols-2 lg:grid-cols-1">
-            <div className="border-l-2 border-[#FF9869] bg-white/6 px-5 py-4">
-              <p className="text-sm font-bold text-[#FFB899]">{copy.today}</p>
-              <p className="mt-2 text-sm leading-6 text-[#E4DDD7]">{copy.todayText}</p>
-            </div>
-            <div className="border-l-2 border-[#B5A89D] bg-white/6 px-5 py-4">
-              <p className="text-sm font-bold text-white">{copy.pilot}</p>
-              <p className="mt-2 text-sm leading-6 text-[#E4DDD7]">{copy.pilotText}</p>
-            </div>
-          </div>
-        </div>
-        <div className="mt-12 border-t border-white/20 pt-8">
-          <p className="text-sm font-semibold text-[#FFB899]">{copy.exploring}</p>
-          <div className="mt-4 grid gap-x-8 sm:grid-cols-2">
-            {copy.fields.map((field) => (
-              <div key={field.number} className="border-t border-white/20 py-5">
-                <p className="font-[var(--font-mono)] text-xs text-[#FFB899]">{field.number}</p>
-                <h3 className="mt-2 text-xl font-semibold">{field.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-[#E4DDD7]">{field.question}</p>
-                <p className="mt-2 text-xs text-[#C4B9AF]">{field.detail}</p>
-                <div className="mt-3 flex gap-4">
-                  {field.issues.map((issue) => (
-                    <a key={issue} href={`https://github.com/moellenbeck-digital/BloomMD/issues/${issue}`} aria-label={`${field.title}: Issue ${issue}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-[#FFB899] underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
-                      #{issue}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-sm leading-6 text-[#D7CDC4]">{copy.foundation}</p>
-        </div>
-      </div>
-    </section>
-  );
+  return <VisionTrieb copy={copy} roadmapHref={roadmapHref} />;
 }

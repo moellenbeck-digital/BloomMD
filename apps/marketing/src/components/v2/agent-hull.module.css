@@ -1,0 +1,6 @@
+/* Only the two colours the shell needs (same values as tokens.module.css). The design class `.ground`
+   stays off: it would also reach focus rings, radius, font rendering and everything inside the scene. */
+.hull { --hull-ground: #fcf9f7; --hull-soil: #e0d3c9; border-top: 1px solid var(--hull-soil); background-color: var(--hull-ground); }
+:global(html.dark) .hull { --hull-ground: #1e150f; --hull-soil: #45352c; }
+.hull > section { background-color: var(--hull-ground) !important; }
+:global(html.dark) .hull > section { background-color: var(--hull-ground) !important; }

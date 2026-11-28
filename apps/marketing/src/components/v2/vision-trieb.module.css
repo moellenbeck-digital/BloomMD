@@ -1,0 +1,64 @@
+.section { scroll-margin-top: 6rem; padding-block: 4rem; overflow: clip; }
+.head { display: grid; gap: 1.5rem; }
+.title { margin-top: 0.5rem; max-width: 15ch; }
+.aside { max-width: 38rem; }
+.roadmap { margin-top: 1rem; }
+
+/* Narrow: the trunk runs down the left edge and thins with each stage. */
+.stage { margin-top: 2.5rem; }
+.stage > svg.wideSvg { display: none; }
+.stageItem { position: relative; padding: 0.5rem 0 1.75rem 3.25rem; }
+.stem { position: absolute; left: 7px; top: 0; bottom: 0; width: calc(var(--a) + 10px); translate: -50% 0; background: var(--bmd-bark); clip-path: polygon(calc(50% - var(--a) / 2) 0, calc(50% + var(--a) / 2) 0, calc(50% + 3px + (var(--a) * 3 + var(--b)) / 8) 25%, calc(50% + 4px + (var(--a) + var(--b)) / 4) 50%, calc(50% + 3px + (var(--a) + var(--b) * 3) / 8) 75%, calc(50% + var(--b) / 2) 100%, calc(50% - var(--b) / 2) 100%, calc(50% + 3px - (var(--a) + var(--b) * 3) / 8) 75%, calc(50% + 4px - (var(--a) + var(--b)) / 4) 50%, calc(50% + 3px - (var(--a) * 3 + var(--b)) / 8) 25%); }
+.today .stem { background: var(--bmd-bloom); }
+.twig { position: absolute; left: 0; top: 0.5rem; width: 44px; height: 36px; overflow: visible; }
+.fields { list-style: none; }
+
+.name { font-family: var(--bmd-display); font-weight: 500; line-height: 1.12; color: var(--bmd-ink); text-wrap: balance; }
+.today .name { font-size: 2.25rem; font-weight: 700; color: var(--bmd-bloom-hi); letter-spacing: -0.012em; }
+.pilot .name { font-size: 1.75rem; }
+.exploring .name { font-size: 1.5rem; font-style: italic; font-weight: 400; }
+.exploring { padding-bottom: 1rem; }
+.number { font-family: var(--bmd-mono); font-size: 0.8125rem; font-weight: 400; color: var(--bmd-ink-3); }
+.name h3 { margin-top: 0.25rem; font-size: 1.5rem; font-weight: 500; }
+
+.body { margin-top: 0.5rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); text-wrap: pretty; }
+.question { font-family: var(--bmd-display); font-style: italic; font-size: 1.1875rem; line-height: 1.4; color: var(--bmd-ink); }
+.detail { margin-top: 0.125rem; font-size: 0.9375rem; line-height: 1.45; color: var(--bmd-ink-3); }
+.issues { display: flex; gap: 1.5rem; }
+.issues a { display: inline-flex; min-width: 2.75rem; min-height: 2.75rem; align-items: center; font-family: var(--bmd-mono); font-size: 0.875rem; color: var(--bmd-bloom-hi); text-decoration: underline; text-decoration-color: var(--bmd-bark); text-decoration-thickness: 1px; text-underline-offset: 4px; transition: text-decoration-color 150ms ease; }
+
+/* The roots: what everything above stands on. */
+.narrowRoots { display: block; width: 100%; max-width: 20rem; height: auto; margin-top: -0.5rem; overflow: visible; }
+.foundation { position: relative; margin-top: 0.75rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); max-width: 34rem; text-wrap: pretty; }
+.soil { stroke: var(--bmd-bark); stroke-width: 2; }
+.root > path { fill: var(--bmd-bark-hi); }
+
+@media (hover: hover) and (pointer: fine) {
+  .issues a:hover { text-decoration-color: var(--bmd-bloom); }
+}
+
+@media (min-width: 73.75rem) {
+  .section { padding-block: 5rem 4rem; }
+  .head { grid-template-columns: minmax(0, 1fr) 31rem; gap: 4rem; align-items: end; }
+  .stage { position: relative; container-type: inline-size; aspect-ratio: 1224 / 712; margin-top: 2rem; }
+  .stage > svg.wideSvg { display: block; position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .stem, .twig, .stage > svg.narrowRoots { display: none; }
+
+  .stageItem { --u: calc(100cqw / 1224); position: absolute; width: 0; height: 0; padding: 0; left: calc(var(--x) / 1224 * 100%); top: calc(var(--y) / 712 * 100%); }
+  .stageItem > .name { position: absolute; left: 0; bottom: calc(var(--u) * 13); width: max-content; }
+  .stageItem > .body { position: absolute; left: 0; top: calc(var(--u) * 14); margin: 0; }
+  .today > .name { font-size: calc(var(--u) * 46); }
+  .today > .body { width: calc(var(--u) * 320); font-size: calc(var(--u) * 18); }
+  .pilot > .name { font-size: calc(var(--u) * 28); bottom: calc(var(--u) * 8); }
+  .pilot > .body { width: calc(var(--u) * 212); font-size: max(0.9375rem, calc(var(--u) * 16)); line-height: 1.5; }
+  .exploring > .name { font-size: calc(var(--u) * 28); bottom: calc(var(--u) * 7); }
+  .exploring { padding: 0; }
+  .field > .name { display: flex; align-items: baseline; gap: calc(var(--u) * 12); bottom: calc(var(--u) * 5); }
+  .field .number { order: 2; }
+  .field h3 { margin: 0; font-size: calc(var(--u) * 27); }
+  .field > .body { width: calc(var(--u) * 430); top: calc(var(--u) * 7); }
+  .question { font-size: max(1rem, calc(var(--u) * 18)); }
+  .detail { font-size: max(0.875rem, calc(var(--u) * 15)); }
+
+  .foundation { position: absolute; left: 0; top: calc(648 / 712 * 100%); margin: 0; width: calc(100cqw / 1224 * 480); font-size: max(1rem, calc(100cqw / 1224 * 18)); line-height: 1.5; }
+}

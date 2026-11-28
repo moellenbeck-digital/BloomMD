@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { WikiExplorer, type KnowledgeGraphData, type WikiExplorerPage } from "./WikiExplorer";
-import { useLocale } from "@bloommd/ui";
+import { useLocale } from "@bloommd/ui/locale";
 
 interface WikiPage {
   path: string;

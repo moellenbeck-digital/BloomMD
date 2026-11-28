@@ -9,7 +9,7 @@
 | Datei | Mono wie im Hero, Dateiname + Formatwort, `#`-Zeilen in `ink` |
 | Aufnahme | ohne Rahmen, Radius 4 px, 16:9 fest (kein Layout-Sprung) |
 | Pause | Textknopf ≥ 44 px unter der Aufnahme: „Aufnahme anhalten“ / „Aufnahme abspielen“ |
-| Trieb | spitz zulaufend (14 → 3 px), Akzent. Ab 640 px waagerecht, darunter senkrecht |
+| Trieb | spitz zulaufend (14 → 1,5), Akzent. Ab 640 px waagerecht mit zwei Ablegern zu den Belegen, darunter gebogener Stamm links mit Ansätzen |
 | Motion | beim ersten Sichtkontakt: Trieb wächst (nur `transform`, 560 ms), Wörter folgen (Deckkraft + 8 px) |
 | Reduced motion | Aufnahme startet nicht und steht auf dem letzten Bild; Trieb sofort fertig |
 | Ohne JavaScript | Aufnahme mit `autoPlay` und Browser-Bedienelementen, kein eigener Knopf; Trieb fertig |

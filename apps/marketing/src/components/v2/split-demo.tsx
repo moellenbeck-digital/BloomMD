@@ -4,9 +4,11 @@ import { Pause, Play } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { MarketingLocale } from "@/lib/locale";
+import { Branch } from "./branch";
 import { bmdFonts } from "./fonts";
 import { useGrowOnView } from "./use-grow-on-view";
 import t from "./tokens.module.css";
+import type { TriebShape } from "./trieb";
 import styles from "./split-demo.module.css";
 
 const source = `# Research Plan
@@ -56,6 +58,13 @@ const copy = {
     ] as readonly { label: string; href: string }[],
   },
 } as const;
+
+/* Wide: one shoot under the three proofs, with a twig rising to the second and third. */
+const proofShoots: TriebShape[] = [
+  { from: [4, -4], at: [70, 34], length: 1080, w: [14, 8, 1.5], bend: "v" },
+  { from: [352, 34], at: [436, 10], length: 190, w: [7, 3, 0.8] },
+  { from: [752, 34], at: [836, 10], length: 160, w: [5, 2.4, 0.6] },
+];
 
 /* The recording loops, so it needs a pause control. Reduced motion: it stands on its last frame.
    Without JavaScript the control could do nothing: the browser's own controls and autoplay take over. */
@@ -125,7 +134,7 @@ function DemoVideo({ c }: { c: (typeof copy)[MarketingLocale] }) {
 
 export function SplitDemo({ locale = "de" }: { locale?: MarketingLocale }) {
   const c = copy[locale];
-  const [view, grow] = useGrowOnView<HTMLUListElement>();
+  const [view, grow] = useGrowOnView<HTMLDivElement>();
 
   return (
     <section className={`${t.ground} ${bmdFonts} ${styles.section}`} aria-labelledby="demo-title" data-testid="demo-trieb">
@@ -146,9 +155,14 @@ export function SplitDemo({ locale = "de" }: { locale?: MarketingLocale }) {
           )}
           <DemoVideo c={c} />
         </div>
-        <ul ref={view} className={styles.proof} data-grow={grow}>
-          {c.proof.map((item) => <li key={item}>{item}</li>)}
-        </ul>
+        <div ref={view} className={styles.proofs} data-grow={grow}>
+          <ul className={styles.proof}>
+            {c.proof.map((item) => <li key={item}>{item}</li>)}
+          </ul>
+          <svg className={styles.shoot} viewBox="0 0 1200 44" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            {proofShoots.map((shape, i) => <Branch key={i} id={`demo-proof-${i}`} shape={shape} timing={{ delay: i * 120, duration: 560 }} lit={i === 0} />)}
+          </svg>
+        </div>
         {c.actions.length > 0 && (
           <div className={styles.actions}>
             {c.actions.map((action) => <Link key={action.href} href={action.href} className={t.twig}>{action.label}</Link>)}

@@ -3,7 +3,7 @@
 | Punkt | Regel |
 |---|---|
 | Nutzer will | einen Testaccount anlegen |
-| Layout-Familie | Auslauf: ein Trieb (14 → 3 px) läuft links neben Titel und Text und endet am Knopf |
+| Layout-Familie | Auslauf: ein Trieb läuft links neben Titel und Text und biegt in den Knopf ein |
 | Hierarchie | eine Primäraktion (`primary`), keine Zweitaktion |
 | Verboten hier | Banner-Kasten, Schatten, Zentrierung |
 | Motion | keine |

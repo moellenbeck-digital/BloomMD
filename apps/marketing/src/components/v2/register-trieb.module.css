@@ -1,8 +1,9 @@
 .section { padding-block: 3.5rem 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); scroll-margin-top: 6rem; }
 /* The shoot runs down beside the words and ends at the action. */
 .body { position: relative; padding-left: 2.5rem; }
-.body::before { content: ""; position: absolute; left: 0; top: 0; bottom: 1.5rem; width: 14px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%); }
-.body::after { content: ""; position: absolute; left: 7px; bottom: calc(1.5rem - 3px); width: 1.5rem; height: 6px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); }
+.body::before { content: ""; position: absolute; left: 0; top: 0; bottom: calc(1.5rem + 35px); width: 14px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 0, calc(50% + 4.5px) 100%, calc(50% - 4.5px) 100%); }
+/* The same shoot bends towards the action (shape from trieb.ts). */
+.body::after { content: ""; position: absolute; left: 0; bottom: calc(1.5rem - 4px); width: 44px; height: 40px; background: var(--bmd-bloom); clip-path: path("M2.5 0.1 C3.2 13.2 4.3 22.7 8.4 29.4 C12.5 36.1 19.7 39 30 39 L42 36.5 L42 35.5 L30 33 C20.7 33 16.7 30.9 14.3 26.1 C11.9 21.3 11.2 12.7 11.5 -0.1 Z"); }
 .title { margin-top: 0.25rem; }
 .text { max-width: 40rem; margin-top: 1rem; }
 .action { margin-top: 1.75rem; }
@@ -10,5 +11,5 @@
 @media (min-width: 73.75rem) {
   .section { padding-block: 5.5rem; }
   .body { padding-left: 4rem; }
-  .body::after { width: 3rem; }
+  .body::after { width: 60px; clip-path: path("M2.5 0.1 C3.3 13.3 4.6 22.9 9.7 29.7 C14.8 36.4 23.3 39 36 39 L56 36.5 L56 35.5 L36 33 C24.1 33 18.3 30.5 15.2 25.8 C12.1 21 11.3 12.7 11.5 -0.1 Z"); }
 }

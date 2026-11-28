@@ -37,6 +37,8 @@ Ein spitz zulaufender, warmer Ast wächst aus dem `#` einer Markdown-Zeile, trä
 
 Code: `apps/marketing/src/components/v2/trieb.ts` (Geometrie), `branch.tsx` (Trieb, Blüte, Knospe).
 
+Formen in CSS (`clip-path: path()`) stammen aus `trieb.ts`. Gerade Keile sind nur noch für kurze Unterstriche unter Aktionen und für lange senkrechte Stämme erlaubt.
+
 ## Color (locked)
 
 Neutrale Töne sind zur Markenfarbe getönt (Rinde, Hue 48–75). Ein Akzent. Hell und dunkel folgen dem Systemthema (`html.dark`), gleiche Rollen in beiden.

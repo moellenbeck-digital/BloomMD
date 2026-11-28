@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { parseFile } from "@bloommd/core/browser";
-import { MindMapPreview } from "@bloommd/ui";
 import { AgentWorkflowSection } from "../../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../../components/knowledge-vision-section";
 import {

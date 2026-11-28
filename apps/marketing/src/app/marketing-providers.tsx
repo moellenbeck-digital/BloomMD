@@ -1,7 +1,7 @@
 "use client";
 
 import type { Locale } from "@bloommd/ui";
-import { LocaleProvider } from "@bloommd/ui";
+import { LocaleProvider } from "@bloommd/ui/locale";
 import { AnalyticsProvider } from "./analytics-provider";
 
 export function MarketingProviders({ children, initialLocale }: { children: React.ReactNode; initialLocale: Locale }) {

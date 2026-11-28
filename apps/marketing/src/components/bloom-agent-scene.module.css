@@ -136,7 +136,12 @@
 .leaf { fill: #6dbe63; transform-box: fill-box; }
 .leafA { transform-origin: 0% 100%; }
 .leafB { transform-origin: 100% 60%; fill: #85cf78; }
-.bud { fill: #6dbe63; opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
+/* The bud: only while the scene plays (live), invisible in the final image. */
+.bud { opacity: 0; transform-box: fill-box; transform-origin: 50% 100%; }
+.budCore { fill: #ff8a5c; transform-box: fill-box; transform-origin: 50% 100%; }
+.sepal { fill: #6dbe63; stroke: #85cf78; stroke-width: 0.8; transform-box: fill-box; }
+.sepalL { transform-origin: 100% 100%; }
+.sepalR { transform-origin: 0% 100%; fill: #5fb055; }
 
 .edge { fill: none; stroke: rgba(255, 145, 100, 0.85); stroke-width: 2.6; stroke-linecap: round; }
 .twig { stroke: rgba(128, 206, 116, 0.75); stroke-width: 2.2; }
@@ -157,9 +162,15 @@
 .wide .ghostNode { stroke-width: 1.8; stroke-dasharray: 9 8; }
 .wide .flow { stroke-width: 4.4; }
 
+/* Each node grows out of the end of its branch, not out of its centre: the root out of the bud (bottom
+   centre), the children out of the end of their branch (--o from the component), the leaves out of the twig
+   on their left. */
 .rootNode,
 .childNode,
-.leafNode { transform-box: fill-box; transform-origin: center; }
+.leafNode { transform-box: fill-box; }
+.rootNode { transform-origin: 50% 100%; }
+.childNode { transform-origin: var(--o, 50% 50%); }
+.leafNode { transform-origin: 0% 50%; }
 .rootNode { filter: drop-shadow(4px 8px 18px rgba(255, 107, 53, 0.4)); }
 .rootRim { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .rootMark { fill: rgba(26, 26, 26, 0.55); font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
@@ -410,10 +421,17 @@
   .scene[data-state="play"] .ghostStem { animation: bloom-fade-out 0.4s var(--out) 1.25s forwards; }
   .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.55s var(--pop) 1.2s both; }
   .scene[data-state="play"] .leafB { animation: bloom-unfurl-b 0.55s var(--pop) 1.34s both; }
-  .scene[data-state="play"] .bud { animation: bloom-bud 0.5s var(--out) 1.3s both; }
+  /* The bud (1.3–2.3 s): grows on the stem tip, swells, gathers itself, the sepals open on a soft spring
+     and the core gives way to the root node. */
+  .scene[data-state="play"] .bud { animation: bloom-bud 1s linear 1.3s both; }
+  .scene[data-state="play"] .sepalL { animation: bloom-sepal-l 0.55s var(--spring-soft) calc(var(--t-root) - 0.04s) both; }
+  .scene[data-state="play"] .sepalR { animation: bloom-sepal-r 0.55s var(--spring-soft) calc(var(--t-root) - 0.04s) both; }
+  .scene[data-state="play"] .budCore { animation: bloom-core 0.32s var(--out) var(--t-root) both; }
 
   /* Act 3 (1.72–3.3 s): the map bursts open, node by node, each with a short, strong spring. */
-  .scene[data-state="play"] .rootNode { animation: bloom-node 0.6s var(--pop) var(--t-root) both; }
+  .scene[data-state="play"] .rootNode { animation: bloom-root 0.7s var(--spring) var(--t-root) both; }
+  /* The petals of the root fall away as it opens (the same petals as on a click). */
+  .scene[data-state="play"] [data-bloom-wrap="0"] .petal { animation: bloom-open-petal 0.9s var(--out) calc(var(--t-root) + 0.08s) both; }
   .scene[data-state="play"] .glow { animation: bloom-glow 1.3s var(--out) var(--t-root) both; }
   .scene[data-state="play"] .edge { animation: bloom-draw 0.38s var(--out) calc(var(--t-root) + 0.22s + var(--i) * 0.14s) both; }
   .scene[data-state="play"] .childNode { animation: bloom-node 0.55s var(--pop) calc(var(--t-child) + var(--i) * 0.14s) both; }
@@ -471,6 +489,7 @@
 @supports (animation-timeline: scroll()) and (animation-range: 0px 1px) {
   @media (prefers-reduced-motion: no-preference) {
     .scene {
+      --grid-plx: 3px;
       --plx: 6px;
       --pose-r: 1.5deg;
       --pose-y: 2px;
@@ -478,7 +497,7 @@
       --gaze-y: 1.5%;
     }
     @media (min-width: 720px), (min-aspect-ratio: 1/1) {
-      .scene { --plx: 12px; --pose-r: 4deg; --pose-y: 4px; --gaze-x: 2%; --gaze-y: 2.5%; }
+      .scene { --grid-plx: 6px; --plx: 12px; --pose-r: 4deg; --pose-y: 4px; --gaze-x: 2%; --gaze-y: 2.5%; }
     }
     .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll][data-inview] :is(.parallax, .scrollPose, .scrollGaze) {
       animation-duration: auto;
@@ -490,13 +509,28 @@
     .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll][data-inview] .parallax { animation-name: bloom-parallax; }
     .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll][data-inview] .scrollPose { animation-name: bloom-scroll-pose; }
     .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll][data-inview] .scrollGaze { animation-name: bloom-scroll-gaze; }
+    /* Depth: the dot grid behind the map drifts the other way (±6 px, phones ±3 px), so map and canvas
+       read as two layers. */
+    .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll][data-inview] .stage::before {
+      animation-name: bloom-grid-parallax;
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(root block);
+      animation-range: var(--scroll-from) var(--scroll-to);
+    }
     /* The scroll timeline follows the page, also at the edges of the viewport. */
     .scene[data-offscreen][data-inview] :is(.parallax, .scrollPose, .scrollGaze) { animation-play-state: running !important; }
+    .scene[data-offscreen][data-inview] .stage::before { animation-play-state: running !important; }
   }
 }
 @keyframes bloom-parallax {
   from { transform: translateY(calc(-1 * var(--plx))); }
   to { transform: translateY(var(--plx)); }
+}
+@keyframes bloom-grid-parallax {
+  from { transform: translateY(var(--grid-plx)); }
+  to { transform: translateY(calc(-1 * var(--grid-plx))); }
 }
 @keyframes bloom-scroll-pose {
   0% { transform: translateY(calc(-1 * var(--pose-y))) rotate(calc(-1 * var(--pose-r))); }
@@ -589,26 +623,54 @@
   to { stroke-dashoffset: 0; }
 }
 @keyframes bloom-unfurl {
-  from { opacity: 0; transform: scale(0) rotate(-45deg); }
+  from { opacity: 0; transform: scale(0.2) rotate(-45deg); }
   25% { opacity: 1; }
   to { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 @keyframes bloom-unfurl-b {
-  from { opacity: 0; transform: scale(0) rotate(45deg); }
+  from { opacity: 0; transform: scale(0.2) rotate(45deg); }
   25% { opacity: 1; }
   to { opacity: 1; transform: scale(1) rotate(0deg); }
 }
+/* 1 s from 1.3 s: grow (to 1.5 s), settle, gather (stretch up, 1.62 s), burst wide as it opens (1.72 s),
+   hold while the sepals open, fade from 2 s. */
 @keyframes bloom-bud {
-  0% { opacity: 0; transform: scale(0); }
-  25% { opacity: 1; }
-  65% { opacity: 1; transform: scale(1.15); }
-  80% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.6); }
+  0% { opacity: 0; transform: scale(0.2); animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+  20% { opacity: 1; transform: scale(1.06); animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1); }
+  28% { opacity: 1; transform: scale(1); animation-timing-function: cubic-bezier(0.77, 0, 0.175, 1); }
+  32% { opacity: 1; transform: scale(0.92, 1.14); animation-timing-function: cubic-bezier(0.12, 0.9, 0.2, 1); }
+  42% { opacity: 1; transform: scale(1.16, 0.92); animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+  60%, 70% { opacity: 1; transform: scale(1); animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
+  100% { opacity: 0; transform: scale(1); }
 }
+@keyframes bloom-sepal-l {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-82deg); }
+}
+@keyframes bloom-sepal-r {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(82deg); }
+}
+@keyframes bloom-core {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.7, 2.2); }
+}
+/* The root grows out of the bud: narrow and low at first, then wide on a spring (origin bottom centre). */
+@keyframes bloom-root {
+  from { opacity: 0; transform: scale(0.18, 0.32); }
+  14% { opacity: 1; }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes bloom-open-petal {
+  0% { opacity: 0; transform: translate(0, 0) rotate(var(--pr)) scale(0.4); }
+  20% { opacity: 1; transform: translate(calc(var(--px) * 0.5), calc(var(--py) * 0.5)) rotate(var(--pr)) scale(1.2); }
+  100% { opacity: 0; transform: translate(calc(var(--px) * 1.3), calc(var(--py) * 0.6 + 26px)) rotate(calc(var(--pr) + 70deg)) scale(0.7); }
+}
+/* Children and leaves grow out of the end of their branch (transform-origin), no turn. */
 @keyframes bloom-node {
-  from { opacity: 0; transform: scale(0.15) rotate(-6deg); }
-  12% { opacity: 1; }
-  to { opacity: 1; transform: scale(1) rotate(0deg); }
+  from { opacity: 0; transform: scale(0.35); }
+  14% { opacity: 1; }
+  to { opacity: 1; transform: scale(1); }
 }
 @keyframes bloom-glow {
   0% { opacity: 0; transform: scale(0.5); }

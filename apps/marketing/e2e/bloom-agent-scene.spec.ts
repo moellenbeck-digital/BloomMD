@@ -617,11 +617,12 @@ test("the pause stops the parallax and the scroll pose", async ({ page }) => {
     parallax: getComputedStyle(node.querySelector("[data-bloom-parallax]")!).transform,
     pose: getComputedStyle(node.querySelector("[data-bloom-scroll-pose]")!).transform,
     gaze: getComputedStyle(node.querySelector("[data-bloom-scroll-gaze]")!).transform,
+    grid: getComputedStyle(node.querySelector('[data-testid="bloom-agent-stage"]')!, "::before").transform,
   }));
-  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none" });
+  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none", grid: "none" });
   await page.mouse.wheel(0, 300);
   await page.waitForTimeout(400);
-  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none" });
+  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none", grid: "none" });
 });
 
 /* The scroll animations exist only near the viewport. Far away the page has no running animation from
@@ -636,7 +637,8 @@ test("the scroll animations run only while the scene is near the viewport", asyn
   await expect(scene).not.toHaveAttribute("data-inview");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-inview", "");
-  await expect.poll(scrollAnimations).toBe(3);
+  // Map parallax, agent pose, agent gaze and the counter-drift of the dot grid (depth).
+  await expect.poll(scrollAnimations).toBe(4);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await expect(scene).not.toHaveAttribute("data-inview");
   await expect.poll(scrollAnimations).toBe(0);

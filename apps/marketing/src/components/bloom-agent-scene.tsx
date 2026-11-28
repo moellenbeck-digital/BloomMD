@@ -352,7 +352,20 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
       <path d={stem} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
       <path d={`M${r1(ax + 1)} ${r1(ay)} c${15 * s} ${-1 * s} ${23 * s} ${-9 * s} ${24 * s} ${-19 * s} c${-11 * s} ${-1 * s} ${-21 * s} ${6 * s} ${-24 * s} ${19 * s} z`} className={`${styles.leaf} ${styles.leafA}`} />
       <path d={`M${r1(bx - 1)} ${r1(by)} c${-13 * s} ${-7 * s} ${-25 * s} ${-6 * s} ${-30 * s} ${1 * s} c${9 * s} ${7 * s} ${22 * s} ${7 * s} ${30 * s} ${-1 * s} z`} className={`${styles.leaf} ${styles.leafB}`} />
-      {live ? <ellipse cx={root.cx} cy={rootBottom - 2} rx={9 * s} ry={11 * s} className={styles.bud} /> : null}
+      {/* The bud on the tip of the stem: two sepals around an orange core. It swells, gathers itself and
+          opens; the root node grows out of it (transform-origin at its bottom centre). */}
+      {live ? (
+        <g className={styles.bud} data-bloom-bud>
+          <ellipse cx={root.cx} cy={r1(rootBottom - 6 * s)} rx={r1(6 * s)} ry={r1(11 * s)} className={styles.budCore} />
+          {[-1, 1].map((side) => (
+            <path
+              key={side}
+              d={`M${root.cx} ${r1(rootBottom + 6 * s)} C${r1(root.cx + side * 13 * s)} ${r1(rootBottom)} ${r1(root.cx + side * 12 * s)} ${r1(rootBottom - 14 * s)} ${r1(root.cx + side * 1 * s)} ${r1(rootBottom - 21 * s)} C${r1(root.cx + side * 4 * s)} ${r1(rootBottom - 12 * s)} ${r1(root.cx + side * 3 * s)} ${r1(rootBottom - 2 * s)} ${root.cx} ${r1(rootBottom + 6 * s)} z`}
+              className={`${styles.sepal} ${side < 0 ? styles.sepalL : styles.sepalR}`}
+            />
+          ))}
+        </g>
+      ) : null}
 
       {edges.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
@@ -371,7 +384,8 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
 
       {/* Sparks only at the two key moments: the root bursts open (behind the node, with one ring) and the
           cheer. The children and leaves pop with a spring alone, so the stage stays clean. */}
-      {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={6} rise={1.2} scale={spark} ring /> : null}
+      {/* The root opens with its ring and its petals (see Petals below), no confetti sparks. */}
+      {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={0} rise={1.2} scale={spark} ring /> : null}
 
       <g className={styles.nodeWrap} data-bloom-wrap={0}>
       <g className={styles.rootNode} data-bloom-node="root">
@@ -391,7 +405,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         const w = g.childW[index]!;
         return (
           <g key={`node-${cx}`} className={styles.nodeWrap} data-bloom-wrap={1 + index}>
-          <g className={styles.childNode} style={{ "--i": index } as CSSProperties} data-bloom-node="child">
+          <g className={styles.childNode} style={{ "--i": index, "--o": kind === "wide" ? (index === 0 ? "100% 50%" : "0% 50%") : "50% 0%" } as CSSProperties} data-bloom-node="child">
             <g className={styles.pop}>
             <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
             <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>

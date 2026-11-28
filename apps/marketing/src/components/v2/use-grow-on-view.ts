@@ -26,7 +26,16 @@ export function useGrowOnView<T extends Element>() {
       { rootMargin: "0px 0px -18% 0px", threshold: 0 },
     );
     observer.observe(element);
-    return () => observer.disconnect();
+    // Keyboard focus never lands on something invisible: the first focus inside shows the end image.
+    const finish = () => {
+      observer.disconnect();
+      setState("end");
+    };
+    element.addEventListener("focusin", finish, { once: true });
+    return () => {
+      observer.disconnect();
+      element.removeEventListener("focusin", finish);
+    };
   }, []);
 
   return [ref, state] as const;

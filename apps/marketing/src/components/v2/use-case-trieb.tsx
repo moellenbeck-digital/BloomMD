@@ -123,7 +123,7 @@ export function UseCaseTrieb({ items, kicker, title }: { items: UseCase[]; kicke
               ))}
             </div>
           </div>
-          <div id="usecase-panel" role="tabpanel" aria-labelledby={`usecase-tab-${active.id}`} className={styles.panel}>
+          <div id="usecase-panel" role="tabpanel" tabIndex={0} aria-labelledby={`usecase-tab-${active.id}`} className={styles.panel}>
             <div key={active.id} className={styles.sub} data-grow={subState} role="img" aria-label={`${active.label} Markdown mind map preview`}>
               <svg className={styles.wideSvg} viewBox={`0 0 ${WIDE.w} ${WIDE.h}`} aria-hidden="true" focusable="false">
                 {subWide(selected).map((shape, i) => <Branch key={i} id={`sub-w-${active.id}-${i}`} shape={shape} timing={subTime[i]!} lit={i === 0} />)}

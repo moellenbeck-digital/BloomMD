@@ -17,6 +17,8 @@
   /* Words arrive where their branch ends. */
   :global([data-grow="ready"]) .arrive { opacity: 0; }
   :global([data-grow="play"]) .arrive { animation: arrive 320ms var(--bmd-grow) var(--d) both; }
+  /* A focused word is there at once, also before the script runs. */
+  :global([data-grow]) .arrive:focus-within { animation-delay: 0s; animation-duration: 1ms; }
 }
 
 @keyframes arrive {

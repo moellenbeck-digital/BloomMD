@@ -11,6 +11,7 @@
 .wideSvg { display: none; }
 
 .panel { display: flex; flex-direction: column; margin-top: 2rem; }
+.panel:focus-visible { outline: 2px solid var(--bmd-bloom-hi); outline-offset: 3px; border-radius: var(--bmd-radius); }
 .copy { max-width: 40rem; min-height: 13.5rem; }
 .copy h3 { font-family: var(--bmd-display); font-weight: 500; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.008em; text-wrap: balance; }
 .copy p { margin-top: 0.75rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); text-wrap: pretty; }

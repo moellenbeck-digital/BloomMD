@@ -36,6 +36,7 @@
 | Varianten | breite Map (≥ 1180 px), Gliederungs-Map |
 | Interaktion | Wort ist `button` mit `aria-pressed`. Name: `Zweig „X“ in der Map hervorheben` |
 | Tastatur | Tab durch H1-Aktionen, dann Wörter in Dateireihenfolge. Enter/Leertaste heftet an |
+| Fokus und Wachstum | Kommt der Tastaturfokus in einen Abschnitt, steht dort sofort das Endbild. Kein fokussiertes Element ist unsichtbar |
 | ARIA | Map `role="group"`, SVG `aria-hidden`. Inspector `aside` |
 | Responsive | Datei vollständig sichtbar, nie abgeschnitten. Inspector auf jeder Breite |
 | LCP | H1 (breit), Absatz (Handy). Beide animieren nicht |

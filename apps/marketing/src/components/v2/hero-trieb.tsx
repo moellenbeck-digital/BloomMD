@@ -154,6 +154,8 @@ export function HeroTrieb({ markdown, intro, locale = "de" }: { markdown: string
   const c = copy[locale];
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
+  // Keyboard focus ends the growth: no focused word waits for its branch.
+  const [grown, setGrown] = useState(false);
   const nodes = headingTree(markdown);
   // At rest the focused branch is lit, in the file and in the map.
   const branch = branchOf(nodes, hover ?? pinned ?? nodes[FOCUS]?.line ?? null);
@@ -177,7 +179,7 @@ export function HeroTrieb({ markdown, intro, locale = "de" }: { markdown: string
     <section className={`${t.ground} ${bmdFonts} ${styles.hero} motion-safe:animate-[sectionIn_.45s_ease-out_both]`}>
       <div className={t.wrap}>
         {intro}
-        <div id={c.anchor} className={styles.stage} data-grow="play" data-testid="hero-trieb">
+        <div id={c.anchor} className={styles.stage} data-grow={grown ? "end" : "play"} onFocus={() => setGrown(true)} data-testid="hero-trieb">
           <div className={styles.file}>
             <p className={styles.workspace}>BloomMD Workspace <span>/ files / strategy.md</span></p>
             <p className={styles.filename}><strong>strategy.md</strong> <span>{c.source}</span></p>

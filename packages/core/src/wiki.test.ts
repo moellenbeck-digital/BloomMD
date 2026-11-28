@@ -16,6 +16,7 @@ import {
   regenerateWikiIndex,
   renderWikiDiff,
   isWikiPageExpired,
+  parseWikiPage,
   readWikiBundle,
   SUPPORTED_OKF_VERSIONS,
   WIKI_BUNDLE_VERSION,
@@ -290,5 +291,31 @@ Body.
     expect(status.statusCounts.draft).toBe(1);
     expect(status.trustCounts.generated).toBe(1);
     await rm(root, { recursive: true, force: true });
+  });
+});
+
+describe("Citations from the frontmatter field `source` (#433)", () => {
+  const page = (frontmatter: string) => parseWikiPage("learning.md", `---\ntype: learning\ntitle: Learning\nstatus: neu\n${frontmatter}---\n\n# Learning\n`);
+
+  test("a learning with `source` yields one citation with the value as id and resource", () => {
+    const parsed = page('source: "BloomMD, Ticket #304, PR #306, 2026-11-06"\n');
+    expect(parsed.sources).toEqual([{ id: "BloomMD, Ticket #304, PR #306, 2026-11-06", resource: "BloomMD, Ticket #304, PR #306, 2026-11-06" }]);
+  });
+
+  test("a list in `source` yields one citation per text; blanks and non-texts are skipped", () => {
+    const parsed = page('source:\n  - \"Ticket #304\"\n  - ""\n  - 42\n  - Lauf 17\n');
+    expect(parsed.sources.map((entry) => entry.resource)).toEqual(["Ticket #304", "Lauf 17"]);
+  });
+
+  test("without `source` and without `sources` there is no citation", () => {
+    expect(page("").sources).toEqual([]);
+    expect(page('source: "   "\n').sources).toEqual([]);
+  });
+
+  test("`sources:` stays as before and wins over `source` without merging", () => {
+    const listed = page("sources:\n  - id: a\n    resource: docs/a.md\n    contentHash: sha256:abc\n");
+    expect(listed.sources).toEqual([{ id: "a", resource: "docs/a.md", contentHash: "sha256:abc" }]);
+    const both = page("source: \"Ticket #304\"\nsources:\n  - id: a\n    resource: docs/a.md\n");
+    expect(both.sources).toEqual([{ id: "a", resource: "docs/a.md" }]);
   });
 });

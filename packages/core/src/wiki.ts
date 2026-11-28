@@ -248,6 +248,19 @@ function parseSources(value: unknown): WikiSourceProvenance[] {
   });
 }
 
+/**
+ * Learnings name their origin in the frontmatter field `source` (text or list of texts, see the learning template).
+ * It only counts as citation when no `sources:` list is present: `sources:` wins, nothing is merged.
+ * The value is both id and resource; it is a plain description (ticket, run), so it is never a watched file.
+ */
+function parseSourceField(value: unknown): WikiSourceProvenance[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values.flatMap((entry) => {
+    const text = str(entry);
+    return text ? [{ id: text, resource: text }] : [];
+  });
+}
+
 function parseActorEvent(value: unknown): WikiActorEvent | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const event = value as Record<string, unknown>;
@@ -302,6 +315,11 @@ async function readPage(rootDir: string, path: string): Promise<WikiPage> {
   return parseWikiPage(path, raw);
 }
 
+function sourcesOf(data: Record<string, unknown>): WikiSourceProvenance[] {
+  const listed = parseSources(data.sources);
+  return listed.length > 0 ? listed : parseSourceField(data.source);
+}
+
 /** Parses Markdown that is not (yet) on disk — e.g. the proposed content of a Wiki proposal — into a page. */
 export function parseWikiPage(path: string, raw: string): WikiPage {
   const parsed = parseFrontmatter(raw);
@@ -317,7 +335,7 @@ export function parseWikiPage(path: string, raw: string): WikiPage {
     content: parsed.content,
     raw,
     contentHash: hashWikiContent(raw),
-    sources: parseSources(data.sources),
+    sources: sourcesOf(data),
     type,
     description: str(data.description),
     // OKF defaults an absent or unrecognised status to `stable`; lint reports the unrecognised case.

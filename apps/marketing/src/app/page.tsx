@@ -505,7 +505,7 @@ function WhatIsNewSection() {
 function SplitDemo() {
   return (
     <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
+      <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20 xl:pt-10">
         <div className="mb-8 max-w-3xl">
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Aus Text wird Raum</p>
           <h2 className="text-3xl font-semibold tracking-normal sm:text-4xl">Aus Markdown wird ein navigierbarer Wissensraum.</h2>

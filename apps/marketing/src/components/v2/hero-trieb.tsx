@@ -140,7 +140,9 @@ export function HeroTrieb({ markdown, intro }: { markdown: string; intro: ReactN
   );
 
   return (
-    <section className={`${t.ground} ${bmdFonts} ${styles.hero}`}>
+    // Same entrance as the hero before v2. Content that starts at opacity 0 is no LCP candidate, so the
+    // elements measured as LCP stay the same: header logo (narrow), demo section heading (wide).
+    <section className={`${t.ground} ${bmdFonts} ${styles.hero} motion-safe:animate-[sectionIn_.45s_ease-out_both]`}>
       <div className={t.wrap}>
         {intro}
         <div id="produkt" className={styles.stage} data-grow="play" data-testid="hero-trieb">

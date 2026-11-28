@@ -3,14 +3,13 @@ import Link from "next/link";
 import t from "./tokens.module.css";
 import styles from "./hero-trieb.module.css";
 
-/* Headline, lede and actions. They never animate: the headline (wide) and the lede (narrow) stay the LCP elements. */
+/* Headline, lede and actions. They have no motion of their own; only the hero as a whole fades in. */
 export function HeroIntro({ onDemo }: { onDemo: () => void }) {
   return (
     <div className={styles.intro}>
       <div className={styles.headline}>
         <p className={t.kicker}>Markdown-Dateien · visuelle Maps</p>
         <h1 className={styles.h1}>
-          {/* Inline lines keep the H1 itself the LCP element. */}
           Markdown-Dateien. <br />
           <span>Als visuelle Maps.</span>
         </h1>

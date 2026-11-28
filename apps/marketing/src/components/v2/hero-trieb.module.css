@@ -92,7 +92,8 @@
 }
 
 @media (min-width: 1180px) {
-  .hero { padding-block: 1.5rem 2rem; }
+  /* The heading of the next section stays inside a 900 px high first screen. */
+  .hero { padding-block: 0.75rem 0.5rem; }
   .intro { grid-template-columns: minmax(0, 1fr) 26rem; gap: 2rem; align-items: end; }
   /* The headline reads like its Markdown source: a hanging "#". */
   .headline::before {
@@ -102,18 +103,19 @@
     top: 2.125rem;
     font-family: var(--bmd-display);
     font-weight: 400;
-    font-size: clamp(4.25rem, 6.4vw, 5.75rem);
+    font-size: clamp(4.25rem, min(6.4vw, 9.4svh), 5.75rem);
     line-height: 0.98;
     color: var(--bmd-bloom);
   }
-  .h1 { font-size: clamp(4.25rem, 6.4vw, 5.75rem); line-height: 0.98; }
+  .h1 { font-size: clamp(4.25rem, min(6.4vw, 9.4svh), 5.75rem); line-height: 0.98; }
   .h1 { white-space: nowrap; }
   .actions { column-gap: 1.25rem; }
   .file pre { max-width: 24ch; }
   .lede { font-size: 1.1875rem; }
-  .stage { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; margin-top: 1.25rem; align-items: start; }
+  .stage { grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; margin-top: 0.75rem; align-items: start; }
   .file { padding-top: 0.25rem; }
   .wide { display: block; }
+  .wide .map { max-width: max(53rem, calc((100svh - 29rem) * 968 / 466)); }
   .narrow { display: none; }
   .inspector { max-width: 22rem; }
   .map .inspector { position: absolute; left: 64%; top: 16%; width: 36%; }

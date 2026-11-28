@@ -8,6 +8,27 @@ import { branchOf, headingTree, type TreeNode } from "./markdown-tree";
 import t from "./tokens.module.css";
 import type { TriebShape } from "./trieb";
 import styles from "./hero-trieb.module.css";
+import type { MarketingLocale } from "@/lib/locale";
+
+const copy = {
+  de: {
+    anchor: "produkt",
+    source: "Quelle",
+    saved: "lokal gespeichert",
+    note: "Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.",
+    facts: ["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"],
+    /* Accessible name of a word; without one the heading itself names the button. */
+    highlight: (title: string): string | undefined => `Zweig „${title}“ in der Map hervorheben`,
+  },
+  en: {
+    anchor: "product",
+    source: "Source",
+    saved: "saved locally",
+    note: "The selected section stays editable while its place in the map remains visible.",
+    facts: ["Markdown stays the source", "Node is focused", "Change writes back"],
+    highlight: (): string | undefined => undefined,
+  },
+} as const;
 
 interface Layout {
   w: number;
@@ -60,7 +81,8 @@ function timings(nodes: TreeNode[]): Timing[] {
   return result;
 }
 
-function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children }: {
+function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children, locale }: {
+  locale: MarketingLocale;
   id: string;
   layout: Layout;
   nodes: TreeNode[];
@@ -96,7 +118,7 @@ function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children
               className={styles.word}
               data-lit={branch.has(node.line) || undefined}
               aria-pressed={pinned === node.line}
-              aria-label={`Zweig „${node.title}“ in der Map hervorheben`}
+              aria-label={copy[locale].highlight(node.title)}
               onMouseEnter={() => onActive(node.line)}
               onMouseLeave={() => onActive(null)}
               onFocus={() => onActive(node.line)}
@@ -119,22 +141,23 @@ function TriebMap({ id, layout, nodes, branch, pinned, onActive, onPin, children
 }
 
 /* The hero is the map: the headline is the root, the file's "#" line sends out the trunk. */
-export function HeroTrieb({ markdown, intro }: { markdown: string; intro: ReactNode }) {
+export function HeroTrieb({ markdown, intro, locale = "de" }: { markdown: string; intro: ReactNode; locale?: MarketingLocale }) {
+  const c = copy[locale];
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const nodes = headingTree(markdown);
   // At rest the focused branch is lit, in the file and in the map.
   const branch = branchOf(nodes, hover ?? pinned ?? nodes[FOCUS]?.line ?? null);
   const lines = markdown.split("\n");
-  const map = { nodes, branch, pinned, onActive: setHover, onPin: (line: number) => setPinned((value) => (value === line ? null : line)) };
+  const map = { locale, nodes, branch, pinned, onActive: setHover, onPin: (line: number) => setPinned((value) => (value === line ? null : line)) };
 
   const inspector = (
     <aside className={styles.inspector} aria-label="Inspector">
       <p className={styles.inspectorLabel}>Inspector</p>
       <p className={styles.inspectorTitle}>North Star</p>
-      <p>Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.</p>
+      <p>{c.note}</p>
       <ul>
-        {["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"].map((item) => <li key={item}>{item}</li>)}
+        {c.facts.map((item) => <li key={item}>{item}</li>)}
       </ul>
     </aside>
   );
@@ -145,10 +168,10 @@ export function HeroTrieb({ markdown, intro }: { markdown: string; intro: ReactN
     <section className={`${t.ground} ${bmdFonts} ${styles.hero} motion-safe:animate-[sectionIn_.45s_ease-out_both]`}>
       <div className={t.wrap}>
         {intro}
-        <div id="produkt" className={styles.stage} data-grow="play" data-testid="hero-trieb">
+        <div id={c.anchor} className={styles.stage} data-grow="play" data-testid="hero-trieb">
           <div className={styles.file}>
             <p className={styles.workspace}>BloomMD Workspace <span>/ files / strategy.md</span></p>
-            <p className={styles.filename}><strong>strategy.md</strong> <span>Quelle</span></p>
+            <p className={styles.filename}><strong>strategy.md</strong> <span>{c.source}</span></p>
             <pre>
               {lines.map((line, i) => (
                 <span key={i} className={styles.line} data-lit={branch.has(i) || undefined} data-heading={line.startsWith("#") || undefined}
@@ -158,7 +181,7 @@ export function HeroTrieb({ markdown, intro }: { markdown: string; intro: ReactN
                 </span>
               ))}
             </pre>
-            <p className={styles.status}><span>?</span> <span>⌘S</span> <span>lokal gespeichert</span></p>
+            <p className={styles.status}><span>?</span> <span>⌘S</span> <span>{c.saved}</span></p>
           </div>
           <div className={styles.wide}>
             <TriebMap id="wide" layout={wide} {...map}>{inspector}</TriebMap>

@@ -7,8 +7,7 @@ import { MindMapPreview } from "@bloommd/ui";
 import { AvailabilityTrieb } from "../components/v2/availability-trieb";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
-import { bmdFonts } from "../components/v2/fonts";
-import headerStyles from "../components/v2/header.module.css";
+import { SiteHeader } from "../components/v2/site-header";
 import { HeroIntro } from "../components/v2/hero-intro";
 import { HeroTrieb } from "../components/v2/hero-trieb";
 import { LandingPaths } from "../components/v2/landing-paths";
@@ -36,14 +35,12 @@ import {
   Keyboard,
   Layers3,
   LayoutTemplate,
-  Menu,
   MonitorSmartphone,
   MoveRight,
   PenLine,
   Presentation,
   RefreshCw,
   ShieldCheck,
-  X,
 } from "lucide-react";
 
 const headerNavItems = [
@@ -63,6 +60,21 @@ const secondaryNavItems = [
   { label: "Obsidian", href: "/obsidian" },
   { label: "FAQ", href: "#faq" },
 ];
+
+const headerCopy = {
+  locale: "de",
+  homeHref: "/",
+  homeLabel: "BloomMD Startseite",
+  navLabel: "Hauptnavigation",
+  mobileNavLabel: "Mobile Navigation",
+  menuId: "mobile-navigation",
+  more: "Weitere Themen",
+  open: "Navigation öffnen",
+  close: "Navigation schließen",
+  signup: "Jetzt registrieren",
+  languageLabel: "Sprache",
+  otherLabel: "Switch to English",
+} as const;
 
 const legalLinks = [
   { label: "Impressum", href: "/impressum" },
@@ -362,93 +374,6 @@ const productJsonLd = {
   operatingSystem: "Web, macOS, Linux, iOS, Android",
   description: "BloomMD verwandelt offene Markdown-Dateien in interaktive visuelle Maps, ohne ein neues Dateiformat einzuführen. Local-first, portabel und als Beta verfügbar.",
 };
-
-function Header() {
-  const [open, setOpen] = useState(false);
-  const language = (onClick?: () => void) => (
-    <div className={headerStyles.lang} aria-label="Sprache">
-      <span aria-current="page">DE</span>
-      <Link href="/en" hrefLang="en" onClick={onClick} aria-label="Switch to English">
-        EN
-      </Link>
-    </div>
-  );
-
-  return (
-    <header className={`${tokens.ground} ${bmdFonts} ${headerStyles.header}`}>
-      <div className={headerStyles.bar}>
-        <Link href="/" className="flex min-w-0 shrink-0 items-center gap-3" aria-label="BloomMD Startseite">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <span className="block h-8 w-[144px]">
-            <img src="/logo.svg" alt="BloomMD" className="bloommd-logo-light h-8 w-auto" />
-            <img src="/logo-dark.svg" alt="" aria-hidden="true" className="bloommd-logo-dark h-8 w-auto" />
-          </span>
-          <span className={headerStyles.claim}>Markdown Maps</span>
-        </Link>
-        <nav className={headerStyles.nav} aria-label="Hauptnavigation">
-          {headerNavItems.map((item) => (
-            <a key={item.href} href={item.href} className={headerStyles.link}>
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <div className={headerStyles.tools}>
-          {language()}
-          <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className={headerStyles.link}>
-            Login
-          </a>
-          <a href={appSignupUrl} className={tokens.primary}>
-            Jetzt registrieren
-            <ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className={headerStyles.toggle}
-          aria-expanded={open}
-          aria-controls="mobile-navigation"
-          aria-label={open ? "Navigation schließen" : "Navigation öffnen"}
-        >
-          {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
-        </button>
-      </div>
-      {open && (
-        <div id="mobile-navigation" className={headerStyles.menu}>
-          <nav aria-label="Mobile Navigation">
-            <div className={headerStyles.menuMain}>
-              {headerNavItems.map((item) => (
-                <a key={item.href} href={item.href} onClick={() => setOpen(false)}>
-                  {item.label}
-                </a>
-              ))}
-            </div>
-            <div className={headerStyles.menuGroup}>
-              <p className={headerStyles.menuHead}>Weitere Themen</p>
-              <div className={headerStyles.menuTwo}>
-                {secondaryNavItems.map((item) => (
-                  <a key={item.href} href={item.href} onClick={() => setOpen(false)} className={headerStyles.link}>
-                    {item.label}
-                  </a>
-                ))}
-              </div>
-            </div>
-            <div className={headerStyles.menuGroup}>
-              {language(() => setOpen(false))}
-              <a href={appLoginUrl} onClick={() => trackPlausibleEvent("login_click")} className={headerStyles.link}>
-                Login
-              </a>
-              <a href={appSignupUrl} className={tokens.primary}>
-                Jetzt registrieren
-                <ArrowRight size={16} aria-hidden="true" />
-              </a>
-            </div>
-          </nav>
-        </div>
-      )}
-    </header>
-  );
-}
 
 function WhatIsNewSection() {
   return (
@@ -789,7 +714,13 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F8F5F0] text-[#1A1A1A]">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }} />
-      <Header />
+      <SiteHeader
+        navItems={headerNavItems}
+        secondaryItems={secondaryNavItems}
+        loginUrl={appLoginUrl}
+        signupUrl={appSignupUrl}
+        copy={headerCopy}
+      />
       <HeroTrieb markdown={markdownLines.join("\n")} intro={<HeroIntro onDemo={() => trackPlausibleEvent("demo_click")} />} />
 
       <section id="produkt-demo">

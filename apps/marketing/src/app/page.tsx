@@ -15,6 +15,7 @@ import { LandingPaths } from "../components/v2/landing-paths";
 import { SplitDemo } from "../components/v2/split-demo";
 import { TemplatesTrieb } from "../components/v2/templates-trieb";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
+import { FaqTrieb } from "../components/v2/faq-trieb";
 import { AgentHull } from "../components/v2/agent-hull";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
@@ -23,7 +24,6 @@ import { trackPlausibleEvent } from "../lib/plausible";
 import {
   ArrowRight,
   Bot,
-  ChevronDown,
   CloudOff,
   Code2,
   FileCode2,
@@ -783,38 +783,6 @@ function WikiSection() {
   );
 }
 
-function FAQSection() {
-  const [openIndex, setOpenIndex] = useState(0);
-
-  return (
-    <section id="faq" className="mx-auto max-w-4xl px-5 py-16 lg:py-20">
-      <div className="mb-8 text-center">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">FAQ</p>
-        <h2 className="text-3xl font-semibold sm:text-4xl">Kurze Antworten zu Dateien, Sync und Lizenz.</h2>
-      </div>
-      <div className="divide-y divide-[#E8E4DF] rounded-xl border border-[#E8E4DF] bg-white">
-        {faqItems.map((item, index) => {
-          const open = openIndex === index;
-          return (
-            <div key={item.question}>
-              <button
-                type="button"
-                onClick={() => setOpenIndex(open ? -1 : index)}
-                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left font-semibold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[#FF6B35]/20"
-                aria-expanded={open}
-              >
-                {item.question}
-                <ChevronDown className={`shrink-0 text-[#999999] transition ${open ? "rotate-180" : ""}`} size={18} aria-hidden="true" />
-              </button>
-              {open && <p className="px-5 pb-5 leading-7 text-[#666666]">{item.answer}</p>}
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F8F5F0] text-[#1A1A1A]">
@@ -834,7 +802,7 @@ export default function LandingPage() {
       <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />
       <TemplatesTrieb items={templateCards.slice(0, 3)} />
       <AvailabilityTrieb locale="de" />
-      <FAQSection />
+      <FaqTrieb items={faqItems} kicker="FAQ" title="Kurze Antworten zu Dateien, Sync und Lizenz." />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}
       <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">

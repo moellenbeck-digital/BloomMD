@@ -17,6 +17,7 @@ import { TemplatesTrieb } from "../components/v2/templates-trieb";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
 import { FaqTrieb } from "../components/v2/faq-trieb";
 import { RegisterTrieb } from "../components/v2/register-trieb";
+import { FooterTrieb } from "../components/v2/footer-trieb";
 import { AgentHull } from "../components/v2/agent-hull";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
@@ -814,77 +815,15 @@ export default function LandingPage() {
         onSignup={() => trackPlausibleEvent("signup_click")}
       />
 
-      <footer className="bg-[#171513] text-white">
-        <div className="mx-auto max-w-7xl border-t border-white/10 px-5 py-10">
-          <div className="grid gap-10 lg:grid-cols-[minmax(220px,0.9fr)_minmax(0,2.1fr)]">
-            <div className="max-w-xs">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-dark.svg" alt="BloomMD" className="h-8" />
-              <p className="mt-4 text-sm leading-6 text-white/56">Markdown-Dateien. Als visuelle Maps.</p>
-              <p className="mt-3 text-xs leading-5 text-white/48">
-                BloomMD wird von{" "}
-                <a href="https://moellenbeck-digital.io/" className="font-semibold text-white/72 hover:text-white hover:underline">
-                  moellenbeck-digital.io
-                </a>{" "}
-                zur Verfügung gestellt.
-              </p>
-              <p className="mt-5 inline-flex rounded-full border border-white/12 px-3 py-1 text-xs font-medium text-white/58">
-                Beta · macOS + Omarchy/Linux
-              </p>
-            </div>
-
-            <nav className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4" aria-label="Footer Navigation">
-              {footerSections.map((section) => (
-                <div key={section.title}>
-                  <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/72">{section.title}</h2>
-                  <ul className="mt-4 space-y-2.5">
-                    {section.links.map((item) => {
-                      const className = "inline-flex rounded py-0.5 text-sm text-white/66 transition hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/20";
-                      if (item.href.startsWith("http")) {
-                        return (
-                          <li key={item.href}>
-                            <a href={item.href} className={className}>
-                              {item.label}
-                            </a>
-                          </li>
-                        );
-                      }
-                      if (item.href.startsWith("#")) {
-                        return (
-                          <li key={item.href}>
-                            <a href={item.href} className={className}>
-                              {item.label}
-                            </a>
-                          </li>
-                        );
-                      }
-                      return (
-                        <li key={item.href}>
-                          <Link href={item.href} className={className}>
-                            {item.label}
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </nav>
-          </div>
-
-          <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-5 text-xs text-white/68 sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              © 2026 BloomMD. Ein Produkt von{" "}
-              <a href="https://moellenbeck-digital.io/" className="font-semibold text-white/72 hover:text-white hover:underline">
-                moellenbeck-digital.io
-              </a>.
-            </p>
-            <p>
-              Marketing: bloommd.io · App: bloommd.app · <span data-testid="marketing-build-version">Marketing-Version: {marketingBuildInfo.version}{marketingBuildInfo.shortSha ? ` (${marketingBuildInfo.shortSha})` : ""}</span>
-            </p>
-          </div>
-        </div>
-      </footer>
+      <FooterTrieb
+        claim="Markdown-Dateien. Als visuelle Maps."
+        providedBy={["BloomMD wird von ", " zur Verfügung gestellt."]}
+        beta="Beta · macOS + Omarchy/Linux"
+        navLabel="Footer Navigation"
+        columns={footerSections}
+        copyright="© 2026 BloomMD. Ein Produkt von "
+        domains={<>Marketing: bloommd.io · App: bloommd.app · <span data-testid="marketing-build-version">Marketing-Version: {marketingBuildInfo.version}{marketingBuildInfo.shortSha ? ` (${marketingBuildInfo.shortSha})` : ""}</span></>}
+      />
     </main>
   );
 }

@@ -398,7 +398,7 @@
      seed, the stem draws itself while the water still runs, leaves unfurl. */
   .scene[data-state="play"] .ghost { opacity: 1; }
   .scene[data-state="play"] .canWrap { animation: bloom-can 4.8s linear both; }
-  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.86s both; }
+  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.86s forwards; }
   .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(0.92s + var(--i) * 0.11s) both; }
   .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.04s both; }
   .scene[data-state="play"] :is(.stem, .stemShadow) { animation: bloom-draw 0.8s var(--out) 0.98s both; }

@@ -347,6 +347,30 @@ test("the landing ring of the seed stays hidden until the seed lands", async ({ 
   expect(await ringAt(740)).toBeGreaterThan(0.3);
 });
 
+test("the water jet stays hidden until the can pours", async ({ page }) => {
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  const jetAt = (ms: number) =>
+    scene.evaluate((node, time) => {
+      for (const animation of node.getAnimations({ subtree: true })) {
+        if (animation.timeline !== document.timeline) continue;
+        animation.pause();
+        animation.currentTime = time;
+      }
+      // Jet and core of both stages (CSS module classes .stream and .streamCore).
+      return [...node.querySelectorAll('path[class*="stream"]')].map((element) => Number(getComputedStyle(element).opacity));
+    }, ms);
+  // The jet starts at 0.86 s; before that no bright line may stand above the seed.
+  for (const ms of [0, 300, 600, 850]) {
+    const opacities = await jetAt(ms);
+    expect(opacities.length).toBeGreaterThanOrEqual(2);
+    for (const opacity of opacities) expect(opacity).toBe(0);
+  }
+  expect(Math.max(...(await jetAt(1100)))).toBe(1);
+});
+
 test("reduced motion shows the finished map without a pause button", async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();

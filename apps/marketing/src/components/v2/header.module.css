@@ -1,5 +1,6 @@
 /* Header on the themed ground: plain words, one filled action, no boxed navigation. */
-.header { position: sticky; top: 0; z-index: 30; overflow-x: clip; background: var(--bmd-veil); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--bmd-soil); }
+/* Doubled class: stays sticky whatever order the stylesheet with `.ground` (position: relative) loads in. */
+.header.header { position: sticky; top: 0; z-index: 30; overflow-x: clip; background: var(--bmd-veil); backdrop-filter: blur(20px) saturate(160%); border-bottom: 1px solid var(--bmd-soil); }
 .bar { display: flex; height: 72px; max-width: 83rem; margin-inline: auto; padding-inline: 1.25rem; align-items: center; justify-content: space-between; gap: 1rem; }
 .claim { display: none; font-family: var(--bmd-display); font-style: italic; font-size: 1.0625rem; color: var(--bmd-ink-3); }
 
@@ -42,5 +43,5 @@
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .header { background: var(--bmd-ground); backdrop-filter: none; }
+  .header.header { background: var(--bmd-ground); backdrop-filter: none; }
 }

@@ -22,6 +22,8 @@
 .file [data-heading] { color: var(--bmd-ink); }
 
 .recording { min-width: 0; }
+/* Light theme: the light recording needs an edge against the light ground. */
+:global(html:not(.dark)) .video { border: 1px solid var(--bmd-soil); }
 .video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--bmd-radius); background: var(--bmd-deep); }
 .controls { min-height: 2.75rem; margin-top: 0.25rem; }
 .control {

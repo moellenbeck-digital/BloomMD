@@ -31,7 +31,7 @@ const visibleNodes = (page: Page, selector = "[data-bloom-node]") => page.getByT
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 /* The scene is its own chunk: the server render is only the card, the scene loads when the card comes within
-   800 px of the viewport. loadScene brings the card just below the viewport (not into view), so the scene
+   300 px of the viewport. loadScene brings the card 200 px below the viewport (not into view), so the scene
    loads but does not start yet. */
 async function loadScene(page: Page) {
   await page.evaluate(() => {
@@ -405,6 +405,8 @@ test("the water jet stays hidden until the can pours and then falls from the spo
   expect(geometry.jetBottom).toBeGreaterThan(geometry.seedTop - 6);
   expect(geometry.seedTop - geometry.tipY).toBeGreaterThan(30);
   expect(Math.abs(geometry.jetX - geometry.seedX)).toBeLessThan(20);
+  // The tail leaves with the can: at 1.8 s, while the can still fades out, no rest of the jet is left.
+  for (const opacity of await jetAt(1800)) expect(opacity).toBe(0);
 });
 
 test("reduced motion shows the finished map without a pause button", async ({ browser }) => {
@@ -522,6 +524,65 @@ test("the scene is not in the server HTML and loads near the viewport without a 
   expect(Math.abs(scene!.width - card!.width)).toBeLessThan(1);
   expect(await page.evaluate(() => (window as unknown as { shift: number }).shift)).toBe(0);
 });
+
+/* Load limit 300 px: on a 1440 × 900 desktop the first load of / and /en has no scene chunk (on /en the card is
+   about 590 px below the fold). Scrolled toward the card, the chunk loads before the card is in view, so the
+   scene starts visibly. The LCP element stays a heading of the page, not the scene. */
+for (const locale of locales) {
+  test(`desktop ${locale.path}: the first load has no scene chunk, it loads before the card comes into view`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const chunks: string[] = [];
+    page.on("request", (request) => {
+      if (/\/_next\/static\/.+\.(js|css)(\?|$)/.test(request.url())) chunks.push(request.url());
+    });
+    await page.goto(locale.path, { waitUntil: "load" });
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
+    const card = page.locator("[data-testid=bloom-agent-scene][data-card]");
+    await expect(card).toHaveCount(1);
+    const below = await card.evaluate((node) => node.getBoundingClientRect().top - window.innerHeight);
+    expect(below).toBeGreaterThan(300);
+    const firstLoad = chunks.length;
+    // 250 px below the fold: inside the load limit, outside the in-view margin (225 px).
+    await page.evaluate(() => {
+      const node = document.querySelector('[data-testid="bloom-agent-scene"]')!;
+      window.scrollTo({ top: node.getBoundingClientRect().top + window.scrollY - window.innerHeight - 250, behavior: "instant" });
+    });
+    await expect(page.locator('[data-testid="bloom-agent-scene"]:not([data-card])')).toHaveCount(1);
+    const later = chunks.slice(firstLoad);
+    console.log(`${locale.path} first load ${firstLoad} assets, no scene; after the scroll: ${later.map((url) => new URL(url).pathname.split("/").pop()).join(", ")}`);
+    expect(later.some((url) => /\.js(\?|$)/.test(url))).toBe(true);
+    for (const url of later) expect(chunks.slice(0, firstLoad)).not.toContain(url);
+    const scene = page.getByTestId("bloom-agent-scene");
+    await expect(scene).not.toHaveAttribute("data-inview");
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-inview", "");
+    await expect(scene).toHaveAttribute("data-state", "play");
+  });
+
+  /* As on main: the LCP is the h2 of the first section, on /en also the demo video beside it when its first
+     frame paints first (main 1dc2affa at 1440 × 900: 4 of 5 loads). Never an element of the scene. */
+  test(`desktop ${locale.path}: the LCP element is the heading (or the demo video, as on main), not the scene`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(locale.path, { waitUntil: "load" });
+    await page.waitForTimeout(500);
+    const lcp = await page.evaluate(() => new Promise<{ tag: string; testId: string; scene: boolean }>((resolve) => {
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries() as (PerformanceEntry & { element?: Element | null })[];
+        const element = entries.at(-1)?.element;
+        resolve({
+          tag: element?.tagName.toLowerCase() ?? "",
+          testId: element?.getAttribute("data-testid") ?? "",
+          scene: !!element?.closest('[data-testid="bloom-agent-scene"]'),
+        });
+      }).observe({ type: "largest-contentful-paint", buffered: true });
+    }));
+    console.log(`LCP ${locale.path} desktop: ${lcp.tag}${lcp.testId ? ` ${lcp.testId}` : ""}`);
+    expect(lcp.scene).toBe(false);
+    if (locale.path === "/en" && lcp.tag === "video") expect(lcp.testId).toBe("english-branch-drag-demo-video");
+    else expect(lcp.tag).toBe("h2");
+  });
+}
 
 test("the agent image is requested only when the scene comes close, not during the page load", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -779,15 +840,12 @@ test("the scroll animations run only while the scene is near the viewport", asyn
   await page.goto("/", { waitUntil: "load" });
   await loadScene(page);
   // loadScene leaves the card 200 px below the viewport, inside the in-view margin (25 % = 225 px here).
-  // 400 px below: the scene is loaded (800 px), but not in view.
-  await page.evaluate(() => {
-    const card = document.querySelector('[data-testid="bloom-agent-scene"]')!;
-    window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - window.innerHeight - 400));
-  });
+  // Back to the top: the scene stays loaded, the card is far below. Wait for the observer before the check.
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   const scene = page.getByTestId("bloom-agent-scene");
+  await expect.poll(() => scene.evaluate((node) => node.hasAttribute("data-inview"))).toBe(false);
   const scrollAnimations = () => page.evaluate(() => document.getAnimations().filter((animation) => animation.timeline !== document.timeline).length);
   await expect.poll(scrollAnimations).toBe(0);
-  await expect(scene).not.toHaveAttribute("data-inview");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-inview", "");
   // Map parallax, agent pose, agent gaze and the counter-drift of the dot grid (depth).

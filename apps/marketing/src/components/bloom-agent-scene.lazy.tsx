@@ -14,7 +14,11 @@ let loadedScene: Scene | null = null;
 
 /* The server render is only the empty card: box, tab bar with the file name and the stage size come from the
    small shell module, so the card has the final size and the swap shifts no layout. The scene (markup, SVG
-   and its large CSS module) is an own chunk and loads only when the card comes within 800 px of the viewport.
+   and its large CSS module) is an own chunk and loads only when the card comes within 300 px of the viewport.
+   300 px, not 800: on a 900 px desktop the card of /en is about 590 px below the fold, so 800 px loaded the
+   scene in the first load and took the LCP. An observer (not "load on the first scroll") also loads the scene
+   on a tall screen where the card is visible at once, and after a jump by anchor or keyboard. The scene starts
+   only when it comes within 25 % of the viewport, so 300 px still leaves time for the chunk.
    So it is not part of the HTML and the critical CSS of the first load (LCP). Without JavaScript the card
    shows the finished map as an image. Reduced motion: the scene itself shows its static final image.
    Until the scene is there, the stage is one image with the scene label (role="img"); the noscript image in it
@@ -55,7 +59,7 @@ export function BloomAgentSceneLazy({ locale }: { locale: SceneLocale }) {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
       load();
-    }, { rootMargin: "800px 0px" });
+    }, { rootMargin: "300px 0px" });
     observer.observe(node);
     return () => {
       cancelled = true;

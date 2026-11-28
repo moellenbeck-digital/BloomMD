@@ -327,7 +327,7 @@
      seed, the stem draws itself while the water still runs, leaves unfurl. */
   .scene[data-state="play"] .ghost { opacity: 1; }
   .scene[data-state="play"] .canWrap { animation: bloom-can 4.8s linear both; }
-  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.94s forwards; }
+  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.85s linear 0.94s forwards; }
   .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(1s + var(--i) * 0.11s) both; }
   .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.12s both; }
   .scene[data-state="play"] :is(.stem, .stemShadow) { animation: bloom-draw 0.8s var(--out) 0.98s both; }
@@ -483,11 +483,13 @@
   19.5%, 34% { opacity: 1; transform: scale(1) rotate(-30deg); }
   38%, 100% { opacity: 0; transform: scale(0.2) rotate(6deg); }
 }
-/* The jet shoots out of the spout (draws in), runs, and the tail leaves the spout last. */
+/* The jet shoots out of the spout (draws in), runs, and the tail leaves the spout last. The tail leaves when
+   the can tips back (82 % = 1.64 s, can from 1.63 s) and is gone at 1.79 s, before the can has faded out
+   (1.82 s): no rest of the jet stands in the air for long without the spout. */
 @keyframes bloom-stream {
   0% { opacity: 1; stroke-dashoffset: 1.05; animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1); }
-  18% { opacity: 1; stroke-dashoffset: 0; }
-  78% { opacity: 1; stroke-dashoffset: -0.5; animation-timing-function: ease-in; }
+  20% { opacity: 1; stroke-dashoffset: 0; }
+  82% { opacity: 1; stroke-dashoffset: -0.5; animation-timing-function: ease-in; }
   100% { opacity: 0; stroke-dashoffset: -1.05; }
 }
 @keyframes bloom-splash {

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Pause, Play } from "lucide-react";
 import styles from "./bloom-agent-scene.module.css";
+import shell from "./bloom-agent-scene.shell.module.css";
+import { SCENE_FILE, SCENE_LABEL } from "./bloom-agent-scene.data";
 
 type Locale = "de" | "en";
 
@@ -17,14 +19,14 @@ let playedInThisPageView = false;
 
 const copy = {
   de: {
-    label: "Illustration: Der MD-Agent pflanzt einen Samen und gießt ihn. Daraus wächst eine Mindmap, deren Knoten nacheinander aufblühen.",
+    label: SCENE_LABEL.de,
     pause: "Animation anhalten",
     play: "Animation abspielen",
     agent: "MD-Agent hüpfen lassen",
     node: (title: string) => `Knoten „${title}“ aufblühen lassen`,
   },
   en: {
-    label: "Illustration: The MD agent plants a seed and waters it. A mind map grows from it, and its nodes bloom one after another.",
+    label: SCENE_LABEL.en,
     pause: "Pause animation",
     play: "Play animation",
     agent: "Make the MD agent hop",
@@ -58,8 +60,8 @@ function Layer({ part, near }: { part: keyof typeof clip; near: boolean }) {
    (useCases[0].file and .markdown in app/page.tsx and app/en/english-landing-page.tsx). No new claims.
    The hierarchy is the one of that Markdown: # root, ## children, ### leaves under the second child. */
 const MAP = {
-  de: { file: "strategie.md", root: "Strategie", children: ["Ziele", "Initiativen"], leaves: ["Kundenbindung", "Startrisiko"] },
-  en: { file: "strategy.md", root: "Product Strategy", children: ["Goals", "Initiatives"], leaves: ["Retention", "Launch risk"] },
+  de: { file: SCENE_FILE.de, root: "Strategie", children: ["Ziele", "Initiativen"], leaves: ["Kundenbindung", "Startrisiko"] },
+  en: { file: SCENE_FILE.en, root: "Product Strategy", children: ["Goals", "Initiatives"], leaves: ["Retention", "Launch risk"] },
 } as const;
 
 /* Two stages with the same story. "wide" from 720 px and on every landscape viewport: a broad stage, the
@@ -122,7 +124,9 @@ const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--
 
 /* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
 const AV_RATIO = 261 / 200;
-const SPOUT = { x: 1.285, y: 0.86 };
+/* SPOUT: the spout tip in the pour pose of @keyframes bloom-can (rotate(-30deg) around the handle), measured in
+   the browser (mean of 0.95–1.63 s, both stages). Keep it in sync with the keyframe. */
+const SPOUT = { x: 1.273, y: 0.716 };
 const SEED_AT = 1.29;
 /* Old card scale: the CSS keyframes of the seed toss are written for an avatar 118.8 units wide. */
 const BASE_AVATAR_W = 118.8;
@@ -389,7 +393,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <g key={`node-${cx}`} className={styles.nodeWrap} data-bloom-wrap={1 + index}>
           <g className={styles.childNode} style={{ "--i": index, "--o": kind === "wide" ? (index === 0 ? "100% 50%" : "0% 50%") : "50% 0%" } as CSSProperties} data-bloom-node="child">
             <g className={styles.pop}>
-            <rect x={cx - w / 2 + 2 * s} y={g.childTop + 4 * s} width={w} height={child.h} rx={child.h / 2} className={`${styles.nodeShadow} ${styles.shadowChild}`} />
+            <rect x={cx - w / 2 + 2 * s} y={g.childTop + 4 * s} width={w} height={child.h} rx={child.h / 2} className={styles.nodeShadow} />
             <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
             <rect x={cx - w / 2 + 1} y={g.childTop + 1} width={w - 2} height={child.h - 2} rx={child.h / 2 - 1} stroke={`url(#${id("rim")})`} className={styles.rim} />
             <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>
@@ -700,7 +704,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   return (
     <div
       ref={ref}
-      className={styles.scene}
+      className={`${shell.scene} ${styles.scene}`}
       style={timeline}
       data-state={state}
       data-offscreen={offscreen || undefined}
@@ -708,9 +712,9 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
-      <div className={styles.bar}>
-        <span className={styles.file} data-bloom-file>
-          <svg viewBox="0 0 12 14" className={styles.fileIcon} aria-hidden="true" focusable="false">
+      <div className={shell.bar}>
+        <span className={shell.file} data-bloom-file>
+          <svg viewBox="0 0 12 14" className={shell.fileIcon} aria-hidden="true" focusable="false">
             <path d="M1.5 1.5 h5.5 l3.5 3.5 v7.5 h-9 z M7 1.5 v3.5 h3.5" />
           </svg>
           {map.file}
@@ -722,7 +726,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         ) : null}
       </div>
 
-      <div className={styles.stage} data-testid="bloom-agent-stage">
+      <div className={`${shell.stage} ${styles.stage}`} data-testid="bloom-agent-stage">
         {/* Parallax layer: map, agent and node buttons move together (≤ 24 px, CSS scroll timeline only),
             so the buttons stay on their nodes and the agent stays on the ground. */}
         <div className={styles.parallax} data-bloom-parallax>

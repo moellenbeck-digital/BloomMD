@@ -1,0 +1,93 @@
+/* The card of the bloom scene: box, tab bar and stage size. This small module is part of the critical CSS of
+   the page. The server render shows only this card (BloomAgentSceneLazy); the scene with its large CSS module
+   loads as its own chunk when it comes close to the viewport. Both use these classes, so the swap from the
+   card to the scene shifts no layout. */
+
+.scene {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: 26px;
+  /* Depth: a soft vignette darkens the edges, the one key light sits at the top left. No coloured glow. */
+  background:
+    radial-gradient(120% 110% at 38% 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.24) 100%),
+    radial-gradient(70% 65% at 10% 0%, rgba(255, 236, 220, 0.08), rgba(255, 236, 220, 0) 100%),
+    linear-gradient(180deg, #262220 0%, #1c1a18 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    14px 40px 80px -36px rgba(120, 52, 20, 0.45),
+    8px 18px 40px -24px rgba(31, 29, 27, 0.5),
+    0 2px 6px rgba(31, 29, 27, 0.1);
+  contain: layout paint;
+}
+@media (min-width: 720px) {
+  .scene { max-width: none; border-radius: 32px; }
+}
+/* Landscape phones (844 × 390): the wide card is as tall as the screen allows. Its width follows from the
+   viewport height (tab bar plus a margin of 80 px, stage 1000 × 440), so the whole card stays in sight. */
+@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
+  .scene { max-width: min(100%, calc((100svh - 80px) * 1000 / 440)); }
+}
+
+/* ── Tab bar: file name and the pause button, outside the map ── */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 8px 0 16px;
+}
+@media (min-width: 720px) {
+  .bar { height: 64px; padding: 0 14px 0 24px; }
+}
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 13px 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: rgba(246, 240, 235, 0.82);
+  font: 500 12.5px/1 var(--font-mono, ui-monospace, monospace);
+}
+@media (min-width: 720px) {
+  .file { height: 34px; padding: 0 16px 0 13px; font-size: 14px; }
+}
+.fileIcon { width: 11px; height: 13px; fill: none; stroke: #ff8a5c; stroke-width: 1.3; stroke-linejoin: round; }
+
+.stage {
+  position: relative;
+  width: 100%;
+  /* Tall layout: viewBox 360 × 470 (LAYOUTS.tall in the component). */
+  aspect-ratio: 360 / 470;
+}
+/* A soft dot grid that fades out towards the edges, like the canvas of the app. */
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0.9px, rgba(255, 255, 255, 0) 1.4px) 50% 50% / 20px 20px;
+  mask-image: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%);
+}
+/* Wide layout from 720 px and on every landscape viewport. Keep this query in sync with the scene module. */
+@media (min-width: 720px), (min-aspect-ratio: 1/1) {
+  /* Wide layout: viewBox 1000 × 440 (LAYOUTS.wide in the component). */
+  .stage { aspect-ratio: 1000 / 440; }
+  .stage::before { background-size: 26px 26px; }
+}
+
+/* Without JavaScript: the finished map as a prerendered image, it fills the stage. */
+.endImage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}

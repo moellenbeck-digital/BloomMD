@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
-import { BloomAgentScene } from "./bloom-agent-scene";
+import { BloomAgentSceneLazy } from "./bloom-agent-scene.lazy";
 
 type Locale = "de" | "en";
 
@@ -71,7 +71,7 @@ export function AgentWorkflowSection({ locale }: { locale: Locale }) {
           <p className="max-w-3xl text-base leading-8 text-[#514C46] sm:text-lg lg:pb-1">{copy.intro}</p>
         </div>
         <div className="mt-9 lg:mt-12">
-          <BloomAgentScene locale={locale} />
+          <BloomAgentSceneLazy locale={locale} />
         </div>
 
         <div className="mt-12 grid gap-10 lg:mt-16 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">

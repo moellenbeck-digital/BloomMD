@@ -30,6 +30,22 @@ const stageRatio = (width: number, height: number) => (isWide(width, height) ? 1
 const visibleNodes = (page: Page, selector = "[data-bloom-node]") => page.getByTestId("bloom-agent-scene").locator(selector).filter({ visible: true });
 const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
+/* The scene is its own chunk: the server render is only the card, the scene loads when the card comes within
+   800 px of the viewport. loadScene brings the card just below the viewport (not into view), so the scene
+   loads but does not start yet. */
+async function loadScene(page: Page) {
+  await page.evaluate(() => {
+    const card = document.querySelector('[data-testid="bloom-agent-scene"]')!;
+    const top = card.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo(0, Math.max(0, top - window.innerHeight - 200));
+  });
+  await expect(page.locator('[data-testid="bloom-agent-scene"]:not([data-card])')).toHaveCount(1);
+}
+async function openScene(page: Page, path: string) {
+  await page.goto(path);
+  await loadScene(page);
+}
+
 /* Stops every scene animation at its end state, so boxes are measured on the finished map. */
 async function finishScene(page: Page) {
   await page.getByTestId("bloom-agent-scene").evaluate((node) => {
@@ -44,8 +60,10 @@ async function finishScene(page: Page) {
 
 for (const locale of locales) {
   test(`${locale.path} plays the MD agent bloom scene once it is in view and can stop it`, async ({ page }) => {
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
+    // The scene loads as its own chunk when the card comes close to the viewport.
+    await scene.scrollIntoViewIfNeeded();
     await expect(scene.getByRole("img", { name: locale.label })).toBeAttached();
     const stage = await page.getByTestId("bloom-agent-stage").boundingBox();
     expect(stage && stage.width / stage.height).toBeCloseTo(stageRatio(page.viewportSize()!.width, page.viewportSize()!.height), 1);
@@ -64,7 +82,7 @@ for (const locale of locales) {
   });
 
   test(`${locale.path} plays the scene again after a reload and writes no browser storage and no cookie`, async ({ page, context }) => {
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
     await page.waitForLoadState("load");
     const snapshot = async () => ({
@@ -82,13 +100,14 @@ for (const locale of locales) {
     expect(await snapshot()).toEqual(before);
 
     await page.reload();
+    await loadScene(page);
     await expect(scene).toHaveAttribute("data-state", /ready|play/);
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
   });
 
   test(`${locale.path} after the scene the final image is calm: no sparks of light, no pulses, only the agent floats`, async ({ page }) => {
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -121,8 +140,9 @@ for (const locale of locales) {
   });
 
   test(`${locale.path} map nodes carry the titles of the landing page example map`, async ({ page }) => {
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
+    await scene.scrollIntoViewIfNeeded();
     await expect(scene.locator("[data-bloom-file]")).toHaveText(locale.file);
     // Both stages carry the same titles, in Markdown order.
     for (const kind of ["wide", "tall"]) {
@@ -135,7 +155,7 @@ for (const locale of locales) {
   for (const width of [390, 768, 1440]) {
     test(`${locale.path} at ${width}px: the map is balanced, nothing overlaps and the pause button is free`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
-      await page.goto(locale.path);
+      await openScene(page, locale.path);
       const scene = page.getByTestId("bloom-agent-scene");
       await scene.scrollIntoViewIfNeeded();
       await expect(scene).toHaveAttribute("data-state", "play");
@@ -207,7 +227,7 @@ for (const locale of locales) {
 for (const [width, height] of [[667, 375], [640, 360], [568, 320]] as const) {
   test(`at ${width}×${height} the scene starts and the map grows`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto("/");
+    await openScene(page, "/");
     const scene = page.getByTestId("bloom-agent-scene");
     await expect(scene).toHaveAttribute("data-state", "ready");
     await scene.evaluate((node) => node.scrollIntoView({ block: "center" }));
@@ -226,7 +246,7 @@ for (const [width, height] of [[667, 375], [640, 360], [568, 320]] as const) {
 for (const [width, height] of [[667, 375], [844, 390]] as const) {
   test(`at ${width}×${height} (landscape) the wide layout starts, every node is in sight and the pause button is free`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto("/");
+    await openScene(page, "/");
     const scene = page.getByTestId("bloom-agent-scene");
     await expect(scene.locator('svg[data-bloom-stage="wide"]')).toBeVisible();
     await expect(scene.locator('svg[data-bloom-stage="tall"]')).toBeHidden();
@@ -263,7 +283,7 @@ for (const [width, height] of [[667, 375], [844, 390]] as const) {
 for (const [width, height] of [[1440, 900], [768, 900], [390, 844], [667, 375]] as const) {
   test(`at ${width}×${height} the watering can never touches the face of the agent`, async ({ page }) => {
     await page.setViewportSize({ width, height });
-    await page.goto("/");
+    await openScene(page, "/");
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.evaluate((node) => node.scrollIntoView({ block: "center" }));
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -295,7 +315,7 @@ for (const [width, height] of [[1440, 900], [768, 900], [390, 844], [667, 375]] 
 for (const locale of locales) {
   test(`${locale.path} on a phone the leaves keep a margin to the right edge and their twigs stay in sight`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -327,7 +347,7 @@ for (const locale of locales) {
 }
 
 test("the landing ring of the seed stays hidden until the seed lands", async ({ page }) => {
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -347,8 +367,8 @@ test("the landing ring of the seed stays hidden until the seed lands", async ({ 
   expect(await ringAt(740)).toBeGreaterThan(0.3);
 });
 
-test("the water jet stays hidden until the can pours", async ({ page }) => {
-  await page.goto("/");
+test("the water jet stays hidden until the can pours and then falls from the spout to the seed", async ({ page }) => {
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -362,19 +382,35 @@ test("the water jet stays hidden until the can pours", async ({ page }) => {
       // Jet and core of both stages (CSS module classes .stream and .streamCore).
       return [...node.querySelectorAll('path[class*="stream"]')].map((element) => Number(getComputedStyle(element).opacity));
     }, ms);
-  // The jet starts at 0.86 s; before that no bright line may stand above the seed.
-  for (const ms of [0, 300, 600, 850]) {
+  // The jet starts at 0.94 s, when the can is tipped up; before that no bright line may stand above the seed.
+  for (const ms of [0, 300, 600, 850, 930]) {
     const opacities = await jetAt(ms);
     expect(opacities.length).toBeGreaterThanOrEqual(2);
     for (const opacity of opacities) expect(opacity).toBe(0);
   }
   expect(Math.max(...(await jetAt(1100)))).toBe(1);
+  // The jet starts at the spout of the tipped can and falls a visible way down to the seed: no short stub.
+  const geometry = await scene.evaluate((node) => {
+    const stage = [...node.querySelectorAll('svg[class*="map"]')].find((svg) => getComputedStyle(svg).display !== "none" && svg.querySelector('path[class*="stream"]'))!;
+    const jet = stage.querySelector('path[class*="stream"]')!.getBoundingClientRect();
+    const seed = stage.querySelector('ellipse[class*="seed"]')!.getBoundingClientRect();
+    // Spout tip at (39, 4) of the 42 × 28 can, with every transform of the can and the hand.
+    const can = node.querySelector<SVGSVGElement>("[data-bloom-can] svg")!;
+    const tip = new DOMPoint(39, 4).matrixTransform(can.getScreenCTM()!);
+    return { jetTop: jet.top, jetBottom: jet.bottom, jetX: jet.left + jet.width / 2, tipX: tip.x, tipY: tip.y, seedTop: seed.top, seedX: seed.left + seed.width / 2 };
+  });
+  // The hand moves a little while it pours, so the tip may drift a few pixels from the start of the jet.
+  expect(Math.abs(geometry.jetTop - geometry.tipY)).toBeLessThan(14);
+  expect(Math.abs(geometry.jetX - geometry.tipX)).toBeLessThan(14);
+  expect(geometry.jetBottom).toBeGreaterThan(geometry.seedTop - 6);
+  expect(geometry.seedTop - geometry.tipY).toBeGreaterThan(30);
+  expect(Math.abs(geometry.jetX - geometry.seedX)).toBeLessThan(20);
 });
 
 test("reduced motion shows the finished map without a pause button", async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: "reduce" });
   const page = await context.newPage();
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "end");
@@ -385,20 +421,50 @@ test("reduced motion shows the finished map without a pause button", async ({ br
   await context.close();
 });
 
-test("without JavaScript the server render is the finished map", async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false });
-  const page = await context.newPage();
-  await page.goto("/");
-  const scene = page.getByTestId("bloom-agent-scene");
-  await scene.scrollIntoViewIfNeeded();
-  await expect(scene).toHaveAttribute("data-state", "end");
-  await expect(page.getByTestId("bloom-agent-scene-toggle")).toHaveCount(0);
-  for (const title of locales[0].titles) await expect(visibleNodes(page).locator("[data-bloom-title]", { hasText: title })).toBeVisible();
-  // The agent comes from <noscript>, so the final image is complete without JavaScript.
-  const layers = page.getByTestId("bloom-agent-avatar").locator("img");
-  await expect(layers).toHaveCount(4);
-  expect(await layers.first().evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
-  await context.close();
+test("without JavaScript the card shows the finished map as an image", async ({ browser }) => {
+  for (const [path, locale, viewport, file] of [
+    ["/", locales[0], { width: 1440, height: 900 }, "bloom-scene-end-wide-de.webp"],
+    ["/en", locales[1], { width: 390, height: 844 }, "bloom-scene-end-tall-en.webp"],
+  ] as const) {
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport });
+    const page = await context.newPage();
+    await page.goto(path);
+    const card = page.getByTestId("bloom-agent-scene");
+    await card.scrollIntoViewIfNeeded();
+    await expect(card.getByText(locale.file)).toBeVisible();
+    await expect(page.getByTestId("bloom-agent-scene-toggle")).toHaveCount(0);
+    // The scene loads with JavaScript only; without it, a prerendered end image fills the stage.
+    const image = page.getByTestId("bloom-agent-scene-end-image");
+    await expect(image).toHaveAttribute("alt", locale.label);
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0 && node.currentSrc)).toContain(file);
+    const [stage, picture] = await Promise.all([card.locator("> div").nth(1).boundingBox(), image.boundingBox()]);
+    expect(Math.abs(stage!.width - picture!.width)).toBeLessThan(1);
+    expect(Math.abs(stage!.height - picture!.height)).toBeLessThan(1);
+    await context.close();
+  }
+});
+
+test("the scene is not in the server HTML and loads near the viewport without a layout shift", async ({ page, request }) => {
+  const html = await (await request.get("/")).text();
+  expect(html).toContain('data-testid="bloom-agent-scene"');
+  expect(html).not.toContain("bloom-agent-avatar");
+  expect(html).not.toContain("data-bloom-title");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/", { waitUntil: "load" });
+  await expect(page.locator("[data-testid=bloom-agent-scene][data-card]")).toHaveCount(1);
+  const card = await page.getByTestId("bloom-agent-scene").boundingBox();
+  await page.evaluate(() => {
+    (window as unknown as { shift: number }).shift = 0;
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) (window as unknown as { shift: number }).shift += (entry as unknown as { value: number }).value;
+    }).observe({ type: "layout-shift", buffered: false });
+  });
+  await page.getByTestId("bloom-agent-scene").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("bloom-agent-avatar")).toHaveCount(1);
+  const scene = await page.getByTestId("bloom-agent-scene").boundingBox();
+  expect(Math.abs(scene!.height - card!.height)).toBeLessThan(1);
+  expect(Math.abs(scene!.width - card!.width)).toBeLessThan(1);
+  expect(await page.evaluate(() => (window as unknown as { shift: number }).shift)).toBe(0);
 });
 
 test("the agent image is requested only when the scene comes close, not during the page load", async ({ page }) => {
@@ -429,7 +495,7 @@ const reactionAnimations = (page: Page) =>
 for (const locale of locales) {
   test(`${locale.path} a click, Enter and Tab reach the agent and the nodes and start a reaction`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(locale.path);
+    await openScene(page, locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -478,7 +544,7 @@ for (const locale of locales) {
 
 test("on the desktop the agent looks at the cursor and at a hovered node, damped and at most 6°; the pause stops it", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -513,7 +579,7 @@ test("on the desktop the agent looks at the cursor and at a hovered node, damped
 test("on a touch phone there is no cursor gaze", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -527,7 +593,7 @@ test("on a touch phone there is no cursor gaze", async ({ browser }) => {
 test("reduced motion: a click on the agent or a node changes a colour only, no motion, no gaze", async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "end");
@@ -546,7 +612,7 @@ test("reduced motion: a click on the agent or a node changes a colour only, no m
 });
 
 test("clicks on the agent and the nodes write no browser storage and no cookie", async ({ page, context }) => {
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await page.waitForLoadState("load");
   const snapshot = async () => ({
@@ -607,7 +673,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
   test(`at ${width}×${height} the agent follows the scroll, the map drifts at most 24 px and the agent never covers text`, async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width, height }, isMobile: width < 720, hasTouch: width < 720 });
     const page = await context.newPage();
-    await page.goto("/");
+    await openScene(page, "/");
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
@@ -632,7 +698,7 @@ for (const [width, height] of [[390, 844], [1440, 900]] as const) {
 
 test("the pause stops the parallax and the scroll pose", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -654,7 +720,7 @@ test("the pause stops the parallax and the scroll pose", async ({ page }) => {
    the scene, so checks that wait for all finite animations to end (mobile accessibility scan) can finish. */
 test("the scroll animations run only while the scene is near the viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   await page.waitForLoadState("load");
   const scene = page.getByTestId("bloom-agent-scene");
   const scrollAnimations = () => page.evaluate(() => document.getAnimations().filter((animation) => animation.timeline !== document.timeline).length);
@@ -673,7 +739,7 @@ test("the scroll animations run only while the scene is near the viewport", asyn
    The keyframes carry literal easings, so the springs of the hop and the node pop really overshoot. */
 test("the keyframes use literal easings, the springs of the hop and the node pop work", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");
@@ -698,7 +764,7 @@ test("the keyframes use literal easings, the springs of the hop and the node pop
 
 test("the press feedback of the agent works while the scene runs, not in the pause", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   const avatar = page.getByTestId("bloom-agent-avatar");
   await scene.scrollIntoViewIfNeeded();
@@ -739,7 +805,7 @@ const materialAudit = (page: Page) =>
 
 test("the scene has no filter, animates no shadow and shows no sparks, also on a click", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await openScene(page, "/");
   const scene = page.getByTestId("bloom-agent-scene");
   await scene.scrollIntoViewIfNeeded();
   await expect(scene).toHaveAttribute("data-state", "play");

@@ -30,82 +30,13 @@
   --branch: #c9b7a6;
   /* Shadows fall away from the one light at the top left (down and to the right). */
   --shade: rgba(8, 5, 3, 0.42);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 560px;
-  margin-inline: auto;
-  overflow: hidden;
-  border-radius: 26px;
-  /* Depth: a soft vignette darkens the edges, the one key light sits at the top left. No coloured glow. */
-  background:
-    radial-gradient(120% 110% at 38% 30%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.24) 100%),
-    radial-gradient(70% 65% at 10% 0%, rgba(255, 236, 220, 0.08), rgba(255, 236, 220, 0) 100%),
-    linear-gradient(180deg, #262220 0%, #1c1a18 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    14px 40px 80px -36px rgba(120, 52, 20, 0.45),
-    8px 18px 40px -24px rgba(31, 29, 27, 0.5),
-    0 2px 6px rgba(31, 29, 27, 0.1);
-  contain: layout paint;
-}
-@media (min-width: 720px) {
-  .scene { max-width: none; border-radius: 32px; }
 }
 @media (min-width: 720px), (min-aspect-ratio: 1/1) {
   .scene { --look-x: 4%; --look-y: -1.5%; --look-r: 3deg; }
 }
-/* Landscape phones (844 × 390): the wide card is as tall as the screen allows. Its width follows from the
-   viewport height (tab bar plus a margin of 80 px, stage 1000 × 440), so the whole card stays in sight. */
-@media (min-aspect-ratio: 1/1) and (max-height: 640px) {
-  .scene { max-width: min(100%, calc((100svh - 80px) * 1000 / 440)); }
-}
 
-/* ── Tab bar: file name and the pause button, outside the map ── */
-.bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 56px;
-  padding: 0 8px 0 16px;
-}
-@media (min-width: 720px) {
-  .bar { height: 64px; padding: 0 14px 0 24px; }
-}
-.file {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 13px 0 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
-  color: rgba(246, 240, 235, 0.82);
-  font: 500 12.5px/1 var(--font-mono, ui-monospace, monospace);
-}
-@media (min-width: 720px) {
-  .file { height: 34px; padding: 0 16px 0 13px; font-size: 14px; }
-}
-.fileIcon { width: 11px; height: 13px; fill: none; stroke: #ff8a5c; stroke-width: 1.3; stroke-linejoin: round; }
-
-.stage {
-  pointer-events: none;
-  position: relative;
-  width: 100%;
-  /* Tall layout: viewBox 360 × 470 (LAYOUTS.tall in the component). */
-  aspect-ratio: 360 / 470;
-}
-/* A soft dot grid that fades out towards the edges, like the canvas of the app. */
-.stage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0.9px, rgba(255, 255, 255, 0) 1.4px) 50% 50% / 20px 20px;
-  mask-image: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%);
-}
+/* Card box, tab bar and stage size: bloom-agent-scene.shell.module.css (critical CSS, also the placeholder). */
+.stage { pointer-events: none; }
 .art,
 .parallax {
   position: absolute;
@@ -123,8 +54,6 @@
    stage would be taller than the screen there. Keep this query in sync with WIDE_QUERY in the component. */
 @media (min-width: 720px), (min-aspect-ratio: 1/1) {
   /* Wide layout: viewBox 1000 × 440 (LAYOUTS.wide in the component). */
-  .stage { aspect-ratio: 1000 / 440; }
-  .stage::before { background-size: 26px 26px; }
   .wide { display: block; }
   .tall { display: none; }
 }
@@ -398,9 +327,9 @@
      seed, the stem draws itself while the water still runs, leaves unfurl. */
   .scene[data-state="play"] .ghost { opacity: 1; }
   .scene[data-state="play"] .canWrap { animation: bloom-can 4.8s linear both; }
-  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.86s forwards; }
-  .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(0.92s + var(--i) * 0.11s) both; }
-  .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.04s both; }
+  .scene[data-state="play"] :is(.stream, .streamCore) { animation: bloom-stream 0.95s linear 0.94s forwards; }
+  .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(1s + var(--i) * 0.11s) both; }
+  .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.12s both; }
   .scene[data-state="play"] :is(.stem, .stemShadow) { animation: bloom-draw 0.8s var(--out) 0.98s both; }
   .scene[data-state="play"] .ghostStem { animation: bloom-fade-out 0.4s var(--out) 1.25s forwards; }
   .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.55s var(--pop) 1.2s both; }
@@ -545,11 +474,14 @@
   from { opacity: 0.9; transform: scale(0.3); }
   to { opacity: 0; transform: scale(1.9); }
 }
+/* The can pops up level, then tips up around the handle (19.5 %, 0.94 s, when the head has come up) and pours
+   until 34 %: the spout stands clear above the seed and the jet falls a visible way down to it. SPOUT in the
+   component is this pose. The jet starts at 0.94 s. The body stays below the head. */
 @keyframes bloom-can {
   0%, 14.5% { opacity: 0; transform: scale(0.2) rotate(-20deg); }
   17% { opacity: 1; transform: scale(1.08) rotate(4deg); }
-  19.5%, 34% { opacity: 1; transform: scale(1) rotate(0deg); }
-  38%, 100% { opacity: 0; transform: scale(0.2) rotate(10deg); }
+  19.5%, 34% { opacity: 1; transform: scale(1) rotate(-30deg); }
+  38%, 100% { opacity: 0; transform: scale(0.2) rotate(6deg); }
 }
 /* The jet shoots out of the spout (draws in), runs, and the tail leaves the spout last. */
 @keyframes bloom-stream {

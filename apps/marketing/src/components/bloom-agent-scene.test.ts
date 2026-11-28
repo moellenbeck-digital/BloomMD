@@ -44,3 +44,34 @@ describe("bloom agent scene keyframes", () => {
     for (const rule of scrollRules) expect(rule).toContain("[data-inview]");
   });
 });
+
+describe("bloom agent scene first load", () => {
+  const lazy = readFileSync(new URL("./bloom-agent-scene.lazy.tsx", import.meta.url), "utf8");
+  const shellCss = readFileSync(new URL("./bloom-agent-scene.shell.module.css", import.meta.url), "utf8");
+  const section = readFileSync(new URL("./agent-workflow-section.tsx", import.meta.url), "utf8");
+
+  // The scene and its CSS module are an own chunk: only a dynamic import, no static one, so they stay out of
+  // the server HTML and the critical CSS of the page (LCP).
+  test("the page renders the card, the scene loads by a dynamic import only", () => {
+    expect(section).toMatch(/from "\.\/bloom-agent-scene\.lazy"/);
+    expect(section).not.toMatch(/from "\.\/bloom-agent-scene"/);
+    expect(lazy).toMatch(/import\("\.\/bloom-agent-scene"\)/);
+    expect(lazy).not.toMatch(/from "\.\/bloom-agent-scene(\.module\.css)?"/);
+  });
+
+  test("the card CSS stays small and holds no animation", () => {
+    expect(shellCss.length).toBeLessThan(4000);
+    expect(shellCss).not.toMatch(/@keyframes|animation/);
+  });
+
+  test("without JavaScript the card shows a prerendered end image with the label as alt text", () => {
+    expect(lazy).toMatch(/<noscript>/);
+    expect(lazy).toMatch(/alt=\{SCENE_LABEL\[locale\]\}/);
+  });
+});
+
+describe("bloom agent scene cleanup", () => {
+  test("no dead node shadow class", () => {
+    expect(source).not.toMatch(/shadowChild/);
+  });
+});

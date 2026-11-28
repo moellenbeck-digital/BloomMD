@@ -109,7 +109,7 @@ Statusfarben: keine. Status wird durch Wort, Dicke und Knospenform getragen.
 |---|---|---|
 | Krone | Hero | H1 und Aktionen oben, darunter Datei links, Map wächst nach rechts |
 | Gabel | Anwendungsfälle | Die vier Reiter sind vier Äste. Der gewählte wächst weiter zur Map seiner Datei |
-| Trieb | Vision | Ein Stamm von links nach rechts: heute → Pilot → vier Ranken. Wurzeln = Voraussetzungen |
+| Trieb | Vision | Ein Stamm von links nach rechts: heute → Pilot → vier Ranken. Wurzeln = Voraussetzungen (Trieb hell, Kragen 20 Einheiten, Boden-Linie Trieb 2 px, auch am Handy) |
 
 Verboten: Karten, Karten-Raster, gestrichelte Rahmen, Pill-Badges, nachgebaute App-Fenster, Schatten, zentrierte Textwände.
 

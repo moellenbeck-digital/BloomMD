@@ -34,10 +34,22 @@ const pilot: TriebShape = { from: [362, 322], at: [436, 152], length: 232, w: [1
 const exploring: TriebShape = { from: [362, 322], at: [436, 466], length: 204, w: [9, 5.5, 4] };
 const fieldY = [66, 238, 410, 582];
 const tendrils: TriebShape[] = fieldY.map((y) => ({ from: [638, 466], at: [786, y], length: 420, w: [4, 1.6, 0.3] }));
+/* Roots: one thick collar at the soil line, a tap root and laterals that fork, same taper rule as above. */
 const roots: TriebShape[] = [
-  { from: [40, 596], at: [14, 626], length: 0, w: [5, 0.4, 0.4], bend: "v" },
-  { from: [46, 596], at: [66, 632], length: 0, w: [4, 0.4, 0.4], bend: "v" },
-  { from: [54, 596], at: [128, 622], length: 0, w: [4.5, 0.4, 0.4], bend: "v" },
+  { from: [60, 496], at: [78, 622], length: 22, w: [20, 5, 0.8], bend: "v" },
+  { from: [58, 524], at: [2, 584], length: 0, w: [11, 1, 1], bend: "v" },
+  { from: [62, 528], at: [172, 600], length: 54, w: [13, 4, 0.6], bend: "v" },
+  { from: [64, 522], at: [236, 556], length: 108, w: [12, 3.6, 0.5], bend: "v" },
+  { from: [50, 550], at: [26, 622], length: 0, w: [6, 0.6, 0.6], bend: "v" },
+  { from: [112, 578], at: [138, 630], length: 0, w: [5, 0.6, 0.6], bend: "v" },
+  { from: [216, 554], at: [270, 596], length: 30, w: [4.5, 1.6, 0.4], bend: "v" },
+];
+/* Narrow screens: the same roots under the lower end of the vertical trunk. */
+const narrowRoots: TriebShape[] = [
+  { from: [7, 0], at: [26, 70], length: 8, w: [9, 2.6, 0.6], bend: "v" },
+  { from: [9, 14], at: [124, 48], length: 70, w: [7, 2.2, 0.4], bend: "v" },
+  { from: [8, 20], at: [72, 66], length: 26, w: [6, 1.8, 0.4], bend: "v" },
+  { from: [92, 45], at: [124, 70], length: 0, w: [3, 0.5, 0.5], bend: "v" },
 ];
 
 /* Narrow screens: a twig from the vertical trunk to each heading. */
@@ -83,8 +95,8 @@ export function VisionTrieb({ copy, roadmapHref }: { copy: VisionCopy; roadmapHr
             {tendrils.map((shape, i) => <Branch key={i} id={`vision-field-${i}`} shape={shape} timing={{ delay: 760 + i * 90, duration: 460 }} />)}
             <Bloom at={[372, 322]} size={30} timing={{ delay: 560, duration: 460 }} />
             <Bud at={[666, 152]} size={38} timing={{ delay: 820, duration: 420 }} />
-            <line x1="0" y1="595" x2="344" y2="595" className={styles.soil} />
-            {roots.map((shape, i) => <Branch key={i} id={`vision-root-${i}`} shape={shape} timing={{ delay: 300 + i * 70, duration: 420 }} />)}
+            <line x1="0" y1="520" x2="400" y2="520" className={styles.soil} />
+            {roots.map((shape, i) => <Branch key={i} id={`vision-root-${i}`} shape={shape} timing={{ delay: 300 + i * 70, duration: 420 }} className={styles.root} />)}
           </svg>
 
           <div className={`${styles.stageItem} ${styles.today} ${motion.arrive}`} style={place(20, 322, 380)}>
@@ -127,6 +139,10 @@ export function VisionTrieb({ copy, roadmapHref }: { copy: VisionCopy; roadmapHr
               </li>
             ))}
           </ul>
+          <svg className={styles.narrowRoots} viewBox="0 0 220 76" aria-hidden="true" focusable="false">
+            <line x1="0" y1="10" x2="220" y2="10" className={styles.soil} />
+            {narrowRoots.map((shape, i) => <Branch key={i} id={`vision-root-narrow-${i}`} shape={shape} timing={{ delay: 360 + i * 70, duration: 420 }} className={styles.root} />)}
+          </svg>
           <p className={styles.foundation}>{copy.foundation}</p>
         </div>
       </div>

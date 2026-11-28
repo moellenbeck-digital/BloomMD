@@ -147,6 +147,10 @@ Dazu in beiden Themen: `--bmd-veil` (Header, Fläche mit 0,9 Deckkraft), `--bmd-
 | Trieb | Vision | Ein Stamm von links nach rechts: heute → Pilot → vier Ranken. Wurzeln = Voraussetzungen (Trieb hell, Kragen 20 Einheiten, Boden-Linie Trieb 2 px, auch am Handy) |
 | Beleg | Demo | Datei links, Aufnahme rechts, ein Trieb trägt die drei Belege ([demo.md](demo.md)) |
 | Weggabel | Pfade | Ein Trieb mit drei Ansätzen, je Weg ein Link ([pfade.md](pfade.md)) |
+| Äste je Stand | Verfügbarkeit | Drei Äste, dünner je weniger verfügbar ([verfuegbarkeit.md](verfuegbarkeit.md)) |
+| Knoten am Stamm | FAQ | Kopf links, Fragen am Stamm ([faq.md](faq.md)) |
+| Auslauf | Registrieren | Ein Trieb endet am Knopf ([registrieren.md](registrieren.md)) |
+| Wurzelschicht | Footer | Boden-Linie, Wurzelkragen, vier Spalten ([footer.md](footer.md)) |
 
 Verboten: Karten, Karten-Raster, gestrichelte Rahmen, Pill-Badges, nachgebaute App-Fenster, Schatten, zentrierte Textwände.
 
@@ -175,6 +179,7 @@ Bestehende Texte unverändert. Du-Form, sachlich. Aktionsverben bleiben („Demo
 
 | Punkt | Stand |
 |---|---|
-| Abschnitte Agenten, Vorlagen, Verfügbarkeit, FAQ, Registrieren, Footer; `/en`-Hero, -Demo, -Pfade | noch alte Sprache |
+| Agenten-Abschnitt innen (Titel, Schritte, Aktionen) | noch alte Sprache; nur die Hülle ist neu ([agenten.md](agenten.md)) |
+| Nicht gerenderte Komponenten (Workflow, Feature-Raster, LLM-Wiki, Obsidian, Local-first, Desktop) | unverändert |
 | Agenten-Szene | Sperrzone, unverändert |
 | Gedankenstrich im Hero-Absatz | Text unverändert (Inhaltsregel) |

@@ -89,7 +89,7 @@ Statusfarben: keine. Status wird durch Wort, Dicke und Knospenform getragen.
 | source | System-Mono | 0.8125rem | 1.7 | 0 | 400 |
 
 - Drei Familien, mehr nicht. Kontrast: kalligrafische Serife (Feder, läuft spitz aus wie der Trieb), humanistische Grotesk, Mono nur für Markdown.
-- Lokal: `components/v2/fonts/*.woff2` (OFL, Latin), `next/font/local`, `display: swap`, metrisch angepasster Fallback. Kein externer Request.
+- Lokal: `components/v2/fonts/*.woff2` (OFL, Subset Deutsch/Englisch, zusammen unter 40 KB, `fonts/subset.py`), `next/font/local`, `display: swap`, metrisch angepasster Fallback. Kein externer Request.
 - Untergrenze 13 px. Titel `text-wrap: balance`, Absätze `pretty`. Zeilenlänge ≤ 34–40rem.
 - Keine Versalien-Eyebrows. Der Abschnittsname ist eine kursive Randnotiz.
 

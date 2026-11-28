@@ -185,3 +185,5 @@ Bestehende Texte unverändert. Du-Form, sachlich. Aktionsverben bleiben („Demo
 | Nicht gerenderte Komponenten (Workflow, Feature-Raster, LLM-Wiki, Obsidian, Local-first, Desktop) | unverändert |
 | Agenten-Szene | Sperrzone, unverändert |
 | Gedankenstrich im Hero-Absatz | Text unverändert (Inhaltsregel) |
+
+Ausnahme Hell/Dunkel: Der Vision-Abschnitt und der Demo-Quelltext sind in beiden Systemthemen dunkel (Klasse `.night` in `tokens.module.css`).

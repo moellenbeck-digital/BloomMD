@@ -60,17 +60,60 @@ for (const locale of locales) {
     await expect(scene).toHaveAttribute("data-state", "play");
   });
 
-  test(`${locale.path} plays the scene once per visit and starts on the final image afterwards`, async ({ page }) => {
+  test(`${locale.path} plays the scene again after a reload and writes no browser storage and no cookie`, async ({ page, context }) => {
+    await page.goto(locale.path);
+    const scene = page.getByTestId("bloom-agent-scene");
+    await page.waitForLoadState("load");
+    const snapshot = async () => ({
+      cookies: (await context.cookies()).map((cookie) => cookie.name).sort(),
+      storage: await page.evaluate(() => ({
+        local: Object.keys(window.localStorage).sort(),
+        session: Object.keys(window.sessionStorage).sort(),
+      })),
+    });
+    const before = await snapshot();
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-state", "play");
+    await page.waitForTimeout(500);
+    // The scene keeps its "played" flag in memory only.
+    expect(await snapshot()).toEqual(before);
+
+    await page.reload();
+    await expect(scene).toHaveAttribute("data-state", /ready|play/);
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-state", "play");
+  });
+
+  test(`${locale.path} after the scene the final image is calm: no sparks of light, no pulses, only the agent floats`, async ({ page }) => {
     await page.goto(locale.path);
     const scene = page.getByTestId("bloom-agent-scene");
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute("data-state", "play");
-
-    await page.reload();
-    await expect(scene).toHaveAttribute("data-state", "idle");
-    await expect(visibleNodes(page).locator("[data-bloom-title]", { hasText: locale.titles[4] })).toBeVisible();
-    await page.getByRole("button", { name: locale.pause }).click();
-    await expect(scene).toHaveAttribute("data-state", "stopped");
+    await finishScene(page);
+    const after = await scene.evaluate((node) => {
+      // Effective opacity: the element and every ancestor up to the scene.
+      const opacity = (element: Element) => {
+        let value = 1;
+        for (let current: Element | null = element; current && current !== node; current = current.parentElement) value *= Number(getComputedStyle(current).opacity);
+        return value;
+      };
+      const shown = (selector: string) =>
+        [...node.querySelectorAll(selector)].filter((element) => element.getBoundingClientRect().width > 0 && opacity(element) > 0.01).length;
+      return {
+        flow: shown("[data-bloom-flow]"),
+        ghost: shown("[data-bloom-ghost] :not(:has(*))"),
+        water: shown("[data-bloom-water] :not(:has(*))"),
+        loops: node
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.effect?.getComputedTiming().iterations === Infinity)
+          .map((animation) => (animation as CSSAnimation).animationName),
+      };
+    });
+    expect(after.flow).toBe(0);
+    expect(after.ghost).toBe(0);
+    expect(after.water).toBe(0);
+    expect(after.loops.length).toBeGreaterThan(0);
+    for (const name of after.loops) expect(name).toMatch(/bloom-float$/);
   });
 
   test(`${locale.path} map nodes carry the titles of the landing page example map`, async ({ page }) => {
@@ -154,6 +197,77 @@ for (const locale of locales) {
     });
   }
 }
+
+/* Phones in landscape and 1280 × 720 at 200 % zoom: the scene is taller than half the viewport, so a plain
+   visibility ratio of 0.5 is never reached. It starts once half of the viewport shows it. */
+for (const [width, height] of [[667, 375], [640, 360], [568, 320]] as const) {
+  test(`at ${width}×${height} the scene starts and the map grows`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    const scene = page.getByTestId("bloom-agent-scene");
+    await expect(scene).toHaveAttribute("data-state", "ready");
+    await scene.evaluate((node) => node.scrollIntoView({ block: "center" }));
+    await expect(scene).toHaveAttribute("data-state", "play");
+    const nodes = visibleNodes(page);
+    await expect(nodes).toHaveCount(5);
+    // Real time: every node blooms to full opacity.
+    await expect
+      .poll(() => nodes.evaluateAll((groups) => groups.map((group) => Number(getComputedStyle(group).opacity))), { timeout: 10_000 })
+      .toEqual([1, 1, 1, 1, 1]);
+    for (const title of locales[0].titles) await expect(nodes.locator("[data-bloom-title]", { hasText: title })).toBeVisible();
+  });
+}
+
+for (const locale of locales) {
+  test(`${locale.path} on a phone the leaves keep a margin to the right edge and their twigs stay in sight`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(locale.path);
+    const scene = page.getByTestId("bloom-agent-scene");
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-state", "play");
+    await finishScene(page);
+    const stage = (await page.getByTestId("bloom-agent-stage").boundingBox())!;
+    for (const leaf of await visibleNodes(page, "[data-bloom-node='leaf']").all()) {
+      const box = (await leaf.locator("rect").boundingBox())!;
+      expect(stage.x + stage.width - (box.x + box.width)).toBeGreaterThanOrEqual(8);
+    }
+    // Most of each twig runs outside every node pill, so the branch to the leaf is not hidden behind one.
+    const inSight = await page.locator('svg[data-bloom-stage="tall"]').evaluate((svg) => {
+      const pills = [...svg.querySelectorAll("[data-bloom-node] rect")].map((rect) => rect.getBoundingClientRect());
+      const twigs = [...svg.querySelectorAll<SVGPathElement>("path[data-bloom-flow]")].slice(2);
+      const matrix = svg.getScreenCTM()!;
+      return twigs.map((twig) => {
+        const length = twig.getTotalLength();
+        let free = 0;
+        for (let step = 0; step <= 40; step += 1) {
+          const point = new DOMPoint(twig.getPointAtLength((length * step) / 40).x, twig.getPointAtLength((length * step) / 40).y).matrixTransform(matrix);
+          if (!pills.some((pill) => point.x > pill.left && point.x < pill.right && point.y > pill.top && point.y < pill.bottom)) free += 1;
+        }
+        return free / 41;
+      });
+    });
+    expect(inSight).toHaveLength(2);
+    for (const share of inSight) expect(share).toBeGreaterThan(0.75);
+  });
+}
+
+test("the landing ring of the seed stays hidden until the seed lands", async ({ page }) => {
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  const ringAt = (ms: number) =>
+    scene.evaluate((node, time) => {
+      for (const animation of node.getAnimations({ subtree: true })) {
+        animation.pause();
+        animation.currentTime = time;
+      }
+      const ring = [...node.querySelectorAll("[data-bloom-ripple]")].find((element) => element.getBoundingClientRect().width > 0)!;
+      return Number(getComputedStyle(ring).opacity);
+    }, ms);
+  for (const ms of [0, 300, 600, 800]) expect(await ringAt(ms)).toBe(0);
+  expect(await ringAt(900)).toBeGreaterThan(0.3);
+});
 
 test("reduced motion shows the finished map without a pause button", async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: "reduce" });

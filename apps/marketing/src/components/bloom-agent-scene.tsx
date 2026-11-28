@@ -7,12 +7,13 @@ import styles from "./bloom-agent-scene.module.css";
 type Locale = "de" | "en";
 
 /* end: static final image (server render, no JS, reduced motion). ready: before the scene starts.
-   play: one-shot scene, then idle loops. idle: scene already seen in this visit, final image with idle loops.
-   stopped: paused by the user, shows the final image without any motion. */
+   play: one-shot scene, then a calm final image (only the agent floats). idle: scene already played in this
+   page view (client navigation back), final image with the float. stopped: paused by the user, no motion. */
 type SceneState = "end" | "ready" | "play" | "idle" | "stopped";
 
-/* The scene plays once per visit. A second view in the same tab starts on the final image. */
-const SEEN_KEY = "bloommd-agent-scene-seen";
+/* The scene plays once per page view. The flag lives in memory only: no browser storage, no cookie,
+   so the privacy and cookie texts stay true. After a reload the scene plays again. */
+let playedInThisPageView = false;
 
 const copy = {
   de: {
@@ -76,7 +77,6 @@ type Layout = {
   stem: (seed: Point, rootBottom: Point) => Cubic[];
   stemLeaves: readonly [readonly [number, number], readonly [number, number]];
   spark: number;
-  motes: readonly Point[];
 };
 
 const LAYOUTS: Record<"wide" | "tall", Layout> = {
@@ -91,7 +91,6 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
     stem: ([sx, sy], [rx, ry]) => [[[sx, sy], [sx, sy - 70], [rx, ry + 80], [rx, ry]]],
     stemLeaves: [[0, 0.2], [0, 0.52]],
     spark: 1.55,
-    motes: [[330, 360], [600, 300], [880, 400], [380, 160], [470, 250], [700, 150]],
   },
   tall: {
     W: 360,
@@ -100,7 +99,8 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
     avatar: { x: 4, w: 138 },
     root: { cx: 180, cy: 64, h: 52, font: 19.5, pad: 22 },
     child: { cx: [84, 270], cy: 172, h: 44, font: 15.5, pad: 18 },
-    leaf: { x: 188, h: 40, cy: [264, 320], font: 13.5 },
+    /* x 196: the twig from "Initiativen" reaches the leaf on the left of the pill, not behind it. */
+    leaf: { x: 196, h: 40, cy: [264, 320], font: 13.5 },
     /* A gentle S: left over the hand of the agent, back through the gap between the children, up into the root. */
     stem: ([sx, sy], [rx, ry]) => [
       [[sx, sy], [sx, sy - 44], [146, 372], [146, 318]],
@@ -109,13 +109,17 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
     ],
     stemLeaves: [[0, 0.62], [1, 0.45]],
     spark: 1,
-    motes: [[170, 400], [300, 384], [110, 240], [256, 116], [60, 116]],
   },
 };
 
+/* Beats of the scene in seconds. The CSS module reads them as custom properties (--t-*), so the sparks
+   in the markup and the keyframes in the CSS keep the same timeline. The agent tracks run 6 s. */
+const T = { root: 2.15, child: 2.77, leaf: 3.37, shine: 3.75, cheer: 4.78 } as const;
+const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--t-${key}`, `${value}s`])) as CSSProperties;
+
 /* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
 const AV_RATIO = 261 / 200;
-const SPOUT = { x: 1.207, y: 0.755 };
+const SPOUT = { x: 1.32, y: 0.715 };
 const SEED_AT = 1.29;
 /* Old card scale: the CSS keyframes of the seed toss are written for an avatar 118.8 units wide. */
 const BASE_AVATAR_W = 118.8;
@@ -165,10 +169,10 @@ const cubicPath = (segments: readonly Cubic[]) => `M${segments[0]![0].join(" ")}
 const r1 = (value: number) => Math.round(value * 10) / 10;
 
 /* Deterministic sparks: a fan that rises from a burst point. */
-function Sparks({ x, y, delay, count = 8, spread = 1, rise = 1, scale = 1 }: { x: number; y: number; delay: number; count?: number; spread?: number; rise?: number; scale?: number }) {
+function Sparks({ x, y, delay, count = 8, spread = 1, rise = 1, scale = 1, ring = false }: { x: number; y: number; delay: number; count?: number; spread?: number; rise?: number; scale?: number; ring?: boolean }) {
   return (
     <g className={styles.burst} style={{ "--d": `${delay}s` } as CSSProperties} aria-hidden="true">
-      <circle cx={x} cy={y} r={14 * scale} className={styles.ring} />
+      {ring ? <circle cx={x} cy={y} r={14 * scale} className={styles.ring} /> : null}
       {Array.from({ length: count }, (_, index) => {
         const angle = ((-90 + (index - (count - 1) / 2) * (150 / count) * spread) * Math.PI) / 180;
         const reach = (24 + (index % 3) * 9) * rise * scale;
@@ -196,9 +200,9 @@ function WateringCan() {
   );
 }
 
-/* Everything behind the agent: light, ground, stem, branches, nodes and their pollen.
+/* Everything behind the agent: light, ground, stem, branches, nodes and their sparks.
    live: motion is allowed. Only then the parts that are invisible in the final image are rendered
-   (sparks, pollen, flow pulses, ripple, bud). The server render stays small, the final image is the same. */
+   (ghost outline, sparks, flow pulses, ripple, bud). The server render stays small, the final image is the same. */
 function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale; live: boolean }) {
   const layout = LAYOUTS[kind];
   const map = MAP[locale];
@@ -231,7 +235,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
   const iw = g.childW[1]!;
   const tx = child.cx[1] - iw / 2 + (kind === "wide" ? 44 : 28);
   const ty = g.childBottom - 3;
-  const lead = kind === "wide" ? 40 : 8;
+  const lead = kind === "wide" ? 40 : 24;
   const twig0: Cubic = [[tx, ty], [tx - (kind === "wide" ? 12 * s : 14), ty + (leaf.cy[0] - ty) * 0.55], [leaf.x - lead, leaf.cy[0]], [leaf.x + 2, leaf.cy[0]]];
   /* The fork leaves twig0 along its tangent, so the branch has no corner. */
   const forkT = 0.42;
@@ -285,7 +289,23 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
       <ellipse cx={layout.avatar.x + layout.avatar.w * 0.52} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
       <ellipse cx={g.seed.x} cy={ground + 1} rx={24 * s} ry={4.5 * s} className={styles.soil} />
       <circle cx={g.seed.x} cy={g.seed.y - 3} r={30 * s} fill={`url(#${id("seedglow")})`} className={styles.seedGlow} />
-      {live ? <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} /> : null}
+      {live ? <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} data-bloom-ripple /> : null}
+
+      {/* Ghost outline of the map before it grows: the stage is never an empty card. Each part fades
+          out when its real node blooms. */}
+      {live ? (
+        <g className={styles.ghost} data-bloom-ghost>
+          <path d={stem} className={`${styles.ghostLine} ${styles.ghostStem}`} />
+          {[...edges, ...twigs].map((d) => <path key={d} d={d} className={styles.ghostLine} />)}
+          <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} className={`${styles.ghostNode} ${styles.ghostRoot}`} />
+          {child.cx.map((cx, index) => (
+            <rect key={cx} x={cx - g.childW[index]! / 2} y={g.childTop} width={g.childW[index]} height={child.h} rx={child.h / 2} className={`${styles.ghostNode} ${styles.ghostChild}`} style={{ "--i": index } as CSSProperties} />
+          ))}
+          {leaf.cy.map((cy, index) => (
+            <rect key={cy} x={leaf.x} y={cy - leaf.h / 2} width={g.leafW} height={leaf.h} rx={leaf.h / 2} className={`${styles.ghostNode} ${styles.ghostLeaf}`} style={{ "--i": index } as CSSProperties} />
+          ))}
+        </g>
+      ) : null}
 
       <path d={stem} pathLength={1} className={`${styles.stemHalo} ${styles.draw}`} />
       <path d={stem} pathLength={1} className={`${styles.stem} ${styles.draw}`} />
@@ -297,16 +317,27 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         <g key={d} style={{ "--i": index } as CSSProperties}>
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.halo} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.draw}`} />
-          {live ? <path d={d} pathLength={1} className={styles.flow} /> : null}
+          {live ? <path d={d} pathLength={1} className={styles.flow} data-bloom-flow /> : null}
         </g>
       ))}
       {twigs.map((d, index) => (
         <g key={d} style={{ "--i": index } as CSSProperties}>
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.halo} ${styles.draw}`} />
           <path d={d} pathLength={1} className={`${styles.edge} ${styles.twig} ${styles.draw}`} />
-          {live ? <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} /> : null}
+          {live ? <path d={d} pathLength={1} className={`${styles.flow} ${styles.flowTwig}`} data-bloom-flow /> : null}
         </g>
       ))}
+
+      {/* Sparks sit behind the nodes, so they never cover a title. Only the root gets a ring. */}
+      {live ? (
+        <>
+          <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={10} rise={1.2} scale={spark} ring />
+          <Sparks x={child.cx[0]} y={g.childTop + 4} delay={T.child + 0.04} scale={spark} />
+          <Sparks x={child.cx[1]} y={g.childTop + 4} delay={T.child + 0.22} scale={spark} />
+          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={T.leaf + 0.04} count={6} rise={0.8} scale={spark} />
+          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={T.leaf + 0.18} count={6} rise={0.8} scale={spark} />
+        </>
+      ) : null}
 
       <g className={styles.rootNode} data-bloom-node="root">
         <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
@@ -340,42 +371,43 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         </g>
       ))}
 
-      {live ? (
-        <>
-          <Sparks x={root.cx} y={g.rootY} delay={2.72} count={10} rise={1.2} scale={spark} />
-          <Sparks x={child.cx[0]} y={g.childTop + 4} delay={3.36} scale={spark} />
-          <Sparks x={child.cx[1]} y={g.childTop + 4} delay={3.54} scale={spark} />
-          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={3.96} count={6} rise={0.8} scale={spark} />
-          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={4.1} count={6} rise={0.8} scale={spark} />
-          {/* Ambient pollen after the scene: a few motes drift up from the map. */}
-          {layout.motes.map(([x, y], k) => (
-            <circle key={k} cx={x} cy={y} r={(k % 2 ? 1.6 : 2.2) * s} className={styles.mote} style={{ "--k": k } as CSSProperties} />
-          ))}
-        </>
-      ) : null}
     </svg>
   );
 }
 
-/* In front of the agent: water drops, the seed and the cheer sparks. Drops and sparks only with motion. */
+/* In front of the agent: the water, the seed and the cheer sparks. Water and sparks only with motion. */
 function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
   const layout = LAYOUTS[kind];
   const g = geometry(layout, "de");
   const s = kind === "wide" ? 1.6 : 1.05;
+  /* The water falls from the spout onto the seed: a dashed stream (stroke-dashoffset) and drops. */
+  const fall = { dx: g.seed.x - g.drop.x, dy: g.seed.y - 4 * s - g.drop.y };
+  const stream = `M${r1(g.drop.x)} ${r1(g.drop.y)} q${r1(fall.dx * 0.15)} ${r1(fall.dy * 0.1)} ${r1(fall.dx)} ${r1(fall.dy)}`;
   return (
-    <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u } as CSSProperties} aria-hidden="true" focusable="false">
-      {live && [0, 1, 2, 3, 4, 5].map((index) => (
-        <g key={index} transform={`translate(${g.drop.x + (index % 3) * 1.5 * s} ${g.drop.y}) scale(${s})`}>
-          <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" className={styles.drop} style={{ "--i": index } as CSSProperties} />
+    <svg className={`${styles.map} ${styles[kind]}`} viewBox={`0 0 ${g.W} ${g.H}`} style={{ "--u": g.u, "--fall-x": `${r1(fall.dx)}px`, "--fall-y": `${r1(fall.dy)}px` } as CSSProperties} aria-hidden="true" focusable="false">
+      {live ? (
+        <g data-bloom-water>
+          <path d={stream} pathLength={1} className={styles.streamHalo} />
+          <path d={stream} pathLength={1} className={styles.stream} />
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+            <g key={index} transform={`translate(${r1(g.drop.x + ((index % 3) - 1) * 2 * s)} ${r1(g.drop.y)})`}>
+              <g className={styles.drop} style={{ "--i": index } as CSSProperties}>
+                <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" transform={`scale(${r1(s * (index % 2 ? 1.2 : 1.5))})`} />
+              </g>
+            </g>
+          ))}
+          <ellipse cx={g.seed.x} cy={g.seed.y - 1} rx={14 * s} ry={3.5 * s} className={styles.splash} />
         </g>
-      ))}
+      ) : null}
       <g className={styles.seedFall}>
+        {live ? <circle cx={g.seed.x} cy={g.seed.y - 4.5 * s} r={16 * s} fill={`url(#bloom-${kind}-seedglow)`} className={styles.seedHalo} /> : null}
         <g className={styles.seedSquash}>
-          <ellipse cx={g.seed.x} cy={g.seed.y - 3.5 * s} rx={4.8 * s} ry={5.8 * s} className={styles.seed} />
+          <ellipse cx={g.seed.x} cy={g.seed.y - 4.5 * s} rx={6 * s} ry={7.2 * s} className={styles.seed} />
+          <ellipse cx={g.seed.x - 1.6 * s} cy={g.seed.y - 7 * s} rx={1.6 * s} ry={2.2 * s} className={styles.seedShine} />
         </g>
       </g>
-      {/* Above the head at the top of the jump. */}
-      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.12} delay={4.78} count={9} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
+      {/* Above the head (clear of the antenna) at the top of the jump. */}
+      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.3} delay={T.cheer} count={9} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
     </svg>
   );
 }
@@ -411,30 +443,23 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     const node = ref.current;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (!node || reduce.matches || !("IntersectionObserver" in window)) return;
-    let seen = false;
-    try {
-      seen = window.sessionStorage.getItem(SEEN_KEY) === "1";
-    } catch {
-      /* Storage blocked: play once per page view. */
-    }
     setMotion(true);
-    setState(seen ? "idle" : "ready");
+    setState(playedInThisPageView ? "idle" : "ready");
+    /* Start when half of what can be seen at all is visible: half of the scene, or half of the viewport
+       when the scene is taller than the viewport (phones in landscape, 200 % zoom). A plain ratio of 0.5
+       would never be reached there. The thresholds 0 / 0.25 / 0.5 are enough to catch both cases. */
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         setOffscreen(!entry.isIntersecting);
-        if (entry.intersectionRatio >= 0.5) {
-          setState((current) => {
-            if (current !== "ready") return current;
-            try {
-              window.sessionStorage.setItem(SEEN_KEY, "1");
-            } catch {
-              /* ignore */
-            }
-            return "play";
-          });
-        }
+        const viewport = entry.rootBounds?.height ?? window.innerHeight;
+        if (!entry.isIntersecting || entry.intersectionRect.height < 0.5 * Math.min(entry.boundingClientRect.height, viewport) - 1) continue;
+        setState((current) => {
+          if (current !== "ready") return current;
+          playedInThisPageView = true;
+          return "play";
+        });
       }
-    }, { threshold: [0, 0.5] });
+    }, { threshold: [0, 0.25, 0.5] });
     observer.observe(node);
     const onReduce = () => {
       if (!reduce.matches) return;
@@ -448,7 +473,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     };
   }, []);
 
-  const running = state === "play" || state === "idle";
+  /* "ready" counts as running: the scene starts by itself, so the button offers to stop it. */
+  const running = state === "ready" || state === "play" || state === "idle";
   const toggle = () => {
     if (running) {
       setState("stopped");
@@ -471,7 +497,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   ) as CSSProperties;
 
   return (
-    <div ref={ref} className={styles.scene} data-state={state} data-offscreen={offscreen || undefined} data-testid="bloom-agent-scene">
+    <div ref={ref} className={styles.scene} style={timeline} data-state={state} data-offscreen={offscreen || undefined} data-testid="bloom-agent-scene">
       <div className={styles.bar}>
         <span className={styles.file} data-bloom-file>
           <svg viewBox="0 0 12 14" className={styles.fileIcon} aria-hidden="true" focusable="false">

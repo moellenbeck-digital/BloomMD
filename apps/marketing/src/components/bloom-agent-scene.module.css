@@ -92,7 +92,8 @@
   background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0.9px, rgba(255, 255, 255, 0) 1.4px) 50% 50% / 20px 20px;
   mask-image: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%);
 }
-.art {
+.art,
+.parallax {
   position: absolute;
   inset: 0;
 }
@@ -270,7 +271,8 @@
 .float,
 .part { position: absolute; inset: 0; display: block; }
 .hop,
-.poke { transform-origin: 50% 100%; }
+.poke,
+.scrollPose { transform-origin: 50% 100%; }
 /* Cursor gaze: the component sets the transform per animation frame (head ±6°, eyes a few per cent). */
 .look { transform-origin: 50% 57.5%; }
 .pokeShow { opacity: 0; }
@@ -442,6 +444,61 @@
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .nodeWrap[data-pop] .pop { animation: bloom-pop 0.6s linear both; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .nodeWrap[data-pop] .petal { animation: bloom-petal 0.6s var(--out) both; }
   .avatar:not(:disabled):active .poke { transform: scale(0.97, 0.95); }
+}
+
+/* ── Scroll coupling: only CSS scroll timelines, no scroll handler ──
+   The timeline is the scroll of the page (scroll(root)). A view() timeline does not work here: the
+   <main> of the landing pages has overflow-x: hidden, which makes it the (non-scrolling) scroll container
+   of the scene. The component measures where the scene crosses the viewport (--scroll-from: its top
+   reaches the bottom of the viewport, --scroll-to: its bottom leaves the top, like "cover") with a
+   ResizeObserver, not on scroll, and sets data-scroll. While the scene crosses the viewport the stage
+   drifts by at most ±12 px (24 px in total, transform only) and the agent turns with the section: it
+   leans back and looks up while the heading and the intro above are in view, stands calm while the scene
+   is in the middle, and leans towards the steps below when the scene leaves at the top. On phones the
+   pose is smaller. The agent stays inside the card, so it never covers text (e2e test with bounding
+   boxes). Without support for animation-timeline there is no parallax and no scroll pose. Reduced
+   motion, the server render (data-state "end") and the pause (data-state "stopped") get none of it. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .scene {
+      --plx: 6px;
+      --pose-r: 1.5deg;
+      --pose-y: 2px;
+      --gaze-x: 1%;
+      --gaze-y: 1.5%;
+    }
+    @media (min-width: 720px), (min-aspect-ratio: 1/1) {
+      .scene { --plx: 12px; --pose-r: 4deg; --pose-y: 4px; --gaze-x: 2%; --gaze-y: 2.5%; }
+    }
+    .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll] :is(.parallax, .scrollPose, .scrollGaze) {
+      animation-duration: auto;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(root block);
+      animation-range: var(--scroll-from) var(--scroll-to);
+    }
+    .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll] .parallax { animation-name: bloom-parallax; }
+    .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll] .scrollPose { animation-name: bloom-scroll-pose; }
+    .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"])[data-scroll] .scrollGaze { animation-name: bloom-scroll-gaze; }
+    /* The scroll timeline follows the page, also at the edges of the viewport. */
+    .scene[data-offscreen] :is(.parallax, .scrollPose, .scrollGaze) { animation-play-state: running !important; }
+  }
+}
+@keyframes bloom-parallax {
+  from { transform: translateY(calc(-1 * var(--plx))); }
+  to { transform: translateY(var(--plx)); }
+}
+@keyframes bloom-scroll-pose {
+  0% { transform: translateY(calc(-1 * var(--pose-y))) rotate(calc(-1 * var(--pose-r))); }
+  35%,
+  65% { transform: none; }
+  100% { transform: translateY(var(--pose-y)) rotate(var(--pose-r)); }
+}
+@keyframes bloom-scroll-gaze {
+  0% { transform: translate(calc(-0.5 * var(--gaze-x)), calc(-1 * var(--gaze-y))); }
+  35%,
+  65% { transform: none; }
+  100% { transform: translate(var(--gaze-x), var(--gaze-y)); }
 }
 
 @keyframes bloom-seed {
@@ -680,3 +737,4 @@
 }
 @keyframes bloom-poke-hide { 0%, 4%, 96%, 100% { opacity: 1; } 8%, 90% { opacity: 0; } }
 @keyframes bloom-poke-show { 0%, 4%, 96%, 100% { opacity: 0; } 8%, 90% { opacity: 1; } }
+

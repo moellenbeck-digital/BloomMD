@@ -538,6 +538,35 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
     };
   }, []);
 
+  /* Scroll coupling: where the scene crosses the viewport, in page pixels, for the CSS scroll timeline
+     (animation-range). Measured on layout changes (ResizeObserver), never on scroll. */
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || !motion || !CSS.supports("animation-timeline: scroll()")) return;
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const box = node.getBoundingClientRect();
+        const top = box.top + window.scrollY;
+        node.style.setProperty("--scroll-from", `${Math.max(0, Math.round(top - window.innerHeight))}px`);
+        node.style.setProperty("--scroll-to", `${Math.round(top + box.height)}px`);
+        node.setAttribute("data-scroll", "");
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.documentElement);
+    observer.observe(node);
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      node.removeAttribute("data-scroll");
+    };
+  }, [motion]);
+
   /* "ready" counts as running: the scene starts by itself, so the button offers to stop it. */
   const running = state === "ready" || state === "play" || state === "idle";
   /* The moving parts (ghost, water, sparks, can, light) are built only near the viewport, like the agent
@@ -687,6 +716,9 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
       </div>
 
       <div className={styles.stage} data-testid="bloom-agent-stage">
+        {/* Parallax layer: map, agent and node buttons move together (≤ 24 px, CSS scroll timeline only),
+            so the buttons stay on their nodes and the agent stays on the ground. */}
+        <div className={styles.parallax} data-bloom-parallax>
         <div className={styles.art} role="img" aria-label={t.label}>
           <MapBack kind="wide" locale={locale} live={live} />
           <MapBack kind="tall" locale={locale} live={live} />
@@ -694,6 +726,8 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         </div>
 
         <button type="button" className={styles.avatar} style={avatarVars} aria-label={t.agent} disabled={!hydrated} onClick={pokeAgent} data-testid="bloom-agent-avatar">
+          {/* Scroll pose: the agent follows the scroll through the section (CSS scroll timeline only). */}
+          <span className={`${styles.part} ${styles.scrollPose}`} data-bloom-scroll-pose>
           <span className={styles.hop}>
             <span className={styles.poke}>
               <span className={styles.float}>
@@ -709,6 +743,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                       <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
                       <span className={styles.screen} style={{ left: "52.5%", top: "43.6%", width: "13%", height: "5%" }} />
                       <span className={`${styles.part} ${styles.gaze}`}>
+                        <span className={`${styles.part} ${styles.scrollGaze}`} data-bloom-scroll-gaze>
                         <span ref={eyesRef} className={`${styles.part} ${styles.lookEyes}`} data-bloom-eyes>
                           <span className={`${styles.part} ${styles.pokeHide}`}>
                             <span className={`${styles.part} ${styles.eyes}`}>
@@ -728,6 +763,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                             <span className={styles.grin} style={{ left: "53%", top: "44%", width: "12%", height: "4.6%", opacity: 1 }} />
                           </span>
                         </span>
+                        </span>
                       </span>
                     </span>
                   </span>
@@ -745,6 +781,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
                 </span>
               </span>
             </span>
+          </span>
           </span>
           {live ? (
             <span className={styles.pokeBurst} aria-hidden="true">
@@ -779,6 +816,7 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
               );
             })
           : null}
+        </div>
       </div>
     </div>
   );

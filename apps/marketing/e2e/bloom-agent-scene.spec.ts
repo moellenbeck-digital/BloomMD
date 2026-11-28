@@ -34,6 +34,7 @@ const overlaps = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width 
 async function finishScene(page: Page) {
   await page.getByTestId("bloom-agent-scene").evaluate((node) => {
     for (const animation of node.getAnimations({ subtree: true })) {
+      if (animation.timeline !== document.timeline) continue;
       const timing = animation.effect?.getComputedTiming();
       if (timing && Number.isFinite(timing.endTime)) animation.finish();
       else animation.pause();
@@ -271,6 +272,8 @@ for (const [width, height] of [[1440, 900], [768, 900], [390, 844], [667, 375]] 
       let shown = 0;
       for (let ms = 0; ms <= 3000; ms += 20) {
         for (const animation of node.getAnimations({ subtree: true })) {
+          // Scroll-driven animations (parallax, scroll pose) follow the page scroll, not the clock.
+          if (animation.timeline !== document.timeline) continue;
           animation.pause();
           animation.currentTime = ms;
         }
@@ -330,6 +333,8 @@ test("the landing ring of the seed stays hidden until the seed lands", async ({ 
   const ringAt = (ms: number) =>
     scene.evaluate((node, time) => {
       for (const animation of node.getAnimations({ subtree: true })) {
+        // Scroll-driven animations (parallax, scroll pose) follow the page scroll, not the clock.
+        if (animation.timeline !== document.timeline) continue;
         animation.pause();
         animation.currentTime = time;
       }
@@ -530,4 +535,91 @@ test("clicks on the agent and the nodes write no browser storage and no cookie",
   await scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(1).click();
   await page.waitForTimeout(300);
   expect(await snapshot()).toEqual(before);
+});
+
+/* Scroll coupling (CSS scroll timeline). Scrolls the page in steps from the scene entering at the bottom
+   to the scene leaving at the top and measures each step. */
+async function scrollThroughScene(page: Page, steps = 14) {
+  const range = await page.getByTestId("bloom-agent-scene").evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const top = window.scrollY + box.top;
+    return { from: Math.max(0, top - window.innerHeight), to: top + box.height };
+  });
+  const samples: { y: number; avatar: Box; texts: { tag: string; text: string; box: Box }[]; parallax: number; pose: string; gaze: string }[] = [];
+  for (let index = 0; index <= steps; index += 1) {
+    const y = Math.round(range.from + ((range.to - range.from) * index) / steps);
+    samples.push(
+      await page.evaluate(async (scrollTo) => {
+        window.scrollTo({ top: scrollTo, behavior: "instant" });
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const scene = document.querySelector('[data-testid="bloom-agent-scene"]')!;
+        const rects = [...scene.querySelectorAll('[data-testid="bloom-agent-avatar"] img')].map((image) => image.getBoundingClientRect()).filter((rect) => rect.width > 0);
+        const left = Math.min(...rects.map((rect) => rect.left));
+        const top = Math.min(...rects.map((rect) => rect.top));
+        const avatar = { x: left, y: top, width: Math.max(...rects.map((rect) => rect.right)) - left, height: Math.max(...rects.map((rect) => rect.bottom)) - top };
+        /* Text of the agent section and of the sections next to it: headings, paragraphs, list items, links, buttons. */
+        const section = document.getElementById("agenten")!;
+        const areas = [section.previousElementSibling, section, section.nextElementSibling].filter((area): area is Element => Boolean(area));
+        const texts = areas
+          .flatMap((area) => [...area.querySelectorAll("h1, h2, h3, h4, p, li, a, button")])
+          .filter((element) => !scene.contains(element))
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return { tag: element.tagName, text: (element.textContent ?? "").trim().slice(0, 40), box: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } };
+          })
+          .filter((entry) => entry.box.width > 0 && entry.box.height > 0 && entry.box.y < window.innerHeight && entry.box.y + entry.box.height > 0);
+        const parallax = new DOMMatrix(getComputedStyle(scene.querySelector("[data-bloom-parallax]")!).transform).m42;
+        const pose = getComputedStyle(scene.querySelector("[data-bloom-scroll-pose]")!).transform;
+        const gaze = getComputedStyle(scene.querySelector("[data-bloom-scroll-gaze]")!).transform;
+        return { y: scrollTo, avatar, texts, parallax, pose, gaze };
+      }, y),
+    );
+  }
+  return samples;
+}
+
+for (const [width, height] of [[390, 844], [1440, 900]] as const) {
+  test(`at ${width}×${height} the agent follows the scroll, the map drifts at most 24 px and the agent never covers text`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width, height }, isMobile: width < 720, hasTouch: width < 720 });
+    const page = await context.newPage();
+    await page.goto("/");
+    const scene = page.getByTestId("bloom-agent-scene");
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-state", "play");
+    await expect(scene.locator('[data-testid="bloom-agent-avatar"] img').first()).toBeVisible();
+    const names = await scene.evaluate((node) => node.getAnimations({ subtree: true }).map((animation) => (animation as CSSAnimation).animationName));
+    for (const name of ["bloom-parallax", "bloom-scroll-pose", "bloom-scroll-gaze"]) expect(names.some((entry) => new RegExp(`${name}(?:__|$)`).test(entry))).toBe(true);
+
+    const samples = await scrollThroughScene(page);
+    for (const sample of samples) {
+      expect(Math.abs(sample.parallax)).toBeLessThanOrEqual(width < 720 ? 6.01 : 12.01);
+      for (const text of sample.texts) expect(overlaps(sample.avatar, text.box), `scrollY ${sample.y}: agent covers ${text.tag} "${text.text}"`).toBe(false);
+    }
+    // The scroll moves something: the map drifts and the pose changes from the entry to the exit.
+    expect(samples.at(-1)!.parallax - samples[0]!.parallax).toBeGreaterThan(width < 720 ? 8 : 20);
+    expect(samples[0]!.pose).not.toBe(samples.at(-1)!.pose);
+    expect(samples[0]!.gaze).not.toBe("none");
+    // In the middle the agent stands calm (on the phone the pose shows only at the edges of the section).
+    expect(samples[Math.floor(samples.length / 2)]!.pose).toBe("none");
+    await context.close();
+  });
+}
+
+test("the pause stops the parallax and the scroll pose", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  await page.getByTestId("bloom-agent-scene-toggle").click();
+  await expect(scene).toHaveAttribute("data-state", "stopped");
+  const read = () => scene.evaluate((node) => ({
+    parallax: getComputedStyle(node.querySelector("[data-bloom-parallax]")!).transform,
+    pose: getComputedStyle(node.querySelector("[data-bloom-scroll-pose]")!).transform,
+    gaze: getComputedStyle(node.querySelector("[data-bloom-scroll-gaze]")!).transform,
+  }));
+  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none" });
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(400);
+  expect(await read()).toEqual({ parallax: "none", pose: "none", gaze: "none" });
 });

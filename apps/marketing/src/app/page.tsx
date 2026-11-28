@@ -11,6 +11,7 @@ import { bmdFonts } from "../components/v2/fonts";
 import headerStyles from "../components/v2/header.module.css";
 import { HeroIntro } from "../components/v2/hero-intro";
 import { HeroTrieb } from "../components/v2/hero-trieb";
+import { LandingPaths } from "../components/v2/landing-paths";
 import { SplitDemo } from "../components/v2/split-demo";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
 import tokens from "../components/v2/tokens.module.css";
@@ -124,21 +125,18 @@ const markdownLines = [
 
 const audiencePaths = [
   {
-    icon: FileText,
     title: "Lokal ausprobieren",
     text: "Teste eine Markdown-Datei im Browser. Die Desktop-Beta gibt es für macOS und Omarchy/Linux.",
     href: "/demo",
     cta: "Demo ohne Konto testen",
   },
   {
-    icon: MonitorSmartphone,
     title: "Web und Team nutzen",
     text: "Teste Web-Workspaces, Sync und Zusammenarbeit 30 Tage kostenlos ab E-Mail-Bestätigung.",
     href: "#beta",
     cta: "Testaccount erstellen",
   },
   {
-    icon: GitBranch,
     title: "Richtung mitgestalten",
     text: "Sieh dir den Stand der Wissensplattform-Roadmap an und teile deine Idee.",
     href: "/roadmap",
@@ -445,39 +443,6 @@ function Header() {
         </div>
       )}
     </header>
-  );
-}
-
-function AudiencePathSection() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-[#FFFDFB]" data-testid="landing-paths">
-      <div className="mx-auto max-w-7xl px-5 py-8 lg:py-10">
-        <div className="grid gap-3 md:grid-cols-3">
-          {audiencePaths.map((path) => {
-            const Icon = path.icon;
-            return (
-              <Link
-                key={path.title}
-                href={path.href}
-                className="group grid min-h-[178px] gap-4 rounded-lg border border-[#E8E4DF] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-[#FFD4BF] hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-[#FFF4EE] text-[#B64A1F]">
-                    <Icon size={19} aria-hidden="true" />
-                  </span>
-                  <h2 className="text-base font-semibold text-[#1A1A1A]">{path.title}</h2>
-                </div>
-                <p className="text-sm leading-6 text-[#666666]">{path.text}</p>
-                <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-[#B64A1F]">
-                  {path.cta}
-                  <ArrowRight size={15} className="transition group-hover:translate-x-0.5" aria-hidden="true" />
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -898,7 +863,7 @@ export default function LandingPage() {
 
       <AgentWorkflowSection locale="de" />
       <KnowledgeVisionSection locale="de" />
-      <AudiencePathSection />
+      <LandingPaths items={audiencePaths} />
       <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />
       <TemplatesSection />
       <AvailabilityOverview locale="de" />

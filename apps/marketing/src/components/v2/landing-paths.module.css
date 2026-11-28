@@ -1,0 +1,51 @@
+.section { padding-block: 3.5rem; overflow: clip; border-top: 1px solid var(--bmd-soil); }
+
+.fork { display: grid; list-style: none; }
+
+/* --a to --b: width of the shoot along this way. Narrow: it runs down the left edge. */
+.way { --a: 16px; --b: 11px; position: relative; display: flex; padding-left: 2.5rem; }
+.way:nth-child(2) { --a: 11px; --b: 7px; }
+.way:nth-child(3) { --a: 7px; --b: 3px; }
+.way::before { content: ""; position: absolute; left: 8px; top: 0; bottom: 0; width: var(--a); translate: -50% 0; background: var(--bmd-bark); clip-path: polygon(0 0, 100% 0, calc(50% + var(--b) / 2) 100%, calc(50% - var(--b) / 2) 100%); transform-origin: top; }
+/* The offshoot that points at the title. */
+.way::after { content: ""; position: absolute; left: 8px; top: calc(1.625rem - 3px); width: 1.5rem; height: 6px; background: var(--bmd-bark); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); transform-origin: left; }
+.way:first-child::after { background: var(--bmd-bloom); height: 8px; top: calc(1.625rem - 4px); }
+
+.link { display: flex; flex-direction: column; align-items: flex-start; width: 100%; padding-block: 0.625rem 1.75rem; color: var(--bmd-ink); transition: transform 100ms ease-out; }
+.link:active { transform: scale(0.98); }
+.title { font-family: var(--bmd-display); font-weight: 500; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.008em; text-wrap: balance; transition: color 150ms ease; }
+.text { margin-top: 0.5rem; max-width: 34rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); text-wrap: pretty; }
+.cta { position: relative; display: inline-flex; align-items: center; gap: 0.5rem; margin-top: auto; min-height: 2.75rem; padding-top: 0.5rem; font-size: 1.0625rem; font-weight: 700; color: var(--bmd-bloom-hi); }
+.cta::after { content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 4px; background: var(--bmd-bark-hi); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); transition: background-color 150ms ease; }
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover .title { color: var(--bmd-bloom-hi); }
+  .link:hover .cta::after { background: var(--bmd-bloom); }
+}
+
+@media (min-width: 768px) {
+  .fork { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .way { padding: 2.75rem 2.5rem 0 0; }
+  .way:last-child { padding-right: 0; }
+  .way::before { left: 0; right: 0; bottom: auto; top: 8px; width: auto; height: var(--a); translate: 0 -50%; clip-path: polygon(0 0, 100% calc(50% - var(--b) / 2), 100% calc(50% + var(--b) / 2), 0 100%); transform-origin: left; }
+  .way::after, .way:first-child::after { left: 0; top: 8px; width: 8px; height: 2.25rem; clip-path: polygon(0 0, 100% 0, 60% 100%, 30% 100%); transform-origin: top; }
+  .link { padding-block: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fork:global([data-grow="ready"]) .way::before, .fork:global([data-grow="ready"]) .way::after { transform: scale(0); }
+  .fork:global([data-grow="ready"]) .link { opacity: 0; }
+  .fork:global([data-grow="play"]) .way { --d: 0ms; }
+  .fork:global([data-grow="play"]) .way:nth-child(2) { --d: 200ms; }
+  .fork:global([data-grow="play"]) .way:nth-child(3) { --d: 400ms; }
+  .fork:global([data-grow="play"]) .way::before { animation: shoot 370ms var(--bmd-grow) var(--d) both; }
+  .fork:global([data-grow="play"]) .way::after { animation: shoot 370ms var(--bmd-grow) calc(var(--d) + 200ms) both; }
+  .fork:global([data-grow="play"]) .link { animation: arrive 320ms var(--bmd-grow) calc(var(--d) + 270ms) backwards; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link:active { transform: none; }
+}
+
+@keyframes shoot { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes arrive { from { opacity: 0; translate: -8px 0; } to { opacity: 1; translate: 0 0; } }

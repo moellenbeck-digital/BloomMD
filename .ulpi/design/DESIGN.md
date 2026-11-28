@@ -145,6 +145,8 @@ Dazu in beiden Themen: `--bmd-veil` (Header, Fläche mit 0,9 Deckkraft), `--bmd-
 | Krone | Hero | H1 und Aktionen oben, darunter Datei links, Map wächst nach rechts |
 | Gabel | Anwendungsfälle | Die vier Reiter sind vier Äste. Der gewählte wächst weiter zur Map seiner Datei |
 | Trieb | Vision | Ein Stamm von links nach rechts: heute → Pilot → vier Ranken. Wurzeln = Voraussetzungen (Trieb hell, Kragen 20 Einheiten, Boden-Linie Trieb 2 px, auch am Handy) |
+| Beleg | Demo | Datei links, Aufnahme rechts, ein Trieb trägt die drei Belege ([demo.md](demo.md)) |
+| Weggabel | Pfade | Ein Trieb mit drei Ansätzen, je Weg ein Link ([pfade.md](pfade.md)) |
 
 Verboten: Karten, Karten-Raster, gestrichelte Rahmen, Pill-Badges, nachgebaute App-Fenster, Schatten, zentrierte Textwände.
 
@@ -173,6 +175,6 @@ Bestehende Texte unverändert. Du-Form, sachlich. Aktionsverben bleiben („Demo
 
 | Punkt | Stand |
 |---|---|
-| Abschnitte Demo, Agenten, Pfade, Vorlagen, Verfügbarkeit, FAQ, Footer, `/en`-Hero | noch alte Sprache |
+| Abschnitte Agenten, Vorlagen, Verfügbarkeit, FAQ, Registrieren, Footer; `/en`-Hero, -Demo, -Pfade | noch alte Sprache |
 | Agenten-Szene | Sperrzone, unverändert |
 | Gedankenstrich im Hero-Absatz | Text unverändert (Inhaltsregel) |

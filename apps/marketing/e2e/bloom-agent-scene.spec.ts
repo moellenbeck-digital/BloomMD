@@ -385,3 +385,149 @@ test("the agent image is requested only when the scene comes close, not during t
   // Phones take the 200 px file.
   expect(requests.every((url) => url.includes("md-avatar-200.webp"))).toBe(true);
 });
+
+/* Step A: the agent and the nodes of the grown map are buttons. A click, Enter or Space starts a short
+   reaction; the reaction attribute restarts the CSS animation on every press. */
+const reactionAnimations = (page: Page) =>
+  page.getByTestId("bloom-agent-scene").evaluate((node) =>
+    node
+      .getAnimations({ subtree: true })
+      .map((animation) => (animation as CSSAnimation).animationName)
+      .filter((name) => /bloom-(poke|pop|petal)(?:__|$|-)/.test(name)),
+  );
+
+for (const locale of locales) {
+  test(`${locale.path} a click, Enter and Tab reach the agent and the nodes and start a reaction`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(locale.path);
+    const scene = page.getByTestId("bloom-agent-scene");
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toHaveAttribute("data-state", "play");
+    await finishScene(page);
+
+    const agent = page.getByTestId("bloom-agent-avatar");
+    await expect(agent).toBeEnabled();
+    const box = (await agent.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    await agent.click();
+    await expect(scene).toHaveAttribute("data-react", "");
+    expect(await reactionAnimations(page)).toEqual(expect.arrayContaining([expect.stringMatching(/bloom-poke(?:__|$)/)]));
+    await expect(scene).not.toHaveAttribute("data-react", /.*/, { timeout: 2000 });
+
+    // Tab from the pause button: the agent first, then the five nodes in Markdown order.
+    await page.getByTestId("bloom-agent-scene-toggle").focus();
+    await page.keyboard.press("Tab");
+    await expect(agent).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(scene).toHaveAttribute("data-react", "");
+    const hits = scene.locator("[data-bloom-hit]").filter({ visible: true });
+    await expect(hits).toHaveCount(5);
+    for (const [index, title] of locale.titles.entries()) {
+      await page.keyboard.press("Tab");
+      await expect(hits.nth(index)).toBeFocused();
+      await expect(hits.nth(index)).toHaveAccessibleName(new RegExp(title));
+      const hit = (await hits.nth(index).boundingBox())!;
+      expect(hit.height).toBeGreaterThanOrEqual(44);
+    }
+
+    // Enter on the focused leaf: the leaf blooms (spring pop and petals) and the agent cheers.
+    await page.keyboard.press("Enter");
+    const leaf = scene.locator('svg[data-bloom-stage="wide"] [data-bloom-wrap="4"]');
+    await expect(leaf).toHaveAttribute("data-pop", "");
+    await expect(scene).toHaveAttribute("data-react", "");
+    const names = await reactionAnimations(page);
+    expect(names.some((name) => /bloom-pop(?:__|$)/.test(name))).toBe(true);
+    expect(names.some((name) => /bloom-petal(?:__|$)/.test(name))).toBe(true);
+
+    // A click on another node: that node blooms.
+    await hits.nth(1).click();
+    await expect(scene.locator('svg[data-bloom-stage="wide"] [data-bloom-wrap="1"]')).toHaveAttribute("data-pop", "");
+  });
+}
+
+test("on the desktop the agent looks at the cursor and at a hovered node, damped and at most 6°; the pause stops it", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  await finishScene(page);
+  const look = scene.locator("[data-bloom-look]");
+  const angle = () => look.evaluate((node) => {
+    const match = /rotate\((-?[\d.]+)deg\)/.exec((node as HTMLElement).style.transform);
+    return match ? Number(match[1]) : 0;
+  });
+
+  const leaf = scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(3);
+  await leaf.hover();
+  await expect.poll(angle).toBeGreaterThan(2);
+  const stage = (await page.getByTestId("bloom-agent-stage").boundingBox())!;
+  await page.mouse.move(stage.x + stage.width - 2, stage.y + 2, { steps: 4 });
+  await page.waitForTimeout(800);
+  expect(Math.abs(await angle())).toBeLessThanOrEqual(6);
+
+  // The pause stops the gaze and resets it; mouse moves no longer turn the head.
+  await page.getByTestId("bloom-agent-scene-toggle").click();
+  await expect(scene).toHaveAttribute("data-state", "stopped");
+  await expect.poll(angle).toBe(0);
+  await leaf.hover();
+  await page.mouse.move(stage.x + stage.width - 20, stage.y + 20, { steps: 4 });
+  await page.waitForTimeout(400);
+  expect(await angle()).toBe(0);
+  // A click while paused animates nothing.
+  await page.getByTestId("bloom-agent-avatar").click();
+  expect(await reactionAnimations(page)).toEqual([]);
+});
+
+test("on a touch phone there is no cursor gaze", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  expect(await page.evaluate(() => window.matchMedia("(hover: hover) and (pointer: fine)").matches)).toBe(false);
+  // A tap on a node still blooms it.
+  await scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(2).tap();
+  await expect(scene.locator('svg[data-bloom-stage="tall"] [data-bloom-wrap="2"]')).toHaveAttribute("data-pop", "");
+  await context.close();
+});
+
+test("reduced motion: a click on the agent or a node changes a colour only, no motion, no gaze", async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "end");
+  const agent = page.getByTestId("bloom-agent-avatar");
+  await expect(agent).toBeEnabled();
+  await agent.click();
+  await expect(scene).toHaveAttribute("data-react", "");
+  const node = scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(0);
+  await node.hover();
+  await node.click();
+  await expect(scene.locator('svg[data-bloom-stage="wide"] [data-bloom-wrap="0"]')).toHaveAttribute("data-pop", "");
+  await page.waitForTimeout(300);
+  expect(await scene.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(0);
+  expect(await scene.locator("[data-bloom-look]").evaluate((element) => (element as HTMLElement).style.transform)).toBe("");
+  await context.close();
+});
+
+test("clicks on the agent and the nodes write no browser storage and no cookie", async ({ page, context }) => {
+  await page.goto("/");
+  const scene = page.getByTestId("bloom-agent-scene");
+  await page.waitForLoadState("load");
+  const snapshot = async () => ({
+    cookies: (await context.cookies()).map((cookie) => cookie.name).sort(),
+    storage: await page.evaluate(() => ({ local: Object.keys(window.localStorage).sort(), session: Object.keys(window.sessionStorage).sort() })),
+  });
+  const before = await snapshot();
+  await scene.scrollIntoViewIfNeeded();
+  await expect(scene).toHaveAttribute("data-state", "play");
+  await page.getByTestId("bloom-agent-avatar").click();
+  await scene.locator("[data-bloom-hit]").filter({ visible: true }).nth(1).click();
+  await page.waitForTimeout(300);
+  expect(await snapshot()).toEqual(before);
+});

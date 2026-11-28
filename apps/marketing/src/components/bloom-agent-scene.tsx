@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FocusEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { Pause, Play } from "lucide-react";
 import styles from "./bloom-agent-scene.module.css";
 
@@ -20,11 +20,15 @@ const copy = {
     label: "Illustration: Der MD-Agent pflanzt einen Samen und gießt ihn. Daraus wächst eine Mindmap, deren Knoten nacheinander aufblühen.",
     pause: "Animation anhalten",
     play: "Animation abspielen",
+    agent: "MD-Agent hüpfen lassen",
+    node: (title: string) => `Knoten „${title}“ aufblühen lassen`,
   },
   en: {
     label: "Illustration: The MD agent plants a seed and waters it. A mind map grows from it, and its nodes bloom one after another.",
     pause: "Pause animation",
     play: "Play animation",
+    agent: "Make the MD agent hop",
+    node: (title: string) => `Make the “${title}” node bloom`,
   },
 } as const;
 
@@ -161,6 +165,40 @@ function geometry(layout: Layout, locale: Locale) {
   };
 }
 
+/* The five nodes of a stage in Markdown order (root, children, leaves): centre and size in viewBox units.
+   The SVG draws them, the HTML buttons on top of the stage use the same boxes. */
+type NodeBox = { cx: number; cy: number; w: number; h: number; kind: "root" | "child" | "leaf" };
+function nodeBoxes(layout: Layout, locale: Locale): NodeBox[] {
+  const g = geometry(layout, locale);
+  const { root, child, leaf } = layout;
+  return [
+    { cx: root.cx, cy: root.cy, w: g.rootW, h: root.h, kind: "root" },
+    ...child.cx.map((cx, index) => ({ cx, cy: child.cy, w: g.childW[index]!, h: child.h, kind: "child" as const })),
+    ...leaf.cy.map((cy) => ({ cx: leaf.x + g.leafW / 2, cy, w: g.leafW, h: leaf.h, kind: "leaf" as const })),
+  ];
+}
+
+/* Petals for the bloom on a click: a fan out of the upper edge of the node. Rendered only with motion. */
+function Petals({ box, s }: { box: NodeBox; s: number }) {
+  return (
+    <g className={`${styles.petals} ${box.kind === "leaf" ? styles.petalsLeaf : ""}`} aria-hidden="true">
+      {Array.from({ length: 7 }, (_, index) => {
+        const deg = -168 + index * 26;
+        const angle = (deg * Math.PI) / 180;
+        const x = box.cx + Math.cos(angle) * box.w * 0.42;
+        const y = box.cy + Math.sin(angle) * box.h * 0.5;
+        const reach = (20 + (index % 3) * 7) * s;
+        const style = {
+          "--px": `${Math.round(Math.cos(angle) * reach)}px`,
+          "--py": `${Math.round(Math.sin(angle) * reach - 6 * s)}px`,
+          "--pr": `${deg + 90}deg`,
+        } as CSSProperties;
+        return <ellipse key={index} cx={r1(x)} cy={r1(y)} rx={r1(2.6 * s)} ry={r1(5.2 * s)} className={styles.petal} style={style} />;
+      })}
+    </g>
+  );
+}
+
 /* A point on a cubic Bézier, for leaves along the stem and forks of the twigs. */
 function bez([p0, p1, p2, p3]: Cubic, t: number): Point {
   const m = 1 - t;
@@ -213,6 +251,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
   const id = (name: string) => `bloom-${kind}-${name}`;
   const s = kind === "wide" ? 1.6 : 1.05;
   const rootBottom = g.rootY + root.h;
+  const boxes = nodeBoxes(layout, locale);
 
   const stemSegments = layout.stem([g.seed.x, g.seed.y + 2], [root.cx, rootBottom - 4]);
   const stem = cubicPath(stemSegments);
@@ -334,35 +373,50 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           cheer. The children and leaves pop with a spring alone, so the stage stays clean. */}
       {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={6} rise={1.2} scale={spark} ring /> : null}
 
+      <g className={styles.nodeWrap} data-bloom-wrap={0}>
       <g className={styles.rootNode} data-bloom-node="root">
+        <g className={styles.pop}>
         <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
         <rect x={g.rootX + 1} y={g.rootY + 1} width={g.rootW - 2} height={root.h - 2} rx={root.h / 2 - 1} className={styles.rootRim} />
         <text x={root.cx} y={root.cy + root.font * 0.36} textAnchor="middle" className={styles.rootTitle} style={{ fontSize: root.font }}>
           <tspan className={styles.rootMark} style={{ fontSize: root.font * 0.78 }}>#</tspan>
           <tspan dx={g.markGap(root.font)} data-bloom-title>{map.root}</tspan>
         </text>
+        </g>
+      </g>
+      {live ? <Petals box={boxes[0]!} s={s} /> : null}
       </g>
 
       {child.cx.map((cx, index) => {
         const w = g.childW[index]!;
         return (
-          <g key={`node-${cx}`} className={styles.childNode} style={{ "--i": index } as CSSProperties} data-bloom-node="child">
+          <g key={`node-${cx}`} className={styles.nodeWrap} data-bloom-wrap={1 + index}>
+          <g className={styles.childNode} style={{ "--i": index } as CSSProperties} data-bloom-node="child">
+            <g className={styles.pop}>
             <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
             <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>
               <tspan className={styles.childMark} style={{ fontSize: child.font * 0.72 }}>##</tspan>
               <tspan dx={g.markGap(child.font)} data-bloom-title>{map.children[index]}</tspan>
             </text>
+            </g>
+          </g>
+          {live ? <Petals box={boxes[1 + index]!} s={s} /> : null}
           </g>
         );
       })}
 
       {leaf.cy.map((cy, index) => (
-        <g key={`leaf-${cy}`} className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
+        <g key={`leaf-${cy}`} className={styles.nodeWrap} data-bloom-wrap={3 + index}>
+        <g className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
+          <g className={styles.pop}>
           <rect x={leaf.x} y={cy - leaf.h / 2} width={g.leafW} height={leaf.h} rx={leaf.h / 2} fill={`url(#${id("leaf")})`} className={styles.leafRect} />
           <circle cx={leaf.x + g.dot.x} cy={cy} r={kind === "wide" ? 4.2 : 3.4} className={styles.leafDot} />
           <text x={leaf.x + g.dot.x + g.dot.gap} y={cy + leaf.font * 0.35} className={styles.leafTitle} style={{ fontSize: leaf.font }}>
             <tspan data-bloom-title>{map.leaves[index]}</tspan>
           </text>
+          </g>
+        </g>
+        {live ? <Petals box={boxes[3 + index]!} s={s} /> : null}
         </g>
       ))}
 
@@ -409,18 +463,32 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
 }
 
 const pct = (value: number, of: number) => `${((value / of) * 100).toFixed(3)}%`;
+const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
+
+/* Cursor gaze only on devices with a real hover and a fine pointer (desktop). Head turn at most ±6°. */
+const FINE_POINTER = "(hover: hover) and (pointer: fine)";
+const LOOK_DEG = 6;
+/* Durations of the click reactions (CSS: bloom-poke 0.56 s, bloom-pop 0.6 s). */
+const REACT_MS = 600;
+const LOOK_HOLD_MS = 900;
 
 export function BloomAgentScene({ locale }: { locale: Locale }) {
   const t = copy[locale];
   const map = MAP[locale];
+  const titles = [map.root, ...map.children, ...map.leaves];
   const ref = useRef<HTMLDivElement>(null);
+  const lookRef = useRef<HTMLSpanElement>(null);
+  const eyesRef = useRef<HTMLSpanElement>(null);
   const [state, setState] = useState<SceneState>("end");
   /* Paused until the observer reports the scene in view, so no loop runs during the page load. */
   const [offscreen, setOffscreen] = useState(true);
   const [motion, setMotion] = useState(false);
   const [near, setNear] = useState(false);
+  /* The buttons work only with JS: the server render keeps the avatar button disabled and has no node buttons. */
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    setHydrated(true);
     const node = ref.current;
     if (!node) return;
     if (!("IntersectionObserver" in window)) {
@@ -475,6 +543,103 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   /* The moving parts (ghost, water, sparks, can, light) are built only near the viewport, like the agent
      image, so they add no work to the page load. */
   const live = motion && near;
+  /* The gaze may move only while the scene runs and is in view. Pause and reduced motion stop it. */
+  const lookable = live && running && !offscreen;
+
+  /* Gaze: a damped follow (lerp per animation frame) towards a target in -1…1. The loop runs only while the
+     gaze is still moving and stops by itself once it has settled. */
+  const look = useRef({ x: 0, y: 0, tx: 0, ty: 0, frame: 0, hover: false, allowed: false, hold: 0 });
+  const paint = useCallback(() => {
+    const { x, y } = look.current;
+    const still = Math.abs(x) < 0.001 && Math.abs(y) < 0.001;
+    if (lookRef.current) lookRef.current.style.transform = still ? "" : `rotate(${(x * LOOK_DEG).toFixed(2)}deg)`;
+    if (eyesRef.current) eyesRef.current.style.transform = still ? "" : `translate(${(x * 4).toFixed(2)}%, ${(y * 3).toFixed(2)}%)`;
+  }, []);
+  const step = useCallback(() => {
+    const gaze = look.current;
+    gaze.x += (gaze.tx - gaze.x) * 0.14;
+    gaze.y += (gaze.ty - gaze.y) * 0.14;
+    if (Math.abs(gaze.tx - gaze.x) < 0.002 && Math.abs(gaze.ty - gaze.y) < 0.002) {
+      gaze.x = gaze.tx;
+      gaze.y = gaze.ty;
+      gaze.frame = 0;
+    } else gaze.frame = requestAnimationFrame(step);
+    paint();
+  }, [paint]);
+  const aim = useCallback((clientX: number, clientY: number) => {
+    const gaze = look.current;
+    const head = lookRef.current?.getBoundingClientRect();
+    const stage = ref.current?.getBoundingClientRect();
+    if (!gaze.allowed || !head || !stage) return;
+    gaze.tx = clamp((clientX - (head.left + head.width / 2)) / (stage.width * 0.5), 1);
+    gaze.ty = clamp((clientY - (head.top + head.height / 2)) / (stage.height * 0.5), 1);
+    if (!gaze.frame) gaze.frame = requestAnimationFrame(step);
+  }, [step]);
+  const aimHome = useCallback(() => {
+    const gaze = look.current;
+    gaze.tx = 0;
+    gaze.ty = 0;
+    if (gaze.allowed && !gaze.frame) gaze.frame = requestAnimationFrame(step);
+  }, [step]);
+  const aimAt = useCallback((element: Element) => {
+    const box = element.getBoundingClientRect();
+    aim(box.left + box.width / 2, box.top + box.height / 2);
+  }, [aim]);
+
+  useEffect(() => {
+    const gaze = look.current;
+    gaze.allowed = lookable;
+    if (lookable) return;
+    cancelAnimationFrame(gaze.frame);
+    window.clearTimeout(gaze.hold);
+    Object.assign(gaze, { x: 0, y: 0, tx: 0, ty: 0, frame: 0 });
+    paint();
+  }, [lookable, paint]);
+  useEffect(() => () => cancelAnimationFrame(look.current.frame), []);
+
+  /* Click reactions: the attribute is set again on every click, so the CSS animation restarts. */
+  const timers = useRef(new Map<Element, number>());
+  const flash = useCallback((element: Element | null | undefined, attribute: string) => {
+    if (!element) return;
+    window.clearTimeout(timers.current.get(element));
+    element.removeAttribute(attribute);
+    void (element as HTMLElement).getBoundingClientRect();
+    element.setAttribute(attribute, "");
+    timers.current.set(element, window.setTimeout(() => element.removeAttribute(attribute), REACT_MS));
+  }, []);
+  useEffect(() => {
+    const pending = timers.current;
+    return () => pending.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  const finePointer = (event: ReactPointerEvent) => event.pointerType === "mouse" && window.matchMedia(FINE_POINTER).matches;
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!finePointer(event)) return;
+    look.current.hover = true;
+    const nodeButton = (event.target as Element).closest("[data-bloom-hit]");
+    if (nodeButton) aimAt(nodeButton);
+    else aim(event.clientX, event.clientY);
+  };
+  const onPointerLeave = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse") return;
+    look.current.hover = false;
+    aimHome();
+  };
+  const pokeAgent = () => flash(ref.current, "data-react");
+  const bloomNode = (kind: "wide" | "tall", index: number, button: Element) => {
+    flash(ref.current?.querySelector(`svg[data-bloom-stage="${kind}"] [data-bloom-wrap="${index}"]`), "data-pop");
+    flash(ref.current, "data-react");
+    /* The agent looks at the node, holds, and looks back (also on touch, where there is no cursor gaze). */
+    aimAt(button);
+    window.clearTimeout(look.current.hold);
+    look.current.hold = window.setTimeout(() => {
+      if (!look.current.hover) aimHome();
+    }, LOOK_HOLD_MS);
+  };
+  const onNodeFocus = (event: FocusEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.matches(":focus-visible")) aimAt(event.currentTarget);
+  };
+
   const toggle = () => {
     if (running) {
       setState("stopped");
@@ -497,7 +662,16 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
   ) as CSSProperties;
 
   return (
-    <div ref={ref} className={styles.scene} style={timeline} data-state={state} data-offscreen={offscreen || undefined} data-testid="bloom-agent-scene">
+    <div
+      ref={ref}
+      className={styles.scene}
+      style={timeline}
+      data-state={state}
+      data-offscreen={offscreen || undefined}
+      data-testid="bloom-agent-scene"
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+    >
       <div className={styles.bar}>
         <span className={styles.file} data-bloom-file>
           <svg viewBox="0 0 12 14" className={styles.fileIcon} aria-hidden="true" focusable="false">
@@ -512,56 +686,99 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         ) : null}
       </div>
 
-      <div className={styles.stage} role="img" aria-label={t.label} data-testid="bloom-agent-stage">
-        <MapBack kind="wide" locale={locale} live={live} />
-        <MapBack kind="tall" locale={locale} live={live} />
-
-        {live ? <div className={styles.shine} aria-hidden="true" /> : null}
-
-        <div className={styles.avatar} style={avatarVars} aria-hidden="true" data-testid="bloom-agent-avatar">
-          <div className={styles.hop}>
-            <div className={styles.float}>
-              <div className={`${styles.part} ${styles.body}`}>
-                <Layer part="body" near={near} />
-              </div>
-              <div className={`${styles.part} ${styles.headAct}`}>
-                <div className={`${styles.part} ${styles.headIdle}`}>
-                  <Layer part="head" near={near} />
-                  <span className={styles.headBox} data-bloom-head />
-                  <span className={styles.screen} style={{ left: "39.5%", top: "29.5%", width: "13%", height: "14.6%" }} />
-                  <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
-                  <span className={styles.screen} style={{ left: "52.5%", top: "43.6%", width: "13%", height: "5%" }} />
-                  <div className={`${styles.part} ${styles.gaze}`}>
-                    <div className={`${styles.part} ${styles.eyes}`}>
-                      <span className={styles.eye} style={{ left: "41%", top: "30.65%", width: "10%", height: "12.26%" }} />
-                      <span className={styles.eye} style={{ left: "67%", top: "29.89%", width: "9.5%", height: "11.88%" }} />
-                    </div>
-                    <div className={`${styles.part} ${styles.joys}`}>
-                      <span className={styles.joy} style={{ left: "39.5%", top: "32.8%", width: "13%", height: "6.8%" }} />
-                      <span className={styles.joy} style={{ left: "65.6%", top: "32%", width: "12.4%", height: "6.5%" }} />
-                    </div>
-                    <span className={styles.mouth} style={{ left: "54%", top: "44.83%", width: "10%", height: "2.68%" }} />
-                    <span className={styles.grin} style={{ left: "53%", top: "44%", width: "12%", height: "4.6%" }} />
-                  </div>
-                </div>
-              </div>
-              <div className={`${styles.part} ${styles.handL}`}>
-                <Layer part="handL" near={near} />
-              </div>
-              <div className={`${styles.part} ${styles.handR}`}>
-                <Layer part="handR" near={near} />
-                {live ? (
-                  <div className={styles.canWrap} data-bloom-can>
-                    <WateringCan />
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </div>
+      <div className={styles.stage} data-testid="bloom-agent-stage">
+        <div className={styles.art} role="img" aria-label={t.label}>
+          <MapBack kind="wide" locale={locale} live={live} />
+          <MapBack kind="tall" locale={locale} live={live} />
+          {live ? <div className={styles.shine} aria-hidden="true" /> : null}
         </div>
+
+        <button type="button" className={styles.avatar} style={avatarVars} aria-label={t.agent} disabled={!hydrated} onClick={pokeAgent} data-testid="bloom-agent-avatar">
+          <span className={styles.hop}>
+            <span className={styles.poke}>
+              <span className={styles.float}>
+                <span className={`${styles.part} ${styles.body}`}>
+                  <Layer part="body" near={near} />
+                </span>
+                <span className={`${styles.part} ${styles.headAct}`}>
+                  <span ref={lookRef} className={`${styles.part} ${styles.look}`} data-bloom-look>
+                    <span className={`${styles.part} ${styles.headIdle}`}>
+                      <Layer part="head" near={near} />
+                      <span className={styles.headBox} data-bloom-head />
+                      <span className={styles.screen} style={{ left: "39.5%", top: "29.5%", width: "13%", height: "14.6%" }} />
+                      <span className={styles.screen} style={{ left: "65.5%", top: "28.7%", width: "12.5%", height: "14.2%" }} />
+                      <span className={styles.screen} style={{ left: "52.5%", top: "43.6%", width: "13%", height: "5%" }} />
+                      <span className={`${styles.part} ${styles.gaze}`}>
+                        <span ref={eyesRef} className={`${styles.part} ${styles.lookEyes}`} data-bloom-eyes>
+                          <span className={`${styles.part} ${styles.pokeHide}`}>
+                            <span className={`${styles.part} ${styles.eyes}`}>
+                              <span className={styles.eye} style={{ left: "41%", top: "30.65%", width: "10%", height: "12.26%" }} />
+                              <span className={styles.eye} style={{ left: "67%", top: "29.89%", width: "9.5%", height: "11.88%" }} />
+                            </span>
+                            <span className={styles.mouth} style={{ left: "54%", top: "44.83%", width: "10%", height: "2.68%" }} />
+                          </span>
+                          <span className={`${styles.part} ${styles.joys}`}>
+                            <span className={styles.joy} style={{ left: "39.5%", top: "32.8%", width: "13%", height: "6.8%" }} />
+                            <span className={styles.joy} style={{ left: "65.6%", top: "32%", width: "12.4%", height: "6.5%" }} />
+                          </span>
+                          <span className={styles.grin} style={{ left: "53%", top: "44%", width: "12%", height: "4.6%" }} />
+                          <span className={`${styles.part} ${styles.pokeShow}`}>
+                            <span className={styles.joy} style={{ left: "39.5%", top: "32.8%", width: "13%", height: "6.8%" }} />
+                            <span className={styles.joy} style={{ left: "65.6%", top: "32%", width: "12.4%", height: "6.5%" }} />
+                            <span className={styles.grin} style={{ left: "53%", top: "44%", width: "12%", height: "4.6%", opacity: 1 }} />
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                  </span>
+                </span>
+                <span className={`${styles.part} ${styles.handL}`}>
+                  <Layer part="handL" near={near} />
+                </span>
+                <span className={`${styles.part} ${styles.handR}`}>
+                  <Layer part="handR" near={near} />
+                  {live ? (
+                    <span className={styles.canWrap} data-bloom-can>
+                      <WateringCan />
+                    </span>
+                  ) : null}
+                </span>
+              </span>
+            </span>
+          </span>
+          {live ? (
+            <span className={styles.pokeBurst} aria-hidden="true">
+              {[-60, -30, 0, 30, 60].map((deg, index) => (
+                <span key={deg} className={styles.pokeDot} style={{ "--dx": `${Math.round(Math.sin((deg * Math.PI) / 180) * 34)}px`, "--dy": `${Math.round(-Math.cos((deg * Math.PI) / 180) * 30 - 6)}px`, "--k": index % 3 } as CSSProperties} />
+              ))}
+            </span>
+          ) : null}
+        </button>
 
         <MapFront kind="wide" live={live} />
         <MapFront kind="tall" live={live} />
+
+        {hydrated
+          ? (["wide", "tall"] as const).map((kind) => {
+              const layout = LAYOUTS[kind];
+              return (
+                <div key={kind} className={`${styles.hits} ${styles[kind]}`}>
+                  {nodeBoxes(layout, locale).map((box, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className={styles.hit}
+                      style={{ left: pct(box.cx, layout.W), top: pct(box.cy, layout.H), width: pct(box.w, layout.W), height: pct(box.h, layout.H) }}
+                      aria-label={t.node(titles[index]!)}
+                      onClick={(event) => bloomNode(kind, index, event.currentTarget)}
+                      onFocus={onNodeFocus}
+                      data-bloom-hit={index}
+                    />
+                  ))}
+                </div>
+              );
+            })
+          : null}
       </div>
     </div>
   );

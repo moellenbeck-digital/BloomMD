@@ -1,12 +1,14 @@
 /* MD agent plants a seed, waters it, a mind map grows and its nodes bloom.
    Only transform, opacity and SVG stroke-dashoffset move. The default styles are the final image
    (server render, no JS, prefers-reduced-motion, paused). The scene runs once per page view, inside the
-   viewport, about six seconds. Afterwards the final image is calm: only the agent floats gently, and the
+   viewport, 4.8 seconds, the phases overlap. Afterwards the final image is calm: only the agent floats gently, and the
    pause button stops that too. The beats --t-* come from the component (T). */
 
 .scene {
   --spring: linear(0, 0.103, 0.331, 0.589, 0.815, 0.98, 1.079, 1.122, 1.123, 1.101, 1.069, 1.038, 1.012, 0.996, 0.987, 0.984, 0.986, 0.989, 0.993, 0.997, 1, 1.001, 1.002, 1.002, 1.002, 1.001, 1.001, 1, 1);
   --spring-soft: linear(0, 0.113, 0.338, 0.569, 0.756, 0.887, 0.967, 1.009, 1.026, 1.028, 1.023, 1.017, 1.011, 1.006, 1.002, 1, 1, 0.999, 0.999, 0.999, 1, 1, 1);
+  /* Node pop: about 23 % overshoot, settled after 60 % of the time. */
+  --pop: linear(0, 0.134, 0.433, 0.76, 1.022, 1.18, 1.233, 1.208, 1.141, 1.064, 1, 0.961, 0.946, 0.95, 0.965, 0.983, 0.999, 1.008, 1.013, 1.012, 1.009, 1.004, 1.001, 0.998, 0.997, 0.997, 0.998, 0.999, 1, 1, 1);
   --out: cubic-bezier(0.23, 1, 0.32, 1);
   --in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --fall: cubic-bezier(0.55, 0, 1, 0.45);
@@ -23,15 +25,15 @@
   overflow: hidden;
   border-radius: 26px;
   background:
-    radial-gradient(70% 60% at 55% 42%, rgba(255, 107, 53, 0.16), rgba(255, 107, 53, 0) 70%),
-    radial-gradient(60% 50% at 12% 100%, rgba(255, 138, 92, 0.14), rgba(255, 138, 92, 0) 70%),
-    radial-gradient(50% 45% at 92% 8%, rgba(109, 190, 99, 0.1), rgba(109, 190, 99, 0) 70%),
+    radial-gradient(60% 55% at 10% 0%, rgba(255, 236, 220, 0.07), rgba(255, 236, 220, 0) 100%),
+    radial-gradient(70% 60% at 55% 42%, rgba(255, 107, 53, 0.14), rgba(255, 107, 53, 0) 100%),
+    radial-gradient(60% 50% at 12% 100%, rgba(255, 138, 92, 0.12), rgba(255, 138, 92, 0) 100%),
     linear-gradient(180deg, #262220 0%, #1c1a18 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
-    0 40px 80px -36px rgba(120, 52, 20, 0.45),
-    0 18px 40px -24px rgba(31, 29, 27, 0.5),
+    14px 40px 80px -36px rgba(120, 52, 20, 0.45),
+    8px 18px 40px -24px rgba(31, 29, 27, 0.5),
     0 2px 6px rgba(31, 29, 27, 0.1);
   contain: layout paint;
 }
@@ -147,15 +149,15 @@
 .rootNode,
 .childNode,
 .leafNode { transform-box: fill-box; transform-origin: center; }
-.rootNode { filter: drop-shadow(0 8px 22px rgba(255, 107, 53, 0.45)); }
+.rootNode { filter: drop-shadow(4px 8px 18px rgba(255, 107, 53, 0.4)); }
 .rootRim { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
 .rootMark { fill: rgba(26, 26, 26, 0.55); font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
 .rootTitle { fill: #1a1a1a; font-weight: 700; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); letter-spacing: -0.01em; }
-.childNode { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+.childNode { filter: drop-shadow(3px 6px 12px rgba(0, 0, 0, 0.35)); }
 .childRect { stroke: rgba(255, 128, 80, 0.6); stroke-width: 1.4; }
 .childMark { fill: #ff8a5c; font-weight: 700; font-family: var(--font-mono, ui-monospace, monospace); }
 .childTitle { fill: #f6f0eb; font-weight: 600; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
-.leafNode { filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.3)); }
+.leafNode { filter: drop-shadow(3px 5px 10px rgba(0, 0, 0, 0.3)); }
 .leafRect { stroke: rgba(128, 206, 116, 0.55); stroke-width: 1.3; }
 .leafDot { fill: #80ce74; }
 .leafTitle { fill: rgba(246, 240, 235, 0.9); font-weight: 500; font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif); }
@@ -171,13 +173,17 @@
 .spark:nth-child(4n + 3) { fill: #9be08f; }
 .spark:nth-child(4n) { fill: #ff8a5c; }
 .drop { fill: #9adfff; transform-box: fill-box; transform-origin: center; }
+/* The water jet: a soft halo, a solid light-blue core and bright dashes that run down it. */
 .stream,
-.streamHalo { fill: none; stroke-linecap: round; opacity: 0; }
-.stream { stroke: #b5e8ff; stroke-width: 3.2; stroke-dasharray: 0.07 0.04; }
-.streamHalo { stroke: rgba(143, 211, 255, 0.25); stroke-width: 9; }
-.wide .stream { stroke-width: 4.6; }
-.wide .streamHalo { stroke-width: 13; }
-.splash { fill: none; stroke: #b5e8ff; stroke-width: 1.4; transform-box: fill-box; transform-origin: center; }
+.streamCore,
+.streamHalo { fill: none; stroke-linecap: round; opacity: 0; stroke-dasharray: 1 1.1; }
+.stream { stroke: #f2fbff; stroke-width: 2.2; stroke-dasharray: 0.08 0.06; }
+.streamCore { stroke: #7fd0ff; stroke-width: 6; }
+.streamHalo { stroke: rgba(127, 208, 255, 0.32); stroke-width: 16; }
+.wide .stream { stroke-width: 3.2; }
+.wide .streamCore { stroke-width: 9; }
+.wide .streamHalo { stroke-width: 24; }
+.splash { fill: none; stroke: #b5e8ff; stroke-width: 2; transform-box: fill-box; transform-origin: center; }
 
 .seed { fill: #d07a42; stroke: #ffb08a; stroke-width: 1.2; }
 .seedShine { fill: rgba(255, 236, 214, 0.75); }
@@ -243,7 +249,7 @@
   opacity: 0;
   transform-origin: 10% 55%;
 }
-.can { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 6px rgba(255, 138, 92, 0.45)); }
+.can { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(1.5px 2.5px 3px rgba(0, 0, 0, 0.4)); }
 .canBody { fill: #ff7a45; stroke: #ffd2b8; stroke-width: 1.1; }
 .canBand { fill: rgba(255, 255, 255, 0.45); }
 .canHandle,
@@ -322,51 +328,54 @@
   .scene[data-state="ready"] .eye { animation: bloom-blink 4.2s linear 0.8s infinite; }
   .scene:is([data-state="ready"], [data-state="play"], [data-state="idle"]) .float { animation: bloom-float 6s ease-in-out infinite; }
 
-  /* Act 1 (0–1.1 s): the agent tosses the seed at once, it bounces into the soil and glows. */
-  .scene[data-state="play"] .seedFall { animation: bloom-seed 1.2s linear both; }
-  .scene[data-state="play"] .seedHalo { animation: bloom-halo-out 1.2s linear both; }
-  .scene[data-state="play"] .seedSquash { animation: bloom-squash 0.55s var(--spring-soft) 0.82s both; }
-  .scene[data-state="play"] .ripple { animation: bloom-ripple 0.9s var(--out) 0.84s forwards; }
-  .scene[data-state="play"] .seedGlow { animation: bloom-seedglow 1.3s var(--out) 1s both; }
+  /* Act 1 (0–0.95 s): the agent winds up and tosses the seed, it bounces into the soil and glows. */
+  .scene[data-state="play"] .seedFall { animation: bloom-seed 0.95s linear both; }
+  .scene[data-state="play"] .seedHalo { animation: bloom-halo-out 0.95s linear both; }
+  .scene[data-state="play"] .seedSquash { animation: bloom-squash 0.45s var(--spring-soft) 0.66s both; }
+  .scene[data-state="play"] .ripple { animation: bloom-ripple 0.7s var(--out) 0.67s forwards; }
+  .scene[data-state="play"] .seedGlow { animation: bloom-seedglow 1s var(--out) 0.8s both; }
 
-  /* Act 2 (1–2.2 s): the agent leans in and waters, a stream falls, the stem draws itself, leaves unfurl. */
+  /* Act 2 (0.7–1.85 s, over the landing): the agent leans back, then in, and waters; the jet hits the
+     seed, the stem draws itself while the water still runs, leaves unfurl. */
   .scene[data-state="play"] .ghost { opacity: 1; }
-  .scene[data-state="play"] .canWrap { animation: bloom-can 6s linear both; }
-  .scene[data-state="play"] :is(.stream, .streamHalo) { animation: bloom-stream 1s linear 1.1s both; }
-  .scene[data-state="play"] .drop { animation: bloom-drop 0.46s var(--fall) calc(1.15s + var(--i) * 0.09s) both; }
-  .scene[data-state="play"] .splash { animation: bloom-splash 0.42s var(--out) 1.32s 2 both; }
-  .scene[data-state="play"] :is(.stem, .stemHalo) { animation: bloom-draw 0.95s var(--out) 1.2s both; }
-  .scene[data-state="play"] .ghostStem { animation: bloom-fade-out 0.5s var(--out) 1.6s forwards; }
-  .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.7s var(--spring) 1.5s both; }
-  .scene[data-state="play"] .leafB { animation: bloom-unfurl-b 0.7s var(--spring) 1.68s both; }
-  .scene[data-state="play"] .bud { animation: bloom-bud 0.6s var(--out) 1.68s both; }
+  .scene[data-state="play"] .canWrap { animation: bloom-can 4.8s linear both; }
+  .scene[data-state="play"] :is(.stream, .streamCore, .streamHalo) { animation: bloom-stream 0.95s linear 0.86s both; }
+  .scene[data-state="play"] .drop { animation: bloom-drop 0.4s var(--fall) calc(0.92s + var(--i) * 0.11s) both; }
+  .scene[data-state="play"] .splash { animation: bloom-splash 0.5s var(--out) 1.04s both; }
+  .scene[data-state="play"] :is(.stem, .stemHalo) { animation: bloom-draw 0.8s var(--out) 0.98s both; }
+  .scene[data-state="play"] .ghostStem { animation: bloom-fade-out 0.4s var(--out) 1.25s forwards; }
+  .scene[data-state="play"] .leafA { animation: bloom-unfurl 0.55s var(--pop) 1.2s both; }
+  .scene[data-state="play"] .leafB { animation: bloom-unfurl-b 0.55s var(--pop) 1.34s both; }
+  .scene[data-state="play"] .bud { animation: bloom-bud 0.5s var(--out) 1.3s both; }
 
-  /* Act 3 (2.15–4 s): the map bursts open, node by node, each with a spring and a puff of sparks. */
-  .scene[data-state="play"] .rootNode { animation: bloom-node 0.85s var(--spring) var(--t-root) both; }
-  .scene[data-state="play"] .glow { animation: bloom-glow 1.6s var(--out) var(--t-root) both; }
-  .scene[data-state="play"] .edge { animation: bloom-draw 0.45s var(--out) calc(var(--t-root) + 0.3s + var(--i) * 0.18s) both; }
-  .scene[data-state="play"] .childNode { animation: bloom-node 0.75s var(--spring) calc(var(--t-child) + var(--i) * 0.18s) both; }
-  .scene[data-state="play"] .twig { animation-delay: calc(var(--t-leaf) - 0.2s + var(--i) * 0.12s); }
-  .scene[data-state="play"] .leafNode { animation: bloom-node 0.65s var(--spring) calc(var(--t-leaf) + var(--i) * 0.14s) both; }
-  .scene[data-state="play"] .ghostRoot { animation: bloom-fade-out 0.3s var(--out) var(--t-root) forwards; }
-  .scene[data-state="play"] .ghostChild { animation: bloom-fade-out 0.3s var(--out) calc(var(--t-child) + var(--i) * 0.18s) forwards; }
-  .scene[data-state="play"] .ghostLeaf { animation: bloom-fade-out 0.3s var(--out) calc(var(--t-leaf) + var(--i) * 0.14s) forwards; }
-  .scene[data-state="play"] .ghostLine:not(.ghostStem) { animation: bloom-fade-out 0.6s var(--out) calc(var(--t-root) + 0.3s) forwards; }
-  .scene[data-state="play"] .burst { animation: bloom-on 1.1s linear var(--d); }
-  .scene[data-state="play"] .ring { animation: bloom-ring 0.8s var(--out) var(--d) both; }
-  .scene[data-state="play"] .spark { animation: bloom-spark 1.1s var(--out) var(--d) both; }
+  /* Act 3 (1.72–3.3 s): the map bursts open, node by node, each with a short, strong spring. */
+  .scene[data-state="play"] .rootNode { animation: bloom-node 0.6s var(--pop) var(--t-root) both; }
+  .scene[data-state="play"] .glow { animation: bloom-glow 1.3s var(--out) var(--t-root) both; }
+  .scene[data-state="play"] .edge { animation: bloom-draw 0.38s var(--out) calc(var(--t-root) + 0.22s + var(--i) * 0.14s) both; }
+  .scene[data-state="play"] .childNode { animation: bloom-node 0.55s var(--pop) calc(var(--t-child) + var(--i) * 0.14s) both; }
+  .scene[data-state="play"] .twig { animation-delay: calc(var(--t-leaf) - 0.18s + var(--i) * 0.1s); }
+  .scene[data-state="play"] .leafNode { animation: bloom-node 0.5s var(--pop) calc(var(--t-leaf) + var(--i) * 0.12s) both; }
+  .scene[data-state="play"] .ghostRoot { animation: bloom-fade-out 0.25s var(--out) var(--t-root) forwards; }
+  .scene[data-state="play"] .ghostChild { animation: bloom-fade-out 0.25s var(--out) calc(var(--t-child) + var(--i) * 0.14s) forwards; }
+  .scene[data-state="play"] .ghostLeaf { animation: bloom-fade-out 0.25s var(--out) calc(var(--t-leaf) + var(--i) * 0.12s) forwards; }
+  .scene[data-state="play"] .ghostLine:not(.ghostStem) { animation: bloom-fade-out 0.5s var(--out) calc(var(--t-root) + 0.22s) forwards; }
+  .scene[data-state="play"] .burst { animation: bloom-on 0.9s linear var(--d); }
+  .scene[data-state="play"] .ring { animation: bloom-ring 0.65s var(--out) var(--d) both; }
+  .scene[data-state="play"] .spark { animation: bloom-spark 0.9s var(--out) var(--d) both; }
 
-  /* Act 4 (3.75–6 s): a light sweeps the finished map, one pulse runs along the branches, the agent cheers. */
-  .scene[data-state="play"] .shine { animation: bloom-shine 1.1s var(--in-out) var(--t-shine) both; }
-  .scene[data-state="play"] .flow { animation: bloom-flow 1.15s var(--in-out) calc(var(--t-shine) + var(--i) * 0.12s); }
-  .scene[data-state="play"] .flowTwig { animation-delay: calc(var(--t-shine) + 0.45s + var(--i) * 0.12s); }
-  .scene[data-state="play"] .hop { animation: bloom-hop 6s linear both; }
-  .scene[data-state="play"] .handR { animation: bloom-hand-r 6s linear both; }
-  .scene[data-state="play"] .handL { animation: bloom-hand-l 6s linear both; }
-  .scene[data-state="play"] .headAct { animation: bloom-head 6s linear both; }
-  .scene[data-state="play"] .gaze { animation: bloom-gaze 6s var(--in-out) both; }
-  .scene[data-state="play"] :is(.eyes, .mouth) { animation: bloom-hide 6s linear both; }
-  .scene[data-state="play"] :is(.joys, .grin) { animation: bloom-show 6s linear both; }
+  /* Act 4 (3–4.8 s): a light sweeps the finished map, one pulse runs along the branches, the agent cheers,
+     the stage takes the landing, the hands swing through. Calm from 4.8 s. */
+  .scene[data-state="play"] .shine { animation: bloom-shine 0.9s var(--in-out) var(--t-shine) both; }
+  .scene[data-state="play"] .flow { animation: bloom-flow 0.9s var(--in-out) calc(var(--t-shine) + var(--i) * 0.1s); }
+  .scene[data-state="play"] .flowTwig { animation-delay: calc(var(--t-shine) + 0.35s + var(--i) * 0.1s); }
+  .scene[data-state="play"] .stage { animation: bloom-thud 0.42s var(--out) 4.02s; }
+  .scene[data-state="play"] .hop { animation: bloom-hop 4.8s linear both; }
+  .scene[data-state="play"] .handR { animation: bloom-hand-r 4.8s linear both; }
+  .scene[data-state="play"] .handL { animation: bloom-hand-l 4.8s linear both; }
+  .scene[data-state="play"] .headAct { animation: bloom-head 4.8s linear both; }
+  .scene[data-state="play"] .gaze { animation: bloom-gaze 4.8s var(--in-out) both; }
+  .scene[data-state="play"] :is(.eyes, .mouth) { animation: bloom-hide 4.8s linear both; }
+  .scene[data-state="play"] :is(.joys, .grin) { animation: bloom-show 4.8s linear both; }
 }
 
 @keyframes bloom-seed {
@@ -402,16 +411,23 @@
   19.5%, 34% { opacity: 1; transform: scale(1) rotate(0deg); }
   38%, 100% { opacity: 0; transform: scale(0.2) rotate(10deg); }
 }
+/* The jet shoots out of the spout (draws in), runs, and the tail leaves the spout last. */
 @keyframes bloom-stream {
-  0% { opacity: 0; stroke-dashoffset: 0; }
-  12% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { opacity: 0; stroke-dashoffset: -0.85; }
+  0% { opacity: 1; stroke-dashoffset: 1.05; animation-timing-function: var(--out); }
+  18% { opacity: 1; stroke-dashoffset: 0; }
+  78% { opacity: 1; stroke-dashoffset: -0.5; animation-timing-function: ease-in; }
+  100% { opacity: 0; stroke-dashoffset: -1.05; }
+}
+@keyframes bloom-thud {
+  0% { transform: translateY(0) scale(1); }
+  22% { transform: translateY(0.6%) scale(1.008, 0.99); }
+  55% { transform: translateY(-0.25%) scale(0.998, 1.003); }
+  100% { transform: translateY(0) scale(1); }
 }
 @keyframes bloom-splash {
   0% { opacity: 0; transform: scale(0.4); }
-  30% { opacity: 0.8; }
-  100% { opacity: 0; transform: scale(1.5); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: scale(2.2); }
 }
 @keyframes bloom-pulse {
   0%, 100% { transform: scale(0.85); opacity: 0.75; }
@@ -457,8 +473,8 @@
   100% { opacity: 0; transform: scale(1.6); }
 }
 @keyframes bloom-node {
-  from { opacity: 0; transform: scale(0.2) rotate(-5deg); }
-  20% { opacity: 1; }
+  from { opacity: 0; transform: scale(0.15) rotate(-6deg); }
+  12% { opacity: 1; }
   to { opacity: 1; transform: scale(1) rotate(0deg); }
 }
 @keyframes bloom-glow {
@@ -487,10 +503,14 @@
   100% { opacity: 0; stroke-dashoffset: -1; }
 }
 
-/* One six-second track per avatar part, so every beat of the scene lines up. */
+/* One 4.8-second track per avatar part, so every beat of the scene lines up. */
 @keyframes bloom-hop {
-  0%, 16% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--in-out); }
-  20% { transform: translateY(0) rotate(5deg) scale(1); animation-timing-function: var(--in-out); }
+  0% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--in-out); }
+  4% { transform: translateY(0.8%) rotate(-3deg) scale(1.04, 0.96); animation-timing-function: var(--out); }
+  8% { transform: translateY(-1%) rotate(2.5deg) scale(0.98, 1.03); animation-timing-function: var(--in-out); }
+  12.5% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--in-out); }
+  16.5% { transform: translateY(0) rotate(-2.5deg) scale(1); animation-timing-function: var(--in-out); }
+  20% { transform: translateY(0) rotate(5.5deg) scale(1); animation-timing-function: var(--in-out); }
   26% { transform: translateY(0) rotate(3.5deg) scale(1); animation-timing-function: var(--in-out); }
   32% { transform: translateY(0) rotate(5.5deg) scale(1); animation-timing-function: var(--in-out); }
   38% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--out); }
@@ -500,25 +520,28 @@
   50.3%, 55.8% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--out); }
   57.8% { transform: translateY(-2.5%) rotate(0deg) scale(1); animation-timing-function: var(--in-out); }
   60.3%, 69.5% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: var(--in-out); }
-  74% { transform: translateY(1.5%) rotate(0deg) scale(1.07, 0.92); animation-timing-function: var(--out); }
-  77% { transform: translateY(-12%) rotate(0deg) scale(0.95, 1.07); animation-timing-function: var(--out); }
-  80.5% { transform: translateY(-17%) rotate(0deg) scale(1); animation-timing-function: var(--fall); }
-  84% { transform: translateY(1.5%) rotate(0deg) scale(1.09, 0.91); animation-timing-function: var(--spring-soft); }
+  74% { transform: translateY(2%) rotate(0deg) scale(1.1, 0.88); animation-timing-function: var(--out); }
+  77% { transform: translateY(-12%) rotate(0deg) scale(0.9, 1.12); animation-timing-function: var(--out); }
+  80.5% { transform: translateY(-18%) rotate(0deg) scale(1); animation-timing-function: var(--fall); }
+  84% { transform: translateY(2%) rotate(0deg) scale(1.13, 0.87); animation-timing-function: var(--spring-soft); }
   92%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
 }
 @keyframes bloom-hand-r {
   0% { transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--in-out); }
-  4% { transform: translate(-3%, 4%) rotate(12deg); animation-timing-function: var(--out); }
-  7.5% { transform: translate(9%, -9%) rotate(-18deg); animation-timing-function: var(--in-out); }
-  13%, 16% { transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--in-out); }
-  20% { transform: translate(4%, -2%) rotate(30deg); animation-timing-function: var(--in-out); }
+  4% { transform: translate(-6%, 8%) rotate(20deg); animation-timing-function: var(--out); }
+  7.5% { transform: translate(11%, -11%) rotate(-24deg); animation-timing-function: var(--in-out); }
+  10.5% { transform: translate(3%, -2%) rotate(5deg); animation-timing-function: var(--in-out); }
+  13% { transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--in-out); }
+  16.5% { transform: translate(-2%, 2%) rotate(-8deg); animation-timing-function: var(--in-out); }
+  20% { transform: translate(4%, -2%) rotate(32deg); animation-timing-function: var(--in-out); }
   26% { transform: translate(4%, -2%) rotate(24deg); animation-timing-function: var(--in-out); }
   32% { transform: translate(4%, -2%) rotate(32deg); animation-timing-function: var(--in-out); }
   38%, 72% { transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--out); }
   77% { transform: translate(5%, -22%) rotate(28deg); animation-timing-function: var(--in-out); }
   82% { transform: translate(5%, -24%) rotate(14deg); animation-timing-function: var(--in-out); }
   87% { transform: translate(5%, -22%) rotate(28deg); animation-timing-function: var(--in-out); }
-  95%, 100% { transform: translate(0, 0) rotate(0deg); }
+  94% { transform: translate(-1%, 2%) rotate(-7deg); animation-timing-function: var(--in-out); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 @keyframes bloom-hand-l {
   0%, 43.8% { transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--out); }
@@ -529,7 +552,8 @@
   77% { transform: translate(-5%, -22%) rotate(-28deg); animation-timing-function: var(--in-out); }
   82% { transform: translate(-5%, -24%) rotate(-14deg); animation-timing-function: var(--in-out); }
   87% { transform: translate(-5%, -22%) rotate(-28deg); animation-timing-function: var(--in-out); }
-  95%, 100% { transform: translate(0, 0) rotate(0deg); }
+  94% { transform: translate(1%, 2%) rotate(7deg); animation-timing-function: var(--in-out); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 @keyframes bloom-head {
   0% { transform: rotate(0deg); animation-timing-function: var(--in-out); }

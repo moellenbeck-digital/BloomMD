@@ -283,7 +283,7 @@ for (const [width, height] of [[1440, 900], [768, 900], [390, 844], [667, 375]] 
       }
       return { shown, touches };
     });
-    // The can is shown for about 1.4 s, so the samples really cover the watering.
+    // The can is shown for about 1.1 s, so the samples really cover the watering.
     expect(result.shown).toBeGreaterThan(50);
     expect(result.touches).toEqual([]);
   });
@@ -336,8 +336,9 @@ test("the landing ring of the seed stays hidden until the seed lands", async ({ 
       const ring = [...node.querySelectorAll("[data-bloom-ripple]")].find((element) => element.getBoundingClientRect().width > 0)!;
       return Number(getComputedStyle(ring).opacity);
     }, ms);
-  for (const ms of [0, 300, 600, 800]) expect(await ringAt(ms)).toBe(0);
-  expect(await ringAt(900)).toBeGreaterThan(0.3);
+  // The seed lands at 0.665 s (70 % of its 0.95 s toss), the ring starts at 0.67 s.
+  for (const ms of [0, 300, 500, 640]) expect(await ringAt(ms)).toBe(0);
+  expect(await ringAt(740)).toBeGreaterThan(0.3);
 });
 
 test("reduced motion shows the finished map without a pause button", async ({ browser }) => {

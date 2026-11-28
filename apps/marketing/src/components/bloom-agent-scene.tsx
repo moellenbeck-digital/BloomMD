@@ -114,8 +114,9 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
 };
 
 /* Beats of the scene in seconds. The CSS module reads them as custom properties (--t-*), so the sparks
-   in the markup and the keyframes in the CSS keep the same timeline. The agent tracks run 6 s. */
-const T = { root: 2.15, child: 2.77, leaf: 3.37, shine: 3.75, cheer: 4.78 } as const;
+   in the markup and the keyframes in the CSS keep the same timeline. The agent tracks run 4.8 s: the scene
+   is calm before 5 s. The phases overlap (the next one starts while the last one settles). */
+const T = { root: 1.72, child: 2.2, leaf: 2.68, shine: 3, cheer: 3.82 } as const;
 const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--t-${key}`, `${value}s`])) as CSSProperties;
 
 /* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
@@ -287,7 +288,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
       <ellipse cx={g.W / 2} cy={ground + 4} rx={g.W * 0.48} ry={kind === "wide" ? 40 : 28} fill={`url(#${id("soil")})`} />
       <path d={`M${g.W * 0.03} ${ground + 0.5} H${g.W * 0.97}`} stroke={`url(#${id("ground")})`} className={styles.ground} />
 
-      <ellipse cx={layout.avatar.x + layout.avatar.w * 0.52} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
+      <ellipse cx={layout.avatar.x + layout.avatar.w * 0.6} cy={ground + 3} rx={layout.avatar.w * 0.3} ry={4 * s} className={styles.shadow} />
       <ellipse cx={g.seed.x} cy={ground + 1} rx={24 * s} ry={4.5 * s} className={styles.soil} />
       <circle cx={g.seed.x} cy={g.seed.y - 3} r={30 * s} fill={`url(#${id("seedglow")})`} className={styles.seedGlow} />
       {live ? <ellipse cx={g.seed.x} cy={ground} rx={20 * s} ry={5 * s} className={styles.ripple} data-bloom-ripple /> : null}
@@ -329,16 +330,9 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         </g>
       ))}
 
-      {/* Sparks sit behind the nodes, so they never cover a title. Only the root gets a ring. */}
-      {live ? (
-        <>
-          <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={10} rise={1.2} scale={spark} ring />
-          <Sparks x={child.cx[0]} y={g.childTop + 4} delay={T.child + 0.04} scale={spark} />
-          <Sparks x={child.cx[1]} y={g.childTop + 4} delay={T.child + 0.22} scale={spark} />
-          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[0] - 8} delay={T.leaf + 0.04} count={6} rise={0.8} scale={spark} />
-          <Sparks x={leaf.x + g.leafW / 2} y={leaf.cy[1] - 8} delay={T.leaf + 0.18} count={6} rise={0.8} scale={spark} />
-        </>
-      ) : null}
+      {/* Sparks only at the two key moments: the root bursts open (behind the node, with one ring) and the
+          cheer. The children and leaves pop with a spring alone, so the stage stays clean. */}
+      {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={6} rise={1.2} scale={spark} ring /> : null}
 
       <g className={styles.rootNode} data-bloom-node="root">
         <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
@@ -389,8 +383,9 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
       {live ? (
         <g data-bloom-water>
           <path d={stream} pathLength={1} className={styles.streamHalo} />
+          <path d={stream} pathLength={1} className={styles.streamCore} />
           <path d={stream} pathLength={1} className={styles.stream} />
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+          {[0, 1, 2, 3, 4].map((index) => (
             <g key={index} transform={`translate(${r1(g.drop.x + ((index % 3) - 1) * 2 * s)} ${r1(g.drop.y)})`}>
               <g className={styles.drop} style={{ "--i": index } as CSSProperties}>
                 <path d="M0 -3.4 C1.8 -0.6 2.4 0.6 2.4 1.4 a2.4 2.4 0 0 1 -4.8 0 C-2.4 0.6 -1.8 -0.6 0 -3.4 z" transform={`scale(${r1(s * (index % 2 ? 1.2 : 1.5))})`} />
@@ -408,7 +403,7 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
         </g>
       </g>
       {/* Above the head (clear of the antenna) at the top of the jump. */}
-      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.3} delay={T.cheer} count={9} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
+      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.3} delay={T.cheer} count={5} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
     </svg>
   );
 }

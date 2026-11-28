@@ -27,6 +27,7 @@ import {
 import { SiteHeader } from "../../components/v2/site-header";
 import { HeroIntro } from "../../components/v2/hero-intro";
 import { HeroTrieb } from "../../components/v2/hero-trieb";
+import { SplitDemo } from "../../components/v2/split-demo";
 import { getBuildInfo } from "../../lib/build-info";
 import { publicAppUrl } from "../../lib/deployment";
 import { trackPlausibleEvent } from "../../lib/plausible";
@@ -411,52 +412,6 @@ function TemplatesSection() {
   );
 }
 
-function ProductProofSection() {
-  return (
-    <section className="border-y border-[#E8E4DF] bg-white">
-      <div className="mx-auto grid max-w-7xl gap-8 px-5 py-16 lg:grid-cols-[0.82fr_1.18fr] lg:items-center lg:py-20">
-        <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Text becomes space</p>
-          <h2 className="text-3xl font-semibold sm:text-4xl">Markdown turns into a navigable workspace.</h2>
-          <p className="mt-4 text-lg leading-8 text-[#666666]">
-            The M1 proof is intentionally concrete: real product recordings, local files and desktop beta builds for macOS and Omarchy/Linux, alongside private web access.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Link href="/demo?lang=en" className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-[#B94316] px-4 text-sm font-semibold text-white hover:bg-[#963311] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/25">
-              Open the demo
-              <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-            <Link href="/templates?lang=en" className="inline-flex h-11 items-center justify-center rounded-md border border-[#D4CFC8] px-4 text-sm font-semibold text-[#1A1A1A] hover:bg-[#F2F0ED] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20">
-              Browse templates
-            </Link>
-          </div>
-        </div>
-        <div className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4 shadow-sm">
-          <video
-            className="aspect-video w-full rounded-md border border-[#E8E4DF] bg-white object-cover"
-            src="/demo-branch-drag-markdown.webm"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            aria-label="Real BloomMD recording: a branch is moved and the Markdown structure updates."
-            data-testid="english-branch-drag-demo-video"
-          />
-          <div className="mt-4 grid gap-3 text-sm text-[#666666] sm:grid-cols-3">
-            {["Real recording", "Branch moved", "Markdown updated"].map((item) => (
-              <div key={item} className="flex items-center gap-2 rounded-md border border-[#E8E4DF] bg-white px-3 py-2">
-                <Check size={15} className="text-[#FF6B35]" aria-hidden="true" />
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function FeatureSection() {
   return (
     <section className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
@@ -800,7 +755,7 @@ export function EnglishLandingPage() {
       />
       <HeroTrieb locale="en" markdown={heroMarkdown} intro={<HeroIntro locale="en" onDemo={() => trackPlausibleEvent("demo_click")} />} />
 
-      <ProductProofSection />
+      <SplitDemo locale="en" />
       <AgentWorkflowSection locale="en" />
       <KnowledgeVisionSection locale="en" />
 

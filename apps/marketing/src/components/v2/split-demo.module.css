@@ -37,6 +37,8 @@
 }
 .control:active { transform: scale(0.96); }
 
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin-top: 1.5rem; }
+
 /* Three proofs resting on one shoot. Narrow: the shoot runs down the left edge. */
 .proof { position: relative; display: grid; gap: 1rem; margin-top: 2rem; padding-left: 2.25rem; list-style: none; }
 .proof::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 12px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%); transform-origin: top; }

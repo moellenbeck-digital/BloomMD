@@ -118,8 +118,14 @@
   .wide .map { max-width: max(53rem, calc((100svh - 29rem) * 968 / 466)); }
   .narrow { display: none; }
   .inspector { max-width: 22rem; }
-  .map .inspector { position: absolute; left: 64%; top: 16%; width: 36%; }
+  .map .inspector { position: absolute; left: 64%; top: 16%; width: 36%; line-height: 1.38; }
+  /* Clear of the node below also on the smaller map of a 900 px high screen. */
+  .map .inspector ul { margin-top: 0.25rem; }
   .map .inspector::before { content: ""; position: absolute; right: calc(100% + 0.5rem); top: 2.25rem; width: 1.5rem; height: 1px; background: var(--bmd-bark); }
+}
+
+@media (min-width: 1180px) and (max-width: 1319.98px) {
+  .map .inspector { top: 14%; font-size: 0.875rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

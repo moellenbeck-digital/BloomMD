@@ -120,7 +120,7 @@ const LAYOUTS: Record<"wide" | "tall", Layout> = {
 /* Beats of the scene in seconds. The CSS module reads them as custom properties (--t-*), so the sparks
    in the markup and the keyframes in the CSS keep the same timeline. The agent tracks run 4.8 s: the scene
    is calm before 5 s. The phases overlap (the next one starts while the last one settles). */
-const T = { root: 1.72, child: 2.2, leaf: 2.68, shine: 3, cheer: 3.82 } as const;
+const T = { root: 1.72, child: 2.2, leaf: 2.68, flow: 3 } as const;
 const timeline = Object.fromEntries(Object.entries(T).map(([key, value]) => [`--t-${key}`, `${value}s`])) as CSSProperties;
 
 /* Avatar geometry: 200 × 261. Spout tip of the tilted can and the toss point, as a share of the avatar box. */
@@ -310,6 +310,18 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <stop offset="0.7" stopColor="#fff" stopOpacity="0.1" />
           <stop offset="1" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
+        {/* Material: one light from the top left (as on the card). A bright inner top edge where the light
+            catches the pill, fading out by the middle, and a faint sheen on the root only. */}
+        <linearGradient id={id("rim")} x1="0" x2="0.25" y1="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.5" />
+          <stop offset="0.42" stopColor="#fff" stopOpacity="0.06" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={id("sheen")} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.16" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0.03" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
         <linearGradient id={id("root")} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stopColor="#FF9364" />
           <stop offset="1" stopColor="#F2561F" />
@@ -382,8 +394,6 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         </g>
       ))}
 
-      {/* Sparks only at the two key moments: the root bursts open (behind the node, with one ring) and the
-          cheer. The children and leaves pop with a spring alone, so the stage stays clean. */}
       {/* The root opens with its ring and its petals (see Petals below), no confetti sparks. */}
       {live ? <Sparks x={root.cx} y={g.rootY} delay={T.root + 0.02} count={0} rise={1.2} scale={spark} ring /> : null}
 
@@ -391,7 +401,8 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
       <g className={styles.rootNode} data-bloom-node="root">
         <g className={styles.pop}>
         <rect x={g.rootX} y={g.rootY} width={g.rootW} height={root.h} rx={root.h / 2} fill={`url(#${id("root")})`} className={styles.rootRect} />
-        <rect x={g.rootX + 1} y={g.rootY + 1} width={g.rootW - 2} height={root.h - 2} rx={root.h / 2 - 1} className={styles.rootRim} />
+        <rect x={g.rootX + 1} y={g.rootY + 1} width={g.rootW - 2} height={root.h - 2} rx={root.h / 2 - 1} stroke={`url(#${id("rim")})`} className={styles.rootRim} />
+        <rect x={g.rootX + 3} y={g.rootY + 1.5} width={g.rootW - 6} height={root.h - 3} rx={root.h / 2 - 1.5} fill={`url(#${id("sheen")})`} className={styles.sheen} />
         <text x={root.cx} y={root.cy + root.font * 0.36} textAnchor="middle" className={styles.rootTitle} style={{ fontSize: root.font }}>
           <tspan className={styles.rootMark} style={{ fontSize: root.font * 0.78 }}>#</tspan>
           <tspan dx={g.markGap(root.font)} data-bloom-title>{map.root}</tspan>
@@ -408,6 +419,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
           <g className={styles.childNode} style={{ "--i": index, "--o": kind === "wide" ? (index === 0 ? "100% 50%" : "0% 50%") : "50% 0%" } as CSSProperties} data-bloom-node="child">
             <g className={styles.pop}>
             <rect x={cx - w / 2} y={g.childTop} width={w} height={child.h} rx={child.h / 2} fill={`url(#${id("child")})`} className={styles.childRect} />
+            <rect x={cx - w / 2 + 1} y={g.childTop + 1} width={w - 2} height={child.h - 2} rx={child.h / 2 - 1} stroke={`url(#${id("rim")})`} className={styles.rim} />
             <text x={cx} y={child.cy + child.font * 0.36} textAnchor="middle" className={styles.childTitle} style={{ fontSize: child.font }}>
               <tspan className={styles.childMark} style={{ fontSize: child.font * 0.72 }}>##</tspan>
               <tspan dx={g.markGap(child.font)} data-bloom-title>{map.children[index]}</tspan>
@@ -424,6 +436,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
         <g className={styles.leafNode} style={{ "--i": index } as CSSProperties} data-bloom-node="leaf">
           <g className={styles.pop}>
           <rect x={leaf.x} y={cy - leaf.h / 2} width={g.leafW} height={leaf.h} rx={leaf.h / 2} fill={`url(#${id("leaf")})`} className={styles.leafRect} />
+          <rect x={leaf.x + 1} y={cy - leaf.h / 2 + 1} width={g.leafW - 2} height={leaf.h - 2} rx={leaf.h / 2 - 1} stroke={`url(#${id("rim")})`} className={`${styles.rim} ${styles.rimLeaf}`} />
           <circle cx={leaf.x + g.dot.x} cy={cy} r={kind === "wide" ? 4.2 : 3.4} className={styles.leafDot} />
           <text x={leaf.x + g.dot.x + g.dot.gap} y={cy + leaf.font * 0.35} className={styles.leafTitle} style={{ fontSize: leaf.font }}>
             <tspan data-bloom-title>{map.leaves[index]}</tspan>
@@ -438,7 +451,7 @@ function MapBack({ kind, locale, live }: { kind: "wide" | "tall"; locale: Locale
   );
 }
 
-/* In front of the agent: the water, the seed and the cheer sparks. Water and sparks only with motion. */
+/* In front of the agent: the water and the seed. Water only with motion. */
 function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
   const layout = LAYOUTS[kind];
   const g = geometry(layout, "de");
@@ -470,8 +483,6 @@ function MapFront({ kind, live }: { kind: "wide" | "tall"; live: boolean }) {
           <ellipse cx={g.seed.x - 1.6 * s} cy={g.seed.y - 7 * s} rx={1.6 * s} ry={2.2 * s} className={styles.seedShine} />
         </g>
       </g>
-      {/* Above the head (clear of the antenna) at the top of the jump. */}
-      {live ? <Sparks x={layout.avatar.x + layout.avatar.w * 0.55} y={g.avY - g.avH * 0.3} delay={T.cheer} count={5} spread={2.2} rise={1.1} scale={layout.spark} /> : null}
     </svg>
   );
 }
@@ -747,7 +758,6 @@ export function BloomAgentScene({ locale }: { locale: Locale }) {
         <div className={styles.art} role="img" aria-label={t.label}>
           <MapBack kind="wide" locale={locale} live={live} />
           <MapBack kind="tall" locale={locale} live={live} />
-          {live ? <div className={styles.shine} aria-hidden="true" /> : null}
         </div>
 
         <button type="button" className={styles.avatar} style={avatarVars} aria-label={t.agent} disabled={!hydrated} onClick={pokeAgent} data-testid="bloom-agent-avatar">

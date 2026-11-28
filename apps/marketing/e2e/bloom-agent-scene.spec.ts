@@ -302,7 +302,8 @@ for (const locale of locales) {
     await finishScene(page);
     const stage = (await page.getByTestId("bloom-agent-stage").boundingBox())!;
     for (const leaf of await visibleNodes(page, "[data-bloom-node='leaf']").all()) {
-      const box = (await leaf.locator("rect").boundingBox())!;
+      // The first rect is the pill; the second is its inner light edge.
+      const box = (await leaf.locator("rect").first().boundingBox())!;
       expect(stage.x + stage.width - (box.x + box.width)).toBeGreaterThanOrEqual(8);
     }
     // Most of each twig runs outside every node pill, so the branch to the leaf is not hidden behind one.

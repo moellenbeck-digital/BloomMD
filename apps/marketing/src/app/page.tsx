@@ -16,6 +16,7 @@ import { SplitDemo } from "../components/v2/split-demo";
 import { TemplatesTrieb } from "../components/v2/templates-trieb";
 import { UseCaseTrieb } from "../components/v2/use-case-trieb";
 import { FaqTrieb } from "../components/v2/faq-trieb";
+import { RegisterTrieb } from "../components/v2/register-trieb";
 import { AgentHull } from "../components/v2/agent-hull";
 import tokens from "../components/v2/tokens.module.css";
 import { getBuildInfo } from "../lib/build-info";
@@ -805,28 +806,13 @@ export default function LandingPage() {
       <FaqTrieb items={faqItems} kicker="FAQ" title="Kurze Antworten zu Dateien, Sync und Lizenz." />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}
-      <section id="beta" className="scroll-mt-24 border-t border-[#E8E4DF] bg-[#FAF8F5]">
-        <div className="mx-auto max-w-7xl px-5 py-14">
-          <h2 className="text-3xl font-semibold text-[#1A1A1A]">Jetzt registrieren</h2>
-          <p className="mt-3 max-w-2xl text-[#514C46]">
-            Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an,
-            ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto
-            lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin
-            brauchen kein Konto.
-          </p>
-          <div className="mt-6">
-            <a
-              href={appSignupUrl}
-              data-testid="signup-cta"
-              onClick={() => trackPlausibleEvent("signup_click")}
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-[#C94317] px-5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(201,67,23,0.18)] transition hover:bg-[#A93612] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/35"
-            >
-              Jetzt registrieren
-              <ArrowRight size={17} aria-hidden="true" />
-            </a>
-          </div>
-        </div>
-      </section>
+      <RegisterTrieb
+        title="Jetzt registrieren"
+        text="Für BloomMD Web, Cloud-Workspaces, Sync und Zusammenarbeit legst du dir einen kostenlosen Testaccount an, ohne Einladung und ohne Warteliste. Er gilt 30 Tage ab E-Mail-Bestätigung; nach Ablauf bleibt dein Konto lesbar und der Export möglich, nichts geht verloren. Demo, lokale Desktop-Builds und das Obsidian-Plugin brauchen kein Konto."
+        action="Jetzt registrieren"
+        href={appSignupUrl}
+        onSignup={() => trackPlausibleEvent("signup_click")}
+      />
 
       <footer className="bg-[#171513] text-white">
         <div className="mx-auto max-w-7xl border-t border-white/10 px-5 py-10">

@@ -1,0 +1,14 @@
+.section { padding-block: 3.5rem 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); scroll-margin-top: 6rem; }
+/* The shoot runs down beside the words and ends at the action. */
+.body { position: relative; padding-left: 2.5rem; }
+.body::before { content: ""; position: absolute; left: 0; top: 0; bottom: 1.5rem; width: 14px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 0, 62% 100%, 38% 100%); }
+.body::after { content: ""; position: absolute; left: 7px; bottom: calc(1.5rem - 3px); width: 1.5rem; height: 6px; background: var(--bmd-bloom); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); }
+.title { margin-top: 0.25rem; }
+.text { max-width: 40rem; margin-top: 1rem; }
+.action { margin-top: 1.75rem; }
+
+@media (min-width: 1180px) {
+  .section { padding-block: 5.5rem; }
+  .body { padding-left: 4rem; }
+  .body::after { width: 3rem; }
+}

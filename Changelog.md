@@ -2,6 +2,8 @@
 
 ## In Entwicklung
 
+## [Web-App 0.7.0-develop.10, Marketing 0.7.0-develop.10, Sync 0.7.0-develop.10, Wiki-CLI 0.7.0-develop.10] - 2026-11-28
+
 - Learnings-Suche (Ticket 434): `agent search --include-stale` nennt bei einem ersetzten Learning (`status: ersetzt`) den Nachfolger direkt im Treffer (`replaced_by`). Treffer ohne Nachfolger haben das Feld nicht; `agent read` und die übrigen Felder bleiben unverändert.
 - Learnings search (ticket 434): `agent search --include-stale` now shows the successor of a replaced learning (`status: ersetzt`) in the hit itself (`replaced_by`). Hits without a successor have no such field; `agent read` and the other fields are unchanged.
 

@@ -38,7 +38,8 @@
 .line { display: block; padding-left: 2ch; text-indent: -2ch; transition: color 150ms ease; }
 .line[data-heading] { color: var(--bmd-ink); }
 .line[data-lit] { color: var(--bmd-bloom-hi); }
-.status { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin-top: 0.75rem; font-size: 0.8125rem; }
+.status kbd { min-width: 1.75rem; padding-inline: 0.375rem; border: 1px solid var(--bmd-bark); border-radius: var(--bmd-radius); font: inherit; line-height: 1.5; text-align: center; }
 
 .mapwrap { position: relative; min-width: 0; }
 .map { position: relative; container-type: inline-size; max-width: 28rem; aspect-ratio: var(--an); }

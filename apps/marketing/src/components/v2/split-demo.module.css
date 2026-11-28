@@ -56,6 +56,7 @@
   .section { padding-block: 0.75rem 4.5rem; }
   .title { white-space: nowrap; }
   .board { grid-template-columns: 22rem minmax(0, 1fr); gap: 3rem; }
+  .board[data-solo] { grid-template-columns: minmax(0, 60rem); }
 }
 
 @media (hover: hover) and (pointer: fine) {

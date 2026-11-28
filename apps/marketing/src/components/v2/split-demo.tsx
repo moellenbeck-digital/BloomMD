@@ -36,6 +36,8 @@ const copy = {
     testId: "branch-drag-demo-video",
     pause: "Aufnahme anhalten",
     play: "Aufnahme abspielen",
+    /* The source file beside the recording; the earlier /en page showed the recording alone. */
+    sourceFile: true,
     actions: [] as readonly { label: string; href: string }[],
   },
   en: {
@@ -47,6 +49,7 @@ const copy = {
     testId: "english-branch-drag-demo-video",
     pause: "Pause recording",
     play: "Play recording",
+    sourceFile: false,
     actions: [
       { label: "Open the demo", href: "/demo?lang=en" },
       { label: "Browse templates", href: "/templates?lang=en" },
@@ -116,15 +119,17 @@ export function SplitDemo({ locale = "de" }: { locale?: MarketingLocale }) {
         <p className={t.kicker}>{c.kicker}</p>
         <h2 id="demo-title" className={styles.title}>{c.title}</h2>
         <p className={`${t.lede} ${styles.lede}`}>{c.lede}</p>
-        <div className={styles.board}>
-          <div className={styles.file}>
-            <p className={styles.filename}>research-plan.md <span>Markdown</span></p>
-            <pre>
-              {source.split("\n").map((line, index) => (
-                <span key={index} data-heading={line.startsWith("#") || undefined}>{`${line}\n`}</span>
-              ))}
-            </pre>
-          </div>
+        <div className={styles.board} data-solo={!c.sourceFile || undefined}>
+          {c.sourceFile && (
+            <div className={styles.file}>
+              <p className={styles.filename}>research-plan.md <span>Markdown</span></p>
+              <pre>
+                {source.split("\n").map((line, index) => (
+                  <span key={index} data-heading={line.startsWith("#") || undefined}>{`${line}\n`}</span>
+                ))}
+              </pre>
+            </div>
+          )}
           <DemoVideo c={c} />
         </div>
         <ul ref={view} className={styles.proof} data-grow={grow}>

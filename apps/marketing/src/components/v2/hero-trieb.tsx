@@ -15,6 +15,8 @@ const copy = {
     anchor: "produkt",
     source: "Quelle",
     saved: "lokal gespeichert",
+    /* Key hints of the example workspace; the earlier /en page had none. */
+    keys: ["?", "⌘S"] as readonly string[],
     note: "Der ausgewählte Abschnitt bleibt editierbar, während seine Position in der Map sichtbar ist.",
     facts: ["Markdown bleibt Quelle", "Node ist fokussiert", "Änderung speichert zurück"],
     /* Accessible name of a word; without one the heading itself names the button. */
@@ -24,6 +26,7 @@ const copy = {
     anchor: "product",
     source: "Source",
     saved: "saved locally",
+    keys: [] as readonly string[],
     note: "The selected section stays editable while its place in the map remains visible.",
     facts: ["Markdown stays the source", "Node is focused", "Change writes back"],
     highlight: (): string | undefined => undefined,
@@ -187,7 +190,7 @@ export function HeroTrieb({ markdown, intro, locale = "de" }: { markdown: string
                 </span>
               ))}
             </pre>
-            <p className={styles.status}><span>?</span> <span>⌘S</span> <span>{c.saved}</span></p>
+            <p className={styles.status}>{c.keys.map((key) => <kbd key={key}>{key}</kbd>)} <span>{c.saved}</span></p>
           </div>
           <TriebMap {...map}>{inspector}</TriebMap>
         </div>

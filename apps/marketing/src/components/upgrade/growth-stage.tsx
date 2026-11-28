@@ -98,17 +98,16 @@ export interface GrowthStageProps {
   mapLabel: string;
   /** Accessible name of a heading line button. */
   lineLabel: (title: string) => string;
-  /** load: grows with the page (above the fold, CSS only). view: grows when scrolled into view. */
+  /** load: grows as soon as it renders (above the fold or after a click, CSS only). view: grows when scrolled into view. */
   trigger: "load" | "view";
-  replay?: boolean;
 }
 
 /* A Markdown file on the left, the map that grows out of it on the right. Hover or focus a heading and its
    branch lights up in both. Only transform, opacity and stroke-dashoffset move; one shot, under 3 s.
    The default styles are the final image (no JS, prefers-reduced-motion). */
-export function GrowthStage({ markdown, file, badge, mapLabel, lineLabel, trigger, replay }: GrowthStageProps) {
+export function GrowthStage({ markdown, file, badge, mapLabel, lineLabel, trigger }: GrowthStageProps) {
   const nodes = headingTree(markdown);
-  const [ref, state] = useGrowOnView<HTMLDivElement>(replay);
+  const [ref, state] = useGrowOnView<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [pinned, setPinned] = useState<number | null>(null);
   const branch = branchOf(nodes, hover ?? pinned);

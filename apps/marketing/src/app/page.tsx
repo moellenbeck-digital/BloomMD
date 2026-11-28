@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
@@ -8,6 +8,7 @@ import { AvailabilityOverview } from "../components/availability-overview";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
 import { HeroGrowth } from "../components/upgrade/hero-growth";
+import { UseCaseGrowth } from "../components/upgrade/use-case-growth";
 import { getBuildInfo } from "../lib/build-info";
 import { publicAppUrl } from "../lib/deployment";
 import { trackPlausibleEvent } from "../lib/plausible";
@@ -638,10 +639,6 @@ function WorkflowSection() {
 }
 
 function UseCasesSection() {
-  const [activeId, setActiveId] = useState(useCases[0]!.id);
-  const active = useCases.find((item) => item.id === activeId) ?? useCases[0]!;
-  const previewDocument = useMemo(() => parseFile(active.file, active.markdown), [active.file, active.markdown]);
-
   return (
     <section className="border-y border-[#E8E4DF] bg-white">
       <div className="mx-auto max-w-7xl px-5 py-16 lg:py-20">
@@ -649,42 +646,7 @@ function UseCasesSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#B64A1F]">Anwendungsfälle</p>
           <h2 className="text-3xl font-semibold sm:text-4xl">Für Wissen, das zu komplex für eine lineare Liste wird.</h2>
         </div>
-        <div className="space-y-5">
-          <div className="flex flex-wrap gap-2" role="tablist" aria-label="Anwendungsfälle">
-            {useCases.map((item) => (
-              <button
-                key={item.id}
-                id={`usecase-tab-${item.id}`}
-                type="button"
-                role="tab"
-                aria-selected={active.id === item.id}
-                aria-controls={`usecase-panel-${item.id}`}
-                onClick={() => setActiveId(item.id)}
-                className={`min-h-11 rounded-md border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#FF6B35]/20 ${
-                  active.id === item.id ? "border-[#FF6B35] bg-[#FFF4EE] text-[#1A1A1A]" : "border-[#E8E4DF] bg-[#FCFBFA] text-[#666666] hover:bg-white"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div
-            id={`usecase-panel-${active.id}`}
-            role="tabpanel"
-            aria-labelledby={`usecase-tab-${active.id}`}
-            className="rounded-lg border border-[#E8E4DF] bg-[#FCFBFA] p-4"
-          >
-            <h3 className="text-xl font-semibold">{active.heading}</h3>
-            <p className="mt-2 max-w-3xl leading-7 text-[#555555]">{active.text}</p>
-            <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-              <div className="rounded-md border border-[#E8E4DF] bg-[#1F1D1B] p-4 text-white">
-                <div className="mb-3 text-sm font-semibold">{active.file}</div>
-                <pre className="whitespace-pre-wrap font-[var(--font-mono)] text-sm leading-7 text-white/78">{active.markdown}</pre>
-              </div>
-              <MindMapPreview document={previewDocument} className="min-h-[250px]" ariaLabel={`${active.label} Markdown mind map preview`} />
-            </div>
-          </div>
-        </div>
+        <UseCaseGrowth items={useCases} label="Anwendungsfälle" />
       </div>
     </section>
   );

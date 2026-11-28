@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
    ready: below the viewport, waiting. play: one-shot growth, then the same final image. */
 export type GrowState = "end" | "ready" | "play";
 
-export function useGrowOnView<T extends Element>(replay = false) {
+export function useGrowOnView<T extends Element>() {
   const ref = useRef<T>(null);
   const [state, setState] = useState<GrowState>("end");
 
@@ -14,8 +14,8 @@ export function useGrowOnView<T extends Element>(replay = false) {
     const element = ref.current;
     if (!element || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const rect = element.getBoundingClientRect();
-    // Never hide content the visitor already reads, unless the visitor asked for it (replay).
-    if (!replay && rect.top < window.innerHeight * 0.85) return;
+    // Never hide content the visitor already reads.
+    if (rect.top < window.innerHeight * 0.85) return;
     setState("ready");
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -27,7 +27,7 @@ export function useGrowOnView<T extends Element>(replay = false) {
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [replay]);
+  }, []);
 
   return [ref, state] as const;
 }

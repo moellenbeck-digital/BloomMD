@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { parseFile } from "@bloommd/core/browser";
 import { MindMapPreview } from "@bloommd/ui";
-import { AvailabilityOverview } from "../components/availability-overview";
+import { AvailabilityTrieb } from "../components/v2/availability-trieb";
 import { AgentWorkflowSection } from "../components/agent-workflow-section";
 import { KnowledgeVisionSection } from "../components/knowledge-vision-section";
 import { bmdFonts } from "../components/v2/fonts";
@@ -833,7 +833,7 @@ export default function LandingPage() {
       <LandingPaths items={audiencePaths} />
       <UseCaseTrieb items={useCases} kicker="Anwendungsfälle" title="Für Wissen, das zu komplex für eine lineare Liste wird." />
       <TemplatesTrieb items={templateCards.slice(0, 3)} />
-      <AvailabilityOverview locale="de" />
+      <AvailabilityTrieb locale="de" />
       <FAQSection />
 
       {/* Registration replaced the waitlist; the #beta anchor stays so old links and CTAs keep working. */}

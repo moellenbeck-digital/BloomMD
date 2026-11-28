@@ -1,0 +1,34 @@
+.section { padding-block: 3.5rem 4rem; overflow: clip; border-top: 1px solid var(--bmd-soil); }
+.title { margin-top: 0.25rem; }
+.intro { max-width: 40rem; margin-top: 1rem; }
+.grid { display: grid; gap: 2.5rem; margin-top: 2.5rem; }
+
+/* One branch per state. The heading rests on it; its thickness says how far the way is open. */
+.way { min-width: 0; }
+.heading { position: relative; padding-bottom: 1.5rem; font-family: var(--bmd-display); font-weight: 500; font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.008em; text-wrap: balance; }
+.heading::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--h); background: var(--c); clip-path: polygon(0 0, 100% calc(50% - var(--tip)), 100% calc(50% + var(--tip)), 0 100%); }
+.now { --h: 15px; --tip: 3px; --c: var(--bmd-bloom); }
+.trial { --h: 8px; --tip: 1.5px; --c: var(--bmd-bark); }
+/* Open tip: the finest shoot, ending in nothing. */
+.later { --h: 4.5px; --tip: 0px; --c: var(--bmd-bark); }
+.later .heading { color: var(--bmd-ink-2); }
+
+.list { display: grid; gap: 1rem; margin-top: 1rem; list-style: none; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); }
+.text { max-width: 34rem; margin-top: 1rem; font-size: 1.0625rem; line-height: 1.6; color: var(--bmd-ink-2); text-wrap: pretty; }
+.link { font-weight: 700; color: var(--bmd-bloom-hi); text-decoration: underline; text-underline-offset: 3px; transition: color 150ms ease; }
+.action { position: relative; display: inline-flex; align-items: center; min-height: 3rem; margin-top: 0.75rem; font-size: 1.0625rem; font-weight: 700; color: var(--bmd-bloom-hi); transition: color 150ms ease, transform 100ms ease-out; }
+.action::after { content: ""; position: absolute; inset-inline: 0; bottom: 0.5rem; height: 4px; background: var(--bmd-bark-hi); clip-path: polygon(0 0, 100% 40%, 100% 60%, 0 100%); }
+.action:active { transform: scale(0.96); }
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover, .action:hover { color: var(--bmd-ink); }
+}
+
+@media (min-width: 1180px) {
+  .section { padding-block: 5.5rem; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action:active { transform: none; }
+}

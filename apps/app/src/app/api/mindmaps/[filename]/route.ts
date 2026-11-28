@@ -1,4 +1,5 @@
 import { parseFile, serializeToMarkdown } from "@bloommd/core/parser";
+import { cloudFilenameFromPath } from "@bloommd/core/agent-ledger";
 import { sanitizeMarkdownFilename } from "@bloommd/core/paths";
 import type { MindMapNode } from "@bloommd/core/types";
 import { NextResponse } from "next/server";
@@ -180,13 +181,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
       // A rename can move a map between areas: an agent needs the right to write in both.
       const gate = await agentGate(identity, current.storage.workspaceId, current.filePath);
-      const targetGate = gate ? await agentGate(identity, current.storage.workspaceId, sanitizeMarkdownFilename(newFilename)) : null;
+      // A "/" in the new name is an area ("Team/ops/x.md" becomes "Team › ops – x.md"); the rights check sees the converted name (#446).
+      const cloudName = sanitizeMarkdownFilename(cloudFilenameFromPath(newFilename));
+      const targetGate = gate ? await agentGate(identity, current.storage.workspaceId, cloudName) : null;
       const blocked = [gate, targetGate].find((entry) => entry && entry.access !== "write");
       if (blocked) return agentWriteRequiredResponse(blocked, "renaming a map");
       try {
         const renamed = await renameThroughSyncServer(current.storage.documentId, {
           filename,
-          newFilename: sanitizeMarkdownFilename(newFilename),
+          newFilename: cloudName,
           workspaceId: current.storage.workspaceId,
           userId: identity.userId,
           expectedVersion: current.storage.version,

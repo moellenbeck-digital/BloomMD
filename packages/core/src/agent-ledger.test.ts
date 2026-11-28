@@ -6,6 +6,7 @@ import {
   areaCovers,
   areaKey,
   cloudAreaOf,
+  cloudFilenameFromPath,
   normalizeAreaPath,
   vaultAreaPath,
   isVaultNotePath,
@@ -218,5 +219,31 @@ describe("outline diff", () => {
     expect(outlineDiff(MAP, NEXT)).toEqual([{ mark: "~", id: "w", title: "Wärme", level: 2 }, { mark: "+", id: "o", title: "Optik", level: 2 }]);
     expect(outlineDiff(NEXT, MAP)).toEqual([{ mark: "~", id: "w", title: "Wärme", level: 2 }, { mark: "-", id: "o", title: "Optik", level: 2 }]);
     expect(outlineDiff(null, "# Neu\n").map((line) => line.mark)).toEqual(["+"]);
+  });
+});
+
+describe("cloudFilenameFromPath (#446)", () => {
+  test("maps the segments before the last / to the cloud area spelling", () => {
+    expect(cloudFilenameFromPath("Team/ops/Übersicht.md")).toBe("Team › ops – Übersicht.md");
+    expect(cloudFilenameFromPath("Team/Übersicht.md")).toBe("Team – Übersicht.md");
+    expect(cloudFilenameFromPath("A/B/C/Titel.md")).toBe("A › B › C – Titel.md");
+  });
+
+  test("drops empty segments and edge whitespace", () => {
+    expect(cloudFilenameFromPath("/Team//ops/x.md")).toBe("Team › ops – x.md");
+    expect(cloudFilenameFromPath(" Team / ops / x.md ")).toBe("Team › ops – x.md");
+    expect(cloudFilenameFromPath("/Notiz.md")).toBe("Notiz.md");
+  });
+
+  test("keeps a name without / as it is, and one without a title", () => {
+    expect(cloudFilenameFromPath("Notiz.md")).toBe("Notiz.md");
+    expect(cloudFilenameFromPath("Team › ops – Übersicht.md")).toBe("Team › ops – Übersicht.md");
+    expect(cloudFilenameFromPath("Team/")).toBe("Team/");
+  });
+
+  test("the result is read back by cloudAreaOf", () => {
+    expect(cloudAreaOf(cloudFilenameFromPath("Team/ops/Übersicht.md"))).toBe("Team/ops");
+    expect(cloudAreaOf(cloudFilenameFromPath("Team/Übersicht.md"))).toBe("Team");
+    expect(cloudAreaOf(cloudFilenameFromPath("Notiz.md"))).toBe("");
   });
 });

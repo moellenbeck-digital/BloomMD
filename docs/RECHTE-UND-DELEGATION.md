@@ -168,6 +168,29 @@ Pfade sind relativ zum Repository, Stand `d5bfd8a`.
 | **Schreiben** (Speichern, Anlegen, Umbenennen, Löschen) | **Belegt für Agent-Tokens.** `agentGate` vor `PUT`/`PATCH`/`DELETE` (`mindmaps/[filename]/route.ts:89,182-183,244`) und `POST` (`mindmaps/route.ts:92`); beim Umbenennen werden alter und neuer Name geprüft (`:183`). Ohne Cloud-Datenbank sind Agent-Tokens für Änderungen gesperrt (`mindmap-storage.ts:175`) | Unverändert, plus Prüfung gegen die gemeinsame Grenze; Verschieben und Kopieren prüfen Quelle und Ziel |
 | **Audit** | **Teils.** Schreibvorgänge mit Agent-Token werden protokolliert (`apps/app/src/lib/agent-audit.ts:5`); Sicherheitsereignisse sind inhaltsfrei (`docs/ARCHITECTURE.md`, Abschnitt „Security Boundary“). Lesen und **abgelehnte** Zugriffe werden nicht aufgezeichnet | Jede Entscheidung (erlaubt und abgelehnt) nennt Akteur, Bereich, Aktion, Entscheidung und Zeit, ohne Inhalt, Titel und Dateinamen |
 
+### 4.1 Schreibweise der Cloud-Bereiche (`/` im Dateinamen)
+
+In der Cloud gibt es keine Ordner. Der Bereich einer Karte steckt im Dateinamen: `Bereich › Unterbereich – Titel.md`
+(Trennzeichen ` › ` zwischen den Bereichsteilen, ` – ` vor dem Titel; `CLOUD_AREA_SEPARATOR` und `cloudAreaOf` in
+`packages/core/src/agent-ledger.ts`). `Team › ops – Übersicht.md` liegt im Bereich `Team/ops`, `Team – Übersicht.md` im Bereich `Team`,
+`Notiz.md` ohne Bereich. Die Bereichsrechte eines Agenten (Abschnitt 2) hängen an diesem Bereich.
+
+**`/` wird abgebildet.** `POST /api/mindmaps` (`filename`) und `PATCH /api/mindmaps/<name>` (`newFilename`) wandeln einen Namen mit `/`
+in diese Schreibweise um, bevor sie ihn bereinigen und die Rechte prüfen (`cloudFilenameFromPath`):
+
+| Eingabe | gespeichert als | Bereich |
+| --- | --- | --- |
+| `Team/ops/Übersicht.md` | `Team › ops – Übersicht.md` | `Team/ops` |
+| `Team/Übersicht.md` | `Team – Übersicht.md` | `Team` |
+| `/Team//ops/x.md` | `Team › ops – x.md` | `Team/ops` |
+| `Notiz.md` | `Notiz.md` | – |
+
+Die Segmente vor dem letzten `/` bilden den Bereich, das letzte ist der Titel; leere Segmente und Leerraum am Rand fallen weg.
+Die Rechteprüfung (`agentGate`) läuft auf dem umgewandelten Namen: Ein Agent mit Schreibrecht nur für `Team/ops` legt
+`Team/ops/x.md` an; `Andere/x.md` beurteilt sich nach seinem Recht für `Andere`. Vorher wurde `/` stillschweigend zu `-`
+(`Team-ops-Übersicht.md`, ohne Bereich). Bestehende Karten bleiben unverändert. Gilt nur für die Cloud-API; Desktop, Sync-Server,
+Ordner-Freigabe und Vault-Pfade behandeln `/` weiter wie bisher.
+
 ## 5. Abnahmefälle
 
 Zur Übernahme in [#347](https://github.com/moellenbeck-digital/BloomMD/issues/347). Aufbau: zwei Workspaces

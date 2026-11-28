@@ -8,6 +8,7 @@ let agent = false;
 let rights: { access: "read" | "propose" | "write"; areas: Record<string, "read" | "propose" | "write"> } = { access: "write", areas: {} };
 let proposals: Array<Record<string, unknown>> = [];
 let changes: Array<Record<string, unknown>> = [];
+let createdNames: string[] = [];
 
 mock.module("../../../lib/auth", () => ({
   getApiRequestIdentity: async () => agent
@@ -56,10 +57,11 @@ mock.module("../../../lib/sync-room-status", () => ({
       this.status = status;
     }
   },
-  createThroughSyncServer: async () => {
+  createThroughSyncServer: async (input: { filename: string }) => {
     syncCreateCalls += 1;
     if (syncCreateError) throw syncCreateError;
-    return { filePath: "new.md", frontmatter: { title: "New" }, storage: { mode: "database", documentId: "33333333-3333-4333-8333-333333333333", workspaceId: "22222222-2222-4222-8222-222222222222", version: 1 } };
+    createdNames.push(input.filename);
+    return { filePath: input.filename, frontmatter: { title: "New" }, storage: { mode: "database", documentId: "33333333-3333-4333-8333-333333333333", workspaceId: "22222222-2222-4222-8222-222222222222", version: 1 } };
   },
   writeThroughSyncServer: async () => null,
   renameThroughSyncServer: async () => ({ success: true, newFilePath: "renamed.md", newFilename: "renamed.md", version: 2 }),
@@ -82,6 +84,7 @@ describe("mindmap listing route", () => {
     rights = { access: "write", areas: {} };
     proposals = [];
     changes = [];
+    createdNames = [];
     console.error = () => undefined;
   });
 
@@ -160,6 +163,27 @@ describe("mindmap listing route", () => {
     expect(await response.json()).toEqual({ mode: "proposed", proposalId: "p-1", filename: "Arbeit – Plan.md", area: "Arbeit" });
     expect(syncCreateCalls).toBe(0);
     expect(proposals).toMatchObject([{ tokenId: "tok-1", workspaceId: "22222222-2222-4222-8222-222222222222", area: "Arbeit", baseVersion: null, markdown: "# New" }]);
+  });
+
+  test("a / in the name becomes the cloud area spelling and filePath says so (#446)", async () => {
+    const nested = await create("Team/ops/Übersicht.md");
+    expect(nested.status).toBe(201);
+    expect(((await nested.json()) as { filePath: string }).filePath).toBe("Team › ops – Übersicht.md");
+    expect((await create("Team/Übersicht.md")).status).toBe(201);
+    expect((await create("/Team//ops/x.md")).status).toBe(201);
+    expect((await create("Notiz.md")).status).toBe(201);
+    expect(createdNames).toEqual(["Team › ops – Übersicht.md", "Team – Übersicht.md", "Team › ops – x.md", "Notiz.md"]);
+  });
+
+  test("the rights check of an agent runs on the converted name: Team/ops may write, Andere is judged by its own right (#446)", async () => {
+    agent = true;
+    rights = { access: "read", areas: { "Team/ops": "write", Andere: "propose" } };
+    expect((await create("Team/ops/x.md")).status).toBe(201);
+    expect(changes).toMatchObject([{ area: "Team/ops", event: "written" }]);
+    const proposed = await create("Andere/x.md");
+    expect(proposed.status).toBe(202);
+    expect(await proposed.json()).toMatchObject({ mode: "proposed", filename: "Andere – x.md", area: "Andere" });
+    expect(createdNames).toEqual(["Team › ops – x.md"]);
   });
 
   test("a read-only area refuses with the area in the message; a person is never limited", async () => {

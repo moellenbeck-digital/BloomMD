@@ -51,7 +51,8 @@ const clip = {
 
 /* near: the scene is close to the viewport. Only then the avatar image is requested, so it never competes
    with the LCP element of the page (native lazy loading starts far earlier). Without JS the image comes
-   from <noscript>, so the server render stays the complete final image. */
+   from <noscript>, so the server render stays the complete final image. Once near, the image is eager: the
+   5 s limit counts from near, and some engines start lazy images only closer to the viewport (Firefox 600 px). */
 /* onReady: called once per layer when its image is loaded and decoded (ok true) or failed (ok false), so the
    agent shows only as a whole: the face never floats without its body on a slow network or on an error. */
 function Layer({ part, near, onReady }: { part: keyof typeof clip; near: boolean; onReady?: (ok: boolean) => void }) {
@@ -61,7 +62,7 @@ function Layer({ part, near, onReady }: { part: keyof typeof clip; near: boolean
     if (!img.complete || !img.naturalWidth) return onReady(false);
     img.decode().then(() => onReady(true), () => onReady(false));
   };
-  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading="lazy" decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} onLoad={near ? done : undefined} onError={near && onReady ? () => onReady(false) : undefined} />;
+  const image = <img src={AVATAR_SRC} srcSet={AVATAR_SRCSET} sizes={AVATAR_SIZES} alt="" width={200} height={261} loading={near ? "eager" : "lazy"} decoding="async" draggable={false} className={styles.layer} style={{ clipPath: clip[part] }} onLoad={near ? done : undefined} onError={near && onReady ? () => onReady(false) : undefined} />;
   return near ? image : <noscript>{image}</noscript>;
 }
 

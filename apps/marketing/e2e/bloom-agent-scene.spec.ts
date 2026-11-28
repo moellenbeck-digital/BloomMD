@@ -599,6 +599,23 @@ test("the agent image is requested only when the scene comes close, not during t
   expect(requests.every((url) => url.includes("md-avatar-200.webp"))).toBe(true);
 });
 
+test("once the scene is near, every agent image is eager and requested, even before it is in view", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/agents/md-avatar")) requests.push(request.url());
+  });
+  await page.goto("/", { waitUntil: "load" });
+  /* loadScene: the card 200 px below the viewport, inside the near margin (600 px), outside the view. */
+  await loadScene(page);
+  const scene = page.getByTestId("bloom-agent-scene");
+  const images = page.getByTestId("bloom-agent-avatar").locator("img");
+  await expect(images).toHaveCount(4);
+  expect(await scene.evaluate((node) => node.getBoundingClientRect().top > window.innerHeight)).toBe(true);
+  expect(await images.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("loading")))).toEqual(["eager", "eager", "eager", "eager"]);
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+});
+
 test("on a slow network the face waits for the body: the agent shows and the scene starts only once the image is decoded", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   /* Fast 4G for everything, and the avatar image held back until the test releases it. */
